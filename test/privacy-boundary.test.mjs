@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
 const root = new URL('..', import.meta.url);
 const source = (path) => readFileSync(new URL(path, root), 'utf8');
+const trackedFiles = () =>
+  execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' })
+    .split('\n')
+    .filter(Boolean);
 
 const pwaApiClient = source('apps/pwa/src/services/api-client.ts');
 const pwaStore = source('apps/pwa/src/stores/app-store.ts');
@@ -32,7 +37,66 @@ const forbiddenPrivateFields = [
   'transcript',
 ];
 
+const forbiddenTrackedPathPatterns = [
+  /^\.env(?!\.example$)($|\.)/,
+  /^\.ai\/private\//,
+  /^storage\/(?!\.gitkeep$)/,
+  /(^|\/)(voice-cache|exports|generated-audio|lesson-results|teacher-memory|teacher-journal|learning-history|progress-analytics|speech-recordings|recordings|private-lessons)\//,
+  /\.(sqlite|sqlite3|db)$/i,
+];
+
+const highConfidenceSecretPatterns = [
+  /\bsk-proj-[A-Za-z0-9_-]{20,}\b/,
+  /\bsk-[A-Za-z0-9]{32,}\b/,
+  /\bghp_[A-Za-z0-9_]{30,}\b/,
+  /\bgithub_pat_[A-Za-z0-9_]{80,}\b/,
+  /\bAKIA[0-9A-Z]{16}\b/,
+  /-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----/,
+  /\b(?:api[_-]?key|secret|token|password)\s*[:=]\s*['"][^'"\s]*(?:live|prod|real)[^'"\s]*['"]/i,
+];
+
+const trackedTextFiles = () =>
+  trackedFiles().filter((path) => {
+    if (/\.(png|jpe?g|webp|ico|pdf|zip|gz)$/i.test(path)) {
+      return false;
+    }
+
+    return !path.startsWith('node_modules/');
+  });
+
 describe('privacy boundary', () => {
+  it('keeps local secrets and private learning artifacts out of version control', () => {
+    const leakedPaths = trackedFiles().filter((path) =>
+      forbiddenTrackedPathPatterns.some((pattern) => pattern.test(path)),
+    );
+
+    assert.deepEqual(
+      leakedPaths,
+      [],
+      `Tracked files must not include local secrets or private learning artifacts: ${leakedPaths.join(', ')}`,
+    );
+  });
+
+  it('does not commit high-confidence secrets in tracked text files', () => {
+    const leakedSecrets = [];
+
+    for (const path of trackedTextFiles()) {
+      const contents = source(path);
+
+      for (const pattern of highConfidenceSecretPatterns) {
+        if (pattern.test(contents)) {
+          leakedSecrets.push(`${path} matches ${pattern}`);
+        }
+      }
+    }
+
+    assert.deepEqual(
+      leakedSecrets,
+      [],
+      `Tracked source must not contain committed secrets:\n${leakedSecrets.join('\n')}`,
+    );
+  });
+
   it('synchronizes only learning evidence envelopes', () => {
     assert.match(
       pwaApiClient,
