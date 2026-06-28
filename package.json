@@ -30,8 +30,11 @@
     "prettier": "^3.3.3",
     "typescript": "^5.5.4"
   },
+  "overrides": {
+    "tsx": "4.21.0"
+  },
   "engines": {
-    "node": "20.x",
+    "node": "22.x",
     "npm": ">=10.0.0"
   }
 }

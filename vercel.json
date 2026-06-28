@@ -1,7 +1,7 @@
 {
   "buildCommand": "npm run build:pwa",
   "outputDirectory": "apps/pwa/dist/pwa",
-  "installCommand": "npm ci",
+  "installCommand": "npm install --ignore-scripts",
   "framework": null,
   "rewrites": [
     {
