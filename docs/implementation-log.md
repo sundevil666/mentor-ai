@@ -69,3 +69,38 @@ The lesson content is fixed demo content for basic English greetings and questio
 ### Future Improvements
 
 Milestone 3 should connect this loop to the PWA Start or Continue flow, capture local evidence during exercise execution, and persist progress in IndexedDB for offline recovery.
+
+## 2026-06-28 - Milestone 3: PWA Learning Surface
+
+### Summary
+
+Replaced the placeholder dashboard with the first usable learning surface. The Student can start a locally generated lesson, complete exercises, replay available audio, finish the lesson, and receive the next recommendation from the updated Student Model.
+
+The PWA persists the active lesson, Student Model, statistics, and pending synchronization events in IndexedDB so learning state can survive refresh or restart.
+
+### Files Changed
+
+- `apps/pwa/src/pages/DashboardPage.vue`
+- `apps/pwa/src/stores/app-store.ts`
+- `apps/pwa/src/services/indexed-db.ts`
+- `apps/pwa/src/css/app.scss`
+- `docs/implementation-log.md`
+
+### Architecture References
+
+- [Learning Experience](06-learning-experience.md)
+- [First Implementation](15-first-implementation.md)
+- [Learning Synchronization](10-learning-synchronization.md)
+- [Conceptual Contracts](14-contracts.md)
+
+### Lessons Learned
+
+The learning surface can stay simple when it presents only the current exercise and lets the shared domain loop decide the next teaching step. IndexedDB is enough for this first local continuity slice.
+
+### Known Limitations
+
+Synchronization is local-only. Pending events are queued but not uploaded. Speech capture is represented as typed confirmation for now; only speech synthesis playback is active.
+
+### Future Improvements
+
+Milestone 4 should expose backend endpoints for current Student state, generated lessons, synchronization, recommendations, and configuration so the PWA can submit local evidence through the API.
