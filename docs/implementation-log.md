@@ -348,3 +348,34 @@ There is no browser end-to-end test suite yet. The PWA flow was verified manuall
 ### Future Improvements
 
 Add automated browser tests for offline completion, reload recovery, synchronization, and next lesson generation once the app flow stabilizes further.
+
+## 2026-06-28 - Milestone 11: Offline Evidence Durability
+
+### Summary
+
+Hardened the PWA synchronization queue so pending offline lessons preserve the full evidence needed for backend analytics. Queued Learning Events now carry their related Exercise Results and Speech Results locally, while synchronization still sends clean Learning Events plus structured evidence arrays to the API.
+
+This protects the learning loop when a Student completes a lesson offline, starts another lesson before reconnecting, and later synchronizes delayed evidence.
+
+### Files Changed
+
+- `apps/pwa/src/stores/app-store.ts`
+- `docs/implementation-log.md`
+
+### Architecture References
+
+- [Learning Synchronization](10-learning-synchronization.md)
+- [Learning Analytics](09-learning-analytics.md)
+- [First Implementation](15-first-implementation.md)
+
+### Lessons Learned
+
+Offline continuity depends on preserving evidence as a durable bundle, not only preserving event identifiers. Analytics should not depend on whichever lesson session is currently active in the UI.
+
+### Known Limitations
+
+The PWA still lacks automated browser tests for offline completion, reload recovery, and later synchronization. Older queued entries without embedded evidence fall back to the active session when available.
+
+### Future Improvements
+
+Add a dedicated synchronization batch store with per-session acknowledgement metadata and browser end-to-end coverage for offline-to-online recovery.

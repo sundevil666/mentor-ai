@@ -38,6 +38,12 @@ interface LearningSessionState {
   completedAt?: string;
 }
 
+type QueuedLearningEvent = LearningEvent & {
+  status: string;
+  exerciseResults?: ExerciseResult[];
+  speechResults?: SpeechResult[];
+};
+
 interface AppState {
   storageMode: StorageMode;
   isOfflineReady: boolean;
@@ -272,7 +278,12 @@ export const useAppStore = defineStore('app', {
       const db = await mentorDb;
 
       for (const event of this.session.events) {
-        await db.put('sync-queue', { ...event, status: 'pending' });
+        await db.put('sync-queue', {
+          ...event,
+          status: 'pending',
+          exerciseResults: this.session.results,
+          speechResults: this.session.speechResults,
+        });
       }
 
       const queuedEvents = await db.getAll('sync-queue');
@@ -282,7 +293,7 @@ export const useAppStore = defineStore('app', {
     async syncPendingEvents() {
       const db = await mentorDb;
       const queuedEvents = await db.getAll('sync-queue');
-      const pendingEvents = queuedEvents.filter((event) => event.status === 'pending') as Array<LearningEvent & { status: string }>;
+      const pendingEvents = queuedEvents.filter((event) => event.status === 'pending') as QueuedLearningEvent[];
 
       if (pendingEvents.length === 0) {
         this.pendingSyncEvents = 0;
@@ -291,9 +302,9 @@ export const useAppStore = defineStore('app', {
 
       try {
         const result = await synchronizeLearningEvidence(
-          pendingEvents,
-          this.session?.results ?? [],
-          this.session?.speechResults ?? [],
+          pendingEvents.map(toLearningEvent),
+          collectExerciseResults(pendingEvents, this.session?.results),
+          collectSpeechResults(pendingEvents, this.session?.speechResults),
         );
 
         for (const acknowledgement of result.acknowledgements) {
@@ -384,6 +395,31 @@ function createSpeechResult(
     speechDetected,
     responseStartDelayMs,
     completedAt,
+  };
+}
+
+function collectExerciseResults(events: QueuedLearningEvent[], fallbackResults: ExerciseResult[] = []): ExerciseResult[] {
+  return uniqueById(events.flatMap((event) => event.exerciseResults ?? fallbackResults));
+}
+
+function collectSpeechResults(events: QueuedLearningEvent[], fallbackResults: SpeechResult[] = []): SpeechResult[] {
+  return uniqueById(events.flatMap((event) => event.speechResults ?? fallbackResults));
+}
+
+function uniqueById<T extends { id: string }>(items: T[]): T[] {
+  return Array.from(new Map(items.map((item) => [item.id, item])).values());
+}
+
+function toLearningEvent(event: QueuedLearningEvent): LearningEvent {
+  return {
+    id: event.id,
+    studentId: event.studentId,
+    sessionId: event.sessionId,
+    lessonId: event.lessonId,
+    exerciseId: event.exerciseId,
+    type: event.type,
+    occurredAt: event.occurredAt,
+    data: event.data,
   };
 }
 
