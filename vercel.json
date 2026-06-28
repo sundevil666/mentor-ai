@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build:pwa",
+  "buildCommand": "npm run build:vercel",
   "outputDirectory": "apps/pwa/dist/pwa",
   "installCommand": "npm install --ignore-scripts",
   "framework": null,

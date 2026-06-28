@@ -12,6 +12,7 @@
     "dev:pwa": "npm run dev --workspace @mentor-ai/pwa",
     "dev:api": "npm run dev --workspace @mentor-ai/api",
     "build": "npm run build --workspaces",
+    "build:vercel": "npm run build --workspace @mentor-ai/shared && npm run build:pwa",
     "build:pwa": "npm run build --workspace @mentor-ai/pwa",
     "build:api": "npm run build --workspace @mentor-ai/api",
     "lint": "npm run lint --workspaces",
