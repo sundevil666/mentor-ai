@@ -16,6 +16,8 @@
     "build:api": "npm run build --workspace @mentor-ai/api",
     "lint": "npm run lint --workspaces",
     "test": "npm test --workspaces --if-present",
+    "test:privacy": "node --test test/privacy-boundary.test.mjs",
+    "precommit": "npm run test:privacy",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
     "format": "prettier --write .",
     "typecheck": "npm run typecheck --workspaces"

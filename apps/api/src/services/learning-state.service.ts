@@ -57,22 +57,26 @@ export const learningStateService = {
     const acceptedSpeechResultIds = new Set(state.speechResults.map((result) => result.id));
     const acknowledgements: SynchronizationAcknowledgement[] = [];
     const newEvents: LearningEvent[] = [];
-    const newResults = exerciseResults.filter((result) => {
-      if (acceptedResultIds.has(result.id) || result.studentId !== state.student.id) {
-        return false;
-      }
+    const newResults = exerciseResults
+      .filter((result) => {
+        if (acceptedResultIds.has(result.id) || result.studentId !== state.student.id) {
+          return false;
+        }
 
-      acceptedResultIds.add(result.id);
-      return true;
-    });
-    const newSpeechResults = speechResults.filter((result) => {
-      if (acceptedSpeechResultIds.has(result.id) || result.studentId !== state.student.id) {
-        return false;
-      }
+        acceptedResultIds.add(result.id);
+        return true;
+      })
+      .map(sanitizeExerciseResult);
+    const newSpeechResults = speechResults
+      .filter((result) => {
+        if (acceptedSpeechResultIds.has(result.id) || result.studentId !== state.student.id) {
+          return false;
+        }
 
-      acceptedSpeechResultIds.add(result.id);
-      return true;
-    });
+        acceptedSpeechResultIds.add(result.id);
+        return true;
+      })
+      .map(sanitizeSpeechResult);
 
     for (const event of events) {
       const status = validateLearningEvent(event, state.student.id, acceptedEventIds);
@@ -84,7 +88,7 @@ export const learningStateService = {
 
       if (status === 'accepted') {
         acceptedEventIds.add(event.id);
-        newEvents.push(event);
+        newEvents.push(sanitizeLearningEvent(event));
       }
     }
 
@@ -153,6 +157,31 @@ function validateLearningEvent(event: LearningEvent, studentId: string, accepted
   }
 
   return 'accepted';
+}
+
+function sanitizeLearningEvent(event: LearningEvent): LearningEvent {
+  const { data: _data, ...safeEvent } = event;
+  return safeEvent;
+}
+
+function sanitizeExerciseResult(result: ExerciseResult): ExerciseResult {
+  const { response: _response, ...safeResult } = result as ExerciseResult & { response?: unknown };
+  return safeResult;
+}
+
+function sanitizeSpeechResult(result: SpeechResult): SpeechResult {
+  const {
+    rawAudio: _rawAudio,
+    recording: _recording,
+    transcript: _transcript,
+    ...safeResult
+  } = result as SpeechResult & {
+    rawAudio?: unknown;
+    recording?: unknown;
+    transcript?: unknown;
+  };
+
+  return safeResult;
 }
 
 function defaultLearningContext(): LearningContext {

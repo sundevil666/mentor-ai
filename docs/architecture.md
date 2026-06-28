@@ -12,7 +12,9 @@ Mentor AI is split into app workspaces and shared packages.
 
 `demo` mode reads committed fixture data for public examples.
 
-`personal` mode reads and writes only inside `storage/`, which is ignored by Git.
+`personal` mode reads and writes local real learning data only inside `.ai/private/`, which is ignored by Git, or to a private production database through environment-provided credentials such as `DATABASE_URL`.
+
+`storage/` is a legacy placeholder only. It must not be documented or used as the location for real lessons, Teacher Memory, Teacher Journal, learning history, recommendations, speech results, recordings, generated personal lessons, or Student Model state.
 
 ## Future Boundaries
 

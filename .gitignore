@@ -13,9 +13,8 @@ dist/
 storage/*
 !storage/.gitkeep
 
-.env
-.env.local
-.env.*.local
+.env*
+!.env.example
 *.sqlite
 *.sqlite3
 *.db

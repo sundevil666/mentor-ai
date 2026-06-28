@@ -117,7 +117,6 @@ export const useAppStore = defineStore('app', {
         exercise.id,
         'exercise-finished',
         submittedAt,
-        { response },
       );
       const result = createExerciseResult(
         this.session.id,
@@ -360,7 +359,6 @@ function createExerciseResult(
     exerciseId: exercise.id,
     exerciseType: exercise.type,
     targetSkill: exercise.targetSkill,
-    response,
     correct: scoreExercise(exercise, response),
     attempts: 1,
     responseTimeMs,

@@ -111,7 +111,7 @@ Milestone 4 should expose backend endpoints for current Student state, generated
 
 Added the first backend resource layer for the Version 1 learning loop. The API now exposes current Student state, the current Generated Lesson, Recommendations, configuration, and a synchronization endpoint that accepts delayed Learning Events with idempotent acknowledgements.
 
-Storage is file-backed for personal mode under `storage/` and artificial in-memory demo state for demo mode. The backend remains a workflow coordinator and uses the shared domain functions for Lesson Plan and Generated Lesson creation.
+Storage is file-backed for personal mode under `.ai/private/` for private local development and artificial in-memory demo state for demo mode. Production personal mode must write to a private database through environment-provided credentials. The backend remains a workflow coordinator and uses the shared domain functions for Lesson Plan and Generated Lesson creation.
 
 ### Files Changed
 

@@ -93,7 +93,7 @@ Create the durable single-student backend boundary.
 ### Scope
 
 - Resource-oriented REST endpoints for current Student state, lessons, sessions, synchronization, recommendations, and configuration.
-- File-backed personal storage under `storage/` for local production use.
+- File-backed local personal storage under `.ai/private/` for private development use, or private production database storage through environment-provided credentials.
 - Demo storage with artificial data only.
 - Validation before accepting synchronized evidence.
 - Versioned persistence for Student Model and Generated Lessons.

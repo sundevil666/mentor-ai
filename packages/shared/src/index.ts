@@ -180,7 +180,6 @@ export interface ExerciseResult {
   exerciseId: string;
   exerciseType: ExerciseType;
   targetSkill: SkillArea;
-  response?: string;
   correct: boolean;
   attempts: number;
   responseTimeMs: number;
