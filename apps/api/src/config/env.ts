@@ -7,5 +7,6 @@ export const config = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: Number(process.env.PORT ?? 4000),
   storageMode,
-  personalStoragePath: process.env.PERSONAL_STORAGE_PATH ?? './storage',
+  personalStoragePath: process.env.PERSONAL_STORAGE_PATH ?? '.ai/private',
+  databaseUrl: process.env.DATABASE_URL,
 };

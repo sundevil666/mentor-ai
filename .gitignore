@@ -6,14 +6,29 @@ dist/
 .idea/
 .DS_Store
 
+.ai/private/
+.ai/private/**
+!.ai/README.md
+
 storage/*
 !storage/.gitkeep
 
 .env
 .env.local
+.env.*.local
 *.sqlite
+*.sqlite3
+*.db
 logs/
 voice-cache/
 exports/
 generated-lessons/
 generated-audio/
+lesson-results/
+teacher-memory/
+teacher-journal/
+learning-history/
+progress-analytics/
+speech-recordings/
+recordings/
+private-lessons/

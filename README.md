@@ -8,7 +8,7 @@ Mentor AI is a personal AI English learning platform prepared as a production-re
 - `apps/api` - Node.js, Express, TypeScript REST API shell.
 - `packages/shared` - shared TypeScript contracts used by frontend and backend.
 - `docs` - architecture and operating notes.
-- `storage` - local personal data directory ignored by Git except for `.gitkeep`.
+- `.ai/private` - local personal data directory ignored by Git.
 
 ## Run Frontend
 
@@ -43,9 +43,13 @@ Set `STORAGE_MODE=demo` or leave the default from `.env.example`. Demo mode uses
 
 ## Personal Mode
 
-Set `STORAGE_MODE=personal`. Real lessons, progress, statistics, AI notes, and speech recognition results belong under `storage/`.
+Set `STORAGE_MODE=personal`. Real lessons, progress, statistics, AI notes, Teacher Memory, Teacher Journal, and speech recognition results belong under `.ai/private/`.
 
-The `storage/` directory is ignored by Git so personal data stays local. Only `storage/.gitkeep` is committed to preserve the folder after cloning.
+The `.ai/private/` directory is ignored by Git so personal data stays local. Only `.ai/README.md` is committed to document the privacy boundary. Production data should be written directly by the backend to private database storage through environment-provided credentials such as `DATABASE_URL`; it must not move through Git.
+
+## Production Storage
+
+The current backend/runtime is a Node.js Express API in `apps/api`. For Vercel production, use a private Postgres database such as Neon Postgres, Vercel Postgres, or Supabase Postgres and set `DATABASE_URL` in Vercel environment variables. The starter migration is in `migrations/001_private_learning_state.sql`.
 
 ## Useful Commands
 
