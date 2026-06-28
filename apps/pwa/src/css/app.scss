@@ -1,0 +1,39 @@
+body {
+  background: #f7faf9;
+  color: #10201d;
+}
+
+.dashboard-page {
+  margin: 0 auto;
+  max-width: 1120px;
+  padding: 48px 24px;
+}
+
+.dashboard-page__intro {
+  max-width: 720px;
+}
+
+.dashboard-page__intro h1 {
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  line-height: 1;
+  margin: 0 0 16px;
+}
+
+.dashboard-page__intro p {
+  font-size: 1.125rem;
+  line-height: 1.6;
+}
+
+.dashboard-page__eyebrow {
+  color: #1b5e57;
+  font-weight: 700;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+.dashboard-page__grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-top: 32px;
+}

@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["node", "vite/client"],
+    "paths": {
+      "src/*": ["src/*"],
+      "app/*": ["*"],
+      "layouts/*": ["src/layouts/*"],
+      "pages/*": ["src/pages/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.vue", "quasar.config.ts"]
+}
