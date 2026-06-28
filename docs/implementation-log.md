@@ -211,3 +211,37 @@ Pattern detection is still basic and session-local. Teacher Journal and Teacher 
 ### Future Improvements
 
 Milestone 7 should introduce an AI Teacher workflow boundary with deterministic fallback output for Observations, Recommendations, Lesson Plans, Teacher Journal entries, Teacher Memory candidates, and proposed Student Model changes.
+
+## 2026-06-28 - Milestone 7: AI Teacher Workflow Boundary
+
+### Summary
+
+Introduced an explicit backend AI Teacher service with deterministic fallback behavior. The service creates Lesson Plans from the Student Model and Learning Context, reflects on Exercise Results, proposes Student Model updates, produces Observations, creates Recommendations, and writes Teacher Journal entries.
+
+No external AI provider is required yet. The boundary prepares the system for provider integration without coupling product memory or teaching decisions to a vendor.
+
+### Files Changed
+
+- `apps/api/src/repositories/learning-state.repository.ts`
+- `apps/api/src/services/ai-teacher.service.ts`
+- `apps/api/src/services/learning-state.service.ts`
+- `docs/implementation-log.md`
+
+### Architecture References
+
+- [AI Teacher](07-ai-teacher.md)
+- [Backend](05-backend.md)
+- [Conceptual Contracts](14-contracts.md)
+- [First Implementation](15-first-implementation.md)
+
+### Lessons Learned
+
+The deterministic teacher is useful as a production fallback and as an architectural seam. It lets the backend coordinate AI Teacher outputs without making route handlers or storage code responsible for teaching decisions.
+
+### Known Limitations
+
+The AI Teacher is deterministic and rule-based. It does not call an external model, does not assemble rich provider context, and does not validate provider output yet.
+
+### Future Improvements
+
+Milestone 8 should persist Teacher Journal and Teacher Memory more deliberately, including promotion rules for stable repeated patterns.

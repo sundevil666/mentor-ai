@@ -1,10 +1,7 @@
 import {
-  createLessonPlan,
-  createObservationFromResults,
   createRecommendationFromModel,
   generateLessonFromPlan,
   summarizeResults,
-  updateStudentModelFromResults,
   type ExerciseResult,
   type LearningContext,
   type LearningEvent,
@@ -14,6 +11,7 @@ import {
 } from '@mentor-ai/shared';
 import { config } from '../config/env.js';
 import { learningStateRepository } from '../repositories/learning-state.repository.js';
+import { aiTeacherService } from './ai-teacher.service.js';
 
 export const learningStateService = {
   async getStudentState() {
@@ -34,7 +32,7 @@ export const learningStateService = {
     }
 
     const createdAt = now();
-    const plan = createLessonPlan(state.studentModel, context, createdAt);
+    const plan = aiTeacherService.planLesson(state.studentModel, context, createdAt);
     const lesson = generateLessonFromPlan(plan, createdAt);
 
     await learningStateRepository.write({
@@ -92,6 +90,7 @@ export const learningStateService = {
       exerciseResults: [...state.exerciseResults, ...newResults],
       statisticsSnapshots: [...state.statisticsSnapshots, ...analyzedState.statisticsSnapshots],
       observations: [...state.observations, ...analyzedState.observations],
+      teacherJournal: [...state.teacherJournal, ...analyzedState.teacherJournal],
       recommendations: nextRecommendations,
       acknowledgements: [...state.acknowledgements, ...acknowledgements],
     });
@@ -105,6 +104,7 @@ export const learningStateService = {
       recommendations: nextRecommendations,
       statisticsSnapshots: analyzedState.statisticsSnapshots,
       observations: analyzedState.observations,
+      teacherJournal: analyzedState.teacherJournal,
     };
   },
 
@@ -153,6 +153,7 @@ function analyzeExerciseResults(studentId: string, studentModel: StudentModel, r
       studentModel,
       statisticsSnapshots: [],
       observations: [],
+      teacherJournal: [],
       recommendation: undefined,
     };
   }
@@ -160,12 +161,10 @@ function analyzeExerciseResults(studentId: string, studentModel: StudentModel, r
   const createdAt = now();
   const summary = summarizeResults(results);
   const firstResult = results[0];
-  const nextStudentModel = updateStudentModelFromResults(studentModel, results, createdAt);
-  const observation = createObservationFromResults(studentId, results, createdAt);
-  const recommendation = createRecommendationFromModel(nextStudentModel, createdAt);
+  const reflection = aiTeacherService.reflectOnResults(studentId, studentModel, results, createdAt);
 
   return {
-    studentModel: nextStudentModel,
+    studentModel: reflection.studentModel,
     statisticsSnapshots: [
       {
         id: `statistics-${firstResult.sessionId}-${createdAt}`,
@@ -182,8 +181,9 @@ function analyzeExerciseResults(studentId: string, studentModel: StudentModel, r
         createdAt,
       },
     ],
-    observations: observation ? [observation] : [],
-    recommendation,
+    observations: reflection.observations,
+    teacherJournal: [reflection.journalEntry],
+    recommendation: reflection.recommendation,
   };
 }
 
