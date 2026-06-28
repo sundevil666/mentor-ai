@@ -3,6 +3,7 @@ import {
   generateLessonFromPlan,
   summarizeResults,
   type ExerciseResult,
+  type LearningSessionHandoff,
   type LearningContext,
   type LearningEvent,
   type SpeechResult,
@@ -50,6 +51,32 @@ export const learningStateService = {
     return state.recommendations;
   },
 
+  async listSessionHandoffs() {
+    const state = await learningStateRepository.read();
+    return state.sessionHandoffs.filter((handoff) => handoff.studentId === state.student.id);
+  },
+
+  async upsertSessionHandoff(handoff: LearningSessionHandoff) {
+    const state = await learningStateRepository.read();
+
+    if (handoff.studentId !== state.student.id) {
+      throw new Error('Session handoff failed identity validation.');
+    }
+
+    const safeHandoff = sanitizeSessionHandoff(handoff);
+    const sessionHandoffs = [
+      ...state.sessionHandoffs.filter((item) => item.id !== safeHandoff.id),
+      safeHandoff,
+    ].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+
+    await learningStateRepository.write({
+      ...state,
+      sessionHandoffs,
+    });
+
+    return safeHandoff;
+  },
+
   async synchronize(events: LearningEvent[], exerciseResults: ExerciseResult[] = [], speechResults: SpeechResult[] = []) {
     const state = await learningStateRepository.read();
     const acceptedEventIds = new Set(state.acceptedEvents.map((event) => event.id));
@@ -92,7 +119,7 @@ export const learningStateService = {
       }
     }
 
-    const analyzedState = analyzeExerciseResults(state.student.id, state.studentModel, newResults);
+    const analyzedState = analyzeExerciseResults(state.student.id, state.studentModel, newResults, newSpeechResults);
     const nextRecommendations =
       analyzedState.recommendation === undefined
         ? state.recommendations
@@ -118,8 +145,11 @@ export const learningStateService = {
       acknowledgements,
       acceptedCount: acknowledgements.filter((acknowledgement) => acknowledgement.status === 'accepted').length,
       pendingAnalysis: false,
+      student: state.student,
+      studentModel: analyzedState.studentModel,
       studentModelVersion: analyzedState.studentModel.version,
       currentLesson: state.currentLesson,
+      recommendation: nextRecommendations.at(-1) ?? createRecommendationFromModel(analyzedState.studentModel, now()),
       recommendations: nextRecommendations,
       statisticsSnapshots: analyzedState.statisticsSnapshots,
       observations: analyzedState.observations,
@@ -189,6 +219,15 @@ function sanitizeSpeechResult(result: SpeechResult): SpeechResult {
   return safeResult;
 }
 
+function sanitizeSessionHandoff(handoff: LearningSessionHandoff): LearningSessionHandoff {
+  return {
+    ...handoff,
+    events: handoff.events.map(sanitizeLearningEvent),
+    results: handoff.results.map(sanitizeExerciseResult),
+    speechResults: handoff.speechResults.map(sanitizeSpeechResult),
+  };
+}
+
 function defaultLearningContext(): LearningContext {
   return {
     mode: 'home',
@@ -198,7 +237,12 @@ function defaultLearningContext(): LearningContext {
   };
 }
 
-function analyzeExerciseResults(studentId: string, studentModel: StudentModel, results: ExerciseResult[]) {
+function analyzeExerciseResults(
+  studentId: string,
+  studentModel: StudentModel,
+  results: ExerciseResult[],
+  speechResults: SpeechResult[] = [],
+) {
   if (results.length === 0) {
     return {
       studentModel,
@@ -221,6 +265,8 @@ function analyzeExerciseResults(studentId: string, studentModel: StudentModel, r
     const summary = summarizeResults(sessionResults);
     const firstResult = sessionResults[0];
     const reflection = aiTeacherService.reflectOnResults(studentId, nextStudentModel, sessionResults, createdAt);
+    const sessionSpeechResults = speechResults.filter((result) => result.sessionId === firstResult.sessionId);
+    const pronunciationIssues = sessionSpeechResults.flatMap((result) => result.pronunciationIssues);
 
     nextStudentModel = reflection.studentModel;
     observations.push(...reflection.observations);
@@ -237,6 +283,8 @@ function analyzeExerciseResults(studentId: string, studentModel: StudentModel, r
       completedExercises: summary.completedExercises,
       audioReplays: 0,
       speechAttempts: sessionResults.filter((result) => result.exerciseType === 'repeat-speaking').length,
+      pronunciationIssueCount: pronunciationIssues.length,
+      pronunciationFocus: Array.from(new Set(pronunciationIssues.map((issue) => issue.word))).slice(0, 4),
       fatigueSignal: summary.fatigueSignal,
       createdAt,
     });

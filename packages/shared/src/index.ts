@@ -28,6 +28,28 @@ export type WorkShift = 'first' | 'second' | 'third' | 'off' | 'unknown';
 
 export type ActivityPace = 'passive' | 'steady' | 'active' | 'deep';
 
+export type DeviceSurface = 'mobile' | 'desktop';
+
+export interface WorkShiftSchedule {
+  shift: WorkShift;
+  startsAtMinutes: number;
+  endsAtMinutes: number;
+  leaveHomeMinutesBeforeStart: number;
+  busLeavesMinutesBeforeStart: number;
+  busArrivesMinutesBeforeStart: number;
+  headphonesOffMinutesBeforeStart: number;
+}
+
+export interface WorkShiftTiming {
+  shift: WorkShift;
+  startsAt: string;
+  endsAt: string;
+  leaveHomeAt: string;
+  busLeavesAt: string;
+  busArrivesAt: string;
+  headphonesOffAt: string;
+}
+
 export type ExerciseType =
   | 'vocabulary-recall'
   | 'word-order'
@@ -184,6 +206,7 @@ export interface LearningContext {
   activityPace?: ActivityPace;
   startedHour?: number;
   activityReason?: string;
+  shiftTiming?: WorkShiftTiming;
 }
 
 export interface LessonPlan {
@@ -231,6 +254,8 @@ export interface Exercise {
   id: string;
   type: ExerciseType;
   prompt: string;
+  microLesson: string;
+  successTip: string;
   targetSkill: SkillArea;
   expectedResponse?: string;
   options?: string[];
@@ -379,8 +404,26 @@ export interface SpeechResult {
   exerciseId: string;
   speechAvailable: boolean;
   speechDetected: boolean;
+  expectedText?: string;
+  heardText?: string;
+  pronunciationIssues: PronunciationIssue[];
   responseStartDelayMs?: number;
   completedAt: string;
+}
+
+export interface LearningSessionHandoff {
+  id: string;
+  studentId: string;
+  sourceDevice: DeviceSurface;
+  lesson: GeneratedLesson;
+  context: LearningContext;
+  currentExerciseIndex: number;
+  startedAt: string;
+  exerciseStartedAt: string;
+  events: LearningEvent[];
+  results: ExerciseResult[];
+  speechResults: SpeechResult[];
+  updatedAt: string;
 }
 
 export interface StatisticsSnapshot {
@@ -394,9 +437,12 @@ export interface StatisticsSnapshot {
   completedExercises: number;
   audioReplays: number;
   speechAttempts: number;
+  pronunciationIssueCount: number;
+  pronunciationFocus: string[];
   fatigueSignal: SignalScore;
   learningMode?: LearningMode;
   workShift?: WorkShift;
+  shiftTiming?: WorkShiftTiming;
   dayType?: 'weekday' | 'weekend';
   activityPace?: ActivityPace;
   createdAt: string;
@@ -437,6 +483,7 @@ export interface ActivitySnapshot {
   weekday: number;
   dayType: 'weekday' | 'weekend';
   workShift: WorkShift;
+  shiftTiming?: WorkShiftTiming;
   activityPace: ActivityPace;
   suggestedMode: LearningMode;
   availableMinutes: number;
@@ -544,6 +591,30 @@ export const initialStudentModel: StudentModel = {
   updatedAt: '2026-06-28T00:00:00.000Z',
 };
 
+export const workShiftSchedules: Record<Exclude<WorkShift, 'off' | 'unknown'>, WorkShiftSchedule> = {
+  first: createWorkShiftSchedule('first', 6 * 60, 14 * 60),
+  second: createWorkShiftSchedule('second', 14 * 60, 22 * 60),
+  third: createWorkShiftSchedule('third', 22 * 60, 6 * 60),
+};
+
+export function getWorkShiftTiming(workShift: WorkShift): WorkShiftTiming | undefined {
+  if (workShift === 'off' || workShift === 'unknown') {
+    return undefined;
+  }
+
+  const schedule = workShiftSchedules[workShift];
+
+  return {
+    shift: workShift,
+    startsAt: formatClockMinutes(schedule.startsAtMinutes),
+    endsAt: formatClockMinutes(schedule.endsAtMinutes),
+    leaveHomeAt: formatClockMinutes(schedule.startsAtMinutes - schedule.leaveHomeMinutesBeforeStart),
+    busLeavesAt: formatClockMinutes(schedule.startsAtMinutes - schedule.busLeavesMinutesBeforeStart),
+    busArrivesAt: formatClockMinutes(schedule.startsAtMinutes - schedule.busArrivesMinutesBeforeStart),
+    headphonesOffAt: formatClockMinutes(schedule.startsAtMinutes - schedule.headphonesOffMinutesBeforeStart),
+  };
+}
+
 export function clampSignal(value: number): SignalScore {
   return {
     value: clamp(value),
@@ -573,6 +644,40 @@ export function scoreExercise(exercise: Exercise, response: string): boolean {
   }
 
   return response.trim().toLowerCase() === expected;
+}
+
+export function analyzePronunciationAttempt(
+  expectedText: string,
+  heardText: string,
+  createdAt: string,
+): PronunciationIssue[] {
+  const expectedWords = normalizeWords(expectedText);
+  const heardWords = normalizeWords(heardText);
+  const issues: PronunciationIssue[] = [];
+
+  for (const [index, word] of expectedWords.entries()) {
+    const heard = heardWords[index];
+
+    if (!heard) {
+      issues.push(createPronunciationIssue(word, 'missing', createdAt, index));
+      continue;
+    }
+
+    if (heard !== word) {
+      issues.push({
+        ...createPronunciationIssue(word, wordsLookClose(word, heard) ? 'unclear' : 'substitution', createdAt, index),
+        heard,
+      });
+    }
+  }
+
+  if (heardWords.length > expectedWords.length) {
+    for (const [extraIndex, word] of heardWords.slice(expectedWords.length).entries()) {
+      issues.push(createPronunciationIssue(word, 'extra', createdAt, expectedWords.length + extraIndex));
+    }
+  }
+
+  return issues.slice(0, 4);
 }
 
 export function summarizeResults(results: ExerciseResult[]): Pick<
@@ -1022,6 +1127,8 @@ function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercis
         id: `${plan.id}-reading-text`,
         type: 'review',
         prompt: 'Read: Tom works in a small cafe. In the afternoon, he helps a friend and drinks tea.',
+        microLesson: 'Read for the simple situation first: who, where, and when.',
+        successTip: 'Type read when you finish the short text.',
         targetSkill: 'review',
         expectedResponse: 'read',
       },
@@ -1029,6 +1136,8 @@ function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercis
         id: `${plan.id}-reading-main-idea`,
         type: 'listening-comprehension',
         prompt: 'What is the text mostly about?',
+        microLesson: 'Main idea questions ask for the whole situation, not one isolated word.',
+        successTip: 'Choose the answer that matches the person and place.',
         targetSkill: 'listening',
         expectedResponse: 'tom works in a cafe',
         options: ['tom works in a cafe', 'tom travels by train', 'tom studies math'],
@@ -1037,6 +1146,8 @@ function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercis
         id: `${plan.id}-reading-word`,
         type: 'vocabulary-recall',
         prompt: 'Which word means a place where people drink tea or coffee?',
+        microLesson: 'Unknown words from reading become vocabulary targets for future review.',
+        successTip: 'Look back at the text and write the place word.',
         targetSkill: 'vocabulary',
         expectedResponse: 'cafe',
       },
@@ -1049,6 +1160,8 @@ function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercis
         id: `${plan.id}-vocabulary-recognition`,
         type: 'vocabulary-recall',
         prompt: 'Choose the meaning of "afternoon".',
+        microLesson: 'Recognition is the first layer: connect the English word to the idea quickly.',
+        successTip: 'Pick the time after lunch.',
         targetSkill: 'vocabulary',
         expectedResponse: 'time after lunch',
         options: ['time after lunch', 'very early morning', 'a small question'],
@@ -1057,6 +1170,8 @@ function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercis
         id: `${plan.id}-vocabulary-recall`,
         type: 'vocabulary-recall',
         prompt: 'Translate: dobrý deň',
+        microLesson: 'Active recall is stronger than reading the answer. Pause for one second before typing.',
+        successTip: 'Use the polite greeting for later in the day.',
         targetSkill: 'vocabulary',
         expectedResponse: 'good afternoon',
       },
@@ -1064,6 +1179,8 @@ function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercis
         id: `${plan.id}-vocabulary-context`,
         type: 'word-order',
         prompt: 'Order the words: good / afternoon / teacher',
+        microLesson: 'Putting a word into a phrase makes it easier to use in real speech.',
+        successTip: 'Keep the greeting together: good afternoon.',
         targetSkill: 'grammar',
         expectedResponse: 'good afternoon teacher',
       },
@@ -1075,6 +1192,8 @@ function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercis
       id: `${plan.id}-warmup`,
       type: 'review',
       prompt: `Review: say or type "${reviewTarget}".`,
+      microLesson: 'Warmup protects earlier progress before adding new pressure.',
+      successTip: 'Copy the phrase slowly and clearly.',
       targetSkill: 'review',
       expectedResponse: reviewTarget.toLowerCase().replace('?', ''),
     },
@@ -1082,6 +1201,8 @@ function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercis
       id: `${plan.id}-vocabulary`,
       type: 'vocabulary-recall',
       prompt: 'Translate: dobrý deň',
+      microLesson: 'This step checks whether the greeting is ready for real use.',
+      successTip: 'Think of the polite afternoon greeting.',
       targetSkill: 'vocabulary',
       expectedResponse: 'good afternoon',
     },
@@ -1089,6 +1210,8 @@ function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercis
       id: `${plan.id}-word-order`,
       type: 'word-order',
       prompt: 'Order the words: you / are / where',
+      microLesson: 'English questions often use question word + helper verb + subject.',
+      successTip: 'Start with where, then are, then you.',
       targetSkill: 'grammar',
       expectedResponse: 'where are you',
     },
@@ -1096,6 +1219,8 @@ function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercis
       id: `${plan.id}-listening`,
       type: 'listening-comprehension',
       prompt: 'Listen and choose the meaning.',
+      microLesson: 'Listen for the sentence shape. Replaying audio is useful practice evidence.',
+      successTip: 'Match the question word you hear.',
       targetSkill: 'listening',
       expectedResponse: 'where are you',
       options: ['where are you', 'how old are you', 'what is this'],
@@ -1105,11 +1230,39 @@ function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercis
       id: `${plan.id}-speaking`,
       type: 'repeat-speaking',
       prompt: 'Repeat: Where are you?',
+      microLesson: 'Pronunciation practice is pattern-finding, not a pass/fail test.',
+      successTip: 'Say each word separately first, then connect the phrase.',
       targetSkill: 'speaking',
       expectedResponse: 'where are you',
       audioText: 'Where are you?',
     },
   ];
+}
+
+function normalizeWords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z'\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function createPronunciationIssue(
+  word: string,
+  issueType: PronunciationIssueType,
+  createdAt: string,
+  index: number,
+): PronunciationIssue {
+  return {
+    id: `pronunciation-${word}-${index}-${createdAt}`,
+    word,
+    issueType,
+    confidence: issueType === 'missing' ? 0.7 : 0.5,
+  };
+}
+
+function wordsLookClose(expected: string, heard: string): boolean {
+  return expected[0] === heard[0] || expected.at(-1) === heard.at(-1);
 }
 
 function updateSkillState(
@@ -1412,6 +1565,30 @@ function labelConcept(concept: LearningConcept): string {
     case 'vocabulary':
       return 'Vocabulary Growth';
   }
+}
+
+function createWorkShiftSchedule(
+  shift: Exclude<WorkShift, 'off' | 'unknown'>,
+  startsAtMinutes: number,
+  endsAtMinutes: number,
+): WorkShiftSchedule {
+  return {
+    shift,
+    startsAtMinutes,
+    endsAtMinutes,
+    leaveHomeMinutesBeforeStart: 65,
+    busLeavesMinutesBeforeStart: 50,
+    busArrivesMinutesBeforeStart: 30,
+    headphonesOffMinutesBeforeStart: 20,
+  };
+}
+
+function formatClockMinutes(minutes: number): string {
+  const normalizedMinutes = ((minutes % (24 * 60)) + 24 * 60) % (24 * 60);
+  const hour = Math.floor(normalizedMinutes / 60);
+  const minute = normalizedMinutes % 60;
+
+  return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
 }
 
 function clamp(value: number): number {

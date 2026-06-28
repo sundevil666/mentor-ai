@@ -4,16 +4,20 @@ import {
   createLessonPlan,
   createObservationFromResults,
   createRecommendationFromModel,
+  analyzePronunciationAttempt,
   demoStudent,
   generateLessonFromPlan,
+  getWorkShiftTiming,
   initialStudentModel,
   scoreExercise,
   updateStudentModelFromResults,
   type ActivityPace,
   type ActivitySnapshot,
+  type DeviceSurface,
   type Exercise,
   type ExerciseResult,
   type GeneratedLesson,
+  type LearningSessionHandoff,
   type LearningEvent,
   type LearningContext,
   type LearningMode,
@@ -25,7 +29,12 @@ import {
   type StudentModel,
   type WorkShift,
 } from '@mentor-ai/shared';
-import { synchronizeLearningEvidence } from 'src/services/api-client';
+import {
+  fetchSessionHandoffs,
+  fetchStudentState,
+  synchronizeLearningEvidence,
+  upsertSessionHandoff,
+} from 'src/services/api-client';
 import { mentorDb } from 'src/services/indexed-db';
 
 interface LearningSessionState {
@@ -72,6 +81,7 @@ interface AppState {
   pendingSyncEvents: number;
   lastSyncAt: string | null;
   updateNotifications: UpdateNotification[];
+  sessionHandoffs: LearningSessionHandoff[];
   isHydrated: boolean;
 }
 
@@ -91,6 +101,7 @@ export const useAppStore = defineStore('app', {
     pendingSyncEvents: 0,
     lastSyncAt: null,
     updateNotifications: [],
+    sessionHandoffs: [],
     isHydrated: false,
   }),
 
@@ -115,6 +126,7 @@ export const useAppStore = defineStore('app', {
     unreadUpdateNotificationCount: (state): number =>
       state.updateNotifications.filter((notification) => notification.readAt === null).length,
     latestUpdateNotification: (state): UpdateNotification | null => state.updateNotifications[0] ?? null,
+    remoteSessionHandoffs: (state): LearningSessionHandoff[] => state.sessionHandoffs,
   },
 
   actions: {
@@ -143,13 +155,21 @@ export const useAppStore = defineStore('app', {
       );
       this.isOnline = navigator.onLine;
       this.isHydrated = true;
+
+      if (this.isOnline) {
+        await this.syncPendingEvents();
+        await this.refreshSharedStudentState();
+        await this.refreshSessionHandoffs();
+      }
     },
 
     setNetworkStatus(isOnline: boolean) {
       this.isOnline = isOnline;
 
       if (isOnline) {
-        void this.syncPendingEvents();
+        void this.syncPendingEvents()
+          .then(() => this.refreshSharedStudentState())
+          .then(() => this.refreshSessionHandoffs());
       }
     },
 
@@ -178,6 +198,7 @@ export const useAppStore = defineStore('app', {
 
       await this.persistActivitySnapshot(createActivitySnapshot(learningContext, sessionId, createdAt));
       await this.persistSession();
+      await this.publishSessionHandoff();
     },
 
     async setPreferredWorkShift(workShift: WorkShift) {
@@ -215,7 +236,8 @@ export const useAppStore = defineStore('app', {
         this.session.speechResults.push(
           createSpeechResult(
             this.session.id,
-            exercise.id,
+            exercise,
+            response,
             submittedAt,
             Math.max(0, Date.parse(submittedAt) - Date.parse(this.session.exerciseStartedAt)),
             response.trim().length > 0,
@@ -241,6 +263,7 @@ export const useAppStore = defineStore('app', {
       );
 
       await this.persistSession();
+      await this.publishSessionHandoff();
     },
 
     async replayAudio() {
@@ -253,6 +276,7 @@ export const useAppStore = defineStore('app', {
       );
 
       await this.persistSession();
+      await this.publishSessionHandoff();
     },
 
     async resetLocalLearning() {
@@ -273,6 +297,7 @@ export const useAppStore = defineStore('app', {
       await db.clear('activity-snapshots');
       await db.clear('sync-queue');
       await db.clear('concept-evidence');
+      this.sessionHandoffs = [];
     },
 
     async recordUpdateNotification(version: string) {
@@ -391,6 +416,7 @@ export const useAppStore = defineStore('app', {
       const completed = this.session.results.filter((result) => result.completionState === 'completed');
       const correct = completed.filter((result) => result.correct).length;
       const responseTime = completed.reduce((sum, result) => sum + result.responseTimeMs, 0);
+      const pronunciationIssues = this.session.speechResults.flatMap((result) => result.pronunciationIssues);
 
       const snapshot: StatisticsSnapshot = {
         id: `statistics-${this.session.id}-${createdAt}`,
@@ -403,9 +429,12 @@ export const useAppStore = defineStore('app', {
         completedExercises: completed.length,
         audioReplays: this.session.events.filter((event) => event.type === 'audio-replayed').length,
         speechAttempts: this.session.events.filter((event) => event.type === 'speech-attempted').length,
+        pronunciationIssueCount: pronunciationIssues.length,
+        pronunciationFocus: Array.from(new Set(pronunciationIssues.map((issue) => issue.word))).slice(0, 4),
         fatigueSignal: this.studentModel.fatigue,
         learningMode: this.session.context.mode,
         workShift: this.session.context.workShift,
+        shiftTiming: this.session.context.shiftTiming,
         dayType: this.session.context.dayType,
         activityPace: this.session.context.activityPace,
         createdAt,
@@ -478,6 +507,8 @@ export const useAppStore = defineStore('app', {
           collectSpeechResults(pendingEvents, this.session?.speechResults),
         );
 
+        await this.applySharedStudentState(result.studentModel, result.recommendation);
+
         for (const acknowledgement of result.acknowledgements) {
           const queuedEvent = pendingEvents.find((event) => event.id === acknowledgement.eventId);
 
@@ -492,6 +523,74 @@ export const useAppStore = defineStore('app', {
       } catch {
         this.pendingSyncEvents = pendingEvents.length;
       }
+    },
+
+    async refreshSharedStudentState() {
+      try {
+        const state = await fetchStudentState();
+        await this.applySharedStudentState(state.studentModel, state.recommendation);
+      } catch {
+        return;
+      }
+    },
+
+    async applySharedStudentState(studentModel: StudentModel, recommendation: Recommendation) {
+      if (studentModel.studentId !== demoStudent.id || studentModel.version < this.studentModel.version) {
+        return;
+      }
+
+      this.studentModel = studentModel;
+      this.latestRecommendation = recommendation;
+      await this.persistStudentModel();
+    },
+
+    async refreshSessionHandoffs() {
+      try {
+        this.sessionHandoffs = (await fetchSessionHandoffs()).filter(
+          (handoff) => handoff.studentId === demoStudent.id && handoff.currentExerciseIndex < handoff.lesson.exercises.length,
+        );
+      } catch {
+        return;
+      }
+    },
+
+    async publishSessionHandoff() {
+      if (!this.session || !this.isOnline || this.session.completedAt) {
+        return;
+      }
+
+      const handoff = createSessionHandoff(this.session);
+
+      try {
+        const savedHandoff = await upsertSessionHandoff(handoff);
+        this.sessionHandoffs = [
+          savedHandoff,
+          ...this.sessionHandoffs.filter((item) => item.id !== savedHandoff.id),
+        ].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+      } catch {
+        return;
+      }
+    },
+
+    async continueSessionHandoff(handoff: LearningSessionHandoff) {
+      if (handoff.studentId !== demoStudent.id) {
+        return;
+      }
+
+      this.session = {
+        id: sessionStoreKey,
+        lesson: handoff.lesson,
+        context: handoff.context,
+        currentExerciseIndex: handoff.currentExerciseIndex,
+        startedAt: handoff.startedAt,
+        exerciseStartedAt: handoff.exerciseStartedAt,
+        events: handoff.events,
+        results: handoff.results,
+        speechResults: handoff.speechResults,
+      };
+
+      await this.persistSession();
+      await this.publishSessionHandoff();
     },
   },
 });
@@ -512,7 +611,33 @@ function createDefaultLearningContext(
     activityPace: suggestion.activityPace,
     startedHour: suggestion.localHour,
     activityReason: suggestion.reason,
+    shiftTiming: suggestion.shiftTiming,
   };
+}
+
+function createSessionHandoff(session: LearningSessionState): LearningSessionHandoff {
+  return {
+    id: `handoff-${demoStudent.id}-${getCurrentDeviceSurface()}`,
+    studentId: demoStudent.id,
+    sourceDevice: getCurrentDeviceSurface(),
+    lesson: session.lesson,
+    context: session.context,
+    currentExerciseIndex: session.currentExerciseIndex,
+    startedAt: session.startedAt,
+    exerciseStartedAt: session.exerciseStartedAt,
+    events: session.events,
+    results: session.results,
+    speechResults: session.speechResults,
+    updatedAt: now(),
+  };
+}
+
+function getCurrentDeviceSurface(): DeviceSurface {
+  if (typeof window !== 'undefined' && window.matchMedia('(max-width: 720px)').matches) {
+    return 'mobile';
+  }
+
+  return 'desktop';
 }
 
 export function inferActivitySuggestion(
@@ -525,20 +650,22 @@ export function inferActivitySuggestion(
   const dayType = weekday === 0 || weekday === 6 ? 'weekend' : 'weekday';
   const workShift = preferredWorkShift === 'unknown' ? inferShiftFromHistory(snapshots, dayType, localHour) : preferredWorkShift;
   const historicalPace = inferHistoricalPace(snapshots, dayType, localHour, workShift);
-  const baseline = inferBaselinePace(dayType, workShift, localHour);
+  const baseline = inferBaselinePace(dayType, workShift, localHour, weekday);
   const activityPace = historicalPace ?? baseline;
-  const mode = chooseModeForActivity(activityPace, dayType);
+  const mode = chooseModeForActivity(activityPace, dayType, workShift, localHour);
   const availableMinutes = chooseMinutesForActivity(activityPace);
+  const shiftTiming = getWorkShiftTiming(workShift);
 
   return {
     localHour,
     weekday,
     dayType,
     workShift,
+    shiftTiming,
     activityPace,
     mode,
     availableMinutes,
-    reason: createActivityReason(dayType, workShift, activityPace, snapshots.length > 0),
+    reason: createActivityReason(dayType, workShift, activityPace, snapshots.length > 0, weekday, localHour),
   };
 }
 
@@ -547,8 +674,9 @@ function createActivitySnapshot(context: LearningContext, sessionId: string, obs
   const localHour = context.startedHour ?? observedDate.getHours();
   const weekday = observedDate.getDay();
   const dayType = context.dayType ?? (weekday === 0 || weekday === 6 ? 'weekend' : 'weekday');
-  const activityPace = context.activityPace ?? inferBaselinePace(dayType, context.workShift ?? 'unknown', localHour);
+  const activityPace = context.activityPace ?? inferBaselinePace(dayType, context.workShift ?? 'unknown', localHour, weekday);
   const suggestedMode = context.mode;
+  const shiftTiming = context.shiftTiming ?? getWorkShiftTiming(context.workShift ?? 'unknown');
 
   return {
     id: `activity-${sessionId}-${observedAt}`,
@@ -559,10 +687,13 @@ function createActivitySnapshot(context: LearningContext, sessionId: string, obs
     weekday,
     dayType,
     workShift: context.workShift ?? 'unknown',
+    shiftTiming,
     activityPace,
     suggestedMode,
     availableMinutes: context.availableMinutes,
-    reason: context.activityReason ?? createActivityReason(dayType, context.workShift ?? 'unknown', activityPace, false),
+    reason:
+      context.activityReason ??
+      createActivityReason(dayType, context.workShift ?? 'unknown', activityPace, false, weekday, localHour),
   };
 }
 
@@ -636,8 +767,21 @@ function inferHistoricalPace(
   return 'passive';
 }
 
-function inferBaselinePace(dayType: 'weekday' | 'weekend', workShift: WorkShift, localHour: number): ActivityPace {
+function inferBaselinePace(
+  dayType: 'weekday' | 'weekend',
+  workShift: WorkShift,
+  localHour: number,
+  weekday: number,
+): ActivityPace {
+  if (isThirdShiftRecoveryMorning(workShift, localHour)) {
+    return 'active';
+  }
+
   if (dayType === 'weekend') {
+    if (weekday === 6 && workShift === 'third') {
+      return localHour < 14 ? 'active' : 'steady';
+    }
+
     return 'deep';
   }
 
@@ -652,7 +796,16 @@ function inferBaselinePace(dayType: 'weekday' | 'weekend', workShift: WorkShift,
   return localHour < 10 ? 'active' : 'steady';
 }
 
-function chooseModeForActivity(activityPace: ActivityPace, dayType: 'weekday' | 'weekend'): LearningMode {
+function chooseModeForActivity(
+  activityPace: ActivityPace,
+  dayType: 'weekday' | 'weekend',
+  workShift: WorkShift,
+  localHour: number,
+): LearningMode {
+  if (isThirdShiftRecoveryMorning(workShift, localHour)) {
+    return 'listening';
+  }
+
   if (activityPace === 'passive') {
     return 'review';
   }
@@ -682,11 +835,21 @@ function createActivityReason(
   workShift: WorkShift,
   activityPace: ActivityPace,
   hasHistory: boolean,
+  weekday: number,
+  localHour: number,
 ): string {
   const historyNote = hasHistory ? 'Recent activity history is included.' : 'No strong personal pattern yet.';
 
+  if (isThirdShiftRecoveryMorning(workShift, localHour)) {
+    return `After a third shift, morning lessons are treated as recovery listening: simple, active audio to stay awake without heavy thinking. ${historyNote}`;
+  }
+
+  if (dayType === 'weekend' && weekday === 6 && workShift === 'third') {
+    return `Saturday is usually active, but a third-shift Saturday is treated more carefully before the 22:00-06:00 shift. ${historyNote}`;
+  }
+
   if (dayType === 'weekend') {
-    return `Weekend sessions are likely better for listening and repetition. ${historyNote}`;
+    return `Weekend sessions are treated as an active learning window with room for deeper listening and repetition. ${historyNote}`;
   }
 
   if (workShift === 'first') {
@@ -698,6 +861,10 @@ function createActivityReason(
   }
 
   return `The plan uses a ${activityPace} weekday start until more shift evidence is available. ${historyNote}`;
+}
+
+function isThirdShiftRecoveryMorning(workShift: WorkShift, localHour: number): boolean {
+  return workShift === 'third' && localHour >= 5 && localHour < 10;
 }
 
 function createLearningEvent(
@@ -772,18 +939,25 @@ function createExerciseResult(
 
 function createSpeechResult(
   sessionId: string,
-  exerciseId: string,
+  exercise: Exercise,
+  response: string,
   completedAt: string,
   responseStartDelayMs: number,
   speechDetected: boolean,
 ): SpeechResult {
+  const expectedText = exercise.audioText ?? exercise.expectedResponse ?? exercise.prompt.replace(/^Repeat:\s*/i, '');
+  const pronunciationIssues = speechDetected ? analyzePronunciationAttempt(expectedText, response, completedAt) : [];
+
   return {
-    id: `speech-${exerciseId}-${Date.now()}`,
+    id: `speech-${exercise.id}-${Date.now()}`,
     studentId: demoStudent.id,
     sessionId,
-    exerciseId,
+    exerciseId: exercise.id,
     speechAvailable: 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window,
     speechDetected,
+    expectedText,
+    heardText: response,
+    pronunciationIssues,
     responseStartDelayMs,
     completedAt,
   };

@@ -1,5 +1,5 @@
 import type { RequestHandler } from 'express';
-import type { ExerciseResult, LearningContext, LearningEvent, SpeechResult } from '@mentor-ai/shared';
+import type { ExerciseResult, LearningContext, LearningEvent, LearningSessionHandoff, SpeechResult } from '@mentor-ai/shared';
 import { learningStateService } from '../services/learning-state.service.js';
 
 export const getStudentState: RequestHandler = async (_req, res, next) => {
@@ -21,6 +21,22 @@ export const getCurrentLesson: RequestHandler = async (req, res, next) => {
 export const getRecommendations: RequestHandler = async (_req, res, next) => {
   try {
     res.json({ data: await learningStateService.getRecommendations() });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const listSessionHandoffs: RequestHandler = async (_req, res, next) => {
+  try {
+    res.json({ data: await learningStateService.listSessionHandoffs() });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const upsertSessionHandoff: RequestHandler = async (req, res, next) => {
+  try {
+    res.json({ data: await learningStateService.upsertSessionHandoff(req.body as LearningSessionHandoff) });
   } catch (error) {
     next(error);
   }

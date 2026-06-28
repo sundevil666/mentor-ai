@@ -4,11 +4,13 @@ import { describe, it } from 'node:test';
 import {
   createLessonPlan,
   decideNextTeacherAction,
+  analyzePronunciationAttempt,
   createObservationFromResults,
   createRecommendationFromModel,
   createEvidenceId,
   demoStudent,
   generateLessonFromPlan,
+  getWorkShiftTiming,
   initialStudentModel,
   isLessonDeliverable,
   nextModelVersion,
@@ -101,6 +103,20 @@ describe('shared domain helpers', () => {
     );
   });
 
+  it('finds lightweight pronunciation focus words from a speaking attempt', () => {
+    const issues = analyzePronunciationAttempt(
+      'Where are you?',
+      'Where you',
+      '2026-06-28T08:00:00.000Z',
+    );
+
+    assert.equal(issues.length, 2);
+    assert.equal(issues[0].word, 'are');
+    assert.equal(issues[0].issueType, 'substitution');
+    assert.equal(issues[1].word, 'you');
+    assert.equal(issues[1].issueType, 'missing');
+  });
+
   it('summarizes completed exercise results conservatively', () => {
     const summary = summarizeResults([
       {
@@ -148,6 +164,28 @@ describe('shared domain helpers', () => {
 
   it('increments Student Model versions explicitly', () => {
     assert.equal(nextModelVersion({ version: 4 }), 5);
+  });
+
+  it('keeps personal shift commute timing as durable statistics context', () => {
+    assert.deepEqual(getWorkShiftTiming('first'), {
+      shift: 'first',
+      startsAt: '06:00',
+      endsAt: '14:00',
+      leaveHomeAt: '04:55',
+      busLeavesAt: '05:10',
+      busArrivesAt: '05:30',
+      headphonesOffAt: '05:40',
+    });
+
+    assert.deepEqual(getWorkShiftTiming('third'), {
+      shift: 'third',
+      startsAt: '22:00',
+      endsAt: '06:00',
+      leaveHomeAt: '20:55',
+      busLeavesAt: '21:10',
+      busArrivesAt: '21:30',
+      headphonesOffAt: '21:40',
+    });
   });
 
   it('generates a deliverable lesson from the current Student Model and context', () => {

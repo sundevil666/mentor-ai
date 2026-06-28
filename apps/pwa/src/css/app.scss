@@ -176,6 +176,16 @@ body {
   min-height: 52px;
 }
 
+.handoff-actions {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.handoff-actions .q-btn {
+  min-height: 48px;
+}
+
 .learning-start h1,
 .lesson-stage h1,
 .lesson-complete h1 {
@@ -281,6 +291,35 @@ body {
   font-size: 1rem;
 }
 
+.shift-timing-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.shift-timing-item {
+  background: #ffffff;
+  border: 1px solid #dbe6e2;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  min-height: 64px;
+  padding: 10px 12px;
+}
+
+.shift-timing-item span {
+  color: #60716c;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.shift-timing-item strong {
+  color: #10201d;
+  font-size: 1rem;
+}
+
 .learning-panels {
   display: grid;
   gap: 16px;
@@ -349,7 +388,9 @@ body {
 
   .activity-controls,
   .training-mode-strip,
-  .concept-choice {
+  .concept-choice,
+  .handoff-actions,
+  .shift-timing-grid {
     grid-template-columns: 1fr;
   }
 

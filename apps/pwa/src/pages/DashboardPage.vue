@@ -52,6 +52,24 @@
           </q-btn>
         </div>
 
+        <div
+          v-if="remoteContinueOptions.length > 0"
+          class="handoff-actions"
+        >
+          <q-btn
+            v-for="handoff in remoteContinueOptions"
+            :key="handoff.id"
+            color="primary"
+            outline
+            no-caps
+            icon="devices"
+            :label="handoff.label"
+            @click="continueFromDevice(handoff.id)"
+          >
+            <q-tooltip>{{ handoff.detail }}</q-tooltip>
+          </q-btn>
+        </div>
+
         <p class="learning-start__eyebrow">
           Activity check
         </p>
@@ -72,6 +90,20 @@
           <div class="activity-signal">
             <span>{{ activityMeta }}</span>
             <strong>{{ paceLabel }}</strong>
+          </div>
+        </div>
+
+        <div
+          v-if="shiftTimingRows.length > 0"
+          class="shift-timing-grid"
+        >
+          <div
+            v-for="item in shiftTimingRows"
+            :key="item.label"
+            class="shift-timing-item"
+          >
+            <span>{{ item.label }}</span>
+            <strong>{{ item.value }}</strong>
           </div>
         </div>
 
@@ -115,7 +147,7 @@
             {{ appStore.session.lesson.title }}
           </p>
           <h1>{{ currentExercise.prompt }}</h1>
-          <p>{{ appStore.session.lesson.purpose }}</p>
+          <p>{{ currentExercise.microLesson }}</p>
         </div>
 
         <div
@@ -150,6 +182,7 @@
         />
 
         <div class="lesson-actions">
+          <span>{{ currentExercise.successTip }}</span>
           <q-btn
             color="primary"
             label="Continue"
@@ -230,6 +263,9 @@
           <p v-if="appStore.latestStatistics">
             Last lesson: {{ latestAccuracy }} accuracy, {{ appStore.latestStatistics.completedExercises }} exercises.
           </p>
+          <p v-if="pronunciationSummary">
+            {{ pronunciationSummary }}
+          </p>
         </div>
       </section>
     </section>
@@ -282,6 +318,27 @@ const activityMeta = computed(() => {
   const day = currentSuggestion.value.dayType === 'weekend' ? 'Weekend' : 'Weekday';
   const minutes = `${currentSuggestion.value.availableMinutes} min`;
   return `${day} · ${shiftLabel(currentSuggestion.value.workShift)} · ${minutes}`;
+});
+const remoteContinueOptions = computed(() =>
+  appStore.remoteSessionHandoffs.map((handoff) => ({
+    id: handoff.id,
+    label: `Continue from ${handoff.sourceDevice}`,
+    detail: `${handoff.lesson.title} · ${Math.min(handoff.currentExerciseIndex + 1, handoff.lesson.exercises.length)}/${handoff.lesson.exercises.length}`,
+  })),
+);
+const shiftTimingRows = computed(() => {
+  const timing = currentSuggestion.value.shiftTiming;
+
+  if (!timing) {
+    return [];
+  }
+
+  return [
+    { label: 'Shift', value: `${timing.startsAt}-${timing.endsAt}` },
+    { label: 'Leave home', value: timing.leaveHomeAt },
+    { label: 'Bus', value: `${timing.busLeavesAt}-${timing.busArrivesAt}` },
+    { label: 'Headphones off', value: timing.headphonesOffAt },
+  ];
 });
 const skillRows = computed(() => [
   { label: 'Vocabulary', value: appStore.studentModel.vocabulary.score.value },
@@ -360,6 +417,19 @@ const syncDetail = computed(() => {
 
   return appStore.lastSyncAt ? `Last sync ${new Date(appStore.lastSyncAt).toLocaleString()}.` : 'No pending evidence.';
 });
+const pronunciationSummary = computed(() => {
+  const latest = appStore.latestStatistics;
+
+  if (!latest || latest.speechAttempts === 0) {
+    return '';
+  }
+
+  if (latest.pronunciationIssueCount === 0) {
+    return 'Pronunciation: no repeated issue detected in the last speaking step.';
+  }
+
+  return `Pronunciation focus: ${latest.pronunciationFocus.join(', ')}.`;
+});
 
 onMounted(async () => {
   if (!appStore.isHydrated) {
@@ -397,6 +467,7 @@ async function startWithMode(mode: LearningMode) {
     activityPace: suggestion.activityPace,
     startedHour: suggestion.localHour,
     activityReason: suggestion.reason,
+    shiftTiming: suggestion.shiftTiming,
   });
 }
 
@@ -415,6 +486,7 @@ async function startConcept(concept: LearningConcept) {
     activityPace: suggestion.activityPace,
     startedHour: suggestion.localHour,
     activityReason: suggestion.reason,
+    shiftTiming: suggestion.shiftTiming,
   });
 }
 
@@ -425,6 +497,17 @@ async function startTraining(training: TrainingKey) {
   }
 
   await startWithMode(training);
+}
+
+async function continueFromDevice(handoffId: string) {
+  const handoff = appStore.remoteSessionHandoffs.find((item) => item.id === handoffId);
+
+  if (!handoff) {
+    return;
+  }
+
+  answer.value = '';
+  await appStore.continueSessionHandoff(handoff);
 }
 
 function updateShift(value: WorkShift) {

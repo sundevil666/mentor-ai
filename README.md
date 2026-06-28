@@ -15,14 +15,16 @@ Mentor AI is a personal AI English learning platform built as a production-orien
 The PWA can run a complete demo learning session without the API:
 
 - creates a short English lesson from the current Student Model;
+- explains each exercise with a minimal micro-lesson and a small success tip;
 - plays text-to-speech prompts when audio text is available;
 - scores typed or selected answers locally;
+- records lightweight pronunciation focus words from speaking attempts;
 - updates the Student Model after a completed lesson;
 - stores the active session, lessons, statistics, speech attempts, and sync queue in IndexedDB;
 - shows offline/online state, pending evidence, lesson progress, skill scores, latest accuracy, and manual sync/reset controls;
 - queues learning evidence while offline and sends it to the API when available.
 
-The implementation is still intentionally small: it uses deterministic demo lesson content and browser speech synthesis, not production AI generation or advanced pronunciation scoring.
+The implementation is still intentionally small: it uses deterministic demo lesson content, browser speech synthesis, and local text-based pronunciation focus detection, not production AI generation or advanced acoustic pronunciation scoring.
 
 ## First Statistics Pass
 

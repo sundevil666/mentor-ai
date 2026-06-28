@@ -6,6 +6,7 @@ import {
   initialStudentModel,
   type GeneratedLesson,
   type ExerciseResult,
+  type LearningSessionHandoff,
   type LearningEvent,
   type Observation,
   type Recommendation,
@@ -33,6 +34,7 @@ interface LearningStateRecord {
   teacherJournal: TeacherJournalEntry[];
   teacherMemory: TeacherMemory[];
   acknowledgements: SynchronizationAcknowledgement[];
+  sessionHandoffs: LearningSessionHandoff[];
 }
 
 const demoState: LearningStateRecord = {
@@ -47,6 +49,7 @@ const demoState: LearningStateRecord = {
   teacherJournal: [],
   teacherMemory: [],
   acknowledgements: [],
+  sessionHandoffs: [],
 };
 
 export const learningStateRepository = {
@@ -59,7 +62,7 @@ export const learningStateRepository = {
 
     try {
       const file = await readFile(filePath, 'utf8');
-      return JSON.parse(file) as LearningStateRecord;
+      return normalizeState(JSON.parse(file) as Partial<LearningStateRecord>);
     } catch (error) {
       if (isMissingFileError(error)) {
         await learningStateRepository.write(demoState);
@@ -88,6 +91,24 @@ function stateFilePath(): string {
 
 function cloneState(state: LearningStateRecord): LearningStateRecord {
   return JSON.parse(JSON.stringify(state)) as LearningStateRecord;
+}
+
+function normalizeState(state: Partial<LearningStateRecord>): LearningStateRecord {
+  return {
+    student: state.student ?? demoState.student,
+    studentModel: state.studentModel ?? demoState.studentModel,
+    currentLesson: state.currentLesson,
+    recommendations: state.recommendations ?? [],
+    acceptedEvents: state.acceptedEvents ?? [],
+    exerciseResults: state.exerciseResults ?? [],
+    speechResults: state.speechResults ?? [],
+    statisticsSnapshots: state.statisticsSnapshots ?? [],
+    observations: state.observations ?? [],
+    teacherJournal: state.teacherJournal ?? [],
+    teacherMemory: state.teacherMemory ?? [],
+    acknowledgements: state.acknowledgements ?? [],
+    sessionHandoffs: state.sessionHandoffs ?? [],
+  };
 }
 
 function isMissingFileError(error: unknown): boolean {

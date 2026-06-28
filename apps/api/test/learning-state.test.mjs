@@ -46,7 +46,10 @@ describe('learning state service', () => {
 
     assert.equal(firstSync.acknowledgements[0]?.status, 'accepted');
     assert.equal(firstSync.statisticsSnapshots.length, 1);
+    assert.equal(firstSync.student.id, 'demo-student');
+    assert.equal(firstSync.studentModel.studentId, 'demo-student');
     assert.equal(firstSync.studentModelVersion >= 2, true);
+    assert.equal(firstSync.recommendation.studentId, 'demo-student');
     assert.equal(duplicateSync.acknowledgements[0]?.status, 'duplicate');
   });
 
@@ -115,5 +118,35 @@ describe('learning state service', () => {
     );
     assert.equal(sync.statisticsSnapshots[0]?.speechAttempts, 0);
     assert.equal(sync.statisticsSnapshots[1]?.speechAttempts, 1);
+  });
+
+  it('stores in-progress session handoffs for continuing on another device', async () => {
+    const createdAt = new Date().toISOString();
+    const lesson = await learningStateService.getCurrentLesson();
+    const handoff = {
+      id: `handoff-demo-student-mobile-${Date.now()}`,
+      studentId: 'demo-student',
+      sourceDevice: 'mobile',
+      lesson,
+      context: {
+        mode: 'listening',
+        isOffline: false,
+        speechAvailable: true,
+        availableMinutes: 8,
+      },
+      currentExerciseIndex: 0,
+      startedAt: createdAt,
+      exerciseStartedAt: createdAt,
+      events: [],
+      results: [],
+      speechResults: [],
+      updatedAt: createdAt,
+    };
+
+    const saved = await learningStateService.upsertSessionHandoff(handoff);
+    const handoffs = await learningStateService.listSessionHandoffs();
+
+    assert.equal(saved.studentId, 'demo-student');
+    assert.equal(handoffs.some((item) => item.id === handoff.id && item.sourceDevice === 'mobile'), true);
   });
 });

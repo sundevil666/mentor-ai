@@ -238,6 +238,32 @@ No external AI provider is required yet. The boundary prepares the system for pr
 
 The deterministic teacher is useful as a production fallback and as an architectural seam. It lets the backend coordinate AI Teacher outputs without making route handlers or storage code responsible for teaching decisions.
 
+## 2026-06-28 - Comfort Pass: Micro-Lessons And Pronunciation Focus
+
+### Summary
+
+Improved the first learning loop so each generated exercise carries a minimal step explanation and a short success tip. The PWA now shows that guidance directly in the lesson flow, so the Student has less guessing to do before answering.
+
+Added lightweight local pronunciation focus detection for repeat-speaking exercises. The app compares the expected short phrase with the Student's typed speaking attempt, records missing, substituted, unclear, or extra words as `PronunciationIssue` records, stores them in `SpeechResult`, and surfaces a small pronunciation focus summary in lesson statistics. The backend preserves synchronized speech results and includes pronunciation issue counts and focus words in server-side statistics snapshots.
+
+### Files Changed
+
+- `README.md`
+- `apps/api/src/services/learning-state.service.ts`
+- `apps/pwa/src/pages/DashboardPage.vue`
+- `apps/pwa/src/stores/app-store.ts`
+- `docs/implementation-log.md`
+- `packages/shared/src/index.ts`
+- `packages/shared/test/domain.test.mjs`
+
+### Lessons Learned
+
+The most useful first pronunciation feature is not a score. It is a calm signal that says which words deserve another tiny practice step.
+
+### Known Limitations
+
+Pronunciation focus is text-based and depends on the typed or recognized attempt. It does not analyze audio, stress, intonation, or phonemes yet.
+
 ### Known Limitations
 
 The AI Teacher is deterministic and rule-based. It does not call an external model, does not assemble rich provider context, and does not validate provider output yet.
