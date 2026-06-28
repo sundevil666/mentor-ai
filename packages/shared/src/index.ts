@@ -2,9 +2,31 @@ export type StorageMode = 'demo' | 'personal';
 
 export type EnglishLevel = 'beginner' | 'intermediate' | 'advanced';
 
+export type LearningConcept = 'learning' | 'reading' | 'vocabulary';
+
+export type ConceptLevel = 'foundation' | 'developing' | 'confident';
+
+export type ReadingLevel = 'a1' | 'a2' | 'b1' | 'b2' | 'c1' | 'c2' | 'unknown';
+
+export type ReadingImportSourceType = 'manual' | 'public-domain' | 'licensed-provider';
+
+export type PronunciationIssueType = 'missing' | 'substitution' | 'stress' | 'unclear' | 'extra';
+
 export type SkillArea = 'vocabulary' | 'grammar' | 'listening' | 'speaking' | 'review';
 
+export type LearningActivityType =
+  | 'guided-lesson'
+  | 'reading-comprehension'
+  | 'vocabulary-recognition'
+  | 'vocabulary-recall'
+  | 'recovery-check'
+  | 'review';
+
 export type LearningMode = 'bus' | 'walking' | 'home' | 'listening' | 'speaking' | 'review' | 'recovery';
+
+export type WorkShift = 'first' | 'second' | 'third' | 'off' | 'unknown';
+
+export type ActivityPace = 'passive' | 'steady' | 'active' | 'deep';
 
 export type ExerciseType =
   | 'vocabulary-recall'
@@ -26,6 +48,14 @@ export type LearningEventType =
 export type CompletionState = 'completed' | 'skipped' | 'abandoned';
 
 export type SyncStatus = 'pending' | 'accepted' | 'duplicate' | 'rejected';
+
+export type TeacherLevelDecision = 'increase' | 'decrease' | 'hold';
+
+export type RetentionRisk = 'low' | 'medium' | 'high';
+
+export type ReviewUrgency = 'none' | 'soon' | 'now';
+
+export type AvoidancePattern = 'none' | 'stale' | 'repeated-skip' | 'easy-only';
 
 export interface UserProfile {
   id: string;
@@ -52,6 +82,9 @@ export interface StudentModel {
   studentId: string;
   version: number;
   level: EnglishLevel;
+  conceptLevels: Record<LearningConcept, ConceptState>;
+  conceptHistory: ConceptPracticeRecord[];
+  teacherDecision: TeacherDecision;
   vocabulary: SkillState;
   grammar: SkillState;
   listening: SkillState;
@@ -63,6 +96,44 @@ export interface StudentModel {
   confidence: SignalScore;
   fatigue: SignalScore;
   updatedAt: string;
+}
+
+export interface ConceptState {
+  concept: LearningConcept;
+  level: ConceptLevel;
+  score: SignalScore;
+  confidence: SignalScore;
+  evidenceCount: number;
+  lastPracticedAt?: string;
+  daysSincePractice: number;
+  avoidancePattern: AvoidancePattern;
+  retentionRisk: RetentionRisk;
+  reviewUrgency: ReviewUrgency;
+  recommendedActivity: LearningActivityType;
+  skillLevels?: Partial<Record<SkillArea, ConceptLevel>>;
+}
+
+export interface ConceptPracticeRecord {
+  concept: LearningConcept;
+  activityType: LearningActivityType;
+  practicedAt: string;
+  accuracy: number;
+  averageResponseTimeMs: number;
+  completionRate: number;
+  hintCount: number;
+  skippedCount: number;
+  abandonedCount: number;
+  teacherDecision: TeacherLevelDecision;
+}
+
+export interface TeacherDecision {
+  concept: LearningConcept;
+  activityType: LearningActivityType;
+  levelDecision: TeacherLevelDecision;
+  reason: string;
+  nextRecommendedConcept: LearningConcept;
+  nextRecommendedActivity: LearningActivityType;
+  createdAt: string;
 }
 
 export interface SkillState {
@@ -103,14 +174,25 @@ export interface LearningGoal {
 
 export interface LearningContext {
   mode: LearningMode;
+  selectedConcept?: LearningConcept;
+  manualConceptChoice?: boolean;
   isOffline: boolean;
   speechAvailable: boolean;
   availableMinutes: number;
+  workShift?: WorkShift;
+  dayType?: 'weekday' | 'weekend';
+  activityPace?: ActivityPace;
+  startedHour?: number;
+  activityReason?: string;
 }
 
 export interface LessonPlan {
   id: string;
   studentModelVersion: number;
+  concept: LearningConcept;
+  conceptLevel: ConceptLevel;
+  activityType: LearningActivityType;
+  teacherDecision: TeacherDecision;
   goal: LearningGoal;
   teachingIntent: string;
   targetSkills: SkillArea[];
@@ -124,6 +206,10 @@ export interface GeneratedLesson {
   id: string;
   planId: string;
   studentModelVersion: number;
+  concept: LearningConcept;
+  conceptLevel: ConceptLevel;
+  activityType: LearningActivityType;
+  teacherDecision: TeacherDecision;
   title: string;
   purpose: string;
   targetSkills: SkillArea[];
@@ -161,6 +247,81 @@ export interface LessonRecovery {
   message: string;
 }
 
+export interface ReadingImportSource {
+  id: string;
+  type: ReadingImportSourceType;
+  provider: string;
+  sourceUrl?: string;
+  importedAt: string;
+  licenseNote?: string;
+}
+
+export interface ReadingBook {
+  id: string;
+  title: string;
+  author?: string;
+  level: ReadingLevel;
+  language: 'en';
+  sourceId: string;
+  pageCount: number;
+  chapterCount: number;
+  wordCount: number;
+  importedAt: string;
+  updatedAt: string;
+}
+
+export interface ReadingChapter {
+  id: string;
+  bookId: string;
+  title: string;
+  order: number;
+  pageIds: string[];
+}
+
+export interface ReadingPage {
+  id: string;
+  bookId: string;
+  chapterId?: string;
+  pageNumber: number;
+  text: string;
+  wordCount: number;
+}
+
+export interface ReadingAttempt {
+  id: string;
+  studentId: string;
+  bookId: string;
+  pageId: string;
+  startedAt: string;
+  completedAt?: string;
+  transcript?: string;
+  expectedText: string;
+  pronunciationIssues: PronunciationIssue[];
+  unknownWords: string[];
+}
+
+export interface PronunciationIssue {
+  id: string;
+  word: string;
+  issueType: PronunciationIssueType;
+  expected?: string;
+  heard?: string;
+  sentence?: string;
+  confidence: number;
+}
+
+export interface VocabularyPracticeItem {
+  id: string;
+  studentId: string;
+  word: string;
+  sourceBookId?: string;
+  sourcePageId?: string;
+  sentence?: string;
+  pronunciationIssueIds: string[];
+  nextReviewAt: string;
+  createdAt: string;
+}
+
 export interface LearningEvent {
   id: string;
   studentId: string;
@@ -169,6 +330,12 @@ export interface LearningEvent {
   exerciseId?: string;
   type: LearningEventType;
   occurredAt: string;
+  concept?: LearningConcept;
+  activityType?: LearningActivityType;
+  teacherDecision?: TeacherLevelDecision;
+  retentionRisk?: RetentionRisk;
+  reviewUrgency?: ReviewUrgency;
+  avoidancePattern?: AvoidancePattern;
   data?: Record<string, string | number | boolean>;
 }
 
@@ -180,9 +347,26 @@ export interface ExerciseResult {
   exerciseId: string;
   exerciseType: ExerciseType;
   targetSkill: SkillArea;
+  concept: LearningConcept;
+  activityType: LearningActivityType;
+  conceptLevel: ConceptLevel;
   correct: boolean;
   attempts: number;
   responseTimeMs: number;
+  hintCount: number;
+  skipped: boolean;
+  abandoned: boolean;
+  repeatedMistake: boolean;
+  readingComprehensionScore?: number;
+  unknownWords?: string[];
+  vocabularyRecallStatus?: 'recognized' | 'recalled' | 'forgotten' | 'fragile';
+  teacherDecision: TeacherLevelDecision;
+  reasonForLevelDecision: string;
+  lastPracticedAt?: string;
+  daysSincePractice?: number;
+  avoidancePattern?: AvoidancePattern;
+  retentionRisk?: RetentionRisk;
+  reviewUrgency?: ReviewUrgency;
   completionState: CompletionState;
   evidenceEventIds: string[];
   completedAt: string;
@@ -211,6 +395,10 @@ export interface StatisticsSnapshot {
   audioReplays: number;
   speechAttempts: number;
   fatigueSignal: SignalScore;
+  learningMode?: LearningMode;
+  workShift?: WorkShift;
+  dayType?: 'weekday' | 'weekend';
+  activityPace?: ActivityPace;
   createdAt: string;
 }
 
@@ -238,6 +426,25 @@ export interface Recommendation {
   reason: string;
   lessonPlanId?: string;
   createdAt: string;
+}
+
+export interface ActivitySnapshot {
+  id: string;
+  studentId: string;
+  sessionId?: string;
+  observedAt: string;
+  localHour: number;
+  weekday: number;
+  dayType: 'weekday' | 'weekend';
+  workShift: WorkShift;
+  activityPace: ActivityPace;
+  suggestedMode: LearningMode;
+  availableMinutes: number;
+  reason: string;
+  lessonCompleted?: boolean;
+  completedExercises?: number;
+  accuracy?: number;
+  averageResponseTimeMs?: number;
 }
 
 export interface TeacherJournalEntry {
@@ -294,6 +501,21 @@ export const initialStudentModel: StudentModel = {
   studentId: demoStudent.id,
   version: 1,
   level: 'beginner',
+  conceptLevels: {
+    learning: createConceptState('learning', 0.32, 'guided-lesson'),
+    reading: createConceptState('reading', 0.24, 'reading-comprehension'),
+    vocabulary: createConceptState('vocabulary', 0.35, 'vocabulary-recall'),
+  },
+  conceptHistory: [],
+  teacherDecision: {
+    concept: 'learning',
+    activityType: 'guided-lesson',
+    levelDecision: 'hold',
+    reason: 'Start with a guided lesson so the teacher can observe grammar, listening, speaking, and vocabulary together.',
+    nextRecommendedConcept: 'learning',
+    nextRecommendedActivity: 'guided-lesson',
+    createdAt: '2026-06-28T00:00:00.000Z',
+  },
   vocabulary: createSkillState(0.35),
   grammar: createSkillState(0.3),
   listening: createSkillState(0.3),
@@ -380,7 +602,10 @@ export function nextModelVersion(model: Pick<StudentModel, 'version'>): number {
 }
 
 export function createLessonPlan(model: StudentModel, context: LearningContext, createdAt: string): LessonPlan {
-  const weakestSkill = getWeakestSkill(model);
+  const teacherDecision = decideNextTeacherAction(model, context, [], createdAt);
+  const concept = context.manualConceptChoice && context.selectedConcept ? context.selectedConcept : teacherDecision.nextRecommendedConcept;
+  const conceptState = refreshConceptTimeSignals(getConceptState(model, concept), model.conceptHistory, createdAt);
+  const weakestSkill = getWeakestSkillForConcept(model, concept);
   const reviewPriority = model.reviewPriorities.find((priority) => priority.skill === weakestSkill);
   const goal = model.activeLearningGoals.find((activeGoal) => activeGoal.skill === weakestSkill) ?? {
     id: `goal-${weakestSkill}-${model.version}`,
@@ -390,13 +615,23 @@ export function createLessonPlan(model: StudentModel, context: LearningContext, 
   };
 
   return {
-    id: `plan-${model.studentId}-${model.version}-${weakestSkill}`,
+    id: `plan-${model.studentId}-${model.version}-${concept}-${weakestSkill}`,
     studentModelVersion: model.version,
+    concept,
+    conceptLevel: conceptState.level,
+    activityType: chooseActivityForConcept(concept, conceptState),
+    teacherDecision: {
+      ...teacherDecision,
+      concept,
+      activityType: chooseActivityForConcept(concept, conceptState),
+      nextRecommendedConcept: concept,
+      nextRecommendedActivity: chooseActivityForConcept(concept, conceptState),
+    },
     goal,
-    teachingIntent: createTeachingIntent(weakestSkill, context),
+    teachingIntent: createTeachingIntent(weakestSkill, context, conceptState),
     targetSkills: Array.from(new Set([weakestSkill, 'review'])),
     learningMode: context.mode,
-    difficulty: chooseDifficulty(model, context),
+    difficulty: chooseDifficulty(model, context, conceptState, teacherDecision),
     reviewPriorityIds: reviewPriority ? [reviewPriority.id] : [],
     createdAt,
   };
@@ -404,8 +639,438 @@ export function createLessonPlan(model: StudentModel, context: LearningContext, 
 
 export function generateLessonFromPlan(plan: LessonPlan, createdAt: string): GeneratedLesson {
   const reviewTarget = plan.goal.skill === 'grammar' ? 'Where are you?' : 'Good afternoon';
+  const exercises = createConceptExercises(plan, reviewTarget);
 
-  const exercises: Exercise[] = [
+  return {
+    id: `lesson-${plan.id}`,
+    planId: plan.id,
+    studentModelVersion: plan.studentModelVersion,
+    concept: plan.concept,
+    conceptLevel: plan.conceptLevel,
+    activityType: plan.activityType,
+    teacherDecision: plan.teacherDecision,
+    title: createConceptLessonTitle(plan),
+    purpose: plan.goal.purpose,
+    targetSkills: plan.targetSkills,
+    estimatedMinutes: plan.learningMode === 'bus' ? 4 : 6,
+    exercises,
+    localEvaluation: exercises
+      .filter((exercise) => exercise.expectedResponse)
+      .map((exercise) => ({
+        exerciseId: exercise.id,
+        acceptedResponses: [exercise.expectedResponse as string],
+      })),
+    recovery: {
+      fallbackMode: 'review',
+      message: 'Return to a shorter review if the lesson becomes too demanding.',
+    },
+    createdAt,
+  };
+}
+
+export function updateStudentModelFromResults(
+  model: StudentModel,
+  results: ExerciseResult[],
+  updatedAt: string,
+): StudentModel {
+  const summary = summarizeResults(results);
+  const changedSkills = getChangedSkills(results);
+  const teacherDecision = decideNextTeacherAction(model, createContextFromResults(results), results, updatedAt);
+  const nextModel: StudentModel = {
+    ...model,
+    version: nextModelVersion(model),
+    conceptLevels: updateConceptStates(model, results, teacherDecision, updatedAt),
+    conceptHistory: [...model.conceptHistory, ...createConceptPracticeRecords(results, updatedAt)].slice(-24),
+    teacherDecision,
+    vocabulary: updateSkillState(model.vocabulary, results, 'vocabulary', updatedAt),
+    grammar: updateSkillState(model.grammar, results, 'grammar', updatedAt),
+    listening: updateSkillState(model.listening, results, 'listening', updatedAt),
+    speaking: updateSkillState(model.speaking, results, 'speaking', updatedAt),
+    confidence: {
+      value: clamp(model.confidence.value + (summary.accuracy >= 0.8 ? 0.05 : -0.03)),
+      confidence: clamp(model.confidence.confidence + 0.1),
+    },
+    fatigue: summary.fatigueSignal,
+    updatedAt,
+  };
+
+  return {
+    ...nextModel,
+    knownWeaknesses: mergeLearningSignals(model.knownWeaknesses, createWeaknessSignals(nextModel, results, updatedAt)),
+    knownStrengths: mergeLearningSignals(model.knownStrengths, createStrengthSignals(nextModel, results, updatedAt)),
+    reviewPriorities: refreshReviewPriorities(model.reviewPriorities, changedSkills, results, updatedAt),
+    activeLearningGoals: refreshLearningGoals(model.activeLearningGoals, getWeakestSkill(nextModel), updatedAt),
+  };
+}
+
+export function createRecommendationFromModel(model: StudentModel, createdAt: string): Recommendation {
+  const decision = decideNextTeacherAction(model, { mode: 'home', isOffline: false, speechAvailable: true, availableMinutes: 6 }, [], createdAt);
+
+  return {
+    id: `recommendation-${model.studentId}-${model.version}`,
+    studentId: model.studentId,
+    summary: createConceptRecommendationSummary(decision),
+    reason: decision.reason,
+    createdAt,
+  };
+}
+
+export function createObservationFromResults(
+  studentId: string,
+  results: ExerciseResult[],
+  createdAt: string,
+): Observation | undefined {
+  const completed = results.filter((result) => result.completionState === 'completed');
+  const incorrect = completed.find((result) => !result.correct);
+
+  if (!incorrect) {
+    return undefined;
+  }
+
+  return {
+    id: `observation-${studentId}-${incorrect.exerciseId}-${createdAt}`,
+    studentId,
+    description: `${labelSkill(incorrect.targetSkill)} needs review based on the latest lesson evidence.`,
+    skill: incorrect.targetSkill,
+    evidenceIds: incorrect.evidenceEventIds,
+    confidence: completed.length < 3 ? 0.4 : 0.6,
+    createdAt,
+  };
+}
+
+function createSkillState(value: number): SkillState {
+  return {
+    score: { value, confidence: 0.3 },
+    confidence: { value, confidence: 0.3 },
+    evidenceCount: 0,
+  };
+}
+
+function createConceptState(
+  concept: LearningConcept,
+  value: number,
+  recommendedActivity: LearningActivityType,
+): ConceptState {
+  return {
+    concept,
+    level: scoreToConceptLevel(value),
+    score: { value, confidence: 0.3 },
+    confidence: { value, confidence: 0.3 },
+    evidenceCount: 0,
+    daysSincePractice: 0,
+    avoidancePattern: 'none',
+    retentionRisk: 'low',
+    reviewUrgency: 'none',
+    recommendedActivity,
+    skillLevels: {},
+  };
+}
+
+export function decideNextTeacherAction(
+  model: StudentModel,
+  context: LearningContext,
+  results: ExerciseResult[],
+  createdAt: string,
+): TeacherDecision {
+  const concept = context.selectedConcept ?? getRecommendedConcept(model, createdAt);
+  const conceptState = getConceptState(model, concept);
+  const summary = summarizeConceptEvidence(results, concept);
+  const levelDecision = decideLevelChange(conceptState, summary);
+  const nextRecommendedConcept =
+    context.manualConceptChoice && context.selectedConcept ? context.selectedConcept : getRecommendedConcept(model, createdAt);
+  const nextState = getConceptState(model, nextRecommendedConcept);
+  const nextRecommendedActivity = chooseActivityForConcept(nextRecommendedConcept, nextState);
+
+  return {
+    concept,
+    activityType: chooseActivityForConcept(concept, conceptState),
+    levelDecision,
+    reason: createDecisionReason(concept, conceptState, summary, levelDecision, createdAt),
+    nextRecommendedConcept,
+    nextRecommendedActivity,
+    createdAt,
+  };
+}
+
+function summarizeConceptEvidence(results: ExerciseResult[], concept: LearningConcept) {
+  const conceptResults = results.filter((result) => result.concept === concept);
+  const completed = conceptResults.filter((result) => result.completionState === 'completed');
+  const correct = completed.filter((result) => result.correct).length;
+  const totalResponseTime = completed.reduce((sum, result) => sum + result.responseTimeMs, 0);
+  const skippedCount = conceptResults.filter((result) => result.completionState === 'skipped' || result.skipped).length;
+  const abandonedCount = conceptResults.filter((result) => result.completionState === 'abandoned' || result.abandoned).length;
+  const hintCount = conceptResults.reduce((sum, result) => sum + result.hintCount, 0);
+
+  return {
+    resultCount: conceptResults.length,
+    accuracy: completed.length === 0 ? 0 : correct / completed.length,
+    averageResponseTimeMs: completed.length === 0 ? 0 : Math.round(totalResponseTime / completed.length),
+    completionRate: conceptResults.length === 0 ? 1 : completed.length / conceptResults.length,
+    hintCount,
+    skippedCount,
+    abandonedCount,
+    repeatedMistakes: conceptResults.filter((result) => result.repeatedMistake || !result.correct).length,
+  };
+}
+
+function decideLevelChange(
+  conceptState: ConceptState,
+  summary: ReturnType<typeof summarizeConceptEvidence>,
+): TeacherLevelDecision {
+  if (
+    summary.resultCount > 0 &&
+    (summary.accuracy < 0.55 ||
+      summary.completionRate < 0.75 ||
+      summary.hintCount >= 3 ||
+      summary.abandonedCount > 0 ||
+      summary.repeatedMistakes >= 2 ||
+      conceptState.retentionRisk === 'high')
+  ) {
+    return 'decrease';
+  }
+
+  if (
+    summary.resultCount >= 3 &&
+    summary.accuracy >= 0.8 &&
+    summary.averageResponseTimeMs > 0 &&
+    summary.averageResponseTimeMs <= 9000 &&
+    summary.hintCount === 0 &&
+    summary.completionRate >= 0.9 &&
+    conceptState.retentionRisk !== 'high'
+  ) {
+    return 'increase';
+  }
+
+  return 'hold';
+}
+
+function updateConceptStates(
+  model: StudentModel,
+  results: ExerciseResult[],
+  teacherDecision: TeacherDecision,
+  updatedAt: string,
+): Record<LearningConcept, ConceptState> {
+  const states = { ...model.conceptLevels };
+  const concepts: LearningConcept[] = ['learning', 'reading', 'vocabulary'];
+
+  for (const concept of concepts) {
+    const current = refreshConceptTimeSignals(states[concept], model.conceptHistory, updatedAt);
+    const summary = summarizeConceptEvidence(results, concept);
+
+    if (summary.resultCount === 0) {
+      states[concept] = current;
+      continue;
+    }
+
+    const levelDecision = concept === teacherDecision.concept ? teacherDecision.levelDecision : decideLevelChange(current, summary);
+    const scoreAdjustment = levelDecision === 'increase' ? 0.08 : levelDecision === 'decrease' ? -0.07 : summary.accuracy >= 0.7 ? 0.02 : -0.02;
+    const nextScore = clamp(current.score.value + scoreAdjustment);
+
+    states[concept] = {
+      ...current,
+      level: scoreToConceptLevel(nextScore),
+      score: {
+        value: nextScore,
+        confidence: clamp(current.score.confidence + 0.12),
+      },
+      confidence: {
+        value: clamp(current.confidence.value + (summary.completionRate >= 0.9 && summary.hintCount === 0 ? 0.04 : -0.03)),
+        confidence: clamp(current.confidence.confidence + 0.1),
+      },
+      evidenceCount: current.evidenceCount + summary.resultCount,
+      lastPracticedAt: updatedAt,
+      daysSincePractice: 0,
+      avoidancePattern: summary.skippedCount + summary.abandonedCount > 0 ? 'repeated-skip' : 'none',
+      retentionRisk: 'low',
+      reviewUrgency: 'none',
+      recommendedActivity: chooseActivityForConcept(concept, current),
+    };
+  }
+
+  return states;
+}
+
+function createConceptPracticeRecords(results: ExerciseResult[], practicedAt: string): ConceptPracticeRecord[] {
+  const records: ConceptPracticeRecord[] = [];
+
+  for (const concept of ['learning', 'reading', 'vocabulary'] as LearningConcept[]) {
+    const summary = summarizeConceptEvidence(results, concept);
+
+    if (summary.resultCount === 0) {
+      continue;
+    }
+
+    const firstResult = results.find((result) => result.concept === concept);
+
+    records.push({
+      concept,
+      activityType: firstResult?.activityType ?? chooseActivityForConcept(concept, createConceptState(concept, 0.3, 'review')),
+      practicedAt,
+      accuracy: summary.accuracy,
+      averageResponseTimeMs: summary.averageResponseTimeMs,
+      completionRate: summary.completionRate,
+      hintCount: summary.hintCount,
+      skippedCount: summary.skippedCount,
+      abandonedCount: summary.abandonedCount,
+      teacherDecision: firstResult?.teacherDecision ?? 'hold',
+    });
+  }
+
+  return records;
+}
+
+function getWeakestSkill(model: StudentModel): SkillArea {
+  const entries: Array<[SkillArea, SkillState]> = [
+    ['vocabulary', model.vocabulary],
+    ['grammar', model.grammar],
+    ['listening', model.listening],
+    ['speaking', model.speaking],
+  ];
+
+  return entries.reduce((weakest, current) => (current[1].score.value < weakest[1].score.value ? current : weakest))[0];
+}
+
+function getWeakestSkillForConcept(model: StudentModel, concept: LearningConcept): SkillArea {
+  if (concept === 'reading') {
+    return model.listening.score.value < model.vocabulary.score.value ? 'listening' : 'vocabulary';
+  }
+
+  if (concept === 'vocabulary') {
+    return 'vocabulary';
+  }
+
+  return getWeakestSkill(model);
+}
+
+function chooseDifficulty(
+  model: StudentModel,
+  context: LearningContext,
+  conceptState: ConceptState,
+  teacherDecision: TeacherDecision,
+): LessonPlan['difficulty'] {
+  if (
+    context.mode === 'recovery' ||
+    model.fatigue.value > 0.5 ||
+    conceptState.retentionRisk === 'high' ||
+    teacherDecision.levelDecision === 'decrease'
+  ) {
+    return 'supportive';
+  }
+
+  if (
+    model.confidence.value > 0.7 &&
+    getSkillState(model, getWeakestSkill(model)).score.value > 0.65 &&
+    teacherDecision.levelDecision === 'increase'
+  ) {
+    return 'challenge';
+  }
+
+  return 'steady';
+}
+
+function createTeachingIntent(skill: SkillArea, context: LearningContext, conceptState: ConceptState): string {
+  const manualChoice = context.manualConceptChoice ? 'respecting the student choice' : 'following the teacher recommendation';
+  return `Practice ${labelConcept(conceptState.concept)} through ${labelSkill(skill)} at ${conceptState.level} level, ${manualChoice}, while preserving evidence for the Student Model.`;
+}
+
+function createGoalPurpose(skill: SkillArea): string {
+  switch (skill) {
+    case 'grammar':
+      return 'Stabilize simple English question word order.';
+    case 'listening':
+      return 'Strengthen comprehension of short spoken English questions.';
+    case 'speaking':
+      return 'Build confidence repeating and producing a short English question.';
+    case 'review':
+      return 'Protect recent learning with a short review.';
+    case 'vocabulary':
+      return 'Recall and use basic English greetings with confidence.';
+  }
+}
+
+function createLessonTitle(skill: SkillArea): string {
+  switch (skill) {
+    case 'grammar':
+      return 'Question word order practice';
+    case 'listening':
+      return 'Short question listening';
+    case 'speaking':
+      return 'Speaking confidence practice';
+    case 'review':
+      return 'Focused review';
+    case 'vocabulary':
+      return 'Greeting recall practice';
+  }
+}
+
+function createConceptLessonTitle(plan: LessonPlan): string {
+  if (plan.concept === 'reading') {
+    return 'Short reading check';
+  }
+
+  if (plan.concept === 'vocabulary') {
+    return 'Vocabulary growth practice';
+  }
+
+  return createLessonTitle(plan.goal.skill);
+}
+
+function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercise[] {
+  if (plan.concept === 'reading') {
+    return [
+      {
+        id: `${plan.id}-reading-text`,
+        type: 'review',
+        prompt: 'Read: Tom works in a small cafe. In the afternoon, he helps a friend and drinks tea.',
+        targetSkill: 'review',
+        expectedResponse: 'read',
+      },
+      {
+        id: `${plan.id}-reading-main-idea`,
+        type: 'listening-comprehension',
+        prompt: 'What is the text mostly about?',
+        targetSkill: 'listening',
+        expectedResponse: 'tom works in a cafe',
+        options: ['tom works in a cafe', 'tom travels by train', 'tom studies math'],
+      },
+      {
+        id: `${plan.id}-reading-word`,
+        type: 'vocabulary-recall',
+        prompt: 'Which word means a place where people drink tea or coffee?',
+        targetSkill: 'vocabulary',
+        expectedResponse: 'cafe',
+      },
+    ];
+  }
+
+  if (plan.concept === 'vocabulary') {
+    return [
+      {
+        id: `${plan.id}-vocabulary-recognition`,
+        type: 'vocabulary-recall',
+        prompt: 'Choose the meaning of "afternoon".',
+        targetSkill: 'vocabulary',
+        expectedResponse: 'time after lunch',
+        options: ['time after lunch', 'very early morning', 'a small question'],
+      },
+      {
+        id: `${plan.id}-vocabulary-recall`,
+        type: 'vocabulary-recall',
+        prompt: 'Translate: dobrý deň',
+        targetSkill: 'vocabulary',
+        expectedResponse: 'good afternoon',
+      },
+      {
+        id: `${plan.id}-vocabulary-context`,
+        type: 'word-order',
+        prompt: 'Order the words: good / afternoon / teacher',
+        targetSkill: 'grammar',
+        expectedResponse: 'good afternoon teacher',
+      },
+    ];
+  }
+
+  return [
     {
       id: `${plan.id}-warmup`,
       type: 'review',
@@ -445,159 +1110,6 @@ export function generateLessonFromPlan(plan: LessonPlan, createdAt: string): Gen
       audioText: 'Where are you?',
     },
   ];
-
-  return {
-    id: `lesson-${plan.id}`,
-    planId: plan.id,
-    studentModelVersion: plan.studentModelVersion,
-    title: createLessonTitle(plan.goal.skill),
-    purpose: plan.goal.purpose,
-    targetSkills: plan.targetSkills,
-    estimatedMinutes: plan.learningMode === 'bus' ? 4 : 6,
-    exercises,
-    localEvaluation: exercises
-      .filter((exercise) => exercise.expectedResponse)
-      .map((exercise) => ({
-        exerciseId: exercise.id,
-        acceptedResponses: [exercise.expectedResponse as string],
-      })),
-    recovery: {
-      fallbackMode: 'review',
-      message: 'Return to a shorter review if the lesson becomes too demanding.',
-    },
-    createdAt,
-  };
-}
-
-export function updateStudentModelFromResults(
-  model: StudentModel,
-  results: ExerciseResult[],
-  updatedAt: string,
-): StudentModel {
-  const summary = summarizeResults(results);
-  const changedSkills = getChangedSkills(results);
-  const nextModel: StudentModel = {
-    ...model,
-    version: nextModelVersion(model),
-    vocabulary: updateSkillState(model.vocabulary, results, 'vocabulary', updatedAt),
-    grammar: updateSkillState(model.grammar, results, 'grammar', updatedAt),
-    listening: updateSkillState(model.listening, results, 'listening', updatedAt),
-    speaking: updateSkillState(model.speaking, results, 'speaking', updatedAt),
-    confidence: {
-      value: clamp(model.confidence.value + (summary.accuracy >= 0.8 ? 0.05 : -0.03)),
-      confidence: clamp(model.confidence.confidence + 0.1),
-    },
-    fatigue: summary.fatigueSignal,
-    updatedAt,
-  };
-
-  return {
-    ...nextModel,
-    knownWeaknesses: mergeLearningSignals(model.knownWeaknesses, createWeaknessSignals(nextModel, results, updatedAt)),
-    knownStrengths: mergeLearningSignals(model.knownStrengths, createStrengthSignals(nextModel, results, updatedAt)),
-    reviewPriorities: refreshReviewPriorities(model.reviewPriorities, changedSkills, results, updatedAt),
-    activeLearningGoals: refreshLearningGoals(model.activeLearningGoals, getWeakestSkill(nextModel), updatedAt),
-  };
-}
-
-export function createRecommendationFromModel(model: StudentModel, createdAt: string): Recommendation {
-  const skill = getWeakestSkill(model);
-
-  return {
-    id: `recommendation-${model.studentId}-${model.version}`,
-    studentId: model.studentId,
-    summary: createLessonTitle(skill),
-    reason: createGoalPurpose(skill),
-    createdAt,
-  };
-}
-
-export function createObservationFromResults(
-  studentId: string,
-  results: ExerciseResult[],
-  createdAt: string,
-): Observation | undefined {
-  const completed = results.filter((result) => result.completionState === 'completed');
-  const incorrect = completed.find((result) => !result.correct);
-
-  if (!incorrect) {
-    return undefined;
-  }
-
-  return {
-    id: `observation-${studentId}-${incorrect.exerciseId}-${createdAt}`,
-    studentId,
-    description: `${labelSkill(incorrect.targetSkill)} needs review based on the latest lesson evidence.`,
-    skill: incorrect.targetSkill,
-    evidenceIds: incorrect.evidenceEventIds,
-    confidence: completed.length < 3 ? 0.4 : 0.6,
-    createdAt,
-  };
-}
-
-function createSkillState(value: number): SkillState {
-  return {
-    score: { value, confidence: 0.3 },
-    confidence: { value, confidence: 0.3 },
-    evidenceCount: 0,
-  };
-}
-
-function getWeakestSkill(model: StudentModel): SkillArea {
-  const entries: Array<[SkillArea, SkillState]> = [
-    ['vocabulary', model.vocabulary],
-    ['grammar', model.grammar],
-    ['listening', model.listening],
-    ['speaking', model.speaking],
-  ];
-
-  return entries.reduce((weakest, current) => (current[1].score.value < weakest[1].score.value ? current : weakest))[0];
-}
-
-function chooseDifficulty(model: StudentModel, context: LearningContext): LessonPlan['difficulty'] {
-  if (context.mode === 'recovery' || model.fatigue.value > 0.5) {
-    return 'supportive';
-  }
-
-  if (model.confidence.value > 0.7 && getSkillState(model, getWeakestSkill(model)).score.value > 0.65) {
-    return 'challenge';
-  }
-
-  return 'steady';
-}
-
-function createTeachingIntent(skill: SkillArea, context: LearningContext): string {
-  return `Practice ${labelSkill(skill)} through a ${context.mode} lesson while preserving evidence for the Student Model.`;
-}
-
-function createGoalPurpose(skill: SkillArea): string {
-  switch (skill) {
-    case 'grammar':
-      return 'Stabilize simple English question word order.';
-    case 'listening':
-      return 'Strengthen comprehension of short spoken English questions.';
-    case 'speaking':
-      return 'Build confidence repeating and producing a short English question.';
-    case 'review':
-      return 'Protect recent learning with a short review.';
-    case 'vocabulary':
-      return 'Recall and use basic English greetings with confidence.';
-  }
-}
-
-function createLessonTitle(skill: SkillArea): string {
-  switch (skill) {
-    case 'grammar':
-      return 'Question word order practice';
-    case 'listening':
-      return 'Short question listening';
-    case 'speaking':
-      return 'Speaking confidence practice';
-    case 'review':
-      return 'Focused review';
-    case 'vocabulary':
-      return 'Greeting recall practice';
-  }
 }
 
 function updateSkillState(
@@ -630,6 +1142,153 @@ function updateSkillState(
     evidenceCount: current.evidenceCount + skillResults.length,
     lastPracticedAt: updatedAt,
   };
+}
+
+function getConceptState(model: StudentModel, concept: LearningConcept): ConceptState {
+  return model.conceptLevels?.[concept] ?? createConceptState(concept, 0.3, chooseActivityForConcept(concept));
+}
+
+function getRecommendedConcept(model: StudentModel, createdAt: string): LearningConcept {
+  const refreshed = (['learning', 'reading', 'vocabulary'] as LearningConcept[]).map((concept) =>
+    refreshConceptTimeSignals(getConceptState(model, concept), model.conceptHistory, createdAt),
+  );
+  const urgent = refreshed.find((state) => state.reviewUrgency === 'now' || state.avoidancePattern !== 'none');
+
+  if (urgent) {
+    return urgent.concept;
+  }
+
+  return refreshed.reduce((weakest, current) => (current.score.value < weakest.score.value ? current : weakest)).concept;
+}
+
+function refreshConceptTimeSignals(
+  state: ConceptState,
+  history: ConceptPracticeRecord[],
+  createdAt: string,
+): ConceptState {
+  const lastPractice = state.lastPracticedAt ?? findLastPracticeForConcept(history, state.concept)?.practicedAt;
+  const daysSincePractice = lastPractice ? daysBetween(lastPractice, createdAt) : 0;
+  const recent = history.slice(-6);
+  const practicedRecently = recent.some((record) => record.concept === state.concept);
+  const skippedRecently = recent.filter((record) => record.concept === state.concept && record.skippedCount + record.abandonedCount > 0).length;
+  const avoidancePattern: AvoidancePattern =
+    skippedRecently >= 2 ? 'repeated-skip' : history.length >= 4 && !practicedRecently ? 'stale' : state.avoidancePattern;
+  const retentionRisk: RetentionRisk = daysSincePractice >= 10 ? 'high' : daysSincePractice >= 5 ? 'medium' : 'low';
+  const reviewUrgency: ReviewUrgency = retentionRisk === 'high' || avoidancePattern !== 'none' ? 'now' : retentionRisk === 'medium' ? 'soon' : 'none';
+
+  return {
+    ...state,
+    lastPracticedAt: lastPractice,
+    daysSincePractice,
+    avoidancePattern,
+    retentionRisk,
+    reviewUrgency,
+  };
+}
+
+function findLastPracticeForConcept(
+  history: ConceptPracticeRecord[],
+  concept: LearningConcept,
+): ConceptPracticeRecord | undefined {
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    if (history[index].concept === concept) {
+      return history[index];
+    }
+  }
+
+  return undefined;
+}
+
+function chooseActivityForConcept(
+  concept: LearningConcept,
+  state: Partial<ConceptState> = {},
+): LearningActivityType {
+  if (state.reviewUrgency === 'now' || state.retentionRisk === 'high') {
+    return 'recovery-check';
+  }
+
+  switch (concept) {
+    case 'reading':
+      return 'reading-comprehension';
+    case 'vocabulary':
+      return 'vocabulary-recall';
+    case 'learning':
+      return 'guided-lesson';
+  }
+}
+
+function createDecisionReason(
+  concept: LearningConcept,
+  state: ConceptState,
+  summary: ReturnType<typeof summarizeConceptEvidence>,
+  decision: TeacherLevelDecision,
+  createdAt: string,
+): string {
+  const refreshedState = refreshConceptTimeSignals(state, [], createdAt);
+
+  if (refreshedState.reviewUrgency === 'now') {
+    return `${labelConcept(concept)} has not been practiced recently, so the teacher will use a short, low-pressure check before moving forward.`;
+  }
+
+  if (decision === 'increase') {
+    return `${labelConcept(concept)} looks stable: answers are mostly correct, response time is comfortable, and little support is needed.`;
+  }
+
+  if (decision === 'decrease') {
+    return `${labelConcept(concept)} looks overloaded or fragile, so the next activity should be easier and more supportive.`;
+  }
+
+  if (summary.resultCount > 0) {
+    return `${labelConcept(concept)} has mixed evidence, so the teacher will hold the level and reinforce it once more.`;
+  }
+
+  if (contextualReasonApplies(state, concept)) {
+    return `${labelConcept(concept)} fits the current activity window, so the teacher will keep this session practical and low-friction.`;
+  }
+
+  return `${labelConcept(concept)} is the best next teaching mode based on the current Student Model and recent practice history.`;
+}
+
+function contextualReasonApplies(state: ConceptState, concept: LearningConcept): boolean {
+  return state.concept === concept && state.reviewUrgency === 'none';
+}
+
+function createConceptRecommendationSummary(decision: TeacherDecision): string {
+  switch (decision.nextRecommendedConcept) {
+    case 'reading':
+      return 'Short reading check';
+    case 'vocabulary':
+      return 'Reinforce vocabulary before adding more';
+    case 'learning':
+      return 'Guided learning path';
+  }
+}
+
+function createContextFromResults(results: ExerciseResult[]): LearningContext {
+  return {
+    mode: 'home',
+    selectedConcept: results[0]?.concept,
+    isOffline: false,
+    speechAvailable: true,
+    availableMinutes: 6,
+  };
+}
+
+function scoreToConceptLevel(value: number): ConceptLevel {
+  if (value >= 0.7) {
+    return 'confident';
+  }
+
+  if (value >= 0.45) {
+    return 'developing';
+  }
+
+  return 'foundation';
+}
+
+function daysBetween(from: string, to: string): number {
+  const delta = Date.parse(to) - Date.parse(from);
+  return Number.isNaN(delta) ? 0 : Math.max(0, Math.floor(delta / 86400000));
 }
 
 function createWeaknessSignals(model: StudentModel, results: ExerciseResult[], observedAt: string): LearningSignal[] {
@@ -741,6 +1400,17 @@ function labelSkill(skill: SkillArea): string {
       return 'Review';
     case 'vocabulary':
       return 'Vocabulary';
+  }
+}
+
+function labelConcept(concept: LearningConcept): string {
+  switch (concept) {
+    case 'learning':
+      return 'Learning';
+    case 'reading':
+      return 'Reading';
+    case 'vocabulary':
+      return 'Vocabulary Growth';
   }
 }
 

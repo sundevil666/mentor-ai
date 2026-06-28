@@ -3,6 +3,105 @@ body {
   color: #10201d;
 }
 
+.ios-install-button {
+  margin-right: 8px;
+}
+
+.ios-install-menu {
+  width: min(340px, calc(100vw - 24px));
+}
+
+.ios-install {
+  background: #ffffff;
+  color: #10201d;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.ios-install__icon {
+  align-items: center;
+  background: #e7f1ee;
+  border: 1px solid #cfe1dc;
+  border-radius: 8px;
+  display: flex;
+  height: 56px;
+  justify-content: center;
+  width: 56px;
+}
+
+.ios-install__icon img {
+  border-radius: 14px;
+  height: 44px;
+  width: 44px;
+}
+
+.ios-install__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.ios-install__copy strong {
+  font-size: 1rem;
+}
+
+.ios-install__copy span {
+  color: #60716c;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.update-log-button {
+  margin-right: 8px;
+}
+
+.update-log-menu {
+  width: min(420px, calc(100vw - 24px));
+}
+
+.update-log {
+  background: #ffffff;
+  color: #10201d;
+  display: grid;
+  max-height: min(520px, calc(100vh - 96px));
+  overflow: auto;
+}
+
+.update-log__header {
+  align-items: center;
+  border-bottom: 1px solid #dbe6e2;
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.update-log__header div {
+  display: grid;
+  gap: 2px;
+}
+
+.update-log__header strong {
+  font-size: 1rem;
+}
+
+.update-log__header span,
+.update-log__empty {
+  color: #60716c;
+  font-size: 0.875rem;
+}
+
+.update-log__item {
+  min-height: 84px;
+}
+
+.update-log__item--unread {
+  background: #edf7f4;
+}
+
+.update-log__empty {
+  padding: 18px 16px;
+}
+
 .learning-page {
   align-items: center;
   display: flex;
@@ -26,11 +125,55 @@ body {
   margin-bottom: 24px;
 }
 
+.learning-overview {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 28px;
+}
+
+.metric-tile {
+  background: #ffffff;
+  border: 1px solid #dbe6e2;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  min-height: 78px;
+  padding: 14px;
+}
+
+.metric-tile span,
+.panel-heading,
+.skill-row span {
+  color: #60716c;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.metric-tile strong {
+  color: #10201d;
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
 .learning-start,
 .lesson-stage,
 .lesson-complete {
   display: grid;
   gap: 24px;
+}
+
+.training-mode-strip {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+}
+
+.training-mode-button {
+  min-height: 52px;
 }
 
 .learning-start h1,
@@ -76,6 +219,114 @@ body {
   justify-content: flex-end;
 }
 
+.concept-choice {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+}
+
+.concept-choice .q-btn {
+  min-height: 44px;
+}
+
+.recommended-action {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  margin: 8px 0;
+  min-height: 190px;
+  text-align: center;
+}
+
+.recommended-action__button {
+  border-radius: 8px;
+  font-size: 1.125rem;
+  min-height: 76px;
+  padding: 0 34px;
+  width: min(360px, 100%);
+}
+
+.recommended-action span {
+  color: #4e625d;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  max-width: 520px;
+}
+
+.activity-controls {
+  align-items: stretch;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(180px, 0.55fr) minmax(220px, 1fr);
+}
+
+.activity-signal {
+  background: #ffffff;
+  border: 1px solid #dbe6e2;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.activity-signal span {
+  color: #60716c;
+  font-size: 0.8125rem;
+}
+
+.activity-signal strong {
+  color: #10201d;
+  font-size: 1rem;
+}
+
+.learning-panels {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  margin-top: 36px;
+}
+
+.learning-panel {
+  background: #ffffff;
+  border: 1px solid #dbe6e2;
+  border-radius: 8px;
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.panel-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.skill-list {
+  display: grid;
+  gap: 14px;
+}
+
+.skill-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 92px minmax(96px, 1fr) 44px;
+}
+
+.skill-row strong {
+  color: #17322d;
+  font-size: 0.875rem;
+  text-align: right;
+}
+
+.learning-panel p {
+  color: #4e625d;
+  line-height: 1.55;
+  margin: 0;
+}
+
 @media (max-width: 640px) {
   .learning-page {
     align-items: flex-start;
@@ -94,5 +345,24 @@ body {
 
   .lesson-actions .q-btn {
     width: 100%;
+  }
+
+  .activity-controls,
+  .training-mode-strip,
+  .concept-choice {
+    grid-template-columns: 1fr;
+  }
+
+  .recommended-action {
+    min-height: 156px;
+  }
+
+  .learning-overview,
+  .learning-panels {
+    grid-template-columns: 1fr;
+  }
+
+  .skill-row {
+    grid-template-columns: 82px minmax(72px, 1fr) 40px;
   }
 }

@@ -6,6 +6,142 @@
     >
       <q-toolbar>
         <q-toolbar-title>Mentor AI</q-toolbar-title>
+        <q-btn
+          v-if="showInstallButton"
+          class="ios-install-button"
+          color="primary"
+          dense
+          flat
+          icon="ios_share"
+          label="Install"
+          no-caps
+        >
+          <q-tooltip>Install on iPhone</q-tooltip>
+          <q-menu
+            anchor="bottom right"
+            self="top right"
+            class="ios-install-menu"
+          >
+            <div class="ios-install">
+              <div class="ios-install__icon">
+                <img
+                  src="/icons/apple-icon-180x180.png"
+                  alt=""
+                >
+              </div>
+              <div class="ios-install__copy">
+                <strong>Install Mentor AI</strong>
+                <span>On iPhone, open Share and choose Add to Home Screen.</span>
+              </div>
+              <q-list dense>
+                <q-item>
+                  <q-item-section avatar>
+                    <q-icon name="ios_share" />
+                  </q-item-section>
+                  <q-item-section>Tap Share in Safari.</q-item-section>
+                </q-item>
+                <q-item>
+                  <q-item-section avatar>
+                    <q-icon name="add_box" />
+                  </q-item-section>
+                  <q-item-section>Choose Add to Home Screen.</q-item-section>
+                </q-item>
+                <q-item>
+                  <q-item-section avatar>
+                    <q-icon name="check_circle" />
+                  </q-item-section>
+                  <q-item-section>Open Mentor AI from the new icon.</q-item-section>
+                </q-item>
+              </q-list>
+            </div>
+          </q-menu>
+        </q-btn>
+        <q-btn
+          class="update-log-button"
+          flat
+          icon="notifications"
+          round
+        >
+          <q-badge
+            v-if="appStore.unreadUpdateNotificationCount > 0"
+            color="red-7"
+            floating
+          >
+            {{ appStore.unreadUpdateNotificationCount }}
+          </q-badge>
+          <q-tooltip>Update notifications</q-tooltip>
+          <q-menu
+            anchor="bottom right"
+            self="top right"
+            class="update-log-menu"
+          >
+            <div class="update-log">
+              <div class="update-log__header">
+                <div>
+                  <strong>Update log</strong>
+                  <span>{{ appStore.unreadUpdateNotificationCount }} unread</span>
+                </div>
+                <q-btn
+                  dense
+                  flat
+                  icon="done_all"
+                  round
+                  :disable="appStore.unreadUpdateNotificationCount === 0"
+                  @click="markAllRead"
+                >
+                  <q-tooltip>Mark all as read</q-tooltip>
+                </q-btn>
+              </div>
+
+              <q-list
+                v-if="appStore.updateNotifications.length > 0"
+                separator
+              >
+                <q-item
+                  v-for="notification in appStore.updateNotifications"
+                  :key="notification.id"
+                  class="update-log__item"
+                  :class="{ 'update-log__item--unread': notification.readAt === null }"
+                >
+                  <q-item-section avatar>
+                    <q-icon
+                      :color="notification.readAt === null ? 'primary' : 'grey-6'"
+                      :name="notification.readAt === null ? 'fiber_manual_record' : 'check_circle'"
+                    />
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label>{{ notification.title }}</q-item-label>
+                    <q-item-label caption>
+                      Version {{ notification.version }} · {{ formatDate(notification.createdAt) }}
+                    </q-item-label>
+                    <q-item-label caption>
+                      {{ notification.message }}
+                    </q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <q-btn
+                      v-if="notification.readAt === null"
+                      dense
+                      flat
+                      icon="done"
+                      round
+                      @click="markRead(notification.id)"
+                    >
+                      <q-tooltip>Mark as read</q-tooltip>
+                    </q-btn>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+
+              <div
+                v-else
+                class="update-log__empty"
+              >
+                No updates yet.
+              </div>
+            </div>
+          </q-menu>
+        </q-btn>
         <q-badge
           color="teal-8"
           outline
@@ -20,3 +156,46 @@
     </q-page-container>
   </q-layout>
 </template>
+
+<script setup lang="ts">
+import { onMounted } from 'vue';
+import { computed } from 'vue';
+import { useAppStore } from 'src/stores/app-store';
+
+const appStore = useAppStore();
+const showInstallButton = computed(() => isAppleTouchDevice() && !isStandalonePwa());
+
+onMounted(async () => {
+  if (!appStore.isHydrated) {
+    await appStore.hydrate();
+  }
+});
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleString();
+}
+
+function markRead(id: string) {
+  void appStore.markUpdateNotificationRead(id);
+}
+
+function markAllRead() {
+  void appStore.markAllUpdateNotificationsRead();
+}
+
+function isAppleTouchDevice() {
+  if (typeof navigator === 'undefined') {
+    return false;
+  }
+
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function isStandalonePwa() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+}
+</script>

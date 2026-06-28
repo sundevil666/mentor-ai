@@ -14,6 +14,14 @@ register(process.env.SERVICE_WORKER_FILE, {
     return undefined;
   },
   updated() {
+    window.dispatchEvent(
+      new CustomEvent('mentor-ai:update-available', {
+        detail: {
+          version: process.env.APP_VERSION,
+        },
+      }),
+    );
+
     return undefined;
   },
   offline() {

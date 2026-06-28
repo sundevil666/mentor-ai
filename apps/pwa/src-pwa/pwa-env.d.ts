@@ -2,6 +2,7 @@
 
 declare const process: {
   env: {
+    APP_VERSION: string;
     SERVICE_WORKER_FILE: string;
   };
 };

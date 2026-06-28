@@ -8,25 +8,102 @@
         >
           {{ syncLabel }}
         </q-badge>
+        <q-badge
+          :color="appStore.isOnline ? 'teal-8' : 'grey-7'"
+          outline
+        >
+          {{ appStore.isOnline ? 'Online' : 'Offline' }}
+        </q-badge>
         <span>Model v{{ appStore.studentModel.version }}</span>
       </div>
+
+      <section class="learning-overview">
+        <div class="metric-tile">
+          <span>Lessons</span>
+          <strong>{{ appStore.completedLessonsCount }}</strong>
+        </div>
+        <div class="metric-tile">
+          <span>Accuracy</span>
+          <strong>{{ latestAccuracy }}</strong>
+        </div>
+        <div class="metric-tile">
+          <span>Progress</span>
+          <strong>{{ appStore.lessonProgress }}%</strong>
+        </div>
+      </section>
 
       <section
         v-if="!appStore.session"
         class="learning-start"
       >
+        <div class="training-mode-strip">
+          <q-btn
+            v-for="mode in primaryTrainingModes"
+            :key="mode.key"
+            class="training-mode-button"
+            color="primary"
+            outline
+            no-caps
+            :icon="mode.icon"
+            :label="mode.label"
+            @click="startTraining(mode.key)"
+          >
+            <q-tooltip>{{ mode.reason }}</q-tooltip>
+          </q-btn>
+        </div>
+
         <p class="learning-start__eyebrow">
-          Mentor AI
+          Activity check
         </p>
-        <h1>{{ appStore.latestRecommendation?.summary ?? 'English practice' }}</h1>
-        <p>{{ appStore.latestRecommendation?.reason ?? 'Start with a short lesson prepared from the current Student Model.' }}</p>
-        <q-btn
-          color="primary"
-          label="Start"
-          unelevated
-          size="lg"
-          @click="start"
-        />
+        <h1>{{ activityHeadline }}</h1>
+        <p>{{ currentSuggestion.reason }}</p>
+
+        <div class="activity-controls">
+          <q-select
+            v-model="selectedShift"
+            :options="shiftOptions"
+            emit-value
+            map-options
+            label="Shift today"
+            outlined
+            dense
+            @update:model-value="updateShift"
+          />
+          <div class="activity-signal">
+            <span>{{ activityMeta }}</span>
+            <strong>{{ paceLabel }}</strong>
+          </div>
+        </div>
+
+        <div class="recommended-action">
+          <q-btn
+            class="recommended-action__button"
+            color="primary"
+            unelevated
+            no-caps
+            :icon="recommendedTraining.icon"
+            :label="recommendedTraining.label"
+            @click="startTraining(recommendedTraining.key)"
+          >
+            <q-tooltip>{{ recommendedTraining.reason }}</q-tooltip>
+          </q-btn>
+          <span>{{ recommendedTraining.reason }}</span>
+        </div>
+
+        <div class="concept-choice">
+          <q-btn
+            v-for="concept in conceptChoices"
+            :key="concept.value"
+            color="primary"
+            outline
+            no-caps
+            :icon="concept.icon"
+            :label="concept.label"
+            @click="startConcept(concept.value)"
+          >
+            <q-tooltip>{{ concept.reason }}</q-tooltip>
+          </q-btn>
+        </div>
       </section>
 
       <section
@@ -97,21 +174,78 @@
         </p>
         <q-btn
           color="primary"
-          label="Next lesson"
+          label="Improve now"
           unelevated
-          @click="start"
+          @click="startWithMode(currentSuggestion.mode)"
         />
+      </section>
+
+      <section class="learning-panels">
+        <div class="learning-panel">
+          <div class="panel-heading">
+            <span>Student Model</span>
+            <q-btn
+              dense
+              flat
+              icon="restart_alt"
+              round
+              @click="reset"
+            >
+              <q-tooltip>Reset local learning</q-tooltip>
+            </q-btn>
+          </div>
+          <div class="skill-list">
+            <div
+              v-for="skill in skillRows"
+              :key="skill.label"
+              class="skill-row"
+            >
+              <span>{{ skill.label }}</span>
+              <q-linear-progress
+                :value="skill.value"
+                color="primary"
+                rounded
+                size="8px"
+              />
+              <strong>{{ Math.round(skill.value * 100) }}%</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="learning-panel">
+          <div class="panel-heading">
+            <span>Sync</span>
+            <q-btn
+              dense
+              flat
+              icon="sync"
+              round
+              :disable="appStore.pendingSyncCount === 0 || !appStore.isOnline"
+              @click="sync"
+            >
+              <q-tooltip>Sync learning evidence</q-tooltip>
+            </q-btn>
+          </div>
+          <p>{{ syncDetail }}</p>
+          <p v-if="appStore.latestStatistics">
+            Last lesson: {{ latestAccuracy }} accuracy, {{ appStore.latestStatistics.completedExercises }} exercises.
+          </p>
+        </div>
       </section>
     </section>
   </q-page>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
-import { useAppStore } from 'src/stores/app-store';
+import type { LearningConcept, LearningMode, WorkShift } from '@mentor-ai/shared';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { inferActivitySuggestion, useAppStore } from 'src/stores/app-store';
+
+type TrainingKey = 'listening' | 'speaking' | 'vocabulary';
 
 const appStore = useAppStore();
 const answer = ref('');
+const selectedShift = ref<WorkShift>('unknown');
 
 const currentExercise = computed(() => appStore.currentExercise);
 const optionList = computed(
@@ -120,11 +254,127 @@ const optionList = computed(
 const inputLabel = computed(() => (currentExercise.value?.type === 'repeat-speaking' ? 'What did you say?' : 'Your answer'));
 const syncLabel = computed(() => (appStore.pendingSyncCount > 0 ? `${appStore.pendingSyncCount} pending` : 'Offline ready'));
 const syncColor = computed(() => (appStore.pendingSyncCount > 0 ? 'amber-8' : 'teal-8'));
+const latestAccuracy = computed(() => {
+  const accuracy = appStore.latestStatistics?.accuracy;
+  return accuracy === undefined ? '0%' : `${Math.round(accuracy * 100)}%`;
+});
+const currentSuggestion = computed(() =>
+  inferActivitySuggestion(new Date(), selectedShift.value, appStore.activitySnapshots),
+);
+const activityHeadline = computed(() => {
+  return `Best now: ${recommendedTraining.value.shortLabel}`;
+});
+const paceLabel = computed(() => {
+  switch (currentSuggestion.value.activityPace) {
+    case 'passive':
+      return 'Light review';
+    case 'steady':
+      return 'Steady lesson';
+    case 'active':
+      return 'Active practice';
+    case 'deep':
+      return 'Deep listening';
+    default:
+      return 'Steady lesson';
+  }
+});
+const activityMeta = computed(() => {
+  const day = currentSuggestion.value.dayType === 'weekend' ? 'Weekend' : 'Weekday';
+  const minutes = `${currentSuggestion.value.availableMinutes} min`;
+  return `${day} · ${shiftLabel(currentSuggestion.value.workShift)} · ${minutes}`;
+});
+const skillRows = computed(() => [
+  { label: 'Vocabulary', value: appStore.studentModel.vocabulary.score.value },
+  { label: 'Grammar', value: appStore.studentModel.grammar.score.value },
+  { label: 'Listening', value: appStore.studentModel.listening.score.value },
+  { label: 'Speaking', value: appStore.studentModel.speaking.score.value },
+]);
+const conceptChoices: Array<{ value: LearningConcept; label: string; icon: string; reason: string }> = [
+  {
+    value: 'learning',
+    label: 'Learning',
+    icon: 'school',
+    reason: 'Grammar, listening, speaking, correction, and review together.',
+  },
+  {
+    value: 'reading',
+    label: 'Reading',
+    icon: 'menu_book',
+    reason: 'A short text with comprehension and unknown-word evidence.',
+  },
+  {
+    value: 'vocabulary',
+    label: 'Vocabulary Growth',
+    icon: 'psychology',
+    reason: 'Recall, recognition, and words in context.',
+  },
+];
+const primaryTrainingModes: Array<{ key: TrainingKey; label: string; shortLabel: string; icon: string; reason: string }> = [
+  {
+    key: 'listening',
+    label: 'Listening',
+    shortLabel: 'Listening',
+    icon: 'headphones',
+    reason: 'Listen first when the window is passive, weekend-sized, or good for audio practice.',
+  },
+  {
+    key: 'speaking',
+    label: 'Speaking',
+    shortLabel: 'Speaking',
+    icon: 'record_voice_over',
+    reason: 'Use active speaking when you have enough energy and can answer aloud.',
+  },
+  {
+    key: 'vocabulary',
+    label: 'Vocabulary',
+    shortLabel: 'Vocabulary',
+    icon: 'psychology',
+    reason: 'Build recall when the session should be short, focused, or review-heavy.',
+  },
+];
+const shiftOptions: Array<{ label: string; value: WorkShift }> = [
+  { label: 'Unknown', value: 'unknown' },
+  { label: 'First shift', value: 'first' },
+  { label: 'Second shift', value: 'second' },
+  { label: 'Third shift', value: 'third' },
+  { label: 'Day off', value: 'off' },
+];
+const recommendedTraining = computed(() => {
+  const key = chooseRecommendedTraining();
+  const training = primaryTrainingModes.find((item) => item.key === key) ?? primaryTrainingModes[0];
+
+  return {
+    ...training,
+    label: `Start ${training.shortLabel}`,
+    reason: `${training.reason} ${currentSuggestion.value.reason}`,
+  };
+});
+const syncDetail = computed(() => {
+  if (!appStore.isOnline) {
+    return 'Learning evidence is stored locally and will sync when the network returns.';
+  }
+
+  if (appStore.pendingSyncCount > 0) {
+    return 'Evidence is queued locally and ready to send to the Mentor AI API.';
+  }
+
+  return appStore.lastSyncAt ? `Last sync ${new Date(appStore.lastSyncAt).toLocaleString()}.` : 'No pending evidence.';
+});
 
 onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();
   }
+
+  selectedShift.value = appStore.preferredWorkShift;
+
+  window.addEventListener('online', handleOnline);
+  window.addEventListener('offline', handleOffline);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('online', handleOnline);
+  window.removeEventListener('offline', handleOffline);
 });
 
 watch(
@@ -134,9 +384,51 @@ watch(
   },
 );
 
-async function start() {
+async function startWithMode(mode: LearningMode) {
   answer.value = '';
-  await appStore.startLesson();
+  const suggestion = currentSuggestion.value;
+  await appStore.startLesson({
+    mode,
+    isOffline: !navigator.onLine,
+    speechAvailable: 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window,
+    availableMinutes: suggestion.availableMinutes,
+    workShift: suggestion.workShift,
+    dayType: suggestion.dayType,
+    activityPace: suggestion.activityPace,
+    startedHour: suggestion.localHour,
+    activityReason: suggestion.reason,
+  });
+}
+
+async function startConcept(concept: LearningConcept) {
+  answer.value = '';
+  const suggestion = currentSuggestion.value;
+  await appStore.startLesson({
+    mode: suggestion.mode,
+    selectedConcept: concept,
+    manualConceptChoice: true,
+    isOffline: !navigator.onLine,
+    speechAvailable: 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window,
+    availableMinutes: suggestion.availableMinutes,
+    workShift: suggestion.workShift,
+    dayType: suggestion.dayType,
+    activityPace: suggestion.activityPace,
+    startedHour: suggestion.localHour,
+    activityReason: suggestion.reason,
+  });
+}
+
+async function startTraining(training: TrainingKey) {
+  if (training === 'vocabulary') {
+    await startConcept('vocabulary');
+    return;
+  }
+
+  await startWithMode(training);
+}
+
+function updateShift(value: WorkShift) {
+  appStore.setPreferredWorkShift(value);
 }
 
 async function submit() {
@@ -156,5 +448,60 @@ async function playAudio() {
   }
 
   await appStore.replayAudio();
+}
+
+async function sync() {
+  await appStore.syncPendingEvents();
+}
+
+async function reset() {
+  await appStore.resetLocalLearning();
+}
+
+function handleOnline() {
+  appStore.setNetworkStatus(true);
+}
+
+function handleOffline() {
+  appStore.setNetworkStatus(false);
+}
+
+function shiftLabel(shift: WorkShift): string {
+  switch (shift) {
+    case 'first':
+      return '1st shift';
+    case 'second':
+      return '2nd shift';
+    case 'third':
+      return '3rd shift';
+    case 'off':
+      return 'day off';
+    case 'unknown':
+      return 'shift unknown';
+  }
+}
+
+function chooseRecommendedTraining(): TrainingKey {
+  const suggestion = currentSuggestion.value;
+
+  if (suggestion.mode === 'listening' || suggestion.dayType === 'weekend') {
+    return 'listening';
+  }
+
+  if (suggestion.activityPace === 'passive' || suggestion.mode === 'review') {
+    return 'vocabulary';
+  }
+
+  if (suggestion.activityPace === 'active' || suggestion.workShift === 'second' || suggestion.workShift === 'third') {
+    return 'speaking';
+  }
+
+  const weakest = [
+    { key: 'vocabulary' as const, value: appStore.studentModel.vocabulary.score.value },
+    { key: 'listening' as const, value: appStore.studentModel.listening.score.value },
+    { key: 'speaking' as const, value: appStore.studentModel.speaking.score.value },
+  ].sort((left, right) => left.value - right.value)[0];
+
+  return weakest.key;
 }
 </script>

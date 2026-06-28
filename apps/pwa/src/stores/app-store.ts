@@ -9,17 +9,21 @@ import {
   initialStudentModel,
   scoreExercise,
   updateStudentModelFromResults,
+  type ActivityPace,
+  type ActivitySnapshot,
   type Exercise,
   type ExerciseResult,
   type GeneratedLesson,
   type LearningEvent,
   type LearningContext,
+  type LearningMode,
   type Observation,
   type Recommendation,
   type SpeechResult,
   type StatisticsSnapshot,
   type StorageMode,
   type StudentModel,
+  type WorkShift,
 } from '@mentor-ai/shared';
 import { synchronizeLearningEvidence } from 'src/services/api-client';
 import { mentorDb } from 'src/services/indexed-db';
@@ -27,6 +31,7 @@ import { mentorDb } from 'src/services/indexed-db';
 interface LearningSessionState {
   id: string;
   lesson: GeneratedLesson;
+  context: LearningContext;
   currentExerciseIndex: number;
   startedAt: string;
   exerciseStartedAt: string;
@@ -38,6 +43,16 @@ interface LearningSessionState {
   completedAt?: string;
 }
 
+export interface UpdateNotification {
+  id: string;
+  version: string;
+  title: string;
+  message: string;
+  createdAt: string;
+  viewedAt: string | null;
+  readAt: string | null;
+}
+
 type QueuedLearningEvent = LearningEvent & {
   status: string;
   exerciseResults?: ExerciseResult[];
@@ -47,10 +62,16 @@ type QueuedLearningEvent = LearningEvent & {
 interface AppState {
   storageMode: StorageMode;
   isOfflineReady: boolean;
+  isOnline: boolean;
   studentModel: StudentModel;
   session: LearningSessionState | null;
   latestRecommendation: Recommendation | null;
+  statisticsSnapshots: StatisticsSnapshot[];
+  activitySnapshots: ActivitySnapshot[];
+  preferredWorkShift: WorkShift;
   pendingSyncEvents: number;
+  lastSyncAt: string | null;
+  updateNotifications: UpdateNotification[];
   isHydrated: boolean;
 }
 
@@ -60,10 +81,16 @@ export const useAppStore = defineStore('app', {
   state: (): AppState => ({
     storageMode: 'demo',
     isOfflineReady: true,
+    isOnline: typeof navigator === 'undefined' ? true : navigator.onLine,
     studentModel: initialStudentModel,
     session: null,
     latestRecommendation: null,
+    statisticsSnapshots: [],
+    activitySnapshots: [],
+    preferredWorkShift: 'unknown',
     pendingSyncEvents: 0,
+    lastSyncAt: null,
+    updateNotifications: [],
     isHydrated: false,
   }),
 
@@ -71,6 +98,23 @@ export const useAppStore = defineStore('app', {
     currentExercise: (state): Exercise | null => state.session?.lesson.exercises[state.session.currentExerciseIndex] ?? null,
     isLessonComplete: (state): boolean => Boolean(state.session?.completedAt),
     pendingSyncCount: (state): number => state.pendingSyncEvents,
+    lessonProgress: (state): number => {
+      if (!state.session) {
+        return 0;
+      }
+
+      const completedExercises = state.session.completedAt
+        ? state.session.lesson.exercises.length
+        : state.session.currentExerciseIndex;
+
+      return Math.round((completedExercises / state.session.lesson.exercises.length) * 100);
+    },
+    completedLessonsCount: (state): number => state.statisticsSnapshots.length,
+    latestStatistics: (state): StatisticsSnapshot | null => state.statisticsSnapshots.at(-1) ?? null,
+    latestActivitySnapshot: (state): ActivitySnapshot | null => state.activitySnapshots.at(-1) ?? null,
+    unreadUpdateNotificationCount: (state): number =>
+      state.updateNotifications.filter((notification) => notification.readAt === null).length,
+    latestUpdateNotification: (state): UpdateNotification | null => state.updateNotifications[0] ?? null,
   },
 
   actions: {
@@ -78,27 +122,51 @@ export const useAppStore = defineStore('app', {
       const db = await mentorDb;
       const savedModel = await db.get('student-models', initialStudentModel.id);
       const savedSession = await db.get('learning-sessions', sessionStoreKey);
+      const statistics = await db.getAll('statistics');
+      const activitySnapshots = await db.getAll('activity-snapshots');
       const queuedEvents = await db.getAll('sync-queue');
+      const updateNotifications = await db.getAll('update-notifications');
 
       this.studentModel = (savedModel as StudentModel | undefined) ?? initialStudentModel;
       this.session = (savedSession as LearningSessionState | undefined) ?? null;
       this.latestRecommendation = this.session?.recommendation ?? createRecommendationFromModel(this.studentModel, now());
+      this.statisticsSnapshots = (statistics as StatisticsSnapshot[]).sort((left, right) =>
+        left.createdAt.localeCompare(right.createdAt),
+      );
+      this.activitySnapshots = (activitySnapshots as ActivitySnapshot[]).sort((left, right) =>
+        left.observedAt.localeCompare(right.observedAt),
+      );
+      this.preferredWorkShift = this.activitySnapshots.at(-1)?.workShift ?? 'unknown';
       this.pendingSyncEvents = queuedEvents.filter((event) => event.status === 'pending').length;
+      this.updateNotifications = (updateNotifications as UpdateNotification[]).sort((left, right) =>
+        right.createdAt.localeCompare(left.createdAt),
+      );
+      this.isOnline = navigator.onLine;
       this.isHydrated = true;
     },
 
-    async startLesson(context: LearningContext = createDefaultLearningContext()) {
+    setNetworkStatus(isOnline: boolean) {
+      this.isOnline = isOnline;
+
+      if (isOnline) {
+        void this.syncPendingEvents();
+      }
+    },
+
+    async startLesson(context?: LearningContext) {
       const createdAt = now();
-      const plan = createLessonPlan(this.studentModel, context, createdAt);
+      const learningContext = context ?? createDefaultLearningContext(this.activitySnapshots, this.preferredWorkShift);
+      const plan = createLessonPlan(this.studentModel, learningContext, createdAt);
       const lesson = generateLessonFromPlan(plan, createdAt);
       const sessionId = sessionStoreKey;
       const firstExercise = lesson.exercises[0];
-      const startedEvent = createLearningEvent(sessionId, lesson.id, undefined, 'lesson-started', createdAt);
-      const firstExerciseEvent = createLearningEvent(sessionId, lesson.id, firstExercise?.id, 'exercise-started', createdAt);
+      const startedEvent = createLearningEvent(sessionId, lesson, undefined, 'lesson-started', createdAt);
+      const firstExerciseEvent = createLearningEvent(sessionId, lesson, firstExercise?.id, 'exercise-started', createdAt);
 
       this.session = {
         id: sessionId,
         lesson,
+        context: learningContext,
         currentExerciseIndex: 0,
         startedAt: createdAt,
         exerciseStartedAt: createdAt,
@@ -106,8 +174,14 @@ export const useAppStore = defineStore('app', {
         results: [],
         speechResults: [],
       };
+      this.latestRecommendation = createRecommendationFromModel(this.studentModel, createdAt);
 
+      await this.persistActivitySnapshot(createActivitySnapshot(learningContext, sessionId, createdAt));
       await this.persistSession();
+    },
+
+    async setPreferredWorkShift(workShift: WorkShift) {
+      this.preferredWorkShift = workShift;
     },
 
     async submitCurrentExercise(response: string) {
@@ -119,14 +193,14 @@ export const useAppStore = defineStore('app', {
       const exercise = this.currentExercise;
       const finishedEvent = createLearningEvent(
         this.session.id,
-        this.session.lesson.id,
+        this.session.lesson,
         exercise.id,
         'exercise-finished',
         submittedAt,
       );
       const result = createExerciseResult(
         this.session.id,
-        this.session.lesson.id,
+        this.session.lesson,
         exercise,
         response,
         submittedAt,
@@ -148,7 +222,7 @@ export const useAppStore = defineStore('app', {
           ),
         );
         this.session.events.push(
-          createLearningEvent(this.session.id, this.session.lesson.id, exercise.id, 'speech-attempted', submittedAt),
+          createLearningEvent(this.session.id, this.session.lesson, exercise.id, 'speech-attempted', submittedAt),
         );
       }
 
@@ -163,7 +237,7 @@ export const useAppStore = defineStore('app', {
       this.session.currentExerciseIndex = nextIndex;
       this.session.exerciseStartedAt = submittedAt;
       this.session.events.push(
-        createLearningEvent(this.session.id, this.session.lesson.id, nextExercise.id, 'exercise-started', submittedAt),
+        createLearningEvent(this.session.id, this.session.lesson, nextExercise.id, 'exercise-started', submittedAt),
       );
 
       await this.persistSession();
@@ -175,7 +249,7 @@ export const useAppStore = defineStore('app', {
       }
 
       this.session.events.push(
-        createLearningEvent(this.session.id, this.session.lesson.id, this.currentExercise.id, 'audio-replayed', now()),
+        createLearningEvent(this.session.id, this.session.lesson, this.currentExercise.id, 'audio-replayed', now()),
       );
 
       await this.persistSession();
@@ -188,10 +262,77 @@ export const useAppStore = defineStore('app', {
       this.session = null;
       this.latestRecommendation = createRecommendationFromModel(initialStudentModel, now());
       this.pendingSyncEvents = 0;
+      this.statisticsSnapshots = [];
+      this.activitySnapshots = [];
+      this.preferredWorkShift = 'unknown';
+      this.lastSyncAt = null;
 
       await db.put('student-models', this.studentModel);
       await db.delete('learning-sessions', sessionStoreKey);
+      await db.clear('statistics');
+      await db.clear('activity-snapshots');
       await db.clear('sync-queue');
+      await db.clear('concept-evidence');
+    },
+
+    async recordUpdateNotification(version: string) {
+      const createdAt = now();
+      const id = `update-${version}`;
+      const db = await mentorDb;
+      const existing = (await db.get('update-notifications', id)) as UpdateNotification | undefined;
+
+      if (existing) {
+        return existing;
+      }
+
+      const notification: UpdateNotification = {
+        id,
+        version,
+        title: 'App updated',
+        message: createUpdateMessage(version, createdAt),
+        createdAt,
+        viewedAt: null,
+        readAt: null,
+      };
+
+      await db.put('update-notifications', notification);
+      this.updateNotifications = [notification, ...this.updateNotifications];
+
+      return notification;
+    },
+
+    async markUpdateNotificationRead(id: string) {
+      const notification = this.updateNotifications.find((item) => item.id === id);
+
+      if (!notification || notification.readAt) {
+        return;
+      }
+
+      const updated: UpdateNotification = {
+        ...notification,
+        viewedAt: notification.viewedAt ?? now(),
+        readAt: now(),
+      };
+      const db = await mentorDb;
+
+      await db.delete('update-notifications', updated.id);
+      this.updateNotifications = this.updateNotifications.filter((item) => item.id !== id);
+    },
+
+    async markAllUpdateNotificationsRead() {
+      const unread = this.updateNotifications.filter((notification) => notification.readAt === null);
+
+      if (unread.length === 0) {
+        return;
+      }
+
+      const db = await mentorDb;
+
+      for (const notification of unread) {
+        await db.delete('update-notifications', notification.id);
+      }
+
+      this.updateNotifications = this.updateNotifications.filter((notification) => notification.readAt !== null);
     },
 
     async finishLesson(completedAt: string) {
@@ -201,7 +342,7 @@ export const useAppStore = defineStore('app', {
 
       const lessonFinishedEvent = createLearningEvent(
         this.session.id,
-        this.session.lesson.id,
+        this.session.lesson,
         undefined,
         'lesson-finished',
         completedAt,
@@ -252,7 +393,7 @@ export const useAppStore = defineStore('app', {
       const responseTime = completed.reduce((sum, result) => sum + result.responseTimeMs, 0);
 
       const snapshot: StatisticsSnapshot = {
-        id: `statistics-${this.session.id}`,
+        id: `statistics-${this.session.id}-${createdAt}`,
         studentId: demoStudent.id,
         sessionId: this.session.id,
         lessonId: this.session.lesson.id,
@@ -263,11 +404,41 @@ export const useAppStore = defineStore('app', {
         audioReplays: this.session.events.filter((event) => event.type === 'audio-replayed').length,
         speechAttempts: this.session.events.filter((event) => event.type === 'speech-attempted').length,
         fatigueSignal: this.studentModel.fatigue,
+        learningMode: this.session.context.mode,
+        workShift: this.session.context.workShift,
+        dayType: this.session.context.dayType,
+        activityPace: this.session.context.activityPace,
         createdAt,
       };
 
       const db = await mentorDb;
       await db.put('statistics', { ...snapshot, userId: demoStudent.id });
+      await db.put('concept-evidence', {
+        id: `concept-${this.session.id}-${createdAt}`,
+        studentId: demoStudent.id,
+        lessonId: this.session.lesson.id,
+        concept: this.session.lesson.concept,
+        activityType: this.session.lesson.activityType,
+        teacherDecision: this.session.lesson.teacherDecision,
+        results: this.session.results,
+        createdAt,
+      });
+      this.statisticsSnapshots = [...this.statisticsSnapshots, snapshot];
+      await this.persistActivitySnapshot({
+        ...createActivitySnapshot(this.session.context, this.session.id, createdAt),
+        lessonCompleted: true,
+        completedExercises: snapshot.completedExercises,
+        accuracy: snapshot.accuracy,
+        averageResponseTimeMs: snapshot.averageResponseTimeMs,
+      });
+    },
+
+    async persistActivitySnapshot(snapshot: ActivitySnapshot) {
+      const db = await mentorDb;
+      await db.put('activity-snapshots', snapshot);
+      this.activitySnapshots = [...this.activitySnapshots.filter((item) => item.id !== snapshot.id), snapshot]
+        .sort((left, right) => left.observedAt.localeCompare(right.observedAt))
+        .slice(-80);
     },
 
     async persistSyncQueue() {
@@ -317,6 +488,7 @@ export const useAppStore = defineStore('app', {
 
         const updatedQueue = await db.getAll('sync-queue');
         this.pendingSyncEvents = updatedQueue.filter((event) => event.status === 'pending').length;
+        this.lastSyncAt = now();
       } catch {
         this.pendingSyncEvents = pendingEvents.length;
       }
@@ -324,18 +496,213 @@ export const useAppStore = defineStore('app', {
   },
 });
 
-function createDefaultLearningContext(): LearningContext {
+function createDefaultLearningContext(
+  snapshots: ActivitySnapshot[] = [],
+  preferredWorkShift: WorkShift = 'unknown',
+): LearningContext {
+  const suggestion = inferActivitySuggestion(new Date(), preferredWorkShift, snapshots);
+
   return {
-    mode: 'home',
+    mode: suggestion.mode,
     isOffline: !navigator.onLine,
     speechAvailable: 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window,
-    availableMinutes: 6,
+    availableMinutes: suggestion.availableMinutes,
+    workShift: suggestion.workShift,
+    dayType: suggestion.dayType,
+    activityPace: suggestion.activityPace,
+    startedHour: suggestion.localHour,
+    activityReason: suggestion.reason,
   };
+}
+
+export function inferActivitySuggestion(
+  date: Date,
+  preferredWorkShift: WorkShift,
+  snapshots: ActivitySnapshot[] = [],
+): Omit<ActivitySnapshot, 'id' | 'studentId' | 'observedAt' | 'suggestedMode'> & { mode: LearningMode } {
+  const localHour = date.getHours();
+  const weekday = date.getDay();
+  const dayType = weekday === 0 || weekday === 6 ? 'weekend' : 'weekday';
+  const workShift = preferredWorkShift === 'unknown' ? inferShiftFromHistory(snapshots, dayType, localHour) : preferredWorkShift;
+  const historicalPace = inferHistoricalPace(snapshots, dayType, localHour, workShift);
+  const baseline = inferBaselinePace(dayType, workShift, localHour);
+  const activityPace = historicalPace ?? baseline;
+  const mode = chooseModeForActivity(activityPace, dayType);
+  const availableMinutes = chooseMinutesForActivity(activityPace);
+
+  return {
+    localHour,
+    weekday,
+    dayType,
+    workShift,
+    activityPace,
+    mode,
+    availableMinutes,
+    reason: createActivityReason(dayType, workShift, activityPace, snapshots.length > 0),
+  };
+}
+
+function createActivitySnapshot(context: LearningContext, sessionId: string, observedAt: string): ActivitySnapshot {
+  const observedDate = new Date(observedAt);
+  const localHour = context.startedHour ?? observedDate.getHours();
+  const weekday = observedDate.getDay();
+  const dayType = context.dayType ?? (weekday === 0 || weekday === 6 ? 'weekend' : 'weekday');
+  const activityPace = context.activityPace ?? inferBaselinePace(dayType, context.workShift ?? 'unknown', localHour);
+  const suggestedMode = context.mode;
+
+  return {
+    id: `activity-${sessionId}-${observedAt}`,
+    studentId: demoStudent.id,
+    sessionId,
+    observedAt,
+    localHour,
+    weekday,
+    dayType,
+    workShift: context.workShift ?? 'unknown',
+    activityPace,
+    suggestedMode,
+    availableMinutes: context.availableMinutes,
+    reason: context.activityReason ?? createActivityReason(dayType, context.workShift ?? 'unknown', activityPace, false),
+  };
+}
+
+function createUpdateMessage(version: string, createdAt: string): string {
+  const date = new Date(createdAt);
+  const formattedDate = date.toLocaleDateString(undefined, {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+  const formattedTime = date.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  return `Mentor AI was updated to version ${version} on ${formattedDate} at ${formattedTime}.`;
+}
+
+function inferShiftFromHistory(snapshots: ActivitySnapshot[], dayType: 'weekday' | 'weekend', localHour: number): WorkShift {
+  const matching = snapshots
+    .slice(-12)
+    .filter((snapshot) => snapshot.dayType === dayType && Math.abs(snapshot.localHour - localHour) <= 3 && snapshot.workShift !== 'unknown');
+
+  if (matching.length === 0) {
+    return dayType === 'weekend' ? 'off' : 'unknown';
+  }
+
+  const counts = matching.reduce<Record<WorkShift, number>>(
+    (counts, snapshot) => ({ ...counts, [snapshot.workShift]: counts[snapshot.workShift] + 1 }),
+    { first: 0, second: 0, third: 0, off: 0, unknown: 0 },
+  );
+  const ranked = (Object.entries(counts) as Array<[WorkShift, number]>)
+    .filter(([shift]) => shift !== 'unknown')
+    .sort((left, right) => right[1] - left[1]);
+
+  return ranked[0]?.[1] > 0 ? ranked[0][0] : matching.at(-1)?.workShift ?? 'unknown';
+}
+
+function inferHistoricalPace(
+  snapshots: ActivitySnapshot[],
+  dayType: 'weekday' | 'weekend',
+  localHour: number,
+  workShift: WorkShift,
+): ActivityPace | null {
+  const matching = snapshots
+    .slice(-24)
+    .filter(
+      (snapshot) =>
+        snapshot.dayType === dayType &&
+        snapshot.workShift === workShift &&
+        Math.abs(snapshot.localHour - localHour) <= 3 &&
+        snapshot.lessonCompleted,
+    );
+
+  if (matching.length < 2) {
+    return null;
+  }
+
+  const averageAccuracy = matching.reduce((sum, snapshot) => sum + (snapshot.accuracy ?? 0), 0) / matching.length;
+  const averageExercises = matching.reduce((sum, snapshot) => sum + (snapshot.completedExercises ?? 0), 0) / matching.length;
+
+  if (averageAccuracy >= 0.75 && averageExercises >= 4) {
+    return 'deep';
+  }
+
+  if (averageAccuracy >= 0.55 && averageExercises >= 3) {
+    return 'active';
+  }
+
+  return 'passive';
+}
+
+function inferBaselinePace(dayType: 'weekday' | 'weekend', workShift: WorkShift, localHour: number): ActivityPace {
+  if (dayType === 'weekend') {
+    return 'deep';
+  }
+
+  if (workShift === 'first') {
+    return localHour < 12 ? 'passive' : 'steady';
+  }
+
+  if (workShift === 'second' || workShift === 'third') {
+    return localHour < 12 ? 'active' : 'steady';
+  }
+
+  return localHour < 10 ? 'active' : 'steady';
+}
+
+function chooseModeForActivity(activityPace: ActivityPace, dayType: 'weekday' | 'weekend'): LearningMode {
+  if (activityPace === 'passive') {
+    return 'review';
+  }
+
+  if (activityPace === 'deep') {
+    return dayType === 'weekend' ? 'listening' : 'home';
+  }
+
+  return 'home';
+}
+
+function chooseMinutesForActivity(activityPace: ActivityPace): number {
+  switch (activityPace) {
+    case 'passive':
+      return 3;
+    case 'steady':
+      return 6;
+    case 'active':
+      return 8;
+    case 'deep':
+      return 12;
+  }
+}
+
+function createActivityReason(
+  dayType: 'weekday' | 'weekend',
+  workShift: WorkShift,
+  activityPace: ActivityPace,
+  hasHistory: boolean,
+): string {
+  const historyNote = hasHistory ? 'Recent activity history is included.' : 'No strong personal pattern yet.';
+
+  if (dayType === 'weekend') {
+    return `Weekend sessions are likely better for listening and repetition. ${historyNote}`;
+  }
+
+  if (workShift === 'first') {
+    return `First-shift mornings are treated as low-energy, so the plan starts lighter. ${historyNote}`;
+  }
+
+  if (workShift === 'second' || workShift === 'third') {
+    return `Before a ${workShift}-shift day, mornings are treated as a strong learning window. ${historyNote}`;
+  }
+
+  return `The plan uses a ${activityPace} weekday start until more shift evidence is available. ${historyNote}`;
 }
 
 function createLearningEvent(
   sessionId: string,
-  lessonId: string,
+  lesson: GeneratedLesson,
   exerciseId: string | undefined,
   type: LearningEvent['type'],
   occurredAt: string,
@@ -345,17 +712,23 @@ function createLearningEvent(
     id: `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     studentId: demoStudent.id,
     sessionId,
-    lessonId,
+    lessonId: lesson.id,
     exerciseId,
     type,
     occurredAt,
+    concept: lesson.concept,
+    activityType: lesson.activityType,
+    teacherDecision: lesson.teacherDecision.levelDecision,
+    retentionRisk: lesson.teacherDecision.levelDecision === 'decrease' ? 'medium' : 'low',
+    reviewUrgency: lesson.activityType === 'recovery-check' ? 'now' : 'none',
+    avoidancePattern: 'none',
     data,
   };
 }
 
 function createExerciseResult(
   sessionId: string,
-  lessonId: string,
+  lesson: GeneratedLesson,
   exercise: Exercise,
   response: string,
   completedAt: string,
@@ -366,13 +739,31 @@ function createExerciseResult(
     id: `result-${exercise.id}-${Date.now()}`,
     studentId: demoStudent.id,
     sessionId,
-    lessonId,
+    lessonId: lesson.id,
     exerciseId: exercise.id,
     exerciseType: exercise.type,
     targetSkill: exercise.targetSkill,
+    concept: lesson.concept,
+    activityType: lesson.activityType,
+    conceptLevel: lesson.conceptLevel,
     correct: scoreExercise(exercise, response),
     attempts: 1,
     responseTimeMs,
+    hintCount: 0,
+    skipped: response.trim().length === 0,
+    abandoned: false,
+    repeatedMistake: false,
+    readingComprehensionScore: lesson.concept === 'reading' ? (scoreExercise(exercise, response) ? 1 : 0) : undefined,
+    unknownWords: lesson.concept === 'reading' && !scoreExercise(exercise, response) ? ['cafe'] : [],
+    vocabularyRecallStatus:
+      lesson.concept === 'vocabulary' ? (scoreExercise(exercise, response) ? 'recalled' : 'fragile') : undefined,
+    teacherDecision: lesson.teacherDecision.levelDecision,
+    reasonForLevelDecision: lesson.teacherDecision.reason,
+    lastPracticedAt: completedAt,
+    daysSincePractice: 0,
+    avoidancePattern: 'none',
+    retentionRisk: lesson.activityType === 'recovery-check' ? 'medium' : 'low',
+    reviewUrgency: lesson.activityType === 'recovery-check' ? 'now' : 'none',
     completionState: response.trim().length === 0 ? 'skipped' : 'completed',
     evidenceEventIds: [evidenceId],
     completedAt,
@@ -419,6 +810,12 @@ function toLearningEvent(event: QueuedLearningEvent): LearningEvent {
     exerciseId: event.exerciseId,
     type: event.type,
     occurredAt: event.occurredAt,
+    concept: event.concept,
+    activityType: event.activityType,
+    teacherDecision: event.teacherDecision,
+    retentionRisk: event.retentionRisk,
+    reviewUrgency: event.reviewUrgency,
+    avoidancePattern: event.avoidancePattern,
     data: event.data,
   };
 }

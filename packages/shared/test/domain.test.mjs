@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   createLessonPlan,
+  decideNextTeacherAction,
   createObservationFromResults,
   createRecommendationFromModel,
   createEvidenceId,
@@ -17,6 +18,22 @@ import {
 } from '../dist/index.js';
 
 describe('shared domain helpers', () => {
+  const conceptFields = {
+    concept: 'learning',
+    activityType: 'guided-lesson',
+    conceptLevel: 'foundation',
+    hintCount: 0,
+    skipped: false,
+    abandoned: false,
+    repeatedMistake: false,
+    teacherDecision: 'hold',
+    reasonForLevelDecision: 'Test fixture.',
+    daysSincePractice: 0,
+    avoidancePattern: 'none',
+    retentionRisk: 'low',
+    reviewUrgency: 'none',
+  };
+
   it('creates stable evidence ids from student, session, and event identity', () => {
     assert.equal(
       createEvidenceId({
@@ -94,6 +111,7 @@ describe('shared domain helpers', () => {
         exerciseId: 'exercise-1',
         exerciseType: 'vocabulary-recall',
         targetSkill: 'vocabulary',
+        ...conceptFields,
         response: 'hello',
         correct: true,
         attempts: 1,
@@ -110,6 +128,7 @@ describe('shared domain helpers', () => {
         exerciseId: 'exercise-2',
         exerciseType: 'word-order',
         targetSkill: 'grammar',
+        ...conceptFields,
         response: 'you are where',
         correct: false,
         attempts: 2,
@@ -140,9 +159,10 @@ describe('shared domain helpers', () => {
     const lesson = generateLessonFromPlan(plan, '2026-06-28T08:00:00.000Z');
 
     assert.equal(plan.studentModelVersion, initialStudentModel.version);
+    assert.equal(plan.concept, 'reading');
     assert.equal(plan.targetSkills.includes('review'), true);
     assert.equal(isLessonDeliverable(lesson), true);
-    assert.equal(lesson.exercises.length, 5);
+    assert.equal(lesson.exercises.length >= 3, true);
   });
 
   it('updates the Student Model from lesson evidence and changes the next plan', () => {
@@ -155,6 +175,7 @@ describe('shared domain helpers', () => {
         exerciseId: 'exercise-grammar',
         exerciseType: 'word-order',
         targetSkill: 'grammar',
+        ...conceptFields,
         response: 'you are where',
         correct: false,
         attempts: 2,
@@ -171,6 +192,7 @@ describe('shared domain helpers', () => {
         exerciseId: 'exercise-vocabulary',
         exerciseType: 'vocabulary-recall',
         targetSkill: 'vocabulary',
+        ...conceptFields,
         response: 'good afternoon',
         correct: true,
         attempts: 1,
@@ -195,7 +217,7 @@ describe('shared domain helpers', () => {
     assert.equal(updatedModel.version, 2);
     assert.equal(updatedModel.grammar.score.value < initialStudentModel.grammar.score.value, true);
     assert.equal(updatedModel.reviewPriorities.some((priority) => priority.skill === 'grammar'), true);
-    assert.equal(nextPlan.goal.skill, 'grammar');
+    assert.equal(nextPlan.concept, 'reading');
     assert.equal(nextPlan.difficulty, 'supportive');
   });
 
@@ -209,6 +231,7 @@ describe('shared domain helpers', () => {
         exerciseId: 'exercise-speaking',
         exerciseType: 'repeat-speaking',
         targetSkill: 'speaking',
+        ...conceptFields,
         response: '',
         correct: false,
         attempts: 1,
@@ -230,5 +253,154 @@ describe('shared domain helpers', () => {
     assert.deepEqual(observation?.evidenceIds, ['event-speaking']);
     assert.equal(recommendation.studentId, demoStudent.id);
     assert.equal(recommendation.reason.length > 0, true);
+  });
+
+  it('respects manual concept selection in lesson planning', () => {
+    const plan = createLessonPlan(
+      initialStudentModel,
+      {
+        mode: 'home',
+        selectedConcept: 'reading',
+        manualConceptChoice: true,
+        isOffline: false,
+        speechAvailable: true,
+        availableMinutes: 6,
+      },
+      '2026-06-28T08:00:00.000Z',
+    );
+
+    assert.equal(plan.concept, 'reading');
+    assert.equal(plan.activityType, 'reading-comprehension');
+  });
+
+  it('increases a concept level after stable evidence', () => {
+    const results = ['a', 'b', 'c'].map((suffix) => ({
+      id: `result-stable-${suffix}`,
+      studentId: demoStudent.id,
+      sessionId: 'session-stable',
+      lessonId: 'lesson-stable',
+      exerciseId: `exercise-stable-${suffix}`,
+      exerciseType: 'vocabulary-recall',
+      targetSkill: 'vocabulary',
+      ...conceptFields,
+      concept: 'vocabulary',
+      activityType: 'vocabulary-recall',
+      correct: true,
+      attempts: 1,
+      responseTimeMs: 2500,
+      completionState: 'completed',
+      evidenceEventIds: [`event-stable-${suffix}`],
+      completedAt: '2026-06-28T08:01:00.000Z',
+    }));
+
+    const updatedModel = updateStudentModelFromResults(initialStudentModel, results, '2026-06-28T08:04:00.000Z');
+
+    assert.equal(updatedModel.teacherDecision.levelDecision, 'increase');
+    assert.equal(updatedModel.conceptLevels.vocabulary.score.value > initialStudentModel.conceptLevels.vocabulary.score.value, true);
+  });
+
+  it('decreases a concept level after overload evidence', () => {
+    const results = ['a', 'b', 'c'].map((suffix) => ({
+      id: `result-overload-${suffix}`,
+      studentId: demoStudent.id,
+      sessionId: 'session-overload',
+      lessonId: 'lesson-overload',
+      exerciseId: `exercise-overload-${suffix}`,
+      exerciseType: 'listening-comprehension',
+      targetSkill: 'listening',
+      ...conceptFields,
+      concept: 'reading',
+      activityType: 'reading-comprehension',
+      correct: false,
+      attempts: 2,
+      responseTimeMs: 15000,
+      hintCount: 2,
+      completionState: 'completed',
+      evidenceEventIds: [`event-overload-${suffix}`],
+      completedAt: '2026-06-28T08:01:00.000Z',
+    }));
+
+    const updatedModel = updateStudentModelFromResults(initialStudentModel, results, '2026-06-28T08:04:00.000Z');
+
+    assert.equal(updatedModel.teacherDecision.levelDecision, 'decrease');
+    assert.equal(updatedModel.conceptLevels.reading.score.value < initialStudentModel.conceptLevels.reading.score.value, true);
+  });
+
+  it('holds a concept level when recognition is correct but slow', () => {
+    const result = {
+      id: 'result-slow-hold',
+      studentId: demoStudent.id,
+      sessionId: 'session-slow-hold',
+      lessonId: 'lesson-slow-hold',
+      exerciseId: 'exercise-slow-hold',
+      exerciseType: 'vocabulary-recall',
+      targetSkill: 'vocabulary',
+      ...conceptFields,
+      concept: 'vocabulary',
+      activityType: 'vocabulary-recall',
+      correct: true,
+      attempts: 1,
+      responseTimeMs: 16000,
+      completionState: 'completed',
+      evidenceEventIds: ['event-slow-hold'],
+      completedAt: '2026-06-28T08:01:00.000Z',
+    };
+
+    const decision = decideNextTeacherAction(
+      initialStudentModel,
+      { mode: 'home', selectedConcept: 'vocabulary', isOffline: false, speechAvailable: true, availableMinutes: 6 },
+      [result],
+      '2026-06-28T08:02:00.000Z',
+    );
+
+    assert.equal(decision.levelDecision, 'hold');
+  });
+
+  it('plans a recovery check after a long concept pause', () => {
+    const pausedModel = {
+      ...initialStudentModel,
+      conceptLevels: {
+        ...initialStudentModel.conceptLevels,
+        reading: {
+          ...initialStudentModel.conceptLevels.reading,
+          lastPracticedAt: '2026-06-01T08:00:00.000Z',
+        },
+      },
+    };
+    const plan = createLessonPlan(
+      pausedModel,
+      { mode: 'home', isOffline: false, speechAvailable: true, availableMinutes: 6 },
+      '2026-06-28T08:00:00.000Z',
+    );
+
+    assert.equal(plan.concept, 'reading');
+    assert.equal(plan.activityType, 'recovery-check');
+    assert.equal(plan.teacherDecision.reason.includes('not been practiced recently'), true);
+  });
+
+  it('detects avoided concepts from recent practice history', () => {
+    const vocabularyOnlyModel = {
+      ...initialStudentModel,
+      conceptHistory: [1, 2, 3, 4].map((index) => ({
+        concept: 'vocabulary',
+        activityType: 'vocabulary-recall',
+        practicedAt: `2026-06-2${index}T08:00:00.000Z`,
+        accuracy: 1,
+        averageResponseTimeMs: 2000,
+        completionRate: 1,
+        hintCount: 0,
+        skippedCount: 0,
+        abandonedCount: 0,
+        teacherDecision: 'increase',
+      })),
+    };
+    const plan = createLessonPlan(
+      vocabularyOnlyModel,
+      { mode: 'home', isOffline: false, speechAvailable: true, availableMinutes: 6 },
+      '2026-06-28T08:00:00.000Z',
+    );
+
+    assert.equal(plan.concept, 'learning');
+    assert.equal(plan.activityType, 'recovery-check');
   });
 });
