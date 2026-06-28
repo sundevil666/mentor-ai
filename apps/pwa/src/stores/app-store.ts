@@ -16,6 +16,7 @@ import {
   type LearningContext,
   type Observation,
   type Recommendation,
+  type SpeechResult,
   type StatisticsSnapshot,
   type StorageMode,
   type StudentModel,
@@ -31,6 +32,7 @@ interface LearningSessionState {
   exerciseStartedAt: string;
   events: LearningEvent[];
   results: ExerciseResult[];
+  speechResults: SpeechResult[];
   observation?: Observation;
   recommendation?: Recommendation;
   completedAt?: string;
@@ -96,6 +98,7 @@ export const useAppStore = defineStore('app', {
         exerciseStartedAt: createdAt,
         events: [startedEvent, firstExerciseEvent],
         results: [],
+        speechResults: [],
       };
 
       await this.persistSession();
@@ -128,6 +131,21 @@ export const useAppStore = defineStore('app', {
 
       this.session.events.push(finishedEvent);
       this.session.results.push(result);
+
+      if (exercise.type === 'repeat-speaking') {
+        this.session.speechResults.push(
+          createSpeechResult(
+            this.session.id,
+            exercise.id,
+            submittedAt,
+            Math.max(0, Date.parse(submittedAt) - Date.parse(this.session.exerciseStartedAt)),
+            response.trim().length > 0,
+          ),
+        );
+        this.session.events.push(
+          createLearningEvent(this.session.id, this.session.lesson.id, exercise.id, 'speech-attempted', submittedAt),
+        );
+      }
 
       const nextIndex = this.session.currentExerciseIndex + 1;
 
@@ -273,7 +291,11 @@ export const useAppStore = defineStore('app', {
       }
 
       try {
-        const result = await synchronizeLearningEvidence(pendingEvents, this.session?.results ?? []);
+        const result = await synchronizeLearningEvidence(
+          pendingEvents,
+          this.session?.results ?? [],
+          this.session?.speechResults ?? [],
+        );
 
         for (const acknowledgement of result.acknowledgements) {
           const queuedEvent = pendingEvents.find((event) => event.id === acknowledgement.eventId);
@@ -344,6 +366,25 @@ function createExerciseResult(
     responseTimeMs,
     completionState: response.trim().length === 0 ? 'skipped' : 'completed',
     evidenceEventIds: [evidenceId],
+    completedAt,
+  };
+}
+
+function createSpeechResult(
+  sessionId: string,
+  exerciseId: string,
+  completedAt: string,
+  responseStartDelayMs: number,
+  speechDetected: boolean,
+): SpeechResult {
+  return {
+    id: `speech-${exerciseId}-${Date.now()}`,
+    studentId: demoStudent.id,
+    sessionId,
+    exerciseId,
+    speechAvailable: 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window,
+    speechDetected,
+    responseStartDelayMs,
     completedAt,
   };
 }

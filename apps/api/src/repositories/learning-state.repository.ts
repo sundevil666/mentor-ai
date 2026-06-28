@@ -9,6 +9,7 @@ import {
   type LearningEvent,
   type Observation,
   type Recommendation,
+  type SpeechResult,
   type StatisticsSnapshot,
   type Student,
   type StudentModel,
@@ -26,6 +27,7 @@ interface LearningStateRecord {
   recommendations: Recommendation[];
   acceptedEvents: LearningEvent[];
   exerciseResults: ExerciseResult[];
+  speechResults: SpeechResult[];
   statisticsSnapshots: StatisticsSnapshot[];
   observations: Observation[];
   teacherJournal: TeacherJournalEntry[];
@@ -39,6 +41,7 @@ const demoState: LearningStateRecord = {
   recommendations: [createRecommendationFromModel(initialStudentModel, initialStudentModel.updatedAt)],
   acceptedEvents: [],
   exerciseResults: [],
+  speechResults: [],
   statisticsSnapshots: [],
   observations: [],
   teacherJournal: [],

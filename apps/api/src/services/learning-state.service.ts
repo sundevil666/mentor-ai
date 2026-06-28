@@ -5,6 +5,7 @@ import {
   type ExerciseResult,
   type LearningContext,
   type LearningEvent,
+  type SpeechResult,
   type SyncStatus,
   type StudentModel,
   type SynchronizationAcknowledgement,
@@ -49,10 +50,11 @@ export const learningStateService = {
     return state.recommendations;
   },
 
-  async synchronize(events: LearningEvent[], exerciseResults: ExerciseResult[] = []) {
+  async synchronize(events: LearningEvent[], exerciseResults: ExerciseResult[] = [], speechResults: SpeechResult[] = []) {
     const state = await learningStateRepository.read();
     const acceptedEventIds = new Set(state.acceptedEvents.map((event) => event.id));
     const acceptedResultIds = new Set(state.exerciseResults.map((result) => result.id));
+    const acceptedSpeechResultIds = new Set(state.speechResults.map((result) => result.id));
     const acknowledgements: SynchronizationAcknowledgement[] = [];
     const newEvents: LearningEvent[] = [];
     const newResults = exerciseResults.filter((result) => {
@@ -61,6 +63,14 @@ export const learningStateService = {
       }
 
       acceptedResultIds.add(result.id);
+      return true;
+    });
+    const newSpeechResults = speechResults.filter((result) => {
+      if (acceptedSpeechResultIds.has(result.id) || result.studentId !== state.student.id) {
+        return false;
+      }
+
+      acceptedSpeechResultIds.add(result.id);
       return true;
     });
 
@@ -91,6 +101,7 @@ export const learningStateService = {
       studentModel: analyzedState.studentModel,
       acceptedEvents: [...state.acceptedEvents, ...newEvents],
       exerciseResults: [...state.exerciseResults, ...newResults],
+      speechResults: [...state.speechResults, ...newSpeechResults],
       statisticsSnapshots: [...state.statisticsSnapshots, ...analyzedState.statisticsSnapshots],
       observations: nextObservations,
       teacherJournal: [...state.teacherJournal, ...analyzedState.teacherJournal],
@@ -110,6 +121,7 @@ export const learningStateService = {
       observations: analyzedState.observations,
       teacherJournal: analyzedState.teacherJournal,
       teacherMemoryCount: nextTeacherMemory.length,
+      acceptedSpeechResults: newSpeechResults.length,
     };
   },
 

@@ -278,3 +278,39 @@ Memory promotion currently counts repeated Observations by skill only. It does n
 ### Future Improvements
 
 Milestone 9 should strengthen the Speech Layer by recording speech availability, attempts, and timing as first-class Speech Results.
+
+## 2026-06-28 - Milestone 9: Speech Layer Version 1
+
+### Summary
+
+Added basic Speech Result capture and synchronization. Repeat-speaking exercises now create Speech Results with speech availability, detection status, response timing, and completion time. The backend accepts and deduplicates Speech Results as first-class synchronized evidence.
+
+Advanced pronunciation analysis remains intentionally postponed.
+
+### Files Changed
+
+- `apps/api/src/controllers/learning-state.controller.ts`
+- `apps/api/src/repositories/learning-state.repository.ts`
+- `apps/api/src/services/learning-state.service.ts`
+- `apps/pwa/src/services/api-client.ts`
+- `apps/pwa/src/stores/app-store.ts`
+- `docs/implementation-log.md`
+
+### Architecture References
+
+- [Learning Experience](06-learning-experience.md)
+- [Learning Synchronization](10-learning-synchronization.md)
+- [Conceptual Contracts](14-contracts.md)
+- [First Implementation](15-first-implementation.md)
+
+### Lessons Learned
+
+Speech evidence should be captured separately from Exercise Results because availability, detection, and timing are useful even when pronunciation scoring is not available.
+
+### Known Limitations
+
+Speech input is still represented by typed confirmation. Browser speech recognition and raw audio processing are not implemented.
+
+### Future Improvements
+
+Milestone 10 should focus on production readiness: end-to-end verification, privacy review, build scripts, and operational documentation.
