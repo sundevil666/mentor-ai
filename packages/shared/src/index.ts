@@ -25,7 +25,7 @@ export type LearningEventType =
 
 export type CompletionState = 'completed' | 'skipped' | 'abandoned';
 
-export type SyncStatus = 'pending' | 'accepted' | 'rejected';
+export type SyncStatus = 'pending' | 'accepted' | 'duplicate' | 'rejected';
 
 export interface UserProfile {
   id: string;

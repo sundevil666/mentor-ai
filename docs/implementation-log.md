@@ -104,3 +104,41 @@ Synchronization is local-only. Pending events are queued but not uploaded. Speec
 ### Future Improvements
 
 Milestone 4 should expose backend endpoints for current Student state, generated lessons, synchronization, recommendations, and configuration so the PWA can submit local evidence through the API.
+
+## 2026-06-28 - Milestone 4: Backend Persistence And API
+
+### Summary
+
+Added the first backend resource layer for the Version 1 learning loop. The API now exposes current Student state, the current Generated Lesson, Recommendations, configuration, and a synchronization endpoint that accepts delayed Learning Events with idempotent acknowledgements.
+
+Storage is file-backed for personal mode under `storage/` and artificial in-memory demo state for demo mode. The backend remains a workflow coordinator and uses the shared domain functions for Lesson Plan and Generated Lesson creation.
+
+### Files Changed
+
+- `apps/api/src/controllers/learning-state.controller.ts`
+- `apps/api/src/repositories/learning-state.repository.ts`
+- `apps/api/src/routes/index.ts`
+- `apps/api/src/routes/learning-state.routes.ts`
+- `apps/api/src/services/learning-state.service.ts`
+- `docs/implementation-log.md`
+- `packages/shared/src/index.ts`
+
+### Architecture References
+
+- [Backend](05-backend.md)
+- [Data Model](04-data-model.md)
+- [Learning Synchronization](10-learning-synchronization.md)
+- [Conceptual Contracts](14-contracts.md)
+- [First Implementation](15-first-implementation.md)
+
+### Lessons Learned
+
+Duplicate synchronization uploads should be acknowledged as duplicate, not treated as generic failures. Repeated uploads are normal offline-first behavior.
+
+### Known Limitations
+
+Synchronization currently stores accepted Learning Events and returns acknowledgements, but deeper analytics and Student Model updates from server-side synchronized evidence are still pending. Demo mode state is process-local.
+
+### Future Improvements
+
+Milestone 5 should connect the PWA synchronization queue to this API, preserve server acknowledgements locally, and make repeated uploads harmless from the client side.
