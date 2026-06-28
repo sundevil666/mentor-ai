@@ -1,10 +1,15 @@
 import {
   createLessonPlan,
+  createObservationFromResults,
   createRecommendationFromModel,
   generateLessonFromPlan,
+  summarizeResults,
+  updateStudentModelFromResults,
+  type ExerciseResult,
   type LearningContext,
   type LearningEvent,
   type SyncStatus,
+  type StudentModel,
   type SynchronizationAcknowledgement,
 } from '@mentor-ai/shared';
 import { config } from '../config/env.js';
@@ -45,11 +50,20 @@ export const learningStateService = {
     return state.recommendations;
   },
 
-  async synchronize(events: LearningEvent[]) {
+  async synchronize(events: LearningEvent[], exerciseResults: ExerciseResult[] = []) {
     const state = await learningStateRepository.read();
     const acceptedEventIds = new Set(state.acceptedEvents.map((event) => event.id));
+    const acceptedResultIds = new Set(state.exerciseResults.map((result) => result.id));
     const acknowledgements: SynchronizationAcknowledgement[] = [];
     const newEvents: LearningEvent[] = [];
+    const newResults = exerciseResults.filter((result) => {
+      if (acceptedResultIds.has(result.id) || result.studentId !== state.student.id) {
+        return false;
+      }
+
+      acceptedResultIds.add(result.id);
+      return true;
+    });
 
     for (const event of events) {
       const status = validateLearningEvent(event, state.student.id, acceptedEventIds);
@@ -65,19 +79,32 @@ export const learningStateService = {
       }
     }
 
+    const analyzedState = analyzeExerciseResults(state.student.id, state.studentModel, newResults);
+    const nextRecommendations =
+      analyzedState.recommendation === undefined
+        ? state.recommendations
+        : [...state.recommendations, analyzedState.recommendation];
+
     await learningStateRepository.write({
       ...state,
+      studentModel: analyzedState.studentModel,
       acceptedEvents: [...state.acceptedEvents, ...newEvents],
+      exerciseResults: [...state.exerciseResults, ...newResults],
+      statisticsSnapshots: [...state.statisticsSnapshots, ...analyzedState.statisticsSnapshots],
+      observations: [...state.observations, ...analyzedState.observations],
+      recommendations: nextRecommendations,
       acknowledgements: [...state.acknowledgements, ...acknowledgements],
     });
 
     return {
       acknowledgements,
       acceptedCount: acknowledgements.filter((acknowledgement) => acknowledgement.status === 'accepted').length,
-      pendingAnalysis: newEvents.length > 0,
-      studentModelVersion: state.studentModel.version,
+      pendingAnalysis: false,
+      studentModelVersion: analyzedState.studentModel.version,
       currentLesson: state.currentLesson,
-      recommendations: state.recommendations,
+      recommendations: nextRecommendations,
+      statisticsSnapshots: analyzedState.statisticsSnapshots,
+      observations: analyzedState.observations,
     };
   },
 
@@ -117,6 +144,46 @@ function defaultLearningContext(): LearningContext {
     isOffline: false,
     speechAvailable: true,
     availableMinutes: 6,
+  };
+}
+
+function analyzeExerciseResults(studentId: string, studentModel: StudentModel, results: ExerciseResult[]) {
+  if (results.length === 0) {
+    return {
+      studentModel,
+      statisticsSnapshots: [],
+      observations: [],
+      recommendation: undefined,
+    };
+  }
+
+  const createdAt = now();
+  const summary = summarizeResults(results);
+  const firstResult = results[0];
+  const nextStudentModel = updateStudentModelFromResults(studentModel, results, createdAt);
+  const observation = createObservationFromResults(studentId, results, createdAt);
+  const recommendation = createRecommendationFromModel(nextStudentModel, createdAt);
+
+  return {
+    studentModel: nextStudentModel,
+    statisticsSnapshots: [
+      {
+        id: `statistics-${firstResult.sessionId}-${createdAt}`,
+        studentId,
+        sessionId: firstResult.sessionId,
+        lessonId: firstResult.lessonId,
+        accuracy: summary.accuracy,
+        averageResponseTimeMs: summary.averageResponseTimeMs,
+        attempts: summary.attempts,
+        completedExercises: summary.completedExercises,
+        audioReplays: 0,
+        speechAttempts: results.filter((result) => result.exerciseType === 'repeat-speaking').length,
+        fatigueSignal: summary.fatigueSignal,
+        createdAt,
+      },
+    ],
+    observations: observation ? [observation] : [],
+    recommendation,
   };
 }
 

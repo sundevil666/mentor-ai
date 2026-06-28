@@ -175,3 +175,39 @@ Synchronization runs after lesson completion while the app is open. Background s
 ### Future Improvements
 
 Milestone 6 should add server-side Learning Analytics so synchronized evidence produces Statistics Snapshots, Educational Insights, and model update inputs.
+
+## 2026-06-28 - Milestone 6: Learning Analytics
+
+### Summary
+
+Extended synchronization to include Exercise Results and added the first server-side analytics path. The backend now deduplicates Exercise Results, creates Statistics Snapshots, creates Observations when evidence shows a mistake, updates the Student Model version from synchronized evidence, and appends a refreshed Recommendation.
+
+The PWA now submits Exercise Results with pending Learning Events so backend analysis can use structured evidence instead of raw events alone.
+
+### Files Changed
+
+- `apps/api/src/controllers/learning-state.controller.ts`
+- `apps/api/src/repositories/learning-state.repository.ts`
+- `apps/api/src/services/learning-state.service.ts`
+- `apps/pwa/src/services/api-client.ts`
+- `apps/pwa/src/stores/app-store.ts`
+- `docs/implementation-log.md`
+
+### Architecture References
+
+- [Learning Analytics](09-learning-analytics.md)
+- [Learning Synchronization](10-learning-synchronization.md)
+- [Student Model](03-system-design.md)
+- [Conceptual Contracts](14-contracts.md)
+
+### Lessons Learned
+
+Raw Learning Events are not enough for backend analysis. Exercise Results are the right first structured evidence unit for updating the Student Model conservatively.
+
+### Known Limitations
+
+Pattern detection is still basic and session-local. Teacher Journal and Teacher Memory promotion are not implemented yet.
+
+### Future Improvements
+
+Milestone 7 should introduce an AI Teacher workflow boundary with deterministic fallback output for Observations, Recommendations, Lesson Plans, Teacher Journal entries, Teacher Memory candidates, and proposed Student Model changes.

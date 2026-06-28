@@ -1,4 +1,4 @@
-import type { ApiResponse, LearningEvent, SynchronizationAcknowledgement } from '@mentor-ai/shared';
+import type { ApiResponse, ExerciseResult, LearningEvent, SynchronizationAcknowledgement } from '@mentor-ai/shared';
 
 interface SynchronizationResponse {
   acknowledgements: SynchronizationAcknowledgement[];
@@ -9,13 +9,16 @@ interface SynchronizationResponse {
 
 const apiBaseUrl = process.env.API_BASE_URL ?? 'http://localhost:4000';
 
-export async function synchronizeLearningEvents(events: LearningEvent[]): Promise<SynchronizationResponse> {
+export async function synchronizeLearningEvidence(
+  events: LearningEvent[],
+  exerciseResults: ExerciseResult[],
+): Promise<SynchronizationResponse> {
   const response = await fetch(`${apiBaseUrl}/api/synchronization`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ events }),
+    body: JSON.stringify({ events, exerciseResults }),
   });
 
   if (!response.ok) {

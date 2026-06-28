@@ -20,7 +20,7 @@ import {
   type StorageMode,
   type StudentModel,
 } from '@mentor-ai/shared';
-import { synchronizeLearningEvents } from 'src/services/api-client';
+import { synchronizeLearningEvidence } from 'src/services/api-client';
 import { mentorDb } from 'src/services/indexed-db';
 
 interface LearningSessionState {
@@ -273,7 +273,7 @@ export const useAppStore = defineStore('app', {
       }
 
       try {
-        const result = await synchronizeLearningEvents(pendingEvents);
+        const result = await synchronizeLearningEvidence(pendingEvents, this.session?.results ?? []);
 
         for (const acknowledgement of result.acknowledgements) {
           const queuedEvent = pendingEvents.find((event) => event.id === acknowledgement.eventId);

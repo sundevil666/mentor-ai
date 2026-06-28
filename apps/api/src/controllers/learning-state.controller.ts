@@ -1,5 +1,5 @@
 import type { RequestHandler } from 'express';
-import type { LearningContext, LearningEvent } from '@mentor-ai/shared';
+import type { ExerciseResult, LearningContext, LearningEvent } from '@mentor-ai/shared';
 import { learningStateService } from '../services/learning-state.service.js';
 
 export const getStudentState: RequestHandler = async (_req, res, next) => {
@@ -29,7 +29,11 @@ export const getRecommendations: RequestHandler = async (_req, res, next) => {
 export const synchronizeLearningEvents: RequestHandler = async (req, res, next) => {
   try {
     const events = Array.isArray(req.body?.events) ? (req.body.events as LearningEvent[]) : [];
-    res.json({ data: await learningStateService.synchronize(events) });
+    const exerciseResults = Array.isArray(req.body?.exerciseResults)
+      ? (req.body.exerciseResults as ExerciseResult[])
+      : [];
+
+    res.json({ data: await learningStateService.synchronize(events, exerciseResults) });
   } catch (error) {
     next(error);
   }
