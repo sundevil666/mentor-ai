@@ -14,6 +14,7 @@ import {
   type StudentModel,
   type SynchronizationAcknowledgement,
   type TeacherJournalEntry,
+  type TeacherMemory,
 } from '@mentor-ai/shared';
 import { config } from '../config/env.js';
 import { resolvePersonalStoragePath } from '../utils/storage-path.js';
@@ -28,6 +29,7 @@ interface LearningStateRecord {
   statisticsSnapshots: StatisticsSnapshot[];
   observations: Observation[];
   teacherJournal: TeacherJournalEntry[];
+  teacherMemory: TeacherMemory[];
   acknowledgements: SynchronizationAcknowledgement[];
 }
 
@@ -40,6 +42,7 @@ const demoState: LearningStateRecord = {
   statisticsSnapshots: [],
   observations: [],
   teacherJournal: [],
+  teacherMemory: [],
   acknowledgements: [],
 };
 

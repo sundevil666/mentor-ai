@@ -245,3 +245,36 @@ The AI Teacher is deterministic and rule-based. It does not call an external mod
 ### Future Improvements
 
 Milestone 8 should persist Teacher Journal and Teacher Memory more deliberately, including promotion rules for stable repeated patterns.
+
+## 2026-06-28 - Milestone 8: Teacher Journal And Teacher Memory
+
+### Summary
+
+Added durable Teacher Journal and Teacher Memory state to the backend learning record. AI Teacher reflections now produce Teacher Journal entries, and repeated Observations for the same skill can promote a versioned Teacher Memory fact.
+
+Memory promotion is conservative: one observation is not enough. The system waits for repeated evidence before creating long-term teaching knowledge.
+
+### Files Changed
+
+- `apps/api/src/repositories/learning-state.repository.ts`
+- `apps/api/src/services/learning-state.service.ts`
+- `docs/implementation-log.md`
+
+### Architecture References
+
+- [AI Teacher](07-ai-teacher.md)
+- [Learning Analytics](09-learning-analytics.md)
+- [Data Model](04-data-model.md)
+- [Conceptual Contracts](14-contracts.md)
+
+### Lessons Learned
+
+Teacher Journal and Teacher Memory need different thresholds. The journal can record a meaningful reflection immediately, while memory should require repeated evidence.
+
+### Known Limitations
+
+Memory promotion currently counts repeated Observations by skill only. It does not yet compare context, time spacing, or successful recovery strategies.
+
+### Future Improvements
+
+Milestone 9 should strengthen the Speech Layer by recording speech availability, attempts, and timing as first-class Speech Results.
