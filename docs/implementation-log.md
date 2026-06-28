@@ -35,3 +35,37 @@ The current domain helpers are intentionally basic. They do not yet generate Les
 ### Future Improvements
 
 Milestone 2 should add deterministic local teaching logic that produces a Lesson Plan and Generated Lesson from a Student Model, then updates the model from completed Exercise Results.
+
+## 2026-06-28 - Milestone 2: Local Teaching Loop
+
+### Summary
+
+Added a deterministic local teaching loop to the shared package. The loop can start from the demo Student Model, create a Lesson Plan, generate a short purposeful English lesson, summarize Exercise Results, update the Student Model version, create an evidence-grounded Observation, and create a Recommendation for the next step.
+
+The implementation is intentionally provider-independent. It gives the PWA and backend a reliable fallback path before external AI integration exists.
+
+### Files Changed
+
+- `docs/implementation-log.md`
+- `packages/shared/src/index.ts`
+- `packages/shared/test/domain.test.mjs`
+
+### Architecture References
+
+- [First Implementation](15-first-implementation.md)
+- [AI Teacher](07-ai-teacher.md)
+- [Lesson Engine](08-lesson-engine.md)
+- [Learning Analytics](09-learning-analytics.md)
+- [Conceptual Contracts](14-contracts.md)
+
+### Lessons Learned
+
+The first teaching loop can stay small if it focuses on evidence changing the next lesson. A deterministic teacher is not the final AI Teacher, but it protects the architecture by keeping lesson planning and Student Model changes outside the UI.
+
+### Known Limitations
+
+The lesson content is fixed demo content for basic English greetings and question word order. The model update rules are simple and conservative. No backend persistence or PWA execution is wired yet.
+
+### Future Improvements
+
+Milestone 3 should connect this loop to the PWA Start or Continue flow, capture local evidence during exercise execution, and persist progress in IndexedDB for offline recovery.
