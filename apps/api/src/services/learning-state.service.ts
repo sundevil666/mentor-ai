@@ -161,11 +161,13 @@ function validateLearningEvent(event: LearningEvent, studentId: string, accepted
 
 function sanitizeLearningEvent(event: LearningEvent): LearningEvent {
   const { data: _data, ...safeEvent } = event;
+  void _data;
   return safeEvent;
 }
 
 function sanitizeExerciseResult(result: ExerciseResult): ExerciseResult {
   const { response: _response, ...safeResult } = result as ExerciseResult & { response?: unknown };
+  void _response;
   return safeResult;
 }
 
@@ -180,6 +182,9 @@ function sanitizeSpeechResult(result: SpeechResult): SpeechResult {
     recording?: unknown;
     transcript?: unknown;
   };
+  void _rawAudio;
+  void _recording;
+  void _transcript;
 
   return safeResult;
 }
@@ -204,33 +209,59 @@ function analyzeExerciseResults(studentId: string, studentModel: StudentModel, r
     };
   }
 
-  const createdAt = now();
-  const summary = summarizeResults(results);
-  const firstResult = results[0];
-  const reflection = aiTeacherService.reflectOnResults(studentId, studentModel, results, createdAt);
+  const baseTime = Date.now();
+  let nextStudentModel = studentModel;
+  const statisticsSnapshots = [];
+  const observations = [];
+  const teacherJournal = [];
+  let recommendation;
+
+  for (const [index, sessionResults] of groupResultsByLessonSession(results).entries()) {
+    const createdAt = new Date(baseTime + index).toISOString();
+    const summary = summarizeResults(sessionResults);
+    const firstResult = sessionResults[0];
+    const reflection = aiTeacherService.reflectOnResults(studentId, nextStudentModel, sessionResults, createdAt);
+
+    nextStudentModel = reflection.studentModel;
+    observations.push(...reflection.observations);
+    teacherJournal.push(reflection.journalEntry);
+    recommendation = reflection.recommendation;
+    statisticsSnapshots.push({
+      id: `statistics-${firstResult.sessionId}-${createdAt}`,
+      studentId,
+      sessionId: firstResult.sessionId,
+      lessonId: firstResult.lessonId,
+      accuracy: summary.accuracy,
+      averageResponseTimeMs: summary.averageResponseTimeMs,
+      attempts: summary.attempts,
+      completedExercises: summary.completedExercises,
+      audioReplays: 0,
+      speechAttempts: sessionResults.filter((result) => result.exerciseType === 'repeat-speaking').length,
+      fatigueSignal: summary.fatigueSignal,
+      createdAt,
+    });
+  }
 
   return {
-    studentModel: reflection.studentModel,
-    statisticsSnapshots: [
-      {
-        id: `statistics-${firstResult.sessionId}-${createdAt}`,
-        studentId,
-        sessionId: firstResult.sessionId,
-        lessonId: firstResult.lessonId,
-        accuracy: summary.accuracy,
-        averageResponseTimeMs: summary.averageResponseTimeMs,
-        attempts: summary.attempts,
-        completedExercises: summary.completedExercises,
-        audioReplays: 0,
-        speechAttempts: results.filter((result) => result.exerciseType === 'repeat-speaking').length,
-        fatigueSignal: summary.fatigueSignal,
-        createdAt,
-      },
-    ],
-    observations: reflection.observations,
-    teacherJournal: [reflection.journalEntry],
-    recommendation: reflection.recommendation,
+    studentModel: nextStudentModel,
+    statisticsSnapshots,
+    observations,
+    teacherJournal,
+    recommendation,
   };
+}
+
+function groupResultsByLessonSession(results: ExerciseResult[]): ExerciseResult[][] {
+  const groups = new Map<string, ExerciseResult[]>();
+
+  for (const result of results) {
+    const groupKey = `${result.sessionId}:${result.lessonId}`;
+    const sessionResults = groups.get(groupKey) ?? [];
+    sessionResults.push(result);
+    groups.set(groupKey, sessionResults);
+  }
+
+  return Array.from(groups.values());
 }
 
 function promoteTeacherMemory(

@@ -379,3 +379,35 @@ The PWA still lacks automated browser tests for offline completion, reload recov
 ### Future Improvements
 
 Add a dedicated synchronization batch store with per-session acknowledgement metadata and browser end-to-end coverage for offline-to-online recovery.
+
+## 2026-06-28 - Milestone 12: Batched Offline Analytics
+
+### Summary
+
+Improved backend synchronization analysis so delayed offline evidence is interpreted per lesson session instead of as one mixed batch. A synchronization request can now contain multiple completed lessons, and the backend creates separate Statistics Snapshots, Teacher Journal entries, Observations, and sequential Student Model updates for each session/lesson group.
+
+This keeps Learning Analytics aligned with the product concept: every completed lesson should preserve its own teaching meaning, even when several offline lessons are uploaded together later.
+
+### Files Changed
+
+- `apps/api/src/services/learning-state.service.ts`
+- `apps/api/test/learning-state.test.mjs`
+- `docs/implementation-log.md`
+
+### Architecture References
+
+- [Learning Synchronization](10-learning-synchronization.md)
+- [Learning Analytics](09-learning-analytics.md)
+- [First Implementation](15-first-implementation.md)
+
+### Lessons Learned
+
+Offline synchronization batches are transport units, not teaching units. Analytics should group evidence by the learning session and lesson that produced it before updating the Student Model.
+
+### Known Limitations
+
+Statistics still derive audio replay counts from Exercise Results only indirectly, so replay totals remain zero in backend-created snapshots until event-aware analytics is added.
+
+### Future Improvements
+
+Use Learning Events and Exercise Results together during backend analytics so audio replay, interruption, hint, and retry patterns can influence Observations and Teacher Memory.
