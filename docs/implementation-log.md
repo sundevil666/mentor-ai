@@ -314,3 +314,37 @@ Speech input is still represented by typed confirmation. Browser speech recognit
 ### Future Improvements
 
 Milestone 10 should focus on production readiness: end-to-end verification, privacy review, build scripts, and operational documentation.
+
+## 2026-06-28 - Milestone 10: Production Readiness
+
+### Summary
+
+Added workspace verification scripts and backend service tests. The root `verify` script now runs lint, typecheck, tests, and build. The API test suite verifies Student state retrieval, current lesson generation, synchronized evidence acceptance, Statistics Snapshot creation, Student Model version movement, and duplicate acknowledgement behavior.
+
+Ran the full verification gate successfully.
+
+### Files Changed
+
+- `apps/api/package.json`
+- `apps/api/test/learning-state.test.mjs`
+- `docs/implementation-log.md`
+- `package.json`
+
+### Architecture References
+
+- [First Implementation](15-first-implementation.md)
+- [Backend](05-backend.md)
+- [Learning Synchronization](10-learning-synchronization.md)
+- [Documentation Style](12-documentation-style.md)
+
+### Lessons Learned
+
+Service-level API tests are enough for the current backend milestone because they verify product behavior without requiring a listening server or external configuration.
+
+### Known Limitations
+
+There is no browser end-to-end test suite yet. The PWA flow was verified manually in the in-app browser during implementation.
+
+### Future Improvements
+
+Add automated browser tests for offline completion, reload recovery, synchronization, and next lesson generation once the app flow stabilizes further.
