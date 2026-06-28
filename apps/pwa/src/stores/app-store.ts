@@ -20,6 +20,7 @@ import {
   type StorageMode,
   type StudentModel,
 } from '@mentor-ai/shared';
+import { synchronizeLearningEvents } from 'src/services/api-client';
 import { mentorDb } from 'src/services/indexed-db';
 
 interface LearningSessionState {
@@ -41,6 +42,7 @@ interface AppState {
   studentModel: StudentModel;
   session: LearningSessionState | null;
   latestRecommendation: Recommendation | null;
+  pendingSyncEvents: number;
   isHydrated: boolean;
 }
 
@@ -53,13 +55,14 @@ export const useAppStore = defineStore('app', {
     studentModel: initialStudentModel,
     session: null,
     latestRecommendation: null,
+    pendingSyncEvents: 0,
     isHydrated: false,
   }),
 
   getters: {
     currentExercise: (state): Exercise | null => state.session?.lesson.exercises[state.session.currentExerciseIndex] ?? null,
     isLessonComplete: (state): boolean => Boolean(state.session?.completedAt),
-    pendingSyncCount: (state): number => state.session?.events.length ?? 0,
+    pendingSyncCount: (state): number => state.pendingSyncEvents,
   },
 
   actions: {
@@ -67,10 +70,12 @@ export const useAppStore = defineStore('app', {
       const db = await mentorDb;
       const savedModel = await db.get('student-models', initialStudentModel.id);
       const savedSession = await db.get('learning-sessions', sessionStoreKey);
+      const queuedEvents = await db.getAll('sync-queue');
 
       this.studentModel = (savedModel as StudentModel | undefined) ?? initialStudentModel;
       this.session = (savedSession as LearningSessionState | undefined) ?? null;
       this.latestRecommendation = this.session?.recommendation ?? createRecommendationFromModel(this.studentModel, now());
+      this.pendingSyncEvents = queuedEvents.filter((event) => event.status === 'pending').length;
       this.isHydrated = true;
     },
 
@@ -159,9 +164,11 @@ export const useAppStore = defineStore('app', {
       this.studentModel = initialStudentModel;
       this.session = null;
       this.latestRecommendation = createRecommendationFromModel(initialStudentModel, now());
+      this.pendingSyncEvents = 0;
 
       await db.put('student-models', this.studentModel);
       await db.delete('learning-sessions', sessionStoreKey);
+      await db.clear('sync-queue');
     },
 
     async finishLesson(completedAt: string) {
@@ -191,6 +198,10 @@ export const useAppStore = defineStore('app', {
       await this.persistStudentModel();
       await this.persistStatistics(completedAt);
       await this.persistSyncQueue();
+
+      if (navigator.onLine) {
+        await this.syncPendingEvents();
+      }
     },
 
     async persistSession() {
@@ -245,6 +256,37 @@ export const useAppStore = defineStore('app', {
 
       for (const event of this.session.events) {
         await db.put('sync-queue', { ...event, status: 'pending' });
+      }
+
+      const queuedEvents = await db.getAll('sync-queue');
+      this.pendingSyncEvents = queuedEvents.filter((event) => event.status === 'pending').length;
+    },
+
+    async syncPendingEvents() {
+      const db = await mentorDb;
+      const queuedEvents = await db.getAll('sync-queue');
+      const pendingEvents = queuedEvents.filter((event) => event.status === 'pending') as Array<LearningEvent & { status: string }>;
+
+      if (pendingEvents.length === 0) {
+        this.pendingSyncEvents = 0;
+        return;
+      }
+
+      try {
+        const result = await synchronizeLearningEvents(pendingEvents);
+
+        for (const acknowledgement of result.acknowledgements) {
+          const queuedEvent = pendingEvents.find((event) => event.id === acknowledgement.eventId);
+
+          if (queuedEvent) {
+            await db.put('sync-queue', { ...queuedEvent, status: acknowledgement.status });
+          }
+        }
+
+        const updatedQueue = await db.getAll('sync-queue');
+        this.pendingSyncEvents = updatedQueue.filter((event) => event.status === 'pending').length;
+      } catch {
+        this.pendingSyncEvents = pendingEvents.length;
       }
     },
   },

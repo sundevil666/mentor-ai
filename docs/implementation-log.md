@@ -142,3 +142,36 @@ Synchronization currently stores accepted Learning Events and returns acknowledg
 ### Future Improvements
 
 Milestone 5 should connect the PWA synchronization queue to this API, preserve server acknowledgements locally, and make repeated uploads harmless from the client side.
+
+## 2026-06-28 - Milestone 5: Client Synchronization
+
+### Summary
+
+Connected the PWA synchronization queue to the backend synchronization endpoint. Completed lessons now store Learning Events locally, upload pending events when online, persist backend acknowledgement statuses, and keep unsent evidence pending when synchronization fails.
+
+The visible status remains simple for the Student: offline-ready when there is no pending evidence, and a pending count only when local evidence still needs synchronization.
+
+### Files Changed
+
+- `apps/pwa/src/services/api-client.ts`
+- `apps/pwa/src/stores/app-store.ts`
+- `docs/implementation-log.md`
+
+### Architecture References
+
+- [Learning Synchronization](10-learning-synchronization.md)
+- [Conceptual Contracts](14-contracts.md)
+- [First Implementation](15-first-implementation.md)
+- [Learning Experience](06-learning-experience.md)
+
+### Lessons Learned
+
+The client should treat synchronization as background continuity. The Student should not have to decide whether to upload, retry, or merge evidence.
+
+### Known Limitations
+
+Synchronization runs after lesson completion while the app is open. Background sync through the service worker is not implemented yet.
+
+### Future Improvements
+
+Milestone 6 should add server-side Learning Analytics so synchronized evidence produces Statistics Snapshots, Educational Insights, and model update inputs.
