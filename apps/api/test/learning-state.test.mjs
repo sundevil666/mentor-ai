@@ -31,6 +31,8 @@ describe('learning state service', () => {
       ),
       true,
     );
+    assert.equal(lesson.exercises[0].type, 'listening-text');
+    assert.equal(lesson.exercises[0].audioText.split(/\s+/).length >= 1100, true);
   });
 
   it('accepts new synchronized evidence and marks repeats as duplicates', async () => {

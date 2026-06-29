@@ -38,12 +38,13 @@ export const learningStateService = {
 
     const createdAt = now();
     const completedLessonIds = new Set(state.exerciseResults.map((result) => result.lessonId));
-    const lesson =
+    const selectedLesson =
       context.mode === 'listening'
         ? (await privateLessonRepository.findNextForMode(context.mode, completedLessonIds)) ??
           generateLessonFromPlan(aiTeacherService.planLesson(state.studentModel, context, createdAt), createdAt)
         : (await privateLessonRepository.findNextForStudent(state.studentModel, completedLessonIds)) ??
           generateLessonFromPlan(aiTeacherService.planLesson(state.studentModel, context, createdAt), createdAt);
+    const lesson = context.mode === 'listening' ? ensureLongListeningLesson(selectedLesson) : selectedLesson;
 
     await learningStateRepository.write({
       ...state,
@@ -201,6 +202,100 @@ function isLessonSuitableForContext(lesson: GeneratedLesson, context: LearningCo
             firstExercise.audioText.trim().length > 0)),
     )
   );
+}
+
+function ensureLongListeningLesson(lesson: GeneratedLesson): GeneratedLesson {
+  const firstExercise = lesson.exercises[0];
+
+  if (!firstExercise || firstExercise.targetSkill !== 'listening') {
+    return lesson;
+  }
+
+  const audioText = firstExercise.audioText ?? '';
+
+  if (countWords(audioText) >= 1100) {
+    return lesson;
+  }
+
+  const longListeningText = createTenMinuteListeningText();
+
+  return {
+    ...lesson,
+    estimatedMinutes: Math.max(lesson.estimatedMinutes, 10),
+    purpose: lesson.purpose || 'Listen to a longer practical text while reading along.',
+    exercises: [
+      {
+        ...firstExercise,
+        type: 'listening-text',
+        prompt: 'Listen and read',
+        microLesson: 'Follow the highlighted words while you listen. Use word and sentence controls to repeat unclear parts.',
+        successTip: 'Continue when you have listened and followed the full text.',
+        expectedResponse: 'listened',
+        options: undefined,
+        audioText: longListeningText,
+      },
+      ...lesson.exercises.slice(1),
+    ],
+  };
+}
+
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function createTenMinuteListeningText(): string {
+  const baseSentences = [
+    'This morning I am going to work, and I want to use my travel time for English.',
+    'I leave home with my bag, my phone, and my headphones.',
+    'The street is quiet, but the bus stop is already a little busy.',
+    'I check the time and I see that I have ten minutes before the bus arrives.',
+    'I decide to listen to a simple English story and read the text at the same time.',
+    'When I hear a new word, I do not stop immediately.',
+    'First, I listen to the whole sentence and try to understand the main idea.',
+    'Then I replay the sentence and look at the word again.',
+    'This helps me connect the sound, the spelling, and the meaning.',
+    'On the bus, I sit near the window and lower the volume a little.',
+    'I can hear the voice clearly, but I can also hear the world around me.',
+    'The speaker talks about a normal day, simple plans, and small choices.',
+    'I hear phrases like I will take the bus, I need a coffee, and I will start work soon.',
+    'These phrases are useful because I can say them in my own life.',
+    'I repeat some words quietly in my head, but I do not need to speak loudly.',
+    'The goal is not to understand every word perfectly.',
+    'The goal is to stay with the text, catch the rhythm, and understand more each time.',
+    'After two minutes, the story feels easier.',
+    'I notice the same words again and again: morning, bus, work, listen, today, and later.',
+    'Repeated words become friendly because my ears meet them many times.',
+    'When the bus turns onto the main road, I move to the next paragraph.',
+    'The text talks about a person planning a small English routine.',
+    'The person listens for ten minutes in the morning and reads for five minutes in the evening.',
+    'This routine is small, but it is easy to repeat.',
+    'A small routine every day is stronger than a hard lesson once a month.',
+    'I like this idea because I am often tired after work.',
+    'If I only have a little energy, I can still listen and read.',
+    'If I have more energy, I can repeat sentences and answer questions.',
+    'The voice says that progress can feel slow, but listening grows quietly.',
+    'One day a phrase is difficult, and later the same phrase feels normal.',
+    'I look at the highlighted words and follow them with my eyes.',
+    'When the highlight moves, I know exactly where the voice is.',
+    'If I lose my place, I go back one sentence and listen again.',
+    'If one word is unclear, I go back one word and hear it again.',
+    'This makes listening active, but still calm.',
+    'Near the end of the ride, I understand the story better than at the beginning.',
+    'I can remember the main idea: use small moments, listen often, and read while listening.',
+    'I do not need perfect grammar in my head while I listen.',
+    'I need attention, patience, and a simple text that I can finish.',
+    'When I arrive at work, I stop the audio and save my progress.',
+    'Later, I can return to the same text and it will feel easier.',
+    'The same listening text can teach me new sounds on the first day and confidence on the second day.',
+    'Every replay is useful evidence because it shows what my ears are training.',
+    'Today I listened, read, and stayed with English for ten minutes.',
+    'That is real practice, and it counts.',
+  ];
+
+  return Array.from({ length: 4 }, (_, index) => {
+    const round = index + 1;
+    return `Part ${round}. ${baseSentences.join(' ')}`;
+  }).join('\n\n');
 }
 
 function validateLearningEvent(event: LearningEvent, studentId: string, acceptedEventIds: Set<string>): SyncStatus {

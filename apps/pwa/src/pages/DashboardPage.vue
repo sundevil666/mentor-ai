@@ -726,10 +726,7 @@ async function jumpSentence(direction: -1 | 1) {
     return;
   }
 
-  const currentSentenceIndex = Math.max(
-    0,
-    sentenceStarts.findLastIndex((wordIndex) => wordIndex <= activeWordIndex.value),
-  );
+  const currentSentenceIndex = Math.max(0, findLastNumberIndex(sentenceStarts, activeWordIndex.value));
   const nextSentenceIndex = clampIndex(currentSentenceIndex + direction, 0, sentenceStarts.length - 1);
 
   await startListeningAtWord(sentenceStarts[nextSentenceIndex] ?? 0);
@@ -900,10 +897,26 @@ function findWordIndexAtChar(tokens: ListeningToken[], charIndex: number): numbe
     return exactToken.index;
   }
 
-  return tokens.findLast((token) => token.start <= charIndex)?.index ?? -1;
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    if ((tokens[index]?.start ?? 0) <= charIndex) {
+      return tokens[index]?.index ?? -1;
+    }
+  }
+
+  return -1;
 }
 
 function clampIndex(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function findLastNumberIndex(values: number[], maxValue: number): number {
+  for (let index = values.length - 1; index >= 0; index -= 1) {
+    if ((values[index] ?? 0) <= maxValue) {
+      return index;
+    }
+  }
+
+  return -1;
 }
 </script>
