@@ -184,44 +184,6 @@ body.body--dark {
   text-align: center;
 }
 
-.active-session-bar {
-  align-items: center;
-  background: var(--app-surface);
-  border: 1px solid var(--app-border-strong);
-  border-radius: 8px;
-  display: flex;
-  gap: 16px;
-  justify-content: space-between;
-  margin-bottom: 16px;
-  padding: 12px;
-}
-
-.active-session-bar div {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.active-session-bar span {
-  color: var(--app-muted);
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.active-session-bar strong {
-  color: var(--app-text-strong);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.active-session-bar__button {
-  flex: 0 0 auto;
-  min-height: 44px;
-}
-
 .learning-overview {
   display: grid;
   gap: 12px;
@@ -512,15 +474,6 @@ body.body--dark {
   .learning-overview,
   .learning-panels {
     grid-template-columns: 1fr;
-  }
-
-  .active-session-bar {
-    align-items: stretch;
-    display: grid;
-  }
-
-  .active-session-bar__button {
-    width: 100%;
   }
 
   .skill-row {
