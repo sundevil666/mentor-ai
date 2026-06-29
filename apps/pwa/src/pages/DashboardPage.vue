@@ -371,7 +371,7 @@
 import type { LearningConcept, LearningMode, WorkShift } from '@mentor-ai/shared';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { inferActivitySuggestion } from 'src/services/activity-suggestion';
-import { createPreferredSpeechUtterance, speakWithPreferredVoice } from 'src/services/speech-synthesis';
+import { createPreferredSpeechUtterance, speakWithPreferredVoice, waitForSpeechVoices } from 'src/services/speech-synthesis';
 import { useAppStore } from 'src/stores/app-store';
 
 type TrainingKey = 'listening' | 'speaking' | 'vocabulary';
@@ -388,6 +388,7 @@ const answer = ref('');
 const activeWordIndex = ref(0);
 const isListeningSpeaking = ref(false);
 const isListeningPaused = ref(false);
+const activeSpeechRunId = ref(0);
 
 const currentExercise = computed(() => appStore.currentExercise);
 const isListeningPlayer = computed(() => {
@@ -723,15 +724,38 @@ async function startListeningAtWord(wordIndex: number) {
     return;
   }
 
+  await waitForSpeechVoices();
   const safeWordIndex = clampIndex(wordIndex, 0, tokens.length - 1);
-  const startOffset = tokens[safeWordIndex]?.start ?? 0;
-  const utterance = createPreferredSpeechUtterance(listeningText.value.slice(startOffset));
+  const runId = activeSpeechRunId.value + 1;
 
+  activeSpeechRunId.value = runId;
   activeWordIndex.value = safeWordIndex;
   isListeningSpeaking.value = true;
   isListeningPaused.value = false;
+  window.speechSynthesis.cancel();
+  speakListeningChunk(safeWordIndex, runId);
+  await appStore.replayAudio();
+}
+
+function speakListeningChunk(wordIndex: number, runId: number) {
+  const tokens = listeningTokens.value;
+
+  if (tokens.length === 0 || runId !== activeSpeechRunId.value || !('speechSynthesis' in window)) {
+    return;
+  }
+
+  const safeWordIndex = clampIndex(wordIndex, 0, tokens.length - 1);
+  const startOffset = tokens[safeWordIndex]?.start ?? 0;
+  const endOffset = getSentenceEndOffset(safeWordIndex, tokens);
+  const utterance = createPreferredSpeechUtterance(listeningText.value.slice(startOffset, endOffset));
+
+  activeWordIndex.value = safeWordIndex;
 
   utterance.onboundary = (event) => {
+    if (runId !== activeSpeechRunId.value) {
+      return;
+    }
+
     if (event.name && event.name !== 'word') {
       return;
     }
@@ -743,20 +767,35 @@ async function startListeningAtWord(wordIndex: number) {
     }
   };
   utterance.onend = () => {
+    if (runId !== activeSpeechRunId.value) {
+      return;
+    }
+
+    const nextWordIndex = findWordIndexAtChar(tokens, endOffset + 1);
+
+    if (nextWordIndex >= 0 && nextWordIndex < tokens.length && !isListeningPaused.value) {
+      speakListeningChunk(nextWordIndex, runId);
+      return;
+    }
+
     isListeningSpeaking.value = false;
     isListeningPaused.value = false;
   };
   utterance.onerror = () => {
+    if (runId !== activeSpeechRunId.value) {
+      return;
+    }
+
     isListeningSpeaking.value = false;
     isListeningPaused.value = false;
   };
 
-  window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
-  await appStore.replayAudio();
 }
 
 function stopListeningAudio() {
+  activeSpeechRunId.value += 1;
+
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
   }
@@ -888,6 +927,18 @@ function findWordIndexAtChar(tokens: ListeningToken[], charIndex: number): numbe
   }
 
   return -1;
+}
+
+function getSentenceEndOffset(wordIndex: number, tokens: ListeningToken[]): number {
+  const sentenceStarts = getSentenceStartWordIndexes(tokens);
+  const currentSentenceIndex = Math.max(0, findLastNumberIndex(sentenceStarts, wordIndex));
+  const nextSentenceStart = sentenceStarts[currentSentenceIndex + 1];
+
+  if (nextSentenceStart === undefined) {
+    return listeningText.value.length;
+  }
+
+  return tokens[nextSentenceStart]?.start ?? listeningText.value.length;
 }
 
 function clampIndex(value: number, min: number, max: number): number {

@@ -53,6 +53,29 @@ export function getAvailableSpeechVoices(): SpeechSynthesisVoice[] {
   return window.speechSynthesis.getVoices();
 }
 
+export async function waitForSpeechVoices(timeoutMs = 1200): Promise<SpeechSynthesisVoice[]> {
+  const voices = getAvailableSpeechVoices();
+
+  if (voices.length > 0 || typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    return voices;
+  }
+
+  return new Promise((resolve) => {
+    const timeout = window.setTimeout(() => {
+      window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged);
+      resolve(getAvailableSpeechVoices());
+    }, timeoutMs);
+
+    function handleVoicesChanged() {
+      window.clearTimeout(timeout);
+      window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged);
+      resolve(getAvailableSpeechVoices());
+    }
+
+    window.speechSynthesis.addEventListener('voiceschanged', handleVoicesChanged);
+  });
+}
+
 export function getFemaleSpeechVoiceOptions(voices = getAvailableSpeechVoices()): SpeechVoiceOption[] {
   const likelyFemaleVoices = voices.filter(isLikelyFemaleVoice);
   const options = likelyFemaleVoices.length > 0 ? likelyFemaleVoices : voices;

@@ -89,6 +89,7 @@ import {
   getAvailableSpeechVoices,
   getFemaleSpeechVoiceOptions,
   speakWithPreferredVoice,
+  waitForSpeechVoices,
   type SpeechVoiceOption,
 } from 'src/services/speech-synthesis';
 import { readSpeechVoicePreference, saveSpeechVoicePreference } from 'src/services/user-preferences';
@@ -123,6 +124,7 @@ onMounted(async () => {
   }
 
   selectedShift.value = appStore.preferredWorkShift;
+  await waitForSpeechVoices();
   refreshVoices();
 
   if ('speechSynthesis' in window) {
