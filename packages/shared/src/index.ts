@@ -53,6 +53,7 @@ export interface WorkShiftTiming {
 export type ExerciseType =
   | 'vocabulary-recall'
   | 'word-order'
+  | 'listening-text'
   | 'listening-comprehension'
   | 'repeat-speaking'
   | 'review';
@@ -637,6 +638,10 @@ export function isLessonDeliverable(lesson: GeneratedLesson): boolean {
 }
 
 export function scoreExercise(exercise: Exercise, response: string): boolean {
+  if (exercise.type === 'listening-text') {
+    return response.trim().length > 0;
+  }
+
   const expected = exercise.expectedResponse?.trim().toLowerCase();
 
   if (!expected) {
@@ -1121,6 +1126,32 @@ function createConceptLessonTitle(plan: LessonPlan): string {
 }
 
 function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercise[] {
+  if (plan.learningMode === 'listening' || plan.goal.skill === 'listening') {
+    return [
+      {
+        id: `${plan.id}-listening-text`,
+        type: 'listening-text',
+        prompt: 'Listen and read',
+        microLesson: 'Read the text while you listen. Replay the audio once if a word feels unclear.',
+        successTip: 'Continue when you have listened and followed the whole text.',
+        targetSkill: 'listening',
+        expectedResponse: 'listened',
+        audioText: 'Good afternoon. I am on the bus. I am going to work. Today I want to understand simple English.',
+      },
+      {
+        id: `${plan.id}-listening-check`,
+        type: 'listening-comprehension',
+        prompt: 'Where is the speaker?',
+        microLesson: 'After listening, check the main situation first.',
+        successTip: 'Choose the place you heard in the text.',
+        targetSkill: 'listening',
+        expectedResponse: 'on the bus',
+        options: ['on the bus', 'in a cafe', 'at school'],
+        audioText: 'Good afternoon. I am on the bus. I am going to work. Today I want to understand simple English.',
+      },
+    ];
+  }
+
   if (plan.concept === 'reading') {
     return [
       {

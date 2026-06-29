@@ -300,6 +300,23 @@ export const useAppStore = defineStore('app', {
       await this.publishSessionHandoff();
     },
 
+    async completeListeningStep() {
+      if (!this.session || this.currentExercise === null) {
+        return;
+      }
+
+      const exercise = this.currentExercise;
+
+      if (
+        exercise.type !== 'listening-text' &&
+        !(this.session.context.mode === 'listening' && exercise.targetSkill === 'listening')
+      ) {
+        return;
+      }
+
+      await this.submitCurrentExercise(exercise.expectedResponse ?? exercise.audioText ?? 'listened');
+    },
+
     async returnToLessonChoice() {
       if (!this.session) {
         return;

@@ -14,6 +14,25 @@ describe('learning state service', () => {
     assert.equal(lesson.studentModelVersion, studentState.studentModel.version);
   });
 
+  it('does not reuse an unsuitable current lesson for listening mode', async () => {
+    const lesson = await learningStateService.getCurrentLesson({
+      mode: 'listening',
+      isOffline: false,
+      speechAvailable: true,
+      availableMinutes: 8,
+    });
+
+    assert.equal(lesson.targetSkills.includes('listening'), true);
+    assert.equal(
+      lesson.exercises.some(
+        (exercise) =>
+          exercise.type === 'listening-text' ||
+          (exercise.targetSkill === 'listening' && typeof exercise.audioText === 'string' && exercise.audioText.length > 0),
+      ),
+      true,
+    );
+  });
+
   it('accepts new synchronized evidence and marks repeats as duplicates', async () => {
     const event = {
       id: `event-service-check-${Date.now()}`,

@@ -3,6 +3,7 @@ import {
   generateLessonFromPlan,
   summarizeResults,
   type ExerciseResult,
+  type GeneratedLesson,
   type LearningSessionHandoff,
   type LearningContext,
   type LearningEvent,
@@ -31,15 +32,18 @@ export const learningStateService = {
   async getCurrentLesson(context: LearningContext = defaultLearningContext()) {
     const state = await learningStateRepository.read();
 
-    if (state.currentLesson) {
+    if (state.currentLesson && isLessonSuitableForContext(state.currentLesson, context)) {
       return state.currentLesson;
     }
 
     const createdAt = now();
     const completedLessonIds = new Set(state.exerciseResults.map((result) => result.lessonId));
     const lesson =
-      (await privateLessonRepository.findNextForStudent(state.studentModel, completedLessonIds)) ??
-      generateLessonFromPlan(aiTeacherService.planLesson(state.studentModel, context, createdAt), createdAt);
+      context.mode === 'listening'
+        ? (await privateLessonRepository.findNextForMode(context.mode, completedLessonIds)) ??
+          generateLessonFromPlan(aiTeacherService.planLesson(state.studentModel, context, createdAt), createdAt)
+        : (await privateLessonRepository.findNextForStudent(state.studentModel, completedLessonIds)) ??
+          generateLessonFromPlan(aiTeacherService.planLesson(state.studentModel, context, createdAt), createdAt);
 
     await learningStateRepository.write({
       ...state,
@@ -179,6 +183,25 @@ export const learningStateService = {
     };
   },
 };
+
+function isLessonSuitableForContext(lesson: GeneratedLesson, context: LearningContext): boolean {
+  if (context.mode !== 'listening') {
+    return true;
+  }
+
+  const firstExercise = lesson.exercises[0];
+
+  return (
+    lesson.targetSkills.includes('listening') &&
+    Boolean(
+      firstExercise &&
+        (firstExercise.type === 'listening-text' ||
+          (firstExercise.targetSkill === 'listening' &&
+            typeof firstExercise.audioText === 'string' &&
+            firstExercise.audioText.trim().length > 0)),
+    )
+  );
+}
 
 function validateLearningEvent(event: LearningEvent, studentId: string, acceptedEventIds: Set<string>): SyncStatus {
   if (acceptedEventIds.has(event.id)) {

@@ -1,5 +1,5 @@
 import { mkdir, readFile } from 'node:fs/promises';
-import type { GeneratedLesson, LearningConcept, LessonSummary, StudentModel } from '@mentor-ai/shared';
+import type { GeneratedLesson, LearningConcept, LearningMode, LessonSummary, StudentModel } from '@mentor-ai/shared';
 import { resolvePersonalStoragePath } from '../utils/storage-path.js';
 import { getPostgresPool } from './postgres-client.js';
 
@@ -45,6 +45,13 @@ export const privateLessonRepository = {
       lessons[0] ??
       null
     );
+  },
+
+  async findNextForMode(mode: LearningMode, completedLessonIds: Set<string>): Promise<GeneratedLesson | null> {
+    const lessons = await this.findAll();
+    const eligibleLessons = lessons.filter((lesson) => !completedLessonIds.has(lesson.id));
+
+    return findLessonForMode(eligibleLessons, mode) ?? findLessonForMode(lessons, mode) ?? null;
   },
 
   async listSummaries(): Promise<LessonSummary[]> {
@@ -134,6 +141,38 @@ async function findAllDatabaseLessons(): Promise<GeneratedLesson[]> {
 
 function findLessonByConcept(lessons: GeneratedLesson[], concept: LearningConcept): GeneratedLesson | undefined {
   return lessons.find((lesson) => lesson.concept === concept);
+}
+
+function findLessonForMode(lessons: GeneratedLesson[], mode: LearningMode): GeneratedLesson | undefined {
+  if (mode === 'listening') {
+    return lessons.find(startsWithListeningStep) ?? lessons.find(isListeningLesson);
+  }
+
+  return lessons[0];
+}
+
+function startsWithListeningStep(lesson: GeneratedLesson): boolean {
+  const firstExercise = lesson.exercises[0];
+
+  return Boolean(
+    firstExercise &&
+      (firstExercise.type === 'listening-text' ||
+        (firstExercise.targetSkill === 'listening' &&
+          typeof firstExercise.audioText === 'string' &&
+          firstExercise.audioText.trim().length > 0)),
+  );
+}
+
+function isListeningLesson(lesson: GeneratedLesson): boolean {
+  return (
+    startsWithListeningStep(lesson) ||
+    lesson.exercises.some(
+      (exercise) =>
+        exercise.type === 'listening-text' ||
+        (exercise.targetSkill === 'listening' && typeof exercise.audioText === 'string' && exercise.audioText.trim().length > 0),
+    ) ||
+    /\blistening\b/i.test(`${lesson.id} ${lesson.title} ${lesson.activityType}`)
+  );
 }
 
 function isGeneratedLesson(value: unknown): value is GeneratedLesson {

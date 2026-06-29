@@ -155,7 +155,7 @@
           <span>{{ appStore.lessonProgress }}% complete</span>
         </div>
 
-        <div>
+        <div v-if="!isListeningPlayer">
           <p class="lesson-stage__eyebrow">
             {{ appStore.session.lesson.title }}
           </p>
@@ -164,7 +164,7 @@
         </div>
 
         <div
-          v-if="currentExercise.audioText"
+          v-if="!isListeningPlayer && currentExercise.audioText"
           class="audio-row"
         >
           <q-btn
@@ -180,13 +180,13 @@
         </div>
 
         <q-option-group
-          v-if="currentExercise.options"
+          v-if="!isListeningPlayer && currentExercise.options"
           v-model="answer"
           :options="optionList"
           color="primary"
         />
         <q-input
-          v-else
+          v-else-if="!isListeningPlayer"
           v-model="answer"
           :label="inputLabel"
           outlined
@@ -194,14 +194,43 @@
           @keyup.enter="submit"
         />
 
+        <div
+          v-else
+          class="listening-player"
+        >
+          <div class="listening-player__header">
+            <p class="lesson-stage__eyebrow">
+              {{ appStore.session.lesson.title }}
+            </p>
+            <h1>{{ listeningTitle }}</h1>
+            <p>{{ currentExercise.microLesson }}</p>
+          </div>
+
+          <div class="listening-player__text">
+            {{ listeningText }}
+          </div>
+
+          <div class="listening-player__controls">
+            <q-btn
+              color="primary"
+              unelevated
+              no-caps
+              icon="play_arrow"
+              :label="audioReplayCount > 0 ? 'Replay' : 'Play'"
+              @click="playAudio"
+            />
+            <span>{{ audioReplayCount > 0 ? `${audioReplayCount} replayed` : 'Ready to listen' }}</span>
+          </div>
+        </div>
+
         <div class="lesson-actions">
           <span>{{ currentExercise.successTip }}</span>
           <q-btn
             color="primary"
             label="Continue"
             unelevated
-            :disable="answer.trim().length === 0"
-            @click="submit"
+            :disable="!isListeningPlayer && answer.trim().length === 0"
+            @click="continueCurrentStep"
           />
         </div>
       </section>
@@ -306,6 +335,32 @@ const answer = ref('');
 const selectedShift = ref<WorkShift>('unknown');
 
 const currentExercise = computed(() => appStore.currentExercise);
+const isListeningPlayer = computed(() => {
+  if (!appStore.session || !currentExercise.value) {
+    return false;
+  }
+
+  return (
+    currentExercise.value.type === 'listening-text' ||
+    (appStore.session.context.mode === 'listening' &&
+      currentExercise.value.targetSkill === 'listening' &&
+      Boolean(currentExercise.value.audioText))
+  );
+});
+const listeningText = computed(() => currentExercise.value?.audioText ?? currentExercise.value?.prompt ?? '');
+const listeningTitle = computed(() =>
+  currentExercise.value?.type === 'listening-text' ? 'Listen and read' : currentExercise.value?.prompt ?? 'Listen',
+);
+const audioReplayCount = computed(() => {
+  const session = appStore.session;
+  const exercise = currentExercise.value;
+
+  if (!session || !exercise) {
+    return 0;
+  }
+
+  return session.events.filter((event) => event.type === 'audio-replayed' && event.exerciseId === exercise.id).length;
+});
 const optionList = computed(
   () => currentExercise.value?.options?.map((option) => ({ label: option, value: option })) ?? [],
 );
@@ -548,6 +603,15 @@ async function submit() {
   }
 
   await appStore.submitCurrentExercise(answer.value);
+}
+
+async function continueCurrentStep() {
+  if (isListeningPlayer.value) {
+    await appStore.completeListeningStep();
+    return;
+  }
+
+  await submit();
 }
 
 async function playAudio() {

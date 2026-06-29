@@ -285,6 +285,43 @@ body.body--dark {
   padding: 12px;
 }
 
+.listening-player {
+  display: grid;
+  gap: 18px;
+}
+
+.listening-player__header {
+  display: grid;
+  gap: 10px;
+}
+
+.listening-player__text {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  color: var(--app-text-strong);
+  font-size: 1.55rem;
+  line-height: 1.65;
+  padding: 22px;
+  white-space: pre-line;
+}
+
+.listening-player__controls {
+  align-items: center;
+  background: var(--app-surface-soft);
+  border: 1px solid var(--app-border-strong);
+  border-radius: 8px;
+  color: var(--app-muted-strong);
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 14px;
+}
+
+.listening-player__controls .q-btn {
+  min-width: 132px;
+}
+
 .lesson-nav {
   align-items: center;
   border-bottom: 1px solid var(--app-border);
@@ -457,6 +494,16 @@ body.body--dark {
 
   .lesson-actions .q-btn {
     width: 100%;
+  }
+
+  .listening-player__text {
+    font-size: 1.25rem;
+    padding: 18px;
+  }
+
+  .listening-player__controls {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .activity-controls,
