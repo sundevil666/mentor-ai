@@ -389,9 +389,6 @@ const activeWordIndex = ref(0);
 const isListeningSpeaking = ref(false);
 const isListeningPaused = ref(false);
 const activeSpeechRunId = ref(0);
-const activeChunkStartedAt = ref(0);
-const activeChunkElapsedMs = ref(0);
-const activeChunkTimerId = ref<number | null>(null);
 
 const currentExercise = computed(() => appStore.currentExercise);
 const isListeningPlayer = computed(() => {
@@ -687,16 +684,20 @@ async function toggleListeningPlayback() {
   }
 
   if (isListeningSpeaking.value && !isListeningPaused.value) {
-    pauseChunkProgress();
     window.speechSynthesis.pause();
     isListeningPaused.value = true;
     return;
   }
 
   if (isListeningSpeaking.value && isListeningPaused.value) {
-    window.speechSynthesis.resume();
     isListeningPaused.value = false;
-    resumeChunkProgress();
+
+    if (window.speechSynthesis.paused || window.speechSynthesis.speaking) {
+      window.speechSynthesis.resume();
+      return;
+    }
+
+    speakListeningWord(activeWordIndex.value, activeSpeechRunId.value);
     return;
   }
 
@@ -738,11 +739,11 @@ async function startListeningAtWord(wordIndex: number) {
   isListeningSpeaking.value = true;
   isListeningPaused.value = false;
   window.speechSynthesis.cancel();
-  speakListeningChunk(safeWordIndex, runId);
+  speakListeningWord(safeWordIndex, runId);
   await appStore.replayAudio();
 }
 
-function speakListeningChunk(wordIndex: number, runId: number) {
+function speakListeningWord(wordIndex: number, runId: number) {
   const tokens = listeningTokens.value;
 
   if (tokens.length === 0 || runId !== activeSpeechRunId.value || !('speechSynthesis' in window)) {
@@ -750,62 +751,57 @@ function speakListeningChunk(wordIndex: number, runId: number) {
   }
 
   const safeWordIndex = clampIndex(wordIndex, 0, tokens.length - 1);
-  const startOffset = tokens[safeWordIndex]?.start ?? 0;
-  const endOffset = getSentenceEndOffset(safeWordIndex, tokens);
-  const utterance = createPreferredSpeechUtterance(listeningText.value.slice(startOffset, endOffset));
-  const chunkWordIndexes = getChunkWordIndexes(tokens, startOffset, endOffset);
+  const token = tokens[safeWordIndex];
+
+  if (!token) {
+    finishListeningPlayback(runId);
+    return;
+  }
+
+  const utterance = createPreferredSpeechUtterance(createSpokenTokenText(token));
 
   activeWordIndex.value = safeWordIndex;
-  startChunkProgress(chunkWordIndexes, runId);
-
-  utterance.onboundary = (event) => {
-    if (runId !== activeSpeechRunId.value) {
-      return;
-    }
-
-    if (event.name && event.name !== 'word') {
-      return;
-    }
-
-    const nextWordIndex = findWordIndexAtChar(tokens, startOffset + event.charIndex);
-
-    if (nextWordIndex >= 0) {
-      activeWordIndex.value = nextWordIndex;
-      syncChunkProgressToWord(chunkWordIndexes, nextWordIndex);
-    }
-  };
   utterance.onend = () => {
     if (runId !== activeSpeechRunId.value) {
       return;
     }
 
-    clearChunkProgress();
-    const nextWordIndex = findWordIndexAtChar(tokens, endOffset + 1);
+    const nextWordIndex = safeWordIndex + 1;
 
     if (nextWordIndex >= 0 && nextWordIndex < tokens.length && !isListeningPaused.value) {
-      speakListeningChunk(nextWordIndex, runId);
+      window.setTimeout(() => speakListeningWord(nextWordIndex, runId), getTokenPauseMs(token));
       return;
     }
 
-    isListeningSpeaking.value = false;
-    isListeningPaused.value = false;
+    if (isListeningPaused.value) {
+      activeWordIndex.value = nextWordIndex < tokens.length ? nextWordIndex : safeWordIndex;
+      return;
+    }
+
+    finishListeningPlayback(runId);
   };
   utterance.onerror = () => {
     if (runId !== activeSpeechRunId.value) {
       return;
     }
 
-    clearChunkProgress();
-    isListeningSpeaking.value = false;
-    isListeningPaused.value = false;
+    finishListeningPlayback(runId);
   };
 
   window.speechSynthesis.speak(utterance);
 }
 
+function finishListeningPlayback(runId: number) {
+  if (runId !== activeSpeechRunId.value) {
+    return;
+  }
+
+  isListeningSpeaking.value = false;
+  isListeningPaused.value = false;
+}
+
 function stopListeningAudio() {
   activeSpeechRunId.value += 1;
-  clearChunkProgress();
 
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
@@ -818,62 +814,6 @@ function stopListeningAudio() {
 function resetListeningPlayback() {
   stopListeningAudio();
   activeWordIndex.value = 0;
-}
-
-function startChunkProgress(wordIndexes: number[], runId: number) {
-  clearChunkProgress();
-
-  if (wordIndexes.length === 0) {
-    return;
-  }
-
-  const durationMs = estimateChunkDurationMs(wordIndexes);
-
-  activeChunkElapsedMs.value = 0;
-  activeChunkStartedAt.value = Date.now();
-  activeChunkTimerId.value = window.setInterval(() => {
-    if (runId !== activeSpeechRunId.value || isListeningPaused.value) {
-      return;
-    }
-
-    const elapsedMs = activeChunkElapsedMs.value + Date.now() - activeChunkStartedAt.value;
-    const progress = clampNumber(elapsedMs / durationMs, 0, 0.98);
-    const index = clampIndex(Math.floor(progress * wordIndexes.length), 0, wordIndexes.length - 1);
-
-    activeWordIndex.value = wordIndexes[index] ?? activeWordIndex.value;
-  }, 140);
-}
-
-function pauseChunkProgress() {
-  if (activeChunkStartedAt.value > 0) {
-    activeChunkElapsedMs.value += Date.now() - activeChunkStartedAt.value;
-    activeChunkStartedAt.value = 0;
-  }
-}
-
-function resumeChunkProgress() {
-  activeChunkStartedAt.value = Date.now();
-}
-
-function clearChunkProgress() {
-  if (activeChunkTimerId.value !== null) {
-    window.clearInterval(activeChunkTimerId.value);
-    activeChunkTimerId.value = null;
-  }
-
-  activeChunkStartedAt.value = 0;
-  activeChunkElapsedMs.value = 0;
-}
-
-function syncChunkProgressToWord(wordIndexes: number[], wordIndex: number) {
-  const chunkIndex = wordIndexes.indexOf(wordIndex);
-
-  if (chunkIndex < 0) {
-    return;
-  }
-
-  activeChunkElapsedMs.value = estimateChunkDurationMs(wordIndexes) * (chunkIndex / Math.max(wordIndexes.length, 1));
-  activeChunkStartedAt.value = Date.now();
 }
 
 async function sync() {
@@ -980,50 +920,28 @@ function getSentenceStartWordIndexes(tokens: ListeningToken[]): number[] {
   return Array.from(new Set(starts));
 }
 
-function findWordIndexAtChar(tokens: ListeningToken[], charIndex: number): number {
-  const exactToken = tokens.find((token) => charIndex >= token.start && charIndex <= token.end);
-
-  if (exactToken) {
-    return exactToken.index;
-  }
-
-  for (let index = tokens.length - 1; index >= 0; index -= 1) {
-    if ((tokens[index]?.start ?? 0) <= charIndex) {
-      return tokens[index]?.index ?? -1;
-    }
-  }
-
-  return -1;
-}
-
-function getSentenceEndOffset(wordIndex: number, tokens: ListeningToken[]): number {
-  const sentenceStarts = getSentenceStartWordIndexes(tokens);
-  const currentSentenceIndex = Math.max(0, findLastNumberIndex(sentenceStarts, wordIndex));
-  const nextSentenceStart = sentenceStarts[currentSentenceIndex + 1];
-
-  if (nextSentenceStart === undefined) {
-    return listeningText.value.length;
-  }
-
-  return tokens[nextSentenceStart]?.start ?? listeningText.value.length;
-}
-
-function getChunkWordIndexes(tokens: ListeningToken[], startOffset: number, endOffset: number): number[] {
-  return tokens
-    .filter((token) => token.start >= startOffset && token.start < endOffset)
-    .map((token) => token.index);
-}
-
-function estimateChunkDurationMs(wordIndexes: number[]): number {
-  return Math.max(900, wordIndexes.length * 360);
+function createSpokenTokenText(token: ListeningToken): string {
+  return `${token.word}${token.trailing.includes('\n') ? '.' : token.trailing}`.trim();
 }
 
 function clampIndex(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function clampNumber(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
+function getTokenPauseMs(token: ListeningToken): number {
+  if (/\n/.test(token.trailing)) {
+    return 320;
+  }
+
+  if (/[.!?]["')\]]*$/.test(token.word)) {
+    return 180;
+  }
+
+  if (/[,;:]["')\]]*$/.test(token.word)) {
+    return 90;
+  }
+
+  return 18;
 }
 
 function findLastNumberIndex(values: number[], maxValue: number): number {

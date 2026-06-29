@@ -372,7 +372,7 @@ body.body--dark {
   color: var(--app-text-strong);
   font-size: 1.7rem;
   line-height: 1.75;
-  max-height: min(56vh, 680px);
+  max-height: min(38vh, 420px);
   overflow: auto;
   padding: 22px;
   white-space: pre-line;
@@ -403,6 +403,9 @@ body.body--dark {
   gap: 14px;
   justify-content: space-between;
   padding: 14px;
+  position: sticky;
+  bottom: 12px;
+  z-index: 1;
 }
 
 .listening-player__controls .q-btn {
