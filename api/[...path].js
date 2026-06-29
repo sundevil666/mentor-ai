@@ -10,5 +10,21 @@ module.exports = async (request, response) => {
     handler = serverless(createApp());
   }
 
+  const routePath = readRoutePath(request);
+
+  if (routePath) {
+    request.url = `/api/${routePath}`;
+  }
+
   return handler(request, response);
 };
+
+function readRoutePath(request) {
+  const value = request.query?.['...path'] ?? request.query?.path;
+
+  if (Array.isArray(value)) {
+    return value.join('/');
+  }
+
+  return typeof value === 'string' ? value : '';
+}
