@@ -5,6 +5,16 @@
       class="app-header"
     >
       <q-toolbar>
+        <q-btn
+          v-if="appStore.session"
+          class="home-nav-button"
+          flat
+          icon="home"
+          round
+          @click="returnToLessonChoice"
+        >
+          <q-tooltip>Back to lesson choice</q-tooltip>
+        </q-btn>
         <q-toolbar-title>Mentor AI</q-toolbar-title>
         <q-btn
           class="theme-toggle-button"
@@ -171,8 +181,8 @@
 import { Dark } from 'quasar';
 import { computed, onMounted, ref } from 'vue';
 import { useAppStore } from 'src/stores/app-store';
+import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
 
-const themeStorageKey = 'mentor-ai-theme';
 const appStore = useAppStore();
 const isDarkTheme = ref(false);
 const showInstallButton = computed(() => isAppleTouchDevice() && !isStandalonePwa());
@@ -198,14 +208,18 @@ function markAllRead() {
   void appStore.markAllUpdateNotificationsRead();
 }
 
+function returnToLessonChoice() {
+  void appStore.returnToLessonChoice();
+}
+
 function toggleTheme() {
   isDarkTheme.value = !isDarkTheme.value;
   Dark.set(isDarkTheme.value);
-  localStorage.setItem(themeStorageKey, isDarkTheme.value ? 'dark' : 'light');
+  saveThemePreference(isDarkTheme.value ? 'dark' : 'light');
 }
 
 function readSavedTheme() {
-  const savedTheme = localStorage.getItem(themeStorageKey);
+  const savedTheme = readThemePreference();
 
   if (savedTheme === 'dark') {
     return true;

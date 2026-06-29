@@ -41,9 +41,14 @@ body.body--dark {
 }
 
 .theme-toggle-button,
+.home-nav-button,
 .ios-install-button,
 .update-log-button {
   color: var(--app-primary);
+}
+
+.home-nav-button {
+  margin-right: 4px;
 }
 
 .header-offline-badge {
@@ -278,6 +283,17 @@ body.body--dark {
   display: flex;
   gap: 12px;
   padding: 12px;
+}
+
+.lesson-nav {
+  align-items: center;
+  border-bottom: 1px solid var(--app-border);
+  color: var(--app-muted);
+  display: flex;
+  font-size: 0.95rem;
+  justify-content: space-between;
+  min-height: 48px;
+  padding-bottom: 8px;
 }
 
 .lesson-actions {

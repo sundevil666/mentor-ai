@@ -143,6 +143,18 @@
         v-else-if="!appStore.isLessonComplete && currentExercise"
         class="lesson-stage"
       >
+        <div class="lesson-nav">
+          <q-btn
+            color="primary"
+            flat
+            icon="home"
+            no-caps
+            label="Choose another"
+            @click="returnToLessonChoice"
+          />
+          <span>{{ appStore.lessonProgress }}% complete</span>
+        </div>
+
         <div>
           <p class="lesson-stage__eyebrow">
             {{ appStore.session.lesson.title }}
@@ -211,6 +223,14 @@
           label="Improve now"
           unelevated
           @click="startWithMode(currentSuggestion.mode)"
+        />
+        <q-btn
+          color="primary"
+          flat
+          icon="home"
+          label="Choose another"
+          no-caps
+          @click="returnToLessonChoice"
         />
       </section>
 
@@ -543,6 +563,11 @@ async function playAudio() {
 
 async function sync() {
   await appStore.syncPendingEvents();
+}
+
+async function returnToLessonChoice() {
+  answer.value = '';
+  await appStore.returnToLessonChoice();
 }
 
 async function reset() {

@@ -40,6 +40,7 @@ import {
   selectRecordsToPrune,
   type RetentionRecord,
 } from 'src/services/storage-retention';
+import { readPreferredWorkShift, savePreferredWorkShift } from 'src/services/user-preferences';
 
 interface LearningSessionState {
   id: string;
@@ -152,7 +153,7 @@ export const useAppStore = defineStore('app', {
       this.activitySnapshots = (activitySnapshots as ActivitySnapshot[]).sort((left, right) =>
         left.observedAt.localeCompare(right.observedAt),
       );
-      this.preferredWorkShift = this.activitySnapshots.at(-1)?.workShift ?? 'unknown';
+      this.preferredWorkShift = readPreferredWorkShift() ?? this.activitySnapshots.at(-1)?.workShift ?? 'unknown';
       this.pendingSyncEvents = queuedEvents.filter((event) => event.status === 'pending').length;
       this.updateNotifications = (updateNotifications as UpdateNotification[]).sort((left, right) =>
         right.createdAt.localeCompare(left.createdAt),
@@ -209,6 +210,7 @@ export const useAppStore = defineStore('app', {
 
     async setPreferredWorkShift(workShift: WorkShift) {
       this.preferredWorkShift = workShift;
+      savePreferredWorkShift(workShift);
     },
 
     async submitCurrentExercise(response: string) {
@@ -285,6 +287,16 @@ export const useAppStore = defineStore('app', {
       await this.publishSessionHandoff();
     },
 
+    async returnToLessonChoice() {
+      if (!this.session) {
+        return;
+      }
+
+      const db = await mentorDb;
+      this.session = null;
+      await db.delete('learning-sessions', sessionStoreKey);
+    },
+
     async resetLocalLearning() {
       const db = await mentorDb;
 
@@ -296,6 +308,7 @@ export const useAppStore = defineStore('app', {
       this.activitySnapshots = [];
       this.preferredWorkShift = 'unknown';
       this.lastSyncAt = null;
+      savePreferredWorkShift('unknown');
 
       await db.put('student-models', this.studentModel);
       await db.delete('learning-sessions', sessionStoreKey);

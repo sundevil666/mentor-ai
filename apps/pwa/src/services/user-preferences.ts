@@ -1,0 +1,62 @@
+import type { WorkShift } from '@mentor-ai/shared';
+
+export type ThemePreference = 'dark' | 'light';
+
+const cookieMaxAgeSeconds = 60 * 60 * 24 * 365;
+const preferredWorkShiftKey = 'mentor_ai_preferred_work_shift';
+const themeKey = 'mentor_ai_theme';
+const validWorkShifts = new Set<WorkShift>(['unknown', 'first', 'second', 'third', 'off']);
+const validThemes = new Set<ThemePreference>(['dark', 'light']);
+
+export function readPreferredWorkShift(): WorkShift | null {
+  const value = readCookie(preferredWorkShiftKey);
+  return isWorkShift(value) ? value : null;
+}
+
+export function savePreferredWorkShift(workShift: WorkShift) {
+  writeCookie(preferredWorkShiftKey, workShift);
+}
+
+export function readThemePreference(): ThemePreference | null {
+  const value = readCookie(themeKey);
+  return isThemePreference(value) ? value : null;
+}
+
+export function saveThemePreference(theme: ThemePreference) {
+  writeCookie(themeKey, theme);
+}
+
+function isWorkShift(value: string | null): value is WorkShift {
+  return value !== null && validWorkShifts.has(value as WorkShift);
+}
+
+function isThemePreference(value: string | null): value is ThemePreference {
+  return value !== null && validThemes.has(value as ThemePreference);
+}
+
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  const prefix = `${encodeURIComponent(name)}=`;
+  const cookie = document.cookie
+    .split(';')
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(prefix));
+
+  return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null;
+}
+
+function writeCookie(name: string, value: string) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  document.cookie = [
+    `${encodeURIComponent(name)}=${encodeURIComponent(value)}`,
+    'path=/',
+    `max-age=${cookieMaxAgeSeconds}`,
+    'SameSite=Lax',
+  ].join('; ');
+}
