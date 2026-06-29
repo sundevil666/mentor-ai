@@ -389,6 +389,9 @@ const activeWordIndex = ref(0);
 const isListeningSpeaking = ref(false);
 const isListeningPaused = ref(false);
 const activeSpeechRunId = ref(0);
+const activeChunkStartedAt = ref(0);
+const activeChunkElapsedMs = ref(0);
+const activeChunkTimerId = ref<number | null>(null);
 
 const currentExercise = computed(() => appStore.currentExercise);
 const isListeningPlayer = computed(() => {
@@ -684,6 +687,7 @@ async function toggleListeningPlayback() {
   }
 
   if (isListeningSpeaking.value && !isListeningPaused.value) {
+    pauseChunkProgress();
     window.speechSynthesis.pause();
     isListeningPaused.value = true;
     return;
@@ -692,6 +696,7 @@ async function toggleListeningPlayback() {
   if (isListeningSpeaking.value && isListeningPaused.value) {
     window.speechSynthesis.resume();
     isListeningPaused.value = false;
+    resumeChunkProgress();
     return;
   }
 
@@ -748,8 +753,10 @@ function speakListeningChunk(wordIndex: number, runId: number) {
   const startOffset = tokens[safeWordIndex]?.start ?? 0;
   const endOffset = getSentenceEndOffset(safeWordIndex, tokens);
   const utterance = createPreferredSpeechUtterance(listeningText.value.slice(startOffset, endOffset));
+  const chunkWordIndexes = getChunkWordIndexes(tokens, startOffset, endOffset);
 
   activeWordIndex.value = safeWordIndex;
+  startChunkProgress(chunkWordIndexes, runId);
 
   utterance.onboundary = (event) => {
     if (runId !== activeSpeechRunId.value) {
@@ -764,6 +771,7 @@ function speakListeningChunk(wordIndex: number, runId: number) {
 
     if (nextWordIndex >= 0) {
       activeWordIndex.value = nextWordIndex;
+      syncChunkProgressToWord(chunkWordIndexes, nextWordIndex);
     }
   };
   utterance.onend = () => {
@@ -771,6 +779,7 @@ function speakListeningChunk(wordIndex: number, runId: number) {
       return;
     }
 
+    clearChunkProgress();
     const nextWordIndex = findWordIndexAtChar(tokens, endOffset + 1);
 
     if (nextWordIndex >= 0 && nextWordIndex < tokens.length && !isListeningPaused.value) {
@@ -786,6 +795,7 @@ function speakListeningChunk(wordIndex: number, runId: number) {
       return;
     }
 
+    clearChunkProgress();
     isListeningSpeaking.value = false;
     isListeningPaused.value = false;
   };
@@ -795,6 +805,7 @@ function speakListeningChunk(wordIndex: number, runId: number) {
 
 function stopListeningAudio() {
   activeSpeechRunId.value += 1;
+  clearChunkProgress();
 
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
@@ -807,6 +818,62 @@ function stopListeningAudio() {
 function resetListeningPlayback() {
   stopListeningAudio();
   activeWordIndex.value = 0;
+}
+
+function startChunkProgress(wordIndexes: number[], runId: number) {
+  clearChunkProgress();
+
+  if (wordIndexes.length === 0) {
+    return;
+  }
+
+  const durationMs = estimateChunkDurationMs(wordIndexes);
+
+  activeChunkElapsedMs.value = 0;
+  activeChunkStartedAt.value = Date.now();
+  activeChunkTimerId.value = window.setInterval(() => {
+    if (runId !== activeSpeechRunId.value || isListeningPaused.value) {
+      return;
+    }
+
+    const elapsedMs = activeChunkElapsedMs.value + Date.now() - activeChunkStartedAt.value;
+    const progress = clampNumber(elapsedMs / durationMs, 0, 0.98);
+    const index = clampIndex(Math.floor(progress * wordIndexes.length), 0, wordIndexes.length - 1);
+
+    activeWordIndex.value = wordIndexes[index] ?? activeWordIndex.value;
+  }, 140);
+}
+
+function pauseChunkProgress() {
+  if (activeChunkStartedAt.value > 0) {
+    activeChunkElapsedMs.value += Date.now() - activeChunkStartedAt.value;
+    activeChunkStartedAt.value = 0;
+  }
+}
+
+function resumeChunkProgress() {
+  activeChunkStartedAt.value = Date.now();
+}
+
+function clearChunkProgress() {
+  if (activeChunkTimerId.value !== null) {
+    window.clearInterval(activeChunkTimerId.value);
+    activeChunkTimerId.value = null;
+  }
+
+  activeChunkStartedAt.value = 0;
+  activeChunkElapsedMs.value = 0;
+}
+
+function syncChunkProgressToWord(wordIndexes: number[], wordIndex: number) {
+  const chunkIndex = wordIndexes.indexOf(wordIndex);
+
+  if (chunkIndex < 0) {
+    return;
+  }
+
+  activeChunkElapsedMs.value = estimateChunkDurationMs(wordIndexes) * (chunkIndex / Math.max(wordIndexes.length, 1));
+  activeChunkStartedAt.value = Date.now();
 }
 
 async function sync() {
@@ -941,7 +1008,21 @@ function getSentenceEndOffset(wordIndex: number, tokens: ListeningToken[]): numb
   return tokens[nextSentenceStart]?.start ?? listeningText.value.length;
 }
 
+function getChunkWordIndexes(tokens: ListeningToken[], startOffset: number, endOffset: number): number[] {
+  return tokens
+    .filter((token) => token.start >= startOffset && token.start < endOffset)
+    .map((token) => token.index);
+}
+
+function estimateChunkDurationMs(wordIndexes: number[]): number {
+  return Math.max(900, wordIndexes.length * 360);
+}
+
 function clampIndex(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function clampNumber(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
