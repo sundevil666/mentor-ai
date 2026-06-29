@@ -34,7 +34,17 @@
       </section>
 
       <section
-        v-if="!appStore.session"
+        v-if="!appStore.isHydrated"
+        class="learning-start"
+      >
+        <p class="learning-start__eyebrow">
+          Loading
+        </p>
+        <h1>Restoring your lesson</h1>
+      </section>
+
+      <section
+        v-else-if="!appStore.session"
         class="learning-start"
       >
         <div class="training-mode-strip">

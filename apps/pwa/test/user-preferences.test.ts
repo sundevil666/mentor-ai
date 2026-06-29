@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
 import {
+  readLastRoutePreference,
   readPreferredWorkShift,
   readSpeechVoicePreference,
   readThemePreference,
+  saveLastRoutePreference,
   savePreferredWorkShift,
   saveSpeechVoicePreference,
   saveThemePreference,
@@ -40,6 +42,19 @@ describe('PWA user preferences', () => {
 
     assert.equal(readSpeechVoicePreference(), 'com.apple.voice.compact.en-US.Samantha');
     assert.match(document.cookie, /mentor_ai_speech_voice=com.apple.voice.compact.en-US.Samantha/);
+  });
+
+  it('persists the last opened route in cookies', () => {
+    saveLastRoutePreference('/settings');
+
+    assert.equal(readLastRoutePreference(), '/settings');
+    assert.match(document.cookie, /mentor_ai_last_route=%2Fsettings/);
+  });
+
+  it('ignores unsafe last opened route cookies', () => {
+    document.cookie = 'mentor_ai_last_route=https%3A%2F%2Fevil.example; path=/';
+
+    assert.equal(readLastRoutePreference(), null);
   });
 });
 

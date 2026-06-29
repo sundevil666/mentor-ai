@@ -6,6 +6,7 @@ const cookieMaxAgeSeconds = 60 * 60 * 24 * 365;
 const preferredWorkShiftKey = 'mentor_ai_preferred_work_shift';
 const speechVoiceKey = 'mentor_ai_speech_voice';
 const themeKey = 'mentor_ai_theme';
+const lastRouteKey = 'mentor_ai_last_route';
 const validWorkShifts = new Set<WorkShift>(['unknown', 'first', 'second', 'third', 'off']);
 const validThemes = new Set<ThemePreference>(['dark', 'light']);
 
@@ -36,12 +37,29 @@ export function saveThemePreference(theme: ThemePreference) {
   writeCookie(themeKey, theme);
 }
 
+export function readLastRoutePreference(): string | null {
+  const value = readCookie(lastRouteKey);
+  return isSafeRoutePath(value) ? value : null;
+}
+
+export function saveLastRoutePreference(routePath: string) {
+  if (!isSafeRoutePath(routePath)) {
+    return;
+  }
+
+  writeCookie(lastRouteKey, routePath);
+}
+
 function isWorkShift(value: string | null): value is WorkShift {
   return value !== null && validWorkShifts.has(value as WorkShift);
 }
 
 function isThemePreference(value: string | null): value is ThemePreference {
   return value !== null && validThemes.has(value as ThemePreference);
+}
+
+function isSafeRoutePath(value: string | null): value is string {
+  return value !== null && value.startsWith('/') && !value.startsWith('//') && !value.includes('://');
 }
 
 function readCookie(name: string): string | null {
