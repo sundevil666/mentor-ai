@@ -1,7 +1,7 @@
 {
-  "version": "0.1.0",
-  "releasedAt": "2026-06-29T00:00:00.000Z",
+  "version": "0.1.0+425f5735b8cc",
+  "releasedAt": "2026-06-29T05:49:01.506Z",
   "notes": [
-    "Automatic PWA update checks are enabled."
+    "A new Mentor AI build is ready."
   ]
 }

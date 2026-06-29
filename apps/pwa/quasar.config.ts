@@ -1,5 +1,7 @@
 import { configure } from 'quasar/wrappers';
 
+const appVersion = createAppVersion();
+
 export default configure(() => ({
   boot: ['pinia'],
   css: ['app.scss'],
@@ -10,7 +12,7 @@ export default configure(() => ({
   },
   build: {
     env: {
-      APP_VERSION: process.env.npm_package_version ?? '0.1.0',
+      APP_VERSION: appVersion,
     },
     target: {
       browser: ['es2022', 'firefox115', 'chrome115', 'safari14'],
@@ -82,3 +84,14 @@ export default configure(() => ({
     },
   },
 }));
+
+function createAppVersion() {
+  const packageVersion = process.env.npm_package_version ?? '0.1.0';
+  const commitSha = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA;
+
+  if (!commitSha) {
+    return packageVersion;
+  }
+
+  return `${packageVersion}+${commitSha.slice(0, 12)}`;
+}
