@@ -14,6 +14,7 @@ import {
 } from '@mentor-ai/shared';
 import { config } from '../config/env.js';
 import { learningStateRepository } from '../repositories/learning-state.repository.js';
+import { privateLessonRepository } from '../repositories/private-lesson.repository.js';
 import { aiTeacherService } from './ai-teacher.service.js';
 
 export const learningStateService = {
@@ -35,8 +36,10 @@ export const learningStateService = {
     }
 
     const createdAt = now();
-    const plan = aiTeacherService.planLesson(state.studentModel, context, createdAt);
-    const lesson = generateLessonFromPlan(plan, createdAt);
+    const completedLessonIds = new Set(state.exerciseResults.map((result) => result.lessonId));
+    const lesson =
+      (await privateLessonRepository.findNextForStudent(state.studentModel, completedLessonIds)) ??
+      generateLessonFromPlan(aiTeacherService.planLesson(state.studentModel, context, createdAt), createdAt);
 
     await learningStateRepository.write({
       ...state,
@@ -127,9 +130,14 @@ export const learningStateService = {
     const nextObservations = [...state.observations, ...analyzedState.observations];
     const nextTeacherMemory = promoteTeacherMemory(state.teacherMemory, nextObservations, state.student.id, now());
 
+    const finishedCurrentLesson = newEvents.some(
+      (event) => event.type === 'lesson-finished' && event.lessonId === state.currentLesson?.id,
+    );
+
     await learningStateRepository.write({
       ...state,
       studentModel: analyzedState.studentModel,
+      currentLesson: finishedCurrentLesson ? undefined : state.currentLesson,
       acceptedEvents: [...state.acceptedEvents, ...newEvents],
       exerciseResults: [...state.exerciseResults, ...newResults],
       speechResults: [...state.speechResults, ...newSpeechResults],
