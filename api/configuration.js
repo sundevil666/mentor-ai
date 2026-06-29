@@ -1,3 +1,10 @@
-const { handleApiRequest } = require('./_handler');
+const { handleError, sendJson } = require('./_shared');
 
-module.exports = (request, response) => handleApiRequest(request, response, '/api/configuration');
+module.exports = async (_request, response) => {
+  try {
+    const { learningStateService } = await import('../apps/api/src/services/learning-state.service.js');
+    sendJson(response, 200, learningStateService.getConfiguration());
+  } catch (error) {
+    handleError(response, error);
+  }
+};
