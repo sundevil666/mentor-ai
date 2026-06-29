@@ -15,10 +15,10 @@ export interface AppUpdateCheckResult {
 const manifestUrl = process.env.APP_UPDATE_MANIFEST_URL ?? '/app-update.json';
 const currentVersion = process.env.APP_VERSION ?? '0.1.0';
 const checkIntervalMs = Number(process.env.APP_UPDATE_CHECK_INTERVAL_MS ?? 15 * 60 * 1000);
-const lastSeenVersionKey = 'mentor-ai:last-seen-app-version';
 
 let intervalId: number | undefined;
 let inFlightCheck: Promise<AppUpdateCheckResult | null> | null = null;
+const notifiedVersions = new Set<string>();
 
 export function startAppUpdatePolling(onUpdate: (result: AppUpdateCheckResult) => void | Promise<void>) {
   void checkForAppUpdate().then((result) => {
@@ -70,13 +70,11 @@ export async function checkForAppUpdate(): Promise<AppUpdateCheckResult | null> 
         return null;
       }
 
-      const lastSeenVersion = window.localStorage.getItem(lastSeenVersionKey);
-
-      if (lastSeenVersion === manifest.version) {
+      if (notifiedVersions.has(manifest.version)) {
         return { manifest, notification: null };
       }
 
-      window.localStorage.setItem(lastSeenVersionKey, manifest.version);
+      notifiedVersions.add(manifest.version);
       await navigator.serviceWorker?.getRegistration().then((registration) => registration?.update());
 
       return {
@@ -98,6 +96,39 @@ export async function checkForAppUpdate(): Promise<AppUpdateCheckResult | null> 
     });
 
   return inFlightCheck;
+}
+
+export async function activatePendingServiceWorkerUpdate(timeoutMs = 8000): Promise<'controllerchange' | 'timeout' | 'unsupported'> {
+  if (!('serviceWorker' in navigator)) {
+    return 'unsupported';
+  }
+
+  const registration = await navigator.serviceWorker.getRegistration();
+
+  if (!registration) {
+    return 'unsupported';
+  }
+
+  await registration.update();
+
+  if (!navigator.serviceWorker.controller) {
+    return 'unsupported';
+  }
+
+  return new Promise((resolve) => {
+    const timeoutId = window.setTimeout(() => {
+      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+      resolve('timeout');
+    }, timeoutMs);
+
+    const handleControllerChange = () => {
+      window.clearTimeout(timeoutId);
+      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+      resolve('controllerchange');
+    };
+
+    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange, { once: true });
+  });
 }
 
 export async function showSystemUpdateNotification(notification: UpdateNotification) {

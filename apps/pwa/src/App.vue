@@ -5,11 +5,17 @@
 <script setup lang="ts">
 import { Notify } from 'quasar';
 import { onMounted, onUnmounted } from 'vue';
-import { startAppUpdatePolling, showSystemUpdateNotification, type AppUpdateCheckResult } from 'src/services/app-update';
+import {
+  activatePendingServiceWorkerUpdate,
+  startAppUpdatePolling,
+  showSystemUpdateNotification,
+  type AppUpdateCheckResult,
+} from 'src/services/app-update';
 import { useAppStore } from 'src/stores/app-store';
 
 const appStore = useAppStore();
 let stopUpdatePolling: (() => void) | undefined;
+let isReloadingForUpdate = false;
 
 onMounted(() => {
   window.addEventListener('mentor-ai:update-available', handleUpdateAvailable);
@@ -49,33 +55,30 @@ async function handleUpdateAvailable(event: Event) {
 }
 
 async function handleServerUpdateAvailable(result: AppUpdateCheckResult) {
+  if (isReloadingForUpdate) {
+    return;
+  }
+
   if (!appStore.isHydrated) {
     await appStore.hydrate();
   }
 
   const notification = await appStore.recordUpdateNotification(result.manifest.version, result.notification?.message);
+  isReloadingForUpdate = true;
 
   await showSystemUpdateNotification(notification);
 
   Notify.create({
     type: 'info',
     icon: 'system_update_alt',
-    message: 'Update available',
+    message: 'Updating Mentor AI',
     caption: notification.message,
-    timeout: 12000,
-    actions: [
-      {
-        label: 'Refresh',
-        color: 'white',
-        handler: () => {
-          window.location.reload();
-        },
-      },
-      {
-        label: 'Later',
-        color: 'white',
-      },
-    ],
+    timeout: 5000,
   });
+
+  await activatePendingServiceWorkerUpdate();
+  window.setTimeout(() => {
+    window.location.reload();
+  }, 1200);
 }
 </script>
