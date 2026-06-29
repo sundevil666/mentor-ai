@@ -14,39 +14,37 @@ export interface AppUpdateCheckResult {
 
 const manifestUrl = process.env.APP_UPDATE_MANIFEST_URL ?? '/app-update.json';
 const currentVersion = process.env.APP_VERSION ?? '0.1.0';
-const checkIntervalMs = Number(process.env.APP_UPDATE_CHECK_INTERVAL_MS ?? 15 * 60 * 1000);
+const checkIntervalMs = Number(process.env.APP_UPDATE_CHECK_INTERVAL_MS ?? 60 * 1000);
 
 let intervalId: number | undefined;
 let inFlightCheck: Promise<AppUpdateCheckResult | null> | null = null;
 const notifiedVersions = new Set<string>();
 
 export function startAppUpdatePolling(onUpdate: (result: AppUpdateCheckResult) => void | Promise<void>) {
-  void checkForAppUpdate().then((result) => {
-    if (result?.notification) {
-      void onUpdate(result);
-    }
-  });
-
-  intervalId = window.setInterval(() => {
+  const runUpdateCheck = () => {
     void checkForAppUpdate().then((result) => {
       if (result?.notification) {
         void onUpdate(result);
       }
     });
+  };
+
+  runUpdateCheck();
+
+  intervalId = window.setInterval(() => {
+    runUpdateCheck();
   }, checkIntervalMs);
 
   const checkWhenActive = () => {
     if (document.visibilityState === 'visible' && navigator.onLine) {
-      void checkForAppUpdate().then((result) => {
-        if (result?.notification) {
-          void onUpdate(result);
-        }
-      });
+      runUpdateCheck();
     }
   };
 
   document.addEventListener('visibilitychange', checkWhenActive);
+  window.addEventListener('focus', checkWhenActive);
   window.addEventListener('online', checkWhenActive);
+  window.addEventListener('pageshow', checkWhenActive);
 
   return () => {
     if (intervalId) {
@@ -55,7 +53,9 @@ export function startAppUpdatePolling(onUpdate: (result: AppUpdateCheckResult) =
     }
 
     document.removeEventListener('visibilitychange', checkWhenActive);
+    window.removeEventListener('focus', checkWhenActive);
     window.removeEventListener('online', checkWhenActive);
+    window.removeEventListener('pageshow', checkWhenActive);
   };
 }
 
