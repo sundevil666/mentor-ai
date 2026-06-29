@@ -34,6 +34,12 @@ import {
 } from 'src/services/api-client';
 import { createActivityReason, inferActivitySuggestion } from 'src/services/activity-suggestion';
 import { mentorDb } from 'src/services/indexed-db';
+import {
+  compactAcknowledgedSyncEvent,
+  defaultRetentionPolicy,
+  selectRecordsToPrune,
+  type RetentionRecord,
+} from 'src/services/storage-retention';
 
 interface LearningSessionState {
   id: string;
@@ -153,6 +159,8 @@ export const useAppStore = defineStore('app', {
       );
       this.isOnline = navigator.onLine;
       this.isHydrated = true;
+
+      await this.pruneLocalStorage();
 
       if (this.isOnline) {
         await this.syncPendingEvents();
@@ -385,6 +393,7 @@ export const useAppStore = defineStore('app', {
       await this.persistStudentModel();
       await this.persistStatistics(completedAt);
       await this.persistSyncQueue();
+      await this.pruneLocalStorage();
 
       if (navigator.onLine) {
         await this.syncPendingEvents();
@@ -511,9 +520,14 @@ export const useAppStore = defineStore('app', {
           const queuedEvent = pendingEvents.find((event) => event.id === acknowledgement.eventId);
 
           if (queuedEvent) {
-            await db.put('sync-queue', { ...queuedEvent, status: acknowledgement.status });
+            await db.put(
+              'sync-queue',
+              compactAcknowledgedSyncEvent({ ...queuedEvent, status: acknowledgement.status }),
+            );
           }
         }
+
+        await this.pruneLocalStorage();
 
         const updatedQueue = await db.getAll('sync-queue');
         this.pendingSyncEvents = updatedQueue.filter((event) => event.status === 'pending').length;
@@ -590,8 +604,69 @@ export const useAppStore = defineStore('app', {
       await this.persistSession();
       await this.publishSessionHandoff();
     },
+
+    async pruneLocalStorage() {
+      const db = await mentorDb;
+      const currentLessonId = this.session?.lesson.id;
+      const protectedLessonIds = new Set(currentLessonId ? [currentLessonId] : []);
+
+      await pruneStore(db, 'lessons', defaultRetentionPolicy.maxLessons, protectedLessonIds);
+      await pruneStore(db, 'statistics', defaultRetentionPolicy.maxStatisticsSnapshots);
+      await pruneStore(db, 'activity-snapshots', defaultRetentionPolicy.maxActivitySnapshots);
+      await pruneStore(db, 'concept-evidence', defaultRetentionPolicy.maxConceptEvidence);
+
+      const queuedEvents = (await db.getAll('sync-queue')) as QueuedLearningEvent[];
+      const pendingEventIds = new Set(queuedEvents.filter((event) => event.status === 'pending').map((event) => event.id));
+
+      for (const event of queuedEvents) {
+        const compactEvent = compactAcknowledgedSyncEvent(event);
+
+        if (compactEvent !== event) {
+          await db.put('sync-queue', compactEvent);
+        }
+      }
+
+      const acknowledgedEvents = (await db.getAll('sync-queue')).filter(
+        (event) => (event as RetentionRecord).status !== 'pending',
+      ) as RetentionRecord[];
+
+      for (const event of selectRecordsToPrune(
+        acknowledgedEvents,
+        defaultRetentionPolicy.maxAcknowledgedSyncEvents,
+        pendingEventIds,
+      )) {
+        await db.delete('sync-queue', event.id);
+      }
+
+      this.statisticsSnapshots = ((await db.getAll('statistics')) as StatisticsSnapshot[]).sort((left, right) =>
+        left.createdAt.localeCompare(right.createdAt),
+      );
+      this.activitySnapshots = ((await db.getAll('activity-snapshots')) as ActivitySnapshot[]).sort((left, right) =>
+        left.observedAt.localeCompare(right.observedAt),
+      );
+      this.pendingSyncEvents = ((await db.getAll('sync-queue')) as QueuedLearningEvent[]).filter(
+        (event) => event.status === 'pending',
+      ).length;
+    },
   },
 });
+
+async function pruneStore(
+  db: Awaited<typeof mentorDb>,
+  storeName:
+    | 'lessons'
+    | 'statistics'
+    | 'activity-snapshots'
+    | 'concept-evidence',
+  maxRecords: number,
+  protectedIds: ReadonlySet<string> = new Set(),
+) {
+  const records = (await db.getAll(storeName)) as RetentionRecord[];
+
+  for (const record of selectRecordsToPrune(records, maxRecords, protectedIds)) {
+    await db.delete(storeName, record.id);
+  }
+}
 
 function createDefaultLearningContext(
   snapshots: ActivitySnapshot[] = [],

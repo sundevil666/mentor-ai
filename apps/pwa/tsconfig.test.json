@@ -7,5 +7,10 @@
     "declaration": false,
     "sourceMap": false
   },
-  "include": ["src/services/activity-suggestion.ts", "src/services/api-client.ts", "test/*.test.ts"]
+  "include": [
+    "src/services/activity-suggestion.ts",
+    "src/services/api-client.ts",
+    "src/services/storage-retention.ts",
+    "test/*.test.ts"
+  ]
 }
