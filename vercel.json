@@ -3,30 +3,31 @@
   "outputDirectory": "apps/pwa/dist/pwa",
   "installCommand": "npm install --ignore-scripts",
   "framework": null,
-  "headers": [
+  "routes": [
     {
-      "source": "/app-update.json",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-store, max-age=0"
-        }
-      ]
+      "src": "^/api/(.*)$",
+      "dest": "/api/[...path]?...path=$1"
     },
     {
-      "source": "/sw.js",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-cache, max-age=0, must-revalidate"
-        }
-      ]
-    }
-  ],
-  "rewrites": [
+      "src": "^/app-update\\.json$",
+      "headers": {
+        "Cache-Control": "no-store, max-age=0"
+      },
+      "continue": true
+    },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "^/sw\\.js$",
+      "headers": {
+        "Cache-Control": "no-cache, max-age=0, must-revalidate"
+      },
+      "continue": true
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "^(?:/(.*))$",
+      "dest": "/index.html"
     }
   ]
 }
