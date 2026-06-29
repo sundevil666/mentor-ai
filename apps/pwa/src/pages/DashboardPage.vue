@@ -18,6 +18,25 @@
         <span>Model v{{ appStore.studentModel.version }}</span>
       </div>
 
+      <div
+        v-if="appStore.session"
+        class="active-session-bar"
+      >
+        <div>
+          <span>{{ activeSessionLabel }}</span>
+          <strong>{{ appStore.session.lesson.title }}</strong>
+        </div>
+        <q-btn
+          class="active-session-bar__button"
+          color="primary"
+          icon="arrow_back"
+          label="Back to choice"
+          no-caps
+          unelevated
+          @click="returnToLessonChoice"
+        />
+      </div>
+
       <section class="learning-overview">
         <div class="metric-tile">
           <span>Lessons</span>
@@ -146,10 +165,10 @@
         <div class="lesson-nav">
           <q-btn
             color="primary"
-            flat
-            icon="home"
+            outline
+            icon="arrow_back"
             no-caps
-            label="Choose another"
+            label="Back to choice"
             @click="returnToLessonChoice"
           />
           <span>{{ appStore.lessonProgress }}% complete</span>
@@ -226,9 +245,9 @@
         />
         <q-btn
           color="primary"
-          flat
-          icon="home"
-          label="Choose another"
+          outline
+          icon="arrow_back"
+          label="Back to choice"
           no-caps
           @click="returnToLessonChoice"
         />
@@ -321,6 +340,13 @@ const syncColor = computed(() => {
 const latestAccuracy = computed(() => {
   const accuracy = appStore.latestStatistics?.accuracy;
   return accuracy === undefined ? '0%' : `${Math.round(accuracy * 100)}%`;
+});
+const activeSessionLabel = computed(() => {
+  if (!appStore.session) {
+    return '';
+  }
+
+  return appStore.session.context.mode === 'listening' ? 'Listening now' : 'Lesson in progress';
 });
 const currentSuggestion = computed(() =>
   inferActivitySuggestion(new Date(), selectedShift.value, appStore.activitySnapshots),
