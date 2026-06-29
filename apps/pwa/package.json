@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "quasar dev -m pwa",
     "build": "quasar build -m pwa",
+    "test": "npm run build --workspace @mentor-ai/shared && tsc -p tsconfig.test.json && node --test dist/node-test/test/*.test.js",
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint \"src/**/*.{ts,vue}\""
   },

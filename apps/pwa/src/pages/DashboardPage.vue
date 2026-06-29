@@ -3,14 +3,15 @@
     <section class="learning-shell">
       <div class="learning-status">
         <q-badge
+          class="network-status-badge"
           :color="syncColor"
-          outline
+          :outline="appStore.isOnline && appStore.pendingSyncCount === 0"
         >
           {{ syncLabel }}
         </q-badge>
         <q-badge
-          :color="appStore.isOnline ? 'teal-8' : 'grey-7'"
-          outline
+          class="network-status-badge"
+          :color="appStore.isOnline ? 'teal-8' : 'negative'"
         >
           {{ appStore.isOnline ? 'Online' : 'Offline' }}
         </q-badge>
@@ -275,7 +276,8 @@
 <script setup lang="ts">
 import type { LearningConcept, LearningMode, WorkShift } from '@mentor-ai/shared';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { inferActivitySuggestion, useAppStore } from 'src/stores/app-store';
+import { inferActivitySuggestion } from 'src/services/activity-suggestion';
+import { useAppStore } from 'src/stores/app-store';
 
 type TrainingKey = 'listening' | 'speaking' | 'vocabulary';
 
@@ -289,7 +291,13 @@ const optionList = computed(
 );
 const inputLabel = computed(() => (currentExercise.value?.type === 'repeat-speaking' ? 'What did you say?' : 'Your answer'));
 const syncLabel = computed(() => (appStore.pendingSyncCount > 0 ? `${appStore.pendingSyncCount} pending` : 'Offline ready'));
-const syncColor = computed(() => (appStore.pendingSyncCount > 0 ? 'amber-8' : 'teal-8'));
+const syncColor = computed(() => {
+  if (appStore.pendingSyncCount > 0) {
+    return appStore.isOnline ? 'amber-8' : 'deep-orange-7';
+  }
+
+  return appStore.isOnline ? 'teal-8' : 'grey-7';
+});
 const latestAccuracy = computed(() => {
   const accuracy = appStore.latestStatistics?.accuracy;
   return accuracy === undefined ? '0%' : `${Math.round(accuracy * 100)}%`;

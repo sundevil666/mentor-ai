@@ -125,6 +125,13 @@ body {
   margin-bottom: 24px;
 }
 
+.network-status-badge {
+  font-weight: 700;
+  min-width: 76px;
+  padding: 5px 10px;
+  text-align: center;
+}
+
 .learning-overview {
   display: grid;
   gap: 12px;
