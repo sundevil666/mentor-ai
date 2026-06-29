@@ -77,21 +77,9 @@
         <h1>{{ activityHeadline }}</h1>
         <p>{{ currentSuggestion.reason }}</p>
 
-        <div class="activity-controls">
-          <q-select
-            v-model="selectedShift"
-            :options="shiftOptions"
-            emit-value
-            map-options
-            label="Shift today"
-            outlined
-            dense
-            @update:model-value="updateShift"
-          />
-          <div class="activity-signal">
-            <span>{{ activityMeta }}</span>
-            <strong>{{ paceLabel }}</strong>
-          </div>
+        <div class="activity-signal">
+          <span>{{ activityMeta }}</span>
+          <strong>{{ paceLabel }}</strong>
         </div>
 
         <div
@@ -387,7 +375,6 @@ type ListeningToken = {
 
 const appStore = useAppStore();
 const answer = ref('');
-const selectedShift = ref<WorkShift>('unknown');
 const activeWordIndex = ref(0);
 const isListeningSpeaking = ref(false);
 const isListeningPaused = ref(false);
@@ -445,7 +432,7 @@ const latestAccuracy = computed(() => {
   return accuracy === undefined ? '0%' : `${Math.round(accuracy * 100)}%`;
 });
 const currentSuggestion = computed(() =>
-  inferActivitySuggestion(new Date(), selectedShift.value, appStore.activitySnapshots),
+  inferActivitySuggestion(new Date(), appStore.preferredWorkShift, appStore.activitySnapshots),
 );
 const activityHeadline = computed(() => {
   return `Best now: ${recommendedTraining.value.shortLabel}`;
@@ -539,13 +526,6 @@ const primaryTrainingModes: Array<{ key: TrainingKey; label: string; shortLabel:
     reason: 'Build recall when the session should be short, focused, or review-heavy.',
   },
 ];
-const shiftOptions: Array<{ label: string; value: WorkShift }> = [
-  { label: 'Unknown', value: 'unknown' },
-  { label: 'First shift', value: 'first' },
-  { label: 'Second shift', value: 'second' },
-  { label: 'Third shift', value: 'third' },
-  { label: 'Day off', value: 'off' },
-];
 const recommendedTraining = computed(() => {
   const key = chooseRecommendedTraining();
   const training = primaryTrainingModes.find((item) => item.key === key) ?? primaryTrainingModes[0];
@@ -585,8 +565,6 @@ onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();
   }
-
-  selectedShift.value = appStore.preferredWorkShift;
 
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
@@ -660,10 +638,6 @@ async function continueFromDevice(handoffId: string) {
 
   answer.value = '';
   await appStore.continueSessionHandoff(handoff);
-}
-
-function updateShift(value: WorkShift) {
-  appStore.setPreferredWorkShift(value);
 }
 
 async function submit() {

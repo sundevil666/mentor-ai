@@ -218,6 +218,17 @@ body.body--dark {
   padding: 16px;
 }
 
+.settings-section__heading {
+  align-items: center;
+  color: var(--app-muted);
+  display: flex;
+  font-size: 0.875rem;
+  font-weight: 700;
+  gap: 8px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
 .voice-actions {
   align-items: center;
   color: var(--app-muted-strong);
@@ -456,13 +467,6 @@ body.body--dark {
   max-width: 520px;
 }
 
-.activity-controls {
-  align-items: stretch;
-  display: grid;
-  gap: 12px;
-  grid-template-columns: minmax(180px, 0.55fr) minmax(220px, 1fr);
-}
-
 .activity-signal {
   background: var(--app-surface);
   border: 1px solid var(--app-border);
@@ -599,7 +603,6 @@ body.body--dark {
     text-align: center;
   }
 
-  .activity-controls,
   .training-mode-strip,
   .concept-choice,
   .handoff-actions,

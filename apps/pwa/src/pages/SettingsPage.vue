@@ -13,11 +13,31 @@
         </q-btn>
         <div>
           <p>Settings</p>
-          <h1>Voice</h1>
+          <h1>Preferences</h1>
         </div>
       </div>
 
       <section class="settings-section">
+        <div class="settings-section__heading">
+          <q-icon name="schedule" />
+          <span>Learning context</span>
+        </div>
+        <q-select
+          v-model="selectedShift"
+          :options="shiftOptions"
+          emit-value
+          map-options
+          label="Current shift"
+          outlined
+          @update:model-value="saveShift"
+        />
+      </section>
+
+      <section class="settings-section">
+        <div class="settings-section__heading">
+          <q-icon name="record_voice_over" />
+          <span>Voice</span>
+        </div>
         <q-select
           v-model="selectedVoiceURI"
           :options="voiceOptions"
@@ -63,6 +83,7 @@
 </template>
 
 <script setup lang="ts">
+import type { WorkShift } from '@mentor-ai/shared';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import {
   getAvailableSpeechVoices,
@@ -71,9 +92,19 @@ import {
   type SpeechVoiceOption,
 } from 'src/services/speech-synthesis';
 import { readSpeechVoicePreference, saveSpeechVoicePreference } from 'src/services/user-preferences';
+import { useAppStore } from 'src/stores/app-store';
 
+const appStore = useAppStore();
+const selectedShift = ref<WorkShift>('unknown');
 const selectedVoiceURI = ref<string | null>(readSpeechVoicePreference());
 const voiceOptions = ref<SpeechVoiceOption[]>([]);
+const shiftOptions: Array<{ label: string; value: WorkShift }> = [
+  { label: 'Unknown', value: 'unknown' },
+  { label: 'First shift', value: 'first' },
+  { label: 'Second shift', value: 'second' },
+  { label: 'Third shift', value: 'third' },
+  { label: 'Day off', value: 'off' },
+];
 const voiceStatus = computed(() => {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     return 'Speech synthesis is not available in this browser.';
@@ -86,7 +117,12 @@ const voiceStatus = computed(() => {
   return `${voiceOptions.value.length} voice${voiceOptions.value.length === 1 ? '' : 's'} available.`;
 });
 
-onMounted(() => {
+onMounted(async () => {
+  if (!appStore.isHydrated) {
+    await appStore.hydrate();
+  }
+
+  selectedShift.value = appStore.preferredWorkShift;
   refreshVoices();
 
   if ('speechSynthesis' in window) {
@@ -114,6 +150,10 @@ function refreshVoices() {
 
 function saveVoice(value: string) {
   saveSpeechVoicePreference(value);
+}
+
+function saveShift(value: WorkShift) {
+  appStore.setPreferredWorkShift(value);
 }
 
 function testVoice() {
