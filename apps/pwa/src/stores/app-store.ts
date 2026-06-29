@@ -306,7 +306,7 @@ export const useAppStore = defineStore('app', {
       this.sessionHandoffs = [];
     },
 
-    async recordUpdateNotification(version: string) {
+    async recordUpdateNotification(version: string, message?: string) {
       const createdAt = now();
       const id = `update-${version}`;
       const db = await mentorDb;
@@ -320,7 +320,7 @@ export const useAppStore = defineStore('app', {
         id,
         version,
         title: 'App updated',
-        message: createUpdateMessage(version, createdAt),
+        message: message ?? createUpdateMessage(version, createdAt),
         createdAt,
         viewedAt: null,
         readAt: null,

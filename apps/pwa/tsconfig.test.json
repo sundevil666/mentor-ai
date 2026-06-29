@@ -9,6 +9,7 @@
   },
   "include": [
     "src/services/activity-suggestion.ts",
+    "src/services/app-update.ts",
     "src/services/api-client.ts",
     "src/services/storage-retention.ts",
     "test/*.test.ts"
