@@ -44,11 +44,22 @@ describe('PWA user preferences', () => {
     assert.match(document.cookie, /mentor_ai_speech_voice=com.apple.voice.compact.en-US.Samantha/);
   });
 
-  it('persists the last opened route in cookies', () => {
+  it('persists the last opened restorable route in cookies', () => {
+    saveLastRoutePreference('/lesson');
+
+    assert.equal(readLastRoutePreference(), '/lesson');
+    assert.match(document.cookie, /mentor_ai_last_route=%2Flesson/);
+  });
+
+  it('does not restore settings as the last opened route', () => {
     saveLastRoutePreference('/settings');
 
-    assert.equal(readLastRoutePreference(), '/settings');
-    assert.match(document.cookie, /mentor_ai_last_route=%2Fsettings/);
+    assert.equal(readLastRoutePreference(), null);
+    assert.doesNotMatch(document.cookie, /mentor_ai_last_route=%2Fsettings/);
+
+    document.cookie = 'mentor_ai_last_route=%2Fsettings; path=/';
+
+    assert.equal(readLastRoutePreference(), null);
   });
 
   it('ignores unsafe last opened route cookies', () => {

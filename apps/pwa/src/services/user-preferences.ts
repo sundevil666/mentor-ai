@@ -9,6 +9,7 @@ const themeKey = 'mentor_ai_theme';
 const lastRouteKey = 'mentor_ai_last_route';
 const validWorkShifts = new Set<WorkShift>(['unknown', 'first', 'second', 'third', 'off']);
 const validThemes = new Set<ThemePreference>(['dark', 'light']);
+const restorableRouteDenyList = new Set(['/settings']);
 
 export function readPreferredWorkShift(): WorkShift | null {
   const value = readCookie(preferredWorkShiftKey);
@@ -39,11 +40,11 @@ export function saveThemePreference(theme: ThemePreference) {
 
 export function readLastRoutePreference(): string | null {
   const value = readCookie(lastRouteKey);
-  return isSafeRoutePath(value) ? value : null;
+  return isRestorableRoutePath(value) ? value : null;
 }
 
 export function saveLastRoutePreference(routePath: string) {
-  if (!isSafeRoutePath(routePath)) {
+  if (!isRestorableRoutePath(routePath)) {
     return;
   }
 
@@ -60,6 +61,10 @@ function isThemePreference(value: string | null): value is ThemePreference {
 
 function isSafeRoutePath(value: string | null): value is string {
   return value !== null && value.startsWith('/') && !value.startsWith('//') && !value.includes('://');
+}
+
+function isRestorableRoutePath(value: string | null): value is string {
+  return isSafeRoutePath(value) && !restorableRouteDenyList.has(value);
 }
 
 function readCookie(name: string): string | null {
