@@ -13,6 +13,7 @@ export const learningStateRouter = Router();
 
 learningStateRouter.get('/student-state', getStudentState);
 learningStateRouter.get('/lessons/current', getCurrentLesson);
+learningStateRouter.post('/lessons/current', getCurrentLesson);
 learningStateRouter.get('/recommendations', getRecommendations);
 learningStateRouter.get('/session-handoffs', listSessionHandoffs);
 learningStateRouter.put('/session-handoffs', upsertSessionHandoff);

@@ -1,6 +1,8 @@
 import type {
   ApiResponse,
   ExerciseResult,
+  GeneratedLesson,
+  LearningContext,
   LearningSessionHandoff,
   LearningEvent,
   Recommendation,
@@ -39,6 +41,23 @@ export async function fetchStudentState(): Promise<StudentStateResponse> {
   }
 
   const body = (await response.json()) as ApiResponse<StudentStateResponse>;
+  return body.data;
+}
+
+export async function fetchCurrentLesson(context: LearningContext): Promise<GeneratedLesson> {
+  const response = await fetch(`${apiBaseUrl}/api/lessons/current`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ context }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Current lesson request failed.');
+  }
+
+  const body = (await response.json()) as ApiResponse<GeneratedLesson>;
   return body.data;
 }
 

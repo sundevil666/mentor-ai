@@ -27,6 +27,7 @@ import {
   type WorkShift,
 } from '@mentor-ai/shared';
 import {
+  fetchCurrentLesson,
   fetchSessionHandoffs,
   fetchStudentState,
   synchronizeLearningEvidence,
@@ -183,8 +184,7 @@ export const useAppStore = defineStore('app', {
     async startLesson(context?: LearningContext) {
       const createdAt = now();
       const learningContext = context ?? createDefaultLearningContext(this.activitySnapshots, this.preferredWorkShift);
-      const plan = createLessonPlan(this.studentModel, learningContext, createdAt);
-      const lesson = generateLessonFromPlan(plan, createdAt);
+      const lesson = await this.loadLesson(learningContext, createdAt);
       const sessionId = sessionStoreKey;
       const firstExercise = lesson.exercises[0];
       const startedEvent = createLearningEvent(sessionId, lesson, undefined, 'lesson-started', createdAt);
@@ -206,6 +206,19 @@ export const useAppStore = defineStore('app', {
       await this.persistActivitySnapshot(createActivitySnapshot(learningContext, sessionId, createdAt));
       await this.persistSession();
       await this.publishSessionHandoff();
+    },
+
+    async loadLesson(context: LearningContext, createdAt: string): Promise<GeneratedLesson> {
+      if (navigator.onLine) {
+        try {
+          return await fetchCurrentLesson(context);
+        } catch (_error) {
+          // Keep offline-first practice usable when the API is temporarily unavailable.
+        }
+      }
+
+      const plan = createLessonPlan(this.studentModel, context, createdAt);
+      return generateLessonFromPlan(plan, createdAt);
     },
 
     async setPreferredWorkShift(workShift: WorkShift) {
