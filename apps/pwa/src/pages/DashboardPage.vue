@@ -933,7 +933,7 @@ function createListeningPhrase(wordIndex: number, tokens: ListeningToken[]): { s
   const startIndex = clampIndex(wordIndex, 0, Math.max(tokens.length - 1, 0));
   let endIndex = startIndex;
 
-  while (endIndex < tokens.length - 1 && endIndex - startIndex < 6 && !endsPhrase(tokens[endIndex])) {
+  while (endIndex < tokens.length - 1 && !endsSentence(tokens[endIndex])) {
     endIndex += 1;
   }
 
@@ -950,8 +950,8 @@ function createListeningPhrase(wordIndex: number, tokens: ListeningToken[]): { s
   };
 }
 
-function endsPhrase(token: ListeningToken): boolean {
-  return /\n/.test(token.trailing) || /[,;:.!?]["')\]]*$/.test(token.word);
+function endsSentence(token: ListeningToken): boolean {
+  return /\n/.test(token.trailing) || /[.!?]["')\]]*$/.test(token.word);
 }
 
 function getPhrasePauseMs(phrase: { endIndex: number }): number {
@@ -969,11 +969,7 @@ function getPhrasePauseMs(phrase: { endIndex: number }): number {
     return 180;
   }
 
-  if (/[,;:]["')\]]*$/.test(token.word)) {
-    return 90;
-  }
-
-  return 18;
+  return 120;
 }
 
 function findLastNumberIndex(values: number[], maxValue: number): number {
