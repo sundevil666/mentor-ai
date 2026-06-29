@@ -2,10 +2,19 @@
   <q-layout view="hHh lpR fFf">
     <q-header
       bordered
-      class="bg-white text-dark"
+      class="app-header"
     >
       <q-toolbar>
         <q-toolbar-title>Mentor AI</q-toolbar-title>
+        <q-btn
+          class="theme-toggle-button"
+          flat
+          :icon="isDarkTheme ? 'light_mode' : 'dark_mode'"
+          round
+          @click="toggleTheme"
+        >
+          <q-tooltip>{{ isDarkTheme ? 'Day theme' : 'Night theme' }}</q-tooltip>
+        </q-btn>
         <q-btn
           v-if="showInstallButton"
           class="ios-install-button"
@@ -143,6 +152,7 @@
           </q-menu>
         </q-btn>
         <q-badge
+          class="header-offline-badge"
           color="teal-8"
           outline
         >
@@ -158,14 +168,19 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
-import { computed } from 'vue';
+import { Dark } from 'quasar';
+import { computed, onMounted, ref } from 'vue';
 import { useAppStore } from 'src/stores/app-store';
 
+const themeStorageKey = 'mentor-ai-theme';
 const appStore = useAppStore();
+const isDarkTheme = ref(false);
 const showInstallButton = computed(() => isAppleTouchDevice() && !isStandalonePwa());
 
 onMounted(async () => {
+  isDarkTheme.value = readSavedTheme();
+  Dark.set(isDarkTheme.value);
+
   if (!appStore.isHydrated) {
     await appStore.hydrate();
   }
@@ -181,6 +196,26 @@ function markRead(id: string) {
 
 function markAllRead() {
   void appStore.markAllUpdateNotificationsRead();
+}
+
+function toggleTheme() {
+  isDarkTheme.value = !isDarkTheme.value;
+  Dark.set(isDarkTheme.value);
+  localStorage.setItem(themeStorageKey, isDarkTheme.value ? 'dark' : 'light');
+}
+
+function readSavedTheme() {
+  const savedTheme = localStorage.getItem(themeStorageKey);
+
+  if (savedTheme === 'dark') {
+    return true;
+  }
+
+  if (savedTheme === 'light') {
+    return false;
+  }
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
 function isAppleTouchDevice() {

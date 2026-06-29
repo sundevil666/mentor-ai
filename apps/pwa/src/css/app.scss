@@ -1,6 +1,53 @@
 body {
-  background: #f5f7f6;
-  color: #10201d;
+  --app-bg: #f4f7f6;
+  --app-surface: #ffffff;
+  --app-surface-soft: #e8f2ef;
+  --app-surface-active: #edf7f4;
+  --app-border: #d7e4df;
+  --app-border-strong: #c5d8d2;
+  --app-text: #10201d;
+  --app-text-strong: #0d1b18;
+  --app-muted: #526762;
+  --app-muted-strong: #3f5751;
+  --app-accent: #14645c;
+  --app-primary: #0f766e;
+  --q-primary: var(--app-primary);
+  background: var(--app-bg);
+  color: var(--app-text);
+  font-size: 17px;
+}
+
+body.body--dark {
+  --app-bg: #121816;
+  --app-surface: #1b2421;
+  --app-surface-soft: #23342f;
+  --app-surface-active: #203f39;
+  --app-border: #324640;
+  --app-border-strong: #456059;
+  --app-text: #edf6f3;
+  --app-text-strong: #ffffff;
+  --app-muted: #b5c9c3;
+  --app-muted-strong: #d1dfdb;
+  --app-accent: #70d7ca;
+  --app-primary: #2bbbad;
+  --q-primary: var(--app-primary);
+  background: var(--app-bg);
+  color: var(--app-text);
+}
+
+.app-header {
+  background: var(--app-surface);
+  color: var(--app-text);
+}
+
+.theme-toggle-button,
+.ios-install-button,
+.update-log-button {
+  color: var(--app-primary);
+}
+
+.header-offline-badge {
+  font-size: 0.8rem;
 }
 
 .ios-install-button {
@@ -12,8 +59,8 @@ body {
 }
 
 .ios-install {
-  background: #ffffff;
-  color: #10201d;
+  background: var(--app-surface);
+  color: var(--app-text);
   display: grid;
   gap: 12px;
   padding: 16px;
@@ -21,8 +68,8 @@ body {
 
 .ios-install__icon {
   align-items: center;
-  background: #e7f1ee;
-  border: 1px solid #cfe1dc;
+  background: var(--app-surface-soft);
+  border: 1px solid var(--app-border-strong);
   border-radius: 8px;
   display: flex;
   height: 56px;
@@ -42,12 +89,12 @@ body {
 }
 
 .ios-install__copy strong {
-  font-size: 1rem;
+  font-size: 1.05rem;
 }
 
 .ios-install__copy span {
-  color: #60716c;
-  font-size: 0.875rem;
+  color: var(--app-muted);
+  font-size: 0.95rem;
   line-height: 1.4;
 }
 
@@ -60,8 +107,8 @@ body {
 }
 
 .update-log {
-  background: #ffffff;
-  color: #10201d;
+  background: var(--app-surface);
+  color: var(--app-text);
   display: grid;
   max-height: min(520px, calc(100vh - 96px));
   overflow: auto;
@@ -69,7 +116,7 @@ body {
 
 .update-log__header {
   align-items: center;
-  border-bottom: 1px solid #dbe6e2;
+  border-bottom: 1px solid var(--app-border);
   display: flex;
   justify-content: space-between;
   padding: 14px 16px;
@@ -81,13 +128,13 @@ body {
 }
 
 .update-log__header strong {
-  font-size: 1rem;
+  font-size: 1.05rem;
 }
 
 .update-log__header span,
 .update-log__empty {
-  color: #60716c;
-  font-size: 0.875rem;
+  color: var(--app-muted);
+  font-size: 0.95rem;
 }
 
 .update-log__item {
@@ -95,7 +142,7 @@ body {
 }
 
 .update-log__item--unread {
-  background: #edf7f4;
+  background: var(--app-surface-active);
 }
 
 .update-log__empty {
@@ -117,9 +164,9 @@ body {
 
 .learning-status {
   align-items: center;
-  color: #5f6f6b;
+  color: var(--app-muted);
   display: flex;
-  font-size: 0.875rem;
+  font-size: 0.95rem;
   gap: 12px;
   justify-content: flex-end;
   margin-bottom: 24px;
@@ -140,8 +187,8 @@ body {
 }
 
 .metric-tile {
-  background: #ffffff;
-  border: 1px solid #dbe6e2;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
   border-radius: 8px;
   display: grid;
   gap: 4px;
@@ -152,15 +199,15 @@ body {
 .metric-tile span,
 .panel-heading,
 .skill-row span {
-  color: #60716c;
-  font-size: 0.8125rem;
+  color: var(--app-muted);
+  font-size: 0.875rem;
   font-weight: 700;
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .metric-tile strong {
-  color: #10201d;
+  color: var(--app-text-strong);
   font-size: 1.75rem;
   line-height: 1;
 }
@@ -180,6 +227,7 @@ body {
 }
 
 .training-mode-button {
+  font-size: 0.98rem;
   min-height: 52px;
 }
 
@@ -196,7 +244,8 @@ body {
 .learning-start h1,
 .lesson-stage h1,
 .lesson-complete h1 {
-  font-size: 2.5rem;
+  color: var(--app-text-strong);
+  font-size: 2.625rem;
   line-height: 1.08;
   margin: 0;
 }
@@ -204,8 +253,8 @@ body {
 .learning-start p,
 .lesson-stage p,
 .lesson-complete p {
-  color: #4e625d;
-  font-size: 1.125rem;
+  color: var(--app-muted-strong);
+  font-size: 1.2rem;
   line-height: 1.6;
   margin: 0;
 }
@@ -213,8 +262,8 @@ body {
 .learning-start__eyebrow,
 .lesson-stage__eyebrow,
 .lesson-complete__eyebrow {
-  color: #14645c;
-  font-size: 0.8125rem;
+  color: var(--app-accent);
+  font-size: 0.875rem;
   font-weight: 700;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -222,10 +271,10 @@ body {
 
 .audio-row {
   align-items: center;
-  background: #e8f2ef;
-  border: 1px solid #cfe1dc;
+  background: var(--app-surface-soft);
+  border: 1px solid var(--app-border-strong);
   border-radius: 8px;
-  color: #213b36;
+  color: var(--app-text);
   display: flex;
   gap: 12px;
   padding: 12px;
@@ -266,8 +315,8 @@ body {
 }
 
 .recommended-action span {
-  color: #4e625d;
-  font-size: 0.95rem;
+  color: var(--app-muted-strong);
+  font-size: 1rem;
   line-height: 1.45;
   max-width: 520px;
 }
@@ -280,8 +329,8 @@ body {
 }
 
 .activity-signal {
-  background: #ffffff;
-  border: 1px solid #dbe6e2;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
   border-radius: 8px;
   display: grid;
   gap: 4px;
@@ -289,13 +338,13 @@ body {
 }
 
 .activity-signal span {
-  color: #60716c;
-  font-size: 0.8125rem;
+  color: var(--app-muted);
+  font-size: 0.875rem;
 }
 
 .activity-signal strong {
-  color: #10201d;
-  font-size: 1rem;
+  color: var(--app-text-strong);
+  font-size: 1.05rem;
 }
 
 .shift-timing-grid {
@@ -305,8 +354,8 @@ body {
 }
 
 .shift-timing-item {
-  background: #ffffff;
-  border: 1px solid #dbe6e2;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
   border-radius: 8px;
   display: grid;
   gap: 4px;
@@ -315,16 +364,16 @@ body {
 }
 
 .shift-timing-item span {
-  color: #60716c;
-  font-size: 0.75rem;
+  color: var(--app-muted);
+  font-size: 0.8125rem;
   font-weight: 700;
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .shift-timing-item strong {
-  color: #10201d;
-  font-size: 1rem;
+  color: var(--app-text-strong);
+  font-size: 1.05rem;
 }
 
 .learning-panels {
@@ -335,8 +384,8 @@ body {
 }
 
 .learning-panel {
-  background: #ffffff;
-  border: 1px solid #dbe6e2;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
   border-radius: 8px;
   display: grid;
   gap: 16px;
@@ -362,13 +411,14 @@ body {
 }
 
 .skill-row strong {
-  color: #17322d;
-  font-size: 0.875rem;
+  color: var(--app-text);
+  font-size: 0.95rem;
   text-align: right;
 }
 
 .learning-panel p {
-  color: #4e625d;
+  color: var(--app-muted-strong);
+  font-size: 1rem;
   line-height: 1.55;
   margin: 0;
 }
@@ -382,7 +432,7 @@ body {
   .learning-start h1,
   .lesson-stage h1,
   .lesson-complete h1 {
-    font-size: 2rem;
+    font-size: 2.125rem;
   }
 
   .lesson-actions {
@@ -412,5 +462,11 @@ body {
 
   .skill-row {
     grid-template-columns: 82px minmax(72px, 1fr) 40px;
+  }
+}
+
+@media (max-width: 520px) {
+  .header-offline-badge {
+    display: none !important;
   }
 }
