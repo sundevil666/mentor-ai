@@ -412,7 +412,7 @@ body.body--dark {
   flex: 0 0 auto;
 }
 
-.listening-player__controls span {
+.listening-player__controls > span {
   margin-left: auto;
   min-width: 132px;
   text-align: right;
@@ -430,8 +430,24 @@ body.body--dark {
 }
 
 .lesson-actions {
+  align-items: center;
   display: flex;
+  gap: 14px;
   justify-content: flex-end;
+}
+
+.lesson-actions span {
+  color: var(--app-text-strong);
+  flex: 1 1 320px;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  min-width: 0;
+  text-align: right;
+}
+
+.lesson-actions .q-btn {
+  min-height: 48px;
+  padding: 0 24px;
 }
 
 .concept-choice {
@@ -582,10 +598,21 @@ body.body--dark {
   }
 
   .lesson-actions {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
     justify-content: stretch;
   }
 
+  .lesson-actions span {
+    flex: none;
+    font-size: 1rem;
+    text-align: left;
+  }
+
   .lesson-actions .q-btn {
+    font-size: 1rem;
+    min-height: 52px;
     width: 100%;
   }
 
@@ -596,14 +623,29 @@ body.body--dark {
 
   .listening-player__controls {
     display: grid;
-    grid-template-columns: repeat(5, 44px);
+    gap: 12px;
+    grid-template-columns: repeat(5, 52px);
     justify-content: center;
   }
 
-  .listening-player__controls span {
+  .listening-player__controls .q-btn {
+    min-height: 52px;
+    min-width: 52px;
+  }
+
+  .listening-player__controls > span {
     grid-column: 1 / -1;
     margin-left: 0;
     text-align: center;
+  }
+
+  .training-mode-button,
+  .handoff-actions .q-btn,
+  .concept-choice .q-btn,
+  .lesson-complete .q-btn,
+  .audio-row .q-btn,
+  .panel-heading .q-btn {
+    min-height: 48px;
   }
 
   .training-mode-strip,
