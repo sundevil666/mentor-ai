@@ -5,10 +5,6 @@
   "framework": null,
   "routes": [
     {
-      "src": "^/api/(.*)$",
-      "dest": "/api/[...path]?...path=$1"
-    },
-    {
       "src": "^/app-update\\.json$",
       "headers": {
         "Cache-Control": "no-store, max-age=0"
