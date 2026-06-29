@@ -9,4 +9,5 @@ export const config = {
   storageMode,
   personalStoragePath: process.env.PERSONAL_STORAGE_PATH ?? '.ai/private',
   databaseUrl: process.env.DATABASE_URL,
+  lessonImportToken: process.env.LESSON_IMPORT_TOKEN,
 };
