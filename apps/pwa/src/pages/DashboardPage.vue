@@ -204,10 +204,15 @@
             <p>{{ currentExercise.microLesson }}</p>
           </div>
 
-          <div class="listening-player__text">
+          <div
+            ref="listeningTextElement"
+            class="listening-player__text"
+            @scroll="handleListeningTextScroll"
+          >
             <span
               v-for="token in listeningTokens"
               :key="token.index"
+              :data-token-index="token.index"
               :class="[
                 'listening-player__token',
                 {
@@ -369,7 +374,7 @@
 
 <script setup lang="ts">
 import type { LearningConcept, LearningMode, WorkShift } from '@mentor-ai/shared';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { inferActivitySuggestion } from 'src/services/activity-suggestion';
 import { createPreferredSpeechUtterance, speakWithPreferredVoice, waitForSpeechVoices } from 'src/services/speech-synthesis';
 import { useAppStore } from 'src/stores/app-store';
@@ -390,6 +395,10 @@ const activeWordEndIndex = ref(0);
 const isListeningSpeaking = ref(false);
 const isListeningPaused = ref(false);
 const activeSpeechRunId = ref(0);
+const listeningTextElement = ref<HTMLElement | null>(null);
+const isListeningAutoScrollPaused = ref(false);
+let listeningAutoScrollPauseTimer: number | undefined;
+let isProgrammaticListeningScroll = false;
 
 const currentExercise = computed(() => appStore.currentExercise);
 const isListeningPlayer = computed(() => {
@@ -584,6 +593,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   stopListeningAudio();
+  resetListeningAutoScroll();
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
 });
@@ -595,6 +605,10 @@ watch(
     resetListeningPlayback();
   },
 );
+
+watch([activeWordIndex, activeWordEndIndex], () => {
+  void scrollActiveListeningPhraseIntoView();
+});
 
 async function startWithMode(mode: LearningMode) {
   answer.value = '';
@@ -819,6 +833,88 @@ function resetListeningPlayback() {
   stopListeningAudio();
   activeWordIndex.value = 0;
   activeWordEndIndex.value = 0;
+  resetListeningAutoScroll();
+}
+
+function handleListeningTextScroll() {
+  if (isProgrammaticListeningScroll) {
+    return;
+  }
+
+  pauseListeningAutoScroll();
+}
+
+function pauseListeningAutoScroll() {
+  isListeningAutoScrollPaused.value = true;
+
+  if (listeningAutoScrollPauseTimer !== undefined) {
+    window.clearTimeout(listeningAutoScrollPauseTimer);
+  }
+
+  listeningAutoScrollPauseTimer = window.setTimeout(() => {
+    isListeningAutoScrollPaused.value = false;
+    listeningAutoScrollPauseTimer = undefined;
+  }, 4000);
+}
+
+function resetListeningAutoScroll() {
+  isListeningAutoScrollPaused.value = false;
+  isProgrammaticListeningScroll = false;
+
+  if (listeningAutoScrollPauseTimer !== undefined) {
+    window.clearTimeout(listeningAutoScrollPauseTimer);
+    listeningAutoScrollPauseTimer = undefined;
+  }
+
+  window.requestAnimationFrame(() => {
+    if (listeningTextElement.value) {
+      listeningTextElement.value.scrollTop = 0;
+    }
+  });
+}
+
+async function scrollActiveListeningPhraseIntoView() {
+  if (isListeningAutoScrollPaused.value) {
+    return;
+  }
+
+  await nextTick();
+
+  const container = listeningTextElement.value;
+
+  if (!container || listeningTokens.value.length === 0) {
+    return;
+  }
+
+  const activeToken = container.querySelector<HTMLElement>(`[data-token-index="${activeWordIndex.value}"]`);
+  const activeEndToken = container.querySelector<HTMLElement>(`[data-token-index="${activeWordEndIndex.value}"]`);
+
+  if (!activeToken) {
+    return;
+  }
+
+  const endToken = activeEndToken ?? activeToken;
+  const tokenTop = activeToken.offsetTop;
+  const tokenBottom = endToken.offsetTop + endToken.offsetHeight;
+  const phraseMiddle = tokenTop + (tokenBottom - tokenTop) / 2;
+  const targetScrollTop = clampIndex(
+    Math.round(phraseMiddle - container.clientHeight * 0.42),
+    0,
+    Math.max(container.scrollHeight - container.clientHeight, 0),
+  );
+
+  if (Math.abs(container.scrollTop - targetScrollTop) < 8) {
+    return;
+  }
+
+  isProgrammaticListeningScroll = true;
+  container.scrollTo({
+    top: targetScrollTop,
+    behavior: 'smooth',
+  });
+  window.setTimeout(() => {
+    isProgrammaticListeningScroll = false;
+  }, 450);
 }
 
 async function sync() {
