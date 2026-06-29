@@ -17,6 +17,17 @@
         </q-btn>
         <q-toolbar-title>Mentor AI</q-toolbar-title>
         <q-btn
+          class="settings-nav-button"
+          dense
+          flat
+          icon="settings"
+          label="Settings"
+          no-caps
+          :to="{ name: 'settings' }"
+        >
+          <q-tooltip>Settings</q-tooltip>
+        </q-btn>
+        <q-btn
           class="theme-toggle-button"
           flat
           :icon="isDarkTheme ? 'light_mode' : 'dark_mode'"

@@ -207,19 +207,66 @@
           </div>
 
           <div class="listening-player__text">
-            {{ listeningText }}
+            <span
+              v-for="token in listeningTokens"
+              :key="token.index"
+              :class="[
+                'listening-player__token',
+                {
+                  'listening-player__token--active': token.index === activeWordIndex,
+                  'listening-player__token--past': token.index < activeWordIndex,
+                },
+              ]"
+            >{{ token.word }}{{ token.trailing }}</span>
           </div>
 
           <div class="listening-player__controls">
             <q-btn
               color="primary"
+              flat
+              icon="keyboard_double_arrow_left"
+              round
+              @click="jumpSentence(-1)"
+            >
+              <q-tooltip>Previous sentence</q-tooltip>
+            </q-btn>
+            <q-btn
+              color="primary"
+              flat
+              icon="skip_previous"
+              round
+              @click="jumpWord(-1)"
+            >
+              <q-tooltip>Previous word</q-tooltip>
+            </q-btn>
+            <q-btn
+              color="primary"
               unelevated
-              no-caps
-              icon="play_arrow"
-              :label="audioReplayCount > 0 ? 'Replay' : 'Play'"
-              @click="playAudio"
-            />
-            <span>{{ audioReplayCount > 0 ? `${audioReplayCount} replayed` : 'Ready to listen' }}</span>
+              :icon="isListeningPaused ? 'play_arrow' : isListeningSpeaking ? 'pause' : 'play_arrow'"
+              round
+              @click="toggleListeningPlayback"
+            >
+              <q-tooltip>{{ isListeningPaused ? 'Resume' : isListeningSpeaking ? 'Pause' : 'Play' }}</q-tooltip>
+            </q-btn>
+            <q-btn
+              color="primary"
+              flat
+              icon="skip_next"
+              round
+              @click="jumpWord(1)"
+            >
+              <q-tooltip>Next word</q-tooltip>
+            </q-btn>
+            <q-btn
+              color="primary"
+              flat
+              icon="keyboard_double_arrow_right"
+              round
+              @click="jumpSentence(1)"
+            >
+              <q-tooltip>Next sentence</q-tooltip>
+            </q-btn>
+            <span>{{ listeningProgressLabel }}</span>
           </div>
         </div>
 
@@ -326,13 +373,24 @@
 import type { LearningConcept, LearningMode, WorkShift } from '@mentor-ai/shared';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { inferActivitySuggestion } from 'src/services/activity-suggestion';
+import { createPreferredSpeechUtterance, speakWithPreferredVoice } from 'src/services/speech-synthesis';
 import { useAppStore } from 'src/stores/app-store';
 
 type TrainingKey = 'listening' | 'speaking' | 'vocabulary';
+type ListeningToken = {
+  index: number;
+  word: string;
+  trailing: string;
+  start: number;
+  end: number;
+};
 
 const appStore = useAppStore();
 const answer = ref('');
 const selectedShift = ref<WorkShift>('unknown');
+const activeWordIndex = ref(0);
+const isListeningSpeaking = ref(false);
+const isListeningPaused = ref(false);
 
 const currentExercise = computed(() => appStore.currentExercise);
 const isListeningPlayer = computed(() => {
@@ -348,9 +406,18 @@ const isListeningPlayer = computed(() => {
   );
 });
 const listeningText = computed(() => currentExercise.value?.audioText ?? currentExercise.value?.prompt ?? '');
+const listeningTokens = computed(() => tokenizeListeningText(listeningText.value));
+const sentenceStartWordIndexes = computed(() => getSentenceStartWordIndexes(listeningTokens.value));
 const listeningTitle = computed(() =>
   currentExercise.value?.type === 'listening-text' ? 'Listen and read' : currentExercise.value?.prompt ?? 'Listen',
 );
+const listeningProgressLabel = computed(() => {
+  if (listeningTokens.value.length === 0) {
+    return 'Ready to listen';
+  }
+
+  return `Word ${Math.min(activeWordIndex.value + 1, listeningTokens.value.length)} / ${listeningTokens.value.length}`;
+});
 const audioReplayCount = computed(() => {
   const session = appStore.session;
   const exercise = currentExercise.value;
@@ -526,6 +593,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  stopListeningAudio();
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
 });
@@ -534,6 +602,7 @@ watch(
   () => currentExercise.value?.id,
   () => {
     answer.value = '';
+    resetListeningPlayback();
   },
 );
 
@@ -618,11 +687,106 @@ async function playAudio() {
   const text = currentExercise.value?.audioText;
 
   if (text && 'speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+    speakWithPreferredVoice(text);
   }
 
   await appStore.replayAudio();
+}
+
+async function toggleListeningPlayback() {
+  if (!('speechSynthesis' in window)) {
+    return;
+  }
+
+  if (isListeningSpeaking.value && !isListeningPaused.value) {
+    window.speechSynthesis.pause();
+    isListeningPaused.value = true;
+    return;
+  }
+
+  if (isListeningSpeaking.value && isListeningPaused.value) {
+    window.speechSynthesis.resume();
+    isListeningPaused.value = false;
+    return;
+  }
+
+  await startListeningAtWord(activeWordIndex.value);
+}
+
+async function jumpWord(direction: -1 | 1) {
+  const maxIndex = Math.max(listeningTokens.value.length - 1, 0);
+  await startListeningAtWord(clampIndex(activeWordIndex.value + direction, 0, maxIndex));
+}
+
+async function jumpSentence(direction: -1 | 1) {
+  const sentenceStarts = sentenceStartWordIndexes.value;
+
+  if (sentenceStarts.length === 0) {
+    await jumpWord(direction);
+    return;
+  }
+
+  const currentSentenceIndex = Math.max(
+    0,
+    sentenceStarts.findLastIndex((wordIndex) => wordIndex <= activeWordIndex.value),
+  );
+  const nextSentenceIndex = clampIndex(currentSentenceIndex + direction, 0, sentenceStarts.length - 1);
+
+  await startListeningAtWord(sentenceStarts[nextSentenceIndex] ?? 0);
+}
+
+async function startListeningAtWord(wordIndex: number) {
+  const tokens = listeningTokens.value;
+
+  if (tokens.length === 0 || !('speechSynthesis' in window)) {
+    return;
+  }
+
+  const safeWordIndex = clampIndex(wordIndex, 0, tokens.length - 1);
+  const startOffset = tokens[safeWordIndex]?.start ?? 0;
+  const utterance = createPreferredSpeechUtterance(listeningText.value.slice(startOffset));
+
+  activeWordIndex.value = safeWordIndex;
+  isListeningSpeaking.value = true;
+  isListeningPaused.value = false;
+
+  utterance.onboundary = (event) => {
+    if (event.name && event.name !== 'word') {
+      return;
+    }
+
+    const nextWordIndex = findWordIndexAtChar(tokens, startOffset + event.charIndex);
+
+    if (nextWordIndex >= 0) {
+      activeWordIndex.value = nextWordIndex;
+    }
+  };
+  utterance.onend = () => {
+    isListeningSpeaking.value = false;
+    isListeningPaused.value = false;
+  };
+  utterance.onerror = () => {
+    isListeningSpeaking.value = false;
+    isListeningPaused.value = false;
+  };
+
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+  await appStore.replayAudio();
+}
+
+function stopListeningAudio() {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+
+  isListeningSpeaking.value = false;
+  isListeningPaused.value = false;
+}
+
+function resetListeningPlayback() {
+  stopListeningAudio();
+  activeWordIndex.value = 0;
 }
 
 async function sync() {
@@ -683,5 +847,63 @@ function chooseRecommendedTraining(): TrainingKey {
   ].sort((left, right) => left.value - right.value)[0];
 
   return weakest.key;
+}
+
+function tokenizeListeningText(text: string): ListeningToken[] {
+  const tokens: ListeningToken[] = [];
+  let index = 0;
+
+  for (const match of text.matchAll(/\S+/g)) {
+    const word = match[0];
+    const start = match.index ?? 0;
+    const end = start + word.length;
+    const nextWordOffset = text.slice(end).search(/\S/);
+    const trailingEnd = nextWordOffset === -1 ? text.length : end + nextWordOffset;
+
+    tokens.push({
+      index,
+      word,
+      trailing: text.slice(end, trailingEnd),
+      start,
+      end,
+    });
+    index += 1;
+  }
+
+  return tokens;
+}
+
+function getSentenceStartWordIndexes(tokens: ListeningToken[]): number[] {
+  if (tokens.length === 0) {
+    return [];
+  }
+
+  const starts = [0];
+
+  for (const token of tokens) {
+    if (/[.!?]["')\]]*$/.test(token.word)) {
+      const nextToken = tokens[token.index + 1];
+
+      if (nextToken) {
+        starts.push(nextToken.index);
+      }
+    }
+  }
+
+  return Array.from(new Set(starts));
+}
+
+function findWordIndexAtChar(tokens: ListeningToken[], charIndex: number): number {
+  const exactToken = tokens.find((token) => charIndex >= token.start && charIndex <= token.end);
+
+  if (exactToken) {
+    return exactToken.index;
+  }
+
+  return tokens.findLast((token) => token.start <= charIndex)?.index ?? -1;
+}
+
+function clampIndex(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }
 </script>

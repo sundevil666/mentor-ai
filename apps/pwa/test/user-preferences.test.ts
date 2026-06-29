@@ -3,8 +3,10 @@ import { beforeEach, describe, it } from 'node:test';
 
 import {
   readPreferredWorkShift,
+  readSpeechVoicePreference,
   readThemePreference,
   savePreferredWorkShift,
+  saveSpeechVoicePreference,
   saveThemePreference,
 } from '../src/services/user-preferences.js';
 
@@ -31,6 +33,13 @@ describe('PWA user preferences', () => {
 
     assert.equal(readThemePreference(), 'dark');
     assert.match(document.cookie, /mentor_ai_theme=dark/);
+  });
+
+  it('persists the speech voice preference in cookies', () => {
+    saveSpeechVoicePreference('com.apple.voice.compact.en-US.Samantha');
+
+    assert.equal(readSpeechVoicePreference(), 'com.apple.voice.compact.en-US.Samantha');
+    assert.match(document.cookie, /mentor_ai_speech_voice=com.apple.voice.compact.en-US.Samantha/);
   });
 });
 

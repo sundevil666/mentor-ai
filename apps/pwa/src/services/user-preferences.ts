@@ -4,6 +4,7 @@ export type ThemePreference = 'dark' | 'light';
 
 const cookieMaxAgeSeconds = 60 * 60 * 24 * 365;
 const preferredWorkShiftKey = 'mentor_ai_preferred_work_shift';
+const speechVoiceKey = 'mentor_ai_speech_voice';
 const themeKey = 'mentor_ai_theme';
 const validWorkShifts = new Set<WorkShift>(['unknown', 'first', 'second', 'third', 'off']);
 const validThemes = new Set<ThemePreference>(['dark', 'light']);
@@ -15,6 +16,15 @@ export function readPreferredWorkShift(): WorkShift | null {
 
 export function savePreferredWorkShift(workShift: WorkShift) {
   writeCookie(preferredWorkShiftKey, workShift);
+}
+
+export function readSpeechVoicePreference(): string | null {
+  const value = readCookie(speechVoiceKey);
+  return value && value.trim().length > 0 ? value : null;
+}
+
+export function saveSpeechVoicePreference(voiceURI: string) {
+  writeCookie(speechVoiceKey, voiceURI);
 }
 
 export function readThemePreference(): ThemePreference | null {
