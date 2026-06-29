@@ -211,7 +211,7 @@
               :class="[
                 'listening-player__token',
                 {
-                  'listening-player__token--active': token.index === activeWordIndex,
+                  'listening-player__token--active': token.index >= activeWordIndex && token.index <= activeWordEndIndex,
                   'listening-player__token--past': token.index < activeWordIndex,
                 },
               ]"
@@ -386,6 +386,7 @@ type ListeningToken = {
 const appStore = useAppStore();
 const answer = ref('');
 const activeWordIndex = ref(0);
+const activeWordEndIndex = ref(0);
 const isListeningSpeaking = ref(false);
 const isListeningPaused = ref(false);
 const activeSpeechRunId = ref(0);
@@ -697,7 +698,7 @@ async function toggleListeningPlayback() {
       return;
     }
 
-    speakListeningWord(activeWordIndex.value, activeSpeechRunId.value);
+    speakListeningPhrase(activeWordIndex.value, activeSpeechRunId.value);
     return;
   }
 
@@ -736,45 +737,48 @@ async function startListeningAtWord(wordIndex: number) {
 
   activeSpeechRunId.value = runId;
   activeWordIndex.value = safeWordIndex;
+  activeWordEndIndex.value = safeWordIndex;
   isListeningSpeaking.value = true;
   isListeningPaused.value = false;
   window.speechSynthesis.cancel();
-  speakListeningWord(safeWordIndex, runId);
+  speakListeningPhrase(safeWordIndex, runId);
   await appStore.replayAudio();
 }
 
-function speakListeningWord(wordIndex: number, runId: number) {
+function speakListeningPhrase(wordIndex: number, runId: number) {
   const tokens = listeningTokens.value;
 
   if (tokens.length === 0 || runId !== activeSpeechRunId.value || !('speechSynthesis' in window)) {
     return;
   }
 
-  const safeWordIndex = clampIndex(wordIndex, 0, tokens.length - 1);
-  const token = tokens[safeWordIndex];
+  const phrase = createListeningPhrase(wordIndex, tokens);
+  const token = tokens[phrase.startIndex];
 
   if (!token) {
     finishListeningPlayback(runId);
     return;
   }
 
-  const utterance = createPreferredSpeechUtterance(createSpokenTokenText(token));
+  const utterance = createPreferredSpeechUtterance(phrase.text);
 
-  activeWordIndex.value = safeWordIndex;
+  activeWordIndex.value = phrase.startIndex;
+  activeWordEndIndex.value = phrase.endIndex;
   utterance.onend = () => {
     if (runId !== activeSpeechRunId.value) {
       return;
     }
 
-    const nextWordIndex = safeWordIndex + 1;
+    const nextWordIndex = phrase.endIndex + 1;
 
     if (nextWordIndex >= 0 && nextWordIndex < tokens.length && !isListeningPaused.value) {
-      window.setTimeout(() => speakListeningWord(nextWordIndex, runId), getTokenPauseMs(token));
+      window.setTimeout(() => speakListeningPhrase(nextWordIndex, runId), getPhrasePauseMs(phrase));
       return;
     }
 
     if (isListeningPaused.value) {
-      activeWordIndex.value = nextWordIndex < tokens.length ? nextWordIndex : safeWordIndex;
+      activeWordIndex.value = nextWordIndex < tokens.length ? nextWordIndex : phrase.startIndex;
+      activeWordEndIndex.value = activeWordIndex.value;
       return;
     }
 
@@ -814,6 +818,7 @@ function stopListeningAudio() {
 function resetListeningPlayback() {
   stopListeningAudio();
   activeWordIndex.value = 0;
+  activeWordEndIndex.value = 0;
 }
 
 async function sync() {
@@ -920,15 +925,42 @@ function getSentenceStartWordIndexes(tokens: ListeningToken[]): number[] {
   return Array.from(new Set(starts));
 }
 
-function createSpokenTokenText(token: ListeningToken): string {
-  return `${token.word}${token.trailing.includes('\n') ? '.' : token.trailing}`.trim();
-}
-
 function clampIndex(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function getTokenPauseMs(token: ListeningToken): number {
+function createListeningPhrase(wordIndex: number, tokens: ListeningToken[]): { startIndex: number; endIndex: number; text: string } {
+  const startIndex = clampIndex(wordIndex, 0, Math.max(tokens.length - 1, 0));
+  let endIndex = startIndex;
+
+  while (endIndex < tokens.length - 1 && endIndex - startIndex < 6 && !endsPhrase(tokens[endIndex])) {
+    endIndex += 1;
+  }
+
+  const phraseText = tokens
+    .slice(startIndex, endIndex + 1)
+    .map((token) => `${token.word}${token.trailing}`)
+    .join('')
+    .trim();
+
+  return {
+    startIndex,
+    endIndex,
+    text: phraseText,
+  };
+}
+
+function endsPhrase(token: ListeningToken): boolean {
+  return /\n/.test(token.trailing) || /[,;:.!?]["')\]]*$/.test(token.word);
+}
+
+function getPhrasePauseMs(phrase: { endIndex: number }): number {
+  const token = listeningTokens.value[phrase.endIndex];
+
+  if (!token) {
+    return 0;
+  }
+
   if (/\n/.test(token.trailing)) {
     return 320;
   }
