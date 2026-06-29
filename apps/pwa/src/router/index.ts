@@ -21,8 +21,8 @@ export default route(() => {
     history: createHistory(process.env.VUE_ROUTER_BASE),
   });
 
-  router.beforeEach((to) => {
-    if (process.env.SERVER || to.name !== 'dashboard' || to.fullPath !== '/') {
+  router.beforeEach((to, from) => {
+    if (process.env.SERVER || from.name !== undefined || to.name !== 'dashboard' || to.fullPath !== '/') {
       return true;
     }
 

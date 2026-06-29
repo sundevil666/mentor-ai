@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
 import {
+  clearLastRoutePreference,
   readLastRoutePreference,
   readPreferredWorkShift,
   readSpeechVoicePreference,
@@ -60,6 +61,15 @@ describe('PWA user preferences', () => {
     document.cookie = 'mentor_ai_last_route=%2Fsettings; path=/';
 
     assert.equal(readLastRoutePreference(), null);
+  });
+
+  it('clears the last opened route preference', () => {
+    saveLastRoutePreference('/lesson');
+
+    clearLastRoutePreference();
+
+    assert.equal(readLastRoutePreference(), null);
+    assert.doesNotMatch(document.cookie, /mentor_ai_last_route=%2Flesson/);
   });
 
   it('ignores unsafe last opened route cookies', () => {

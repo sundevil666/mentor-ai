@@ -43,6 +43,10 @@ export function readLastRoutePreference(): string | null {
   return isRestorableRoutePath(value) ? value : null;
 }
 
+export function clearLastRoutePreference() {
+  clearCookie(lastRouteKey);
+}
+
 export function saveLastRoutePreference(routePath: string) {
   if (!isRestorableRoutePath(routePath)) {
     return;
@@ -90,6 +94,19 @@ function writeCookie(name: string, value: string) {
     `${encodeURIComponent(name)}=${encodeURIComponent(value)}`,
     'path=/',
     `max-age=${cookieMaxAgeSeconds}`,
+    'SameSite=Lax',
+  ].join('; ');
+}
+
+function clearCookie(name: string) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  document.cookie = [
+    `${encodeURIComponent(name)}=`,
+    'path=/',
+    'max-age=0',
     'SameSite=Lax',
   ].join('; ');
 }

@@ -7,7 +7,7 @@
           flat
           icon="arrow_back"
           round
-          :to="{ name: 'dashboard' }"
+          @click="returnToDashboard"
         >
           <q-tooltip>Back to learning</q-tooltip>
         </q-btn>
@@ -85,6 +85,7 @@
 <script setup lang="ts">
 import type { WorkShift } from '@mentor-ai/shared';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import {
   getAvailableSpeechVoices,
   getFemaleSpeechVoiceOptions,
@@ -92,10 +93,11 @@ import {
   waitForSpeechVoices,
   type SpeechVoiceOption,
 } from 'src/services/speech-synthesis';
-import { readSpeechVoicePreference, saveSpeechVoicePreference } from 'src/services/user-preferences';
+import { clearLastRoutePreference, readSpeechVoicePreference, saveSpeechVoicePreference } from 'src/services/user-preferences';
 import { useAppStore } from 'src/stores/app-store';
 
 const appStore = useAppStore();
+const router = useRouter();
 const selectedShift = ref<WorkShift>('unknown');
 const selectedVoiceURI = ref<string | null>(readSpeechVoicePreference());
 const voiceOptions = ref<SpeechVoiceOption[]>([]);
@@ -160,5 +162,10 @@ function saveShift(value: WorkShift) {
 
 function testVoice() {
   speakWithPreferredVoice('This is the voice for listening practice.');
+}
+
+function returnToDashboard() {
+  clearLastRoutePreference();
+  void router.replace({ name: 'dashboard' });
 }
 </script>
