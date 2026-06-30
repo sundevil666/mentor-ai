@@ -39,7 +39,9 @@ export const learningStateService = {
     const createdAt = now();
     const completedLessonIds = new Set(state.exerciseResults.map((result) => result.lessonId));
     const selectedLesson =
-      context.mode === 'listening'
+      context.lessonTemplateKey
+        ? generateLessonFromPlan(aiTeacherService.planLesson(state.studentModel, context, createdAt), createdAt)
+        : context.mode === 'listening'
         ? (await privateLessonRepository.findNextForMode(context.mode, completedLessonIds)) ??
           generateLessonFromPlan(aiTeacherService.planLesson(state.studentModel, context, createdAt), createdAt)
         : (await privateLessonRepository.findNextForStudent(state.studentModel, completedLessonIds)) ??
@@ -186,6 +188,14 @@ export const learningStateService = {
 };
 
 function isLessonSuitableForContext(lesson: GeneratedLesson, context: LearningContext): boolean {
+  if (context.lessonTemplateKey && lesson.lessonTemplateKey !== context.lessonTemplateKey) {
+    return false;
+  }
+
+  if (context.selectedConcept && lesson.concept !== context.selectedConcept) {
+    return false;
+  }
+
   if (context.mode !== 'listening') {
     return true;
   }

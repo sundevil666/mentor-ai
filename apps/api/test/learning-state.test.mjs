@@ -35,6 +35,32 @@ describe('learning state service', () => {
     assert.equal(lesson.exercises[0].audioText.split(/\s+/).length >= 1100, true);
   });
 
+  it('does not reuse the cached current lesson when a lesson card requests a specific template', async () => {
+    const readingLesson = await learningStateService.getCurrentLesson({
+      mode: 'home',
+      selectedConcept: 'reading',
+      manualConceptChoice: true,
+      lessonTemplateKey: 'message-reading',
+      isOffline: false,
+      speechAvailable: true,
+      availableMinutes: 8,
+    });
+    const vocabularyLesson = await learningStateService.getCurrentLesson({
+      mode: 'home',
+      selectedConcept: 'vocabulary',
+      manualConceptChoice: true,
+      lessonTemplateKey: 'travel-vocabulary',
+      isOffline: false,
+      speechAvailable: true,
+      availableMinutes: 8,
+    });
+
+    assert.equal(readingLesson.title, 'Reading: short work message');
+    assert.equal(vocabularyLesson.title, 'Vocabulary Growth: travel words');
+    assert.notEqual(readingLesson.exercises[0].prompt, vocabularyLesson.exercises[0].prompt);
+    assert.equal(vocabularyLesson.exercises[0].prompt, 'Choose the meaning of "arrive".');
+  });
+
   it('accepts new synchronized evidence and marks repeats as duplicates', async () => {
     const event = {
       id: `event-service-check-${Date.now()}`,

@@ -236,6 +236,7 @@ export interface GeneratedLesson {
   concept: LearningConcept;
   conceptLevel: ConceptLevel;
   activityType: LearningActivityType;
+  lessonTemplateKey?: string;
   teacherDecision: TeacherDecision;
   title: string;
   purpose: string;
@@ -801,6 +802,7 @@ export function generateLessonFromPlan(plan: LessonPlan, createdAt: string): Gen
     concept: plan.concept,
     conceptLevel: plan.conceptLevel,
     activityType: plan.activityType,
+    lessonTemplateKey: plan.lessonTemplateKey,
     teacherDecision: plan.teacherDecision,
     title: createConceptLessonTitle(plan),
     purpose: plan.goal.purpose,
