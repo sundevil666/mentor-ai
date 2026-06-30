@@ -16,6 +16,25 @@
           <q-tooltip>Back to lesson choice</q-tooltip>
         </q-btn>
         <q-toolbar-title>Mentor AI</q-toolbar-title>
+        <q-tabs
+          class="main-nav-tabs"
+          dense
+          inline-label
+          shrink
+        >
+          <q-route-tab
+            icon="school"
+            label="Lessons"
+            no-caps
+            :to="{ name: 'dashboard' }"
+          />
+          <q-route-tab
+            icon="query_stats"
+            label="Statistics"
+            no-caps
+            :to="{ name: 'statistics' }"
+          />
+        </q-tabs>
         <q-btn
           class="settings-nav-button"
           dense

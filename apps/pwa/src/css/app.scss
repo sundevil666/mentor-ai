@@ -48,6 +48,11 @@ body.body--dark {
   color: var(--app-primary);
 }
 
+.main-nav-tabs {
+  color: var(--app-primary);
+  margin-right: 6px;
+}
+
 .home-nav-button {
   margin-right: 4px;
 }
@@ -166,7 +171,8 @@ body.body--dark {
   padding: 24px;
 }
 
-.settings-page {
+.settings-page,
+.statistics-page {
   align-items: flex-start;
   display: flex;
   min-height: calc(100vh - 51px);
@@ -179,7 +185,8 @@ body.body--dark {
   width: 100%;
 }
 
-.settings-shell {
+.settings-shell,
+.statistics-shell {
   display: grid;
   gap: 24px;
   margin: 0 auto;
@@ -187,13 +194,20 @@ body.body--dark {
   width: 100%;
 }
 
-.settings-header {
+.statistics-shell {
+  max-width: 760px;
+}
+
+.settings-header,
+.statistics-header {
   align-items: center;
   display: flex;
   gap: 14px;
+  justify-content: space-between;
 }
 
-.settings-header p {
+.settings-header p,
+.statistics-header p {
   color: var(--app-accent);
   font-size: 0.875rem;
   font-weight: 700;
@@ -202,7 +216,8 @@ body.body--dark {
   text-transform: uppercase;
 }
 
-.settings-header h1 {
+.settings-header h1,
+.statistics-header h1 {
   color: var(--app-text-strong);
   font-size: 2.25rem;
   line-height: 1.1;
@@ -655,7 +670,8 @@ body.body--dark {
     padding: 20px;
   }
 
-  .settings-page {
+  .settings-page,
+  .statistics-page {
     padding: 20px;
   }
 
@@ -744,6 +760,7 @@ body.body--dark {
 }
 
 @media (max-width: 520px) {
+  .main-nav-tabs .q-tab__label,
   .settings-nav-button .q-btn__content span {
     display: none;
   }
