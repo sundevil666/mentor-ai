@@ -22,7 +22,8 @@ export type LearningActivityType =
   | 'recovery-check'
   | 'review';
 
-export type LearningMode = 'bus' | 'walking' | 'home' | 'listening' | 'speaking' | 'review' | 'recovery';
+export type LearningMode =
+  'bus' | 'walking' | 'home' | 'listening' | 'speaking' | 'review' | 'recovery';
 
 export type WorkShift = 'first' | 'second' | 'third' | 'off' | 'unknown';
 
@@ -559,7 +560,8 @@ export const initialStudentModel: StudentModel = {
     concept: 'learning',
     activityType: 'guided-lesson',
     levelDecision: 'hold',
-    reason: 'Start with a guided lesson so the teacher can observe grammar, listening, speaking, and vocabulary together.',
+    reason:
+      'Start with a guided lesson so the teacher can observe grammar, listening, speaking, and vocabulary together.',
     nextRecommendedConcept: 'learning',
     nextRecommendedActivity: 'guided-lesson',
     createdAt: '2026-06-28T00:00:00.000Z',
@@ -592,7 +594,10 @@ export const initialStudentModel: StudentModel = {
   updatedAt: '2026-06-28T00:00:00.000Z',
 };
 
-export const workShiftSchedules: Record<Exclude<WorkShift, 'off' | 'unknown'>, WorkShiftSchedule> = {
+export const workShiftSchedules: Record<
+  Exclude<WorkShift, 'off' | 'unknown'>,
+  WorkShiftSchedule
+> = {
   first: createWorkShiftSchedule('first', 6 * 60, 14 * 60),
   second: createWorkShiftSchedule('second', 14 * 60, 22 * 60),
   third: createWorkShiftSchedule('third', 22 * 60, 6 * 60),
@@ -609,10 +614,18 @@ export function getWorkShiftTiming(workShift: WorkShift): WorkShiftTiming | unde
     shift: workShift,
     startsAt: formatClockMinutes(schedule.startsAtMinutes),
     endsAt: formatClockMinutes(schedule.endsAtMinutes),
-    leaveHomeAt: formatClockMinutes(schedule.startsAtMinutes - schedule.leaveHomeMinutesBeforeStart),
-    busLeavesAt: formatClockMinutes(schedule.startsAtMinutes - schedule.busLeavesMinutesBeforeStart),
-    busArrivesAt: formatClockMinutes(schedule.startsAtMinutes - schedule.busArrivesMinutesBeforeStart),
-    headphonesOffAt: formatClockMinutes(schedule.startsAtMinutes - schedule.headphonesOffMinutesBeforeStart),
+    leaveHomeAt: formatClockMinutes(
+      schedule.startsAtMinutes - schedule.leaveHomeMinutesBeforeStart,
+    ),
+    busLeavesAt: formatClockMinutes(
+      schedule.startsAtMinutes - schedule.busLeavesMinutesBeforeStart,
+    ),
+    busArrivesAt: formatClockMinutes(
+      schedule.startsAtMinutes - schedule.busArrivesMinutesBeforeStart,
+    ),
+    headphonesOffAt: formatClockMinutes(
+      schedule.startsAtMinutes - schedule.headphonesOffMinutesBeforeStart,
+    ),
   };
 }
 
@@ -623,7 +636,9 @@ export function clampSignal(value: number): SignalScore {
   };
 }
 
-export function createEvidenceId(event: Pick<LearningEvent, 'studentId' | 'sessionId' | 'id'>): string {
+export function createEvidenceId(
+  event: Pick<LearningEvent, 'studentId' | 'sessionId' | 'id'>,
+): string {
   return `${event.studentId}:${event.sessionId}:${event.id}`;
 }
 
@@ -670,7 +685,12 @@ export function analyzePronunciationAttempt(
 
     if (heard !== word) {
       issues.push({
-        ...createPronunciationIssue(word, wordsLookClose(word, heard) ? 'unclear' : 'substitution', createdAt, index),
+        ...createPronunciationIssue(
+          word,
+          wordsLookClose(word, heard) ? 'unclear' : 'substitution',
+          createdAt,
+          index,
+        ),
         heard,
       });
     }
@@ -678,14 +698,18 @@ export function analyzePronunciationAttempt(
 
   if (heardWords.length > expectedWords.length) {
     for (const [extraIndex, word] of heardWords.slice(expectedWords.length).entries()) {
-      issues.push(createPronunciationIssue(word, 'extra', createdAt, expectedWords.length + extraIndex));
+      issues.push(
+        createPronunciationIssue(word, 'extra', createdAt, expectedWords.length + extraIndex),
+      );
     }
   }
 
   return issues.slice(0, 4);
 }
 
-export function summarizeResults(results: ExerciseResult[]): Pick<
+export function summarizeResults(
+  results: ExerciseResult[],
+): Pick<
   StatisticsSnapshot,
   'accuracy' | 'averageResponseTimeMs' | 'attempts' | 'completedExercises' | 'fatigueSignal'
 > {
@@ -697,7 +721,8 @@ export function summarizeResults(results: ExerciseResult[]): Pick<
 
   return {
     accuracy: completed.length === 0 ? 0 : correct / completed.length,
-    averageResponseTimeMs: completed.length === 0 ? 0 : Math.round(totalResponseTime / completed.length),
+    averageResponseTimeMs:
+      completed.length === 0 ? 0 : Math.round(totalResponseTime / completed.length),
     attempts,
     completedExercises: completed.length,
     fatigueSignal: {
@@ -711,13 +736,28 @@ export function nextModelVersion(model: Pick<StudentModel, 'version'>): number {
   return model.version + 1;
 }
 
-export function createLessonPlan(model: StudentModel, context: LearningContext, createdAt: string): LessonPlan {
+export function createLessonPlan(
+  model: StudentModel,
+  context: LearningContext,
+  createdAt: string,
+): LessonPlan {
   const teacherDecision = decideNextTeacherAction(model, context, [], createdAt);
-  const concept = context.manualConceptChoice && context.selectedConcept ? context.selectedConcept : teacherDecision.nextRecommendedConcept;
-  const conceptState = refreshConceptTimeSignals(getConceptState(model, concept), model.conceptHistory, createdAt);
+  const concept =
+    context.manualConceptChoice && context.selectedConcept
+      ? context.selectedConcept
+      : context.mode === 'listening' || context.mode === 'speaking'
+        ? 'learning'
+        : teacherDecision.nextRecommendedConcept;
+  const conceptState = refreshConceptTimeSignals(
+    getConceptState(model, concept),
+    model.conceptHistory,
+    createdAt,
+  );
   const weakestSkill = getWeakestSkillForConcept(model, concept);
   const reviewPriority = model.reviewPriorities.find((priority) => priority.skill === weakestSkill);
-  const goal = model.activeLearningGoals.find((activeGoal) => activeGoal.skill === weakestSkill) ?? {
+  const goal = model.activeLearningGoals.find(
+    (activeGoal) => activeGoal.skill === weakestSkill,
+  ) ?? {
     id: `goal-${weakestSkill}-${model.version}`,
     skill: weakestSkill,
     purpose: createGoalPurpose(weakestSkill),
@@ -785,12 +825,20 @@ export function updateStudentModelFromResults(
 ): StudentModel {
   const summary = summarizeResults(results);
   const changedSkills = getChangedSkills(results);
-  const teacherDecision = decideNextTeacherAction(model, createContextFromResults(results), results, updatedAt);
+  const teacherDecision = decideNextTeacherAction(
+    model,
+    createContextFromResults(results),
+    results,
+    updatedAt,
+  );
   const nextModel: StudentModel = {
     ...model,
     version: nextModelVersion(model),
     conceptLevels: updateConceptStates(model, results, teacherDecision, updatedAt),
-    conceptHistory: [...model.conceptHistory, ...createConceptPracticeRecords(results, updatedAt)].slice(-24),
+    conceptHistory: [
+      ...model.conceptHistory,
+      ...createConceptPracticeRecords(results, updatedAt),
+    ].slice(-24),
     teacherDecision,
     vocabulary: updateSkillState(model.vocabulary, results, 'vocabulary', updatedAt),
     grammar: updateSkillState(model.grammar, results, 'grammar', updatedAt),
@@ -806,15 +854,38 @@ export function updateStudentModelFromResults(
 
   return {
     ...nextModel,
-    knownWeaknesses: mergeLearningSignals(model.knownWeaknesses, createWeaknessSignals(nextModel, results, updatedAt)),
-    knownStrengths: mergeLearningSignals(model.knownStrengths, createStrengthSignals(nextModel, results, updatedAt)),
-    reviewPriorities: refreshReviewPriorities(model.reviewPriorities, changedSkills, results, updatedAt),
-    activeLearningGoals: refreshLearningGoals(model.activeLearningGoals, getWeakestSkill(nextModel), updatedAt),
+    knownWeaknesses: mergeLearningSignals(
+      model.knownWeaknesses,
+      createWeaknessSignals(nextModel, results, updatedAt),
+    ),
+    knownStrengths: mergeLearningSignals(
+      model.knownStrengths,
+      createStrengthSignals(nextModel, results, updatedAt),
+    ),
+    reviewPriorities: refreshReviewPriorities(
+      model.reviewPriorities,
+      changedSkills,
+      results,
+      updatedAt,
+    ),
+    activeLearningGoals: refreshLearningGoals(
+      model.activeLearningGoals,
+      getWeakestSkill(nextModel),
+      updatedAt,
+    ),
   };
 }
 
-export function createRecommendationFromModel(model: StudentModel, createdAt: string): Recommendation {
-  const decision = decideNextTeacherAction(model, { mode: 'home', isOffline: false, speechAvailable: true, availableMinutes: 6 }, [], createdAt);
+export function createRecommendationFromModel(
+  model: StudentModel,
+  createdAt: string,
+): Recommendation {
+  const decision = decideNextTeacherAction(
+    model,
+    { mode: 'home', isOffline: false, speechAvailable: true, availableMinutes: 6 },
+    [],
+    createdAt,
+  );
 
   return {
     id: `recommendation-${model.studentId}-${model.version}`,
@@ -887,7 +958,9 @@ export function decideNextTeacherAction(
   const summary = summarizeConceptEvidence(results, concept);
   const levelDecision = decideLevelChange(conceptState, summary);
   const nextRecommendedConcept =
-    context.manualConceptChoice && context.selectedConcept ? context.selectedConcept : getRecommendedConcept(model, createdAt);
+    context.manualConceptChoice && context.selectedConcept
+      ? context.selectedConcept
+      : getRecommendedConcept(model, createdAt);
   const nextState = getConceptState(model, nextRecommendedConcept);
   const nextRecommendedActivity = chooseActivityForConcept(nextRecommendedConcept, nextState);
 
@@ -907,19 +980,25 @@ function summarizeConceptEvidence(results: ExerciseResult[], concept: LearningCo
   const completed = conceptResults.filter((result) => result.completionState === 'completed');
   const correct = completed.filter((result) => result.correct).length;
   const totalResponseTime = completed.reduce((sum, result) => sum + result.responseTimeMs, 0);
-  const skippedCount = conceptResults.filter((result) => result.completionState === 'skipped' || result.skipped).length;
-  const abandonedCount = conceptResults.filter((result) => result.completionState === 'abandoned' || result.abandoned).length;
+  const skippedCount = conceptResults.filter(
+    (result) => result.completionState === 'skipped' || result.skipped,
+  ).length;
+  const abandonedCount = conceptResults.filter(
+    (result) => result.completionState === 'abandoned' || result.abandoned,
+  ).length;
   const hintCount = conceptResults.reduce((sum, result) => sum + result.hintCount, 0);
 
   return {
     resultCount: conceptResults.length,
     accuracy: completed.length === 0 ? 0 : correct / completed.length,
-    averageResponseTimeMs: completed.length === 0 ? 0 : Math.round(totalResponseTime / completed.length),
+    averageResponseTimeMs:
+      completed.length === 0 ? 0 : Math.round(totalResponseTime / completed.length),
     completionRate: conceptResults.length === 0 ? 1 : completed.length / conceptResults.length,
     hintCount,
     skippedCount,
     abandonedCount,
-    repeatedMistakes: conceptResults.filter((result) => result.repeatedMistake || !result.correct).length,
+    repeatedMistakes: conceptResults.filter((result) => result.repeatedMistake || !result.correct)
+      .length,
   };
 }
 
@@ -972,8 +1051,18 @@ function updateConceptStates(
       continue;
     }
 
-    const levelDecision = concept === teacherDecision.concept ? teacherDecision.levelDecision : decideLevelChange(current, summary);
-    const scoreAdjustment = levelDecision === 'increase' ? 0.08 : levelDecision === 'decrease' ? -0.07 : summary.accuracy >= 0.7 ? 0.02 : -0.02;
+    const levelDecision =
+      concept === teacherDecision.concept
+        ? teacherDecision.levelDecision
+        : decideLevelChange(current, summary);
+    const scoreAdjustment =
+      levelDecision === 'increase'
+        ? 0.08
+        : levelDecision === 'decrease'
+          ? -0.07
+          : summary.accuracy >= 0.7
+            ? 0.02
+            : -0.02;
     const nextScore = clamp(current.score.value + scoreAdjustment);
 
     states[concept] = {
@@ -984,13 +1073,17 @@ function updateConceptStates(
         confidence: clamp(current.score.confidence + 0.12),
       },
       confidence: {
-        value: clamp(current.confidence.value + (summary.completionRate >= 0.9 && summary.hintCount === 0 ? 0.04 : -0.03)),
+        value: clamp(
+          current.confidence.value +
+            (summary.completionRate >= 0.9 && summary.hintCount === 0 ? 0.04 : -0.03),
+        ),
         confidence: clamp(current.confidence.confidence + 0.1),
       },
       evidenceCount: current.evidenceCount + summary.resultCount,
       lastPracticedAt: updatedAt,
       daysSincePractice: 0,
-      avoidancePattern: summary.skippedCount + summary.abandonedCount > 0 ? 'repeated-skip' : 'none',
+      avoidancePattern:
+        summary.skippedCount + summary.abandonedCount > 0 ? 'repeated-skip' : 'none',
       retentionRisk: 'low',
       reviewUrgency: 'none',
       recommendedActivity: chooseActivityForConcept(concept, current),
@@ -1000,7 +1093,10 @@ function updateConceptStates(
   return states;
 }
 
-function createConceptPracticeRecords(results: ExerciseResult[], practicedAt: string): ConceptPracticeRecord[] {
+function createConceptPracticeRecords(
+  results: ExerciseResult[],
+  practicedAt: string,
+): ConceptPracticeRecord[] {
   const records: ConceptPracticeRecord[] = [];
 
   for (const concept of ['learning', 'reading', 'vocabulary'] as LearningConcept[]) {
@@ -1014,7 +1110,9 @@ function createConceptPracticeRecords(results: ExerciseResult[], practicedAt: st
 
     records.push({
       concept,
-      activityType: firstResult?.activityType ?? chooseActivityForConcept(concept, createConceptState(concept, 0.3, 'review')),
+      activityType:
+        firstResult?.activityType ??
+        chooseActivityForConcept(concept, createConceptState(concept, 0.3, 'review')),
       practicedAt,
       accuracy: summary.accuracy,
       averageResponseTimeMs: summary.averageResponseTimeMs,
@@ -1037,7 +1135,9 @@ function getWeakestSkill(model: StudentModel): SkillArea {
     ['speaking', model.speaking],
   ];
 
-  return entries.reduce((weakest, current) => (current[1].score.value < weakest[1].score.value ? current : weakest))[0];
+  return entries.reduce((weakest, current) =>
+    current[1].score.value < weakest[1].score.value ? current : weakest,
+  )[0];
 }
 
 function getWeakestSkillForConcept(model: StudentModel, concept: LearningConcept): SkillArea {
@@ -1078,8 +1178,14 @@ function chooseDifficulty(
   return 'steady';
 }
 
-function createTeachingIntent(skill: SkillArea, context: LearningContext, conceptState: ConceptState): string {
-  const manualChoice = context.manualConceptChoice ? 'respecting the student choice' : 'following the teacher recommendation';
+function createTeachingIntent(
+  skill: SkillArea,
+  context: LearningContext,
+  conceptState: ConceptState,
+): string {
+  const manualChoice = context.manualConceptChoice
+    ? 'respecting the student choice'
+    : 'following the teacher recommendation';
   return `Practice ${labelConcept(conceptState.concept)} through ${labelSkill(skill)} at ${conceptState.level} level, ${manualChoice}, while preserving evidence for the Student Model.`;
 }
 
@@ -1115,58 +1221,210 @@ function createLessonTitle(skill: SkillArea): string {
 
 function createConceptLessonTitle(plan: LessonPlan): string {
   if (plan.concept === 'reading') {
-    return 'Short reading check';
+    return selectLessonTemplate(readingLessonTemplates, plan).title;
   }
 
   if (plan.concept === 'vocabulary') {
-    return 'Vocabulary growth practice';
+    return selectLessonTemplate(vocabularyLessonTemplates, plan).title;
   }
 
-  return createLessonTitle(plan.goal.skill);
+  return selectLearningLessonTemplate(plan).title;
 }
 
 function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercise[] {
-  if (plan.learningMode === 'listening' || plan.goal.skill === 'listening') {
-    const listeningText = createTenMinuteListeningText();
+  if (plan.concept === 'reading') {
+    return instantiateLessonTemplate(selectLessonTemplate(readingLessonTemplates, plan), plan);
+  }
 
-    return [
+  if (plan.concept === 'vocabulary') {
+    return instantiateLessonTemplate(selectLessonTemplate(vocabularyLessonTemplates, plan), plan);
+  }
+
+  if (plan.learningMode === 'listening' || plan.goal.skill === 'listening') {
+    return instantiateLessonTemplate(learningLessonTemplates[0], plan, reviewTarget);
+  }
+
+  return instantiateLessonTemplate(selectLearningLessonTemplate(plan), plan, reviewTarget);
+}
+
+interface LessonTemplate {
+  key: string;
+  title: string;
+  exercises: Omit<Exercise, 'id'>[];
+}
+
+function selectLessonTemplate(templates: LessonTemplate[], plan: LessonPlan): LessonTemplate {
+  const seed = `${plan.id}-${plan.learningMode}-${plan.activityType}-${plan.difficulty}`;
+  const hash = Array.from(seed).reduce((sum, character) => sum + character.charCodeAt(0), 0);
+  return templates[hash % templates.length] ?? templates[0];
+}
+
+function selectLearningLessonTemplate(plan: LessonPlan): LessonTemplate {
+  if (plan.learningMode === 'listening' || plan.goal.skill === 'listening') {
+    return learningLessonTemplates[0];
+  }
+
+  if (plan.learningMode === 'speaking' || plan.goal.skill === 'speaking') {
+    return learningLessonTemplates[1];
+  }
+
+  if (plan.goal.skill === 'vocabulary') {
+    return learningLessonTemplates[2];
+  }
+
+  return selectLessonTemplate(learningLessonTemplates, plan);
+}
+
+function instantiateLessonTemplate(
+  template: LessonTemplate,
+  plan: LessonPlan,
+  reviewTarget = 'Good afternoon',
+): Exercise[] {
+  return template.exercises.map((exercise, index) => ({
+    ...exercise,
+    id: `${plan.id}-${template.key}-${index + 1}`,
+    prompt: exercise.prompt.replaceAll('{reviewTarget}', reviewTarget),
+    expectedResponse: exercise.expectedResponse?.replaceAll(
+      '{reviewTarget}',
+      reviewTarget.toLowerCase().replace('?', ''),
+    ),
+    audioText: exercise.audioText?.replaceAll('{reviewTarget}', reviewTarget),
+  }));
+}
+
+const learningLessonTemplates: LessonTemplate[] = [
+  {
+    key: 'commute-listening',
+    title: 'Commute listening routine',
+    exercises: [
       {
-        id: `${plan.id}-listening-text`,
         type: 'listening-text',
         prompt: 'Listen and read',
-        microLesson: 'Read the text while you listen. Replay the audio once if a word feels unclear.',
+        microLesson:
+          'Read the text while you listen. Replay the audio once if a word feels unclear.',
         successTip: 'Continue when you have listened and followed the whole text.',
         targetSkill: 'listening',
         expectedResponse: 'listened',
-        audioText: listeningText,
+        audioText: createTenMinuteListeningText(),
       },
       {
-        id: `${plan.id}-listening-check`,
         type: 'listening-comprehension',
-        prompt: 'Where is the speaker?',
+        prompt: 'Where is the speaker during the routine?',
         microLesson: 'After listening, check the main situation first.',
         successTip: 'Choose the place you heard in the text.',
         targetSkill: 'listening',
         expectedResponse: 'on the bus',
         options: ['on the bus', 'in a cafe', 'at school'],
-        audioText: listeningText,
+        audioText: 'On the bus, I sit near the window and lower the volume a little.',
       },
-    ];
-  }
-
-  if (plan.concept === 'reading') {
-    return [
       {
-        id: `${plan.id}-reading-text`,
+        type: 'vocabulary-recall',
+        prompt:
+          'Type one repeated word from the listening text: morning, bus, work, listen, today, or later.',
+        microLesson: 'Repeated words become friendly because your ears meet them many times.',
+        successTip: 'Use one exact word from the list.',
+        targetSkill: 'vocabulary',
+        expectedResponse: 'bus',
+      },
+    ],
+  },
+  {
+    key: 'work-speaking',
+    title: 'Speaking confidence at work',
+    exercises: [
+      {
         type: 'review',
-        prompt: 'Read: Tom works in a small cafe. In the afternoon, he helps a friend and drinks tea.',
+        prompt: 'Review: say or type "{reviewTarget}".',
+        microLesson: 'Warmup protects earlier progress before adding new pressure.',
+        successTip: 'Copy the phrase slowly and clearly.',
+        targetSkill: 'review',
+        expectedResponse: '{reviewTarget}',
+      },
+      {
+        type: 'repeat-speaking',
+        prompt: 'Repeat: Can you help me?',
+        microLesson: 'Pronunciation practice is pattern-finding, not a pass/fail test.',
+        successTip: 'Say each word separately first, then connect the phrase.',
+        targetSkill: 'speaking',
+        expectedResponse: 'can you help me',
+        audioText: 'Can you help me?',
+      },
+      {
+        type: 'word-order',
+        prompt: 'Order the words: you / help / can / me',
+        microLesson: 'English yes/no questions often start with can, then the person.',
+        successTip: 'Start with can, then you.',
+        targetSkill: 'grammar',
+        expectedResponse: 'can you help me',
+      },
+    ],
+  },
+  {
+    key: 'daily-guided',
+    title: 'Daily guided English',
+    exercises: [
+      {
+        type: 'review',
+        prompt: 'Review: say or type "{reviewTarget}".',
+        microLesson: 'Warmup protects earlier progress before adding new pressure.',
+        successTip: 'Copy the phrase slowly and clearly.',
+        targetSkill: 'review',
+        expectedResponse: '{reviewTarget}',
+      },
+      {
+        type: 'vocabulary-recall',
+        prompt: 'Translate: dobrý deň',
+        microLesson: 'This step checks whether the greeting is ready for real use.',
+        successTip: 'Think of the polite afternoon greeting.',
+        targetSkill: 'vocabulary',
+        expectedResponse: 'good afternoon',
+      },
+      {
+        type: 'word-order',
+        prompt: 'Order the words: you / are / where',
+        microLesson: 'English questions often use question word + helper verb + subject.',
+        successTip: 'Start with where, then are, then you.',
+        targetSkill: 'grammar',
+        expectedResponse: 'where are you',
+      },
+      {
+        type: 'listening-comprehension',
+        prompt: 'Listen and choose the meaning.',
+        microLesson: 'Listen for the sentence shape. Replaying audio is useful practice evidence.',
+        successTip: 'Match the question word you hear.',
+        targetSkill: 'listening',
+        expectedResponse: 'where are you',
+        options: ['where are you', 'how old are you', 'what is this'],
+        audioText: 'Where are you?',
+      },
+      {
+        type: 'repeat-speaking',
+        prompt: 'Repeat: Where are you?',
+        microLesson: 'Pronunciation practice is pattern-finding, not a pass/fail test.',
+        successTip: 'Say each word separately first, then connect the phrase.',
+        targetSkill: 'speaking',
+        expectedResponse: 'where are you',
+        audioText: 'Where are you?',
+      },
+    ],
+  },
+];
+
+const readingLessonTemplates: LessonTemplate[] = [
+  {
+    key: 'cafe-reading',
+    title: 'Reading: afternoon cafe',
+    exercises: [
+      {
+        type: 'review',
+        prompt:
+          'Read: Tom works in a small cafe. In the afternoon, he helps a friend and drinks tea.',
         microLesson: 'Read for the simple situation first: who, where, and when.',
         successTip: 'Type read when you finish the short text.',
         targetSkill: 'review',
         expectedResponse: 'read',
       },
       {
-        id: `${plan.id}-reading-main-idea`,
         type: 'listening-comprehension',
         prompt: 'What is the text mostly about?',
         microLesson: 'Main idea questions ask for the whole situation, not one isolated word.',
@@ -1176,7 +1434,6 @@ function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercis
         options: ['tom works in a cafe', 'tom travels by train', 'tom studies math'],
       },
       {
-        id: `${plan.id}-reading-word`,
         type: 'vocabulary-recall',
         prompt: 'Which word means a place where people drink tea or coffee?',
         microLesson: 'Unknown words from reading become vocabulary targets for future review.',
@@ -1184,32 +1441,99 @@ function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercis
         targetSkill: 'vocabulary',
         expectedResponse: 'cafe',
       },
-    ];
-  }
-
-  if (plan.concept === 'vocabulary') {
-    return [
+    ],
+  },
+  {
+    key: 'message-reading',
+    title: 'Reading: short work message',
+    exercises: [
       {
-        id: `${plan.id}-vocabulary-recognition`,
+        type: 'review',
+        prompt:
+          'Read: Maria sends a message to her team. She says the meeting starts at nine, but the room is different today.',
+        microLesson: 'Notice names, time, and the changed detail.',
+        successTip: 'Type read when you finish the message.',
+        targetSkill: 'review',
+        expectedResponse: 'read',
+      },
+      {
+        type: 'listening-comprehension',
+        prompt: 'What changed today?',
+        microLesson: 'A detail question asks what is different from normal.',
+        successTip: 'Choose the changed detail.',
+        targetSkill: 'listening',
+        expectedResponse: 'the room',
+        options: ['the room', 'the team name', 'the day'],
+      },
+      {
+        type: 'vocabulary-recall',
+        prompt: 'Which word means a planned work talk with other people?',
+        microLesson: 'Reading should feed useful words into later vocabulary review.',
+        successTip: 'Use the word from the text.',
+        targetSkill: 'vocabulary',
+        expectedResponse: 'meeting',
+      },
+    ],
+  },
+  {
+    key: 'routine-reading',
+    title: 'Reading: evening routine',
+    exercises: [
+      {
+        type: 'review',
+        prompt:
+          'Read: After work, I cook dinner, call my sister, and read one page in English before I sleep.',
+        microLesson: 'Sequence words help you understand a small routine.',
+        successTip: 'Type read when you finish the routine.',
+        targetSkill: 'review',
+        expectedResponse: 'read',
+      },
+      {
+        type: 'listening-comprehension',
+        prompt: 'When does the person read English?',
+        microLesson: 'Time questions often use before, after, in the morning, or at night.',
+        successTip: 'Choose the time from the text.',
+        targetSkill: 'listening',
+        expectedResponse: 'before sleep',
+        options: ['before sleep', 'before work', 'during dinner'],
+      },
+      {
+        type: 'vocabulary-recall',
+        prompt: 'Write the word that means make food.',
+        microLesson: 'Action words from reading become useful everyday vocabulary.',
+        successTip: 'Use the action from the first part of the text.',
+        targetSkill: 'vocabulary',
+        expectedResponse: 'cook',
+      },
+    ],
+  },
+];
+
+const vocabularyLessonTemplates: LessonTemplate[] = [
+  {
+    key: 'greetings-vocabulary',
+    title: 'Vocabulary Growth: greetings',
+    exercises: [
+      {
         type: 'vocabulary-recall',
         prompt: 'Choose the meaning of "afternoon".',
-        microLesson: 'Recognition is the first layer: connect the English word to the idea quickly.',
+        microLesson:
+          'Recognition is the first layer: connect the English word to the idea quickly.',
         successTip: 'Pick the time after lunch.',
         targetSkill: 'vocabulary',
         expectedResponse: 'time after lunch',
         options: ['time after lunch', 'very early morning', 'a small question'],
       },
       {
-        id: `${plan.id}-vocabulary-recall`,
         type: 'vocabulary-recall',
         prompt: 'Translate: dobrý deň',
-        microLesson: 'Active recall is stronger than reading the answer. Pause for one second before typing.',
+        microLesson:
+          'Active recall is stronger than reading the answer. Pause for one second before typing.',
         successTip: 'Use the polite greeting for later in the day.',
         targetSkill: 'vocabulary',
         expectedResponse: 'good afternoon',
       },
       {
-        id: `${plan.id}-vocabulary-context`,
         type: 'word-order',
         prompt: 'Order the words: good / afternoon / teacher',
         microLesson: 'Putting a word into a phrase makes it easier to use in real speech.',
@@ -1217,60 +1541,72 @@ function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercis
         targetSkill: 'grammar',
         expectedResponse: 'good afternoon teacher',
       },
-    ];
-  }
-
-  return [
-    {
-      id: `${plan.id}-warmup`,
-      type: 'review',
-      prompt: `Review: say or type "${reviewTarget}".`,
-      microLesson: 'Warmup protects earlier progress before adding new pressure.',
-      successTip: 'Copy the phrase slowly and clearly.',
-      targetSkill: 'review',
-      expectedResponse: reviewTarget.toLowerCase().replace('?', ''),
-    },
-    {
-      id: `${plan.id}-vocabulary`,
-      type: 'vocabulary-recall',
-      prompt: 'Translate: dobrý deň',
-      microLesson: 'This step checks whether the greeting is ready for real use.',
-      successTip: 'Think of the polite afternoon greeting.',
-      targetSkill: 'vocabulary',
-      expectedResponse: 'good afternoon',
-    },
-    {
-      id: `${plan.id}-word-order`,
-      type: 'word-order',
-      prompt: 'Order the words: you / are / where',
-      microLesson: 'English questions often use question word + helper verb + subject.',
-      successTip: 'Start with where, then are, then you.',
-      targetSkill: 'grammar',
-      expectedResponse: 'where are you',
-    },
-    {
-      id: `${plan.id}-listening`,
-      type: 'listening-comprehension',
-      prompt: 'Listen and choose the meaning.',
-      microLesson: 'Listen for the sentence shape. Replaying audio is useful practice evidence.',
-      successTip: 'Match the question word you hear.',
-      targetSkill: 'listening',
-      expectedResponse: 'where are you',
-      options: ['where are you', 'how old are you', 'what is this'],
-      audioText: 'Where are you?',
-    },
-    {
-      id: `${plan.id}-speaking`,
-      type: 'repeat-speaking',
-      prompt: 'Repeat: Where are you?',
-      microLesson: 'Pronunciation practice is pattern-finding, not a pass/fail test.',
-      successTip: 'Say each word separately first, then connect the phrase.',
-      targetSkill: 'speaking',
-      expectedResponse: 'where are you',
-      audioText: 'Where are you?',
-    },
-  ];
-}
+    ],
+  },
+  {
+    key: 'work-vocabulary',
+    title: 'Vocabulary Growth: work words',
+    exercises: [
+      {
+        type: 'vocabulary-recall',
+        prompt: 'Choose the meaning of "shift".',
+        microLesson:
+          'Work words need context, because one word can describe a whole part of the day.',
+        successTip: 'Pick the work time meaning.',
+        targetSkill: 'vocabulary',
+        expectedResponse: 'work period',
+        options: ['work period', 'small cafe', 'fast question'],
+      },
+      {
+        type: 'vocabulary-recall',
+        prompt: 'Translate: zmena',
+        microLesson: 'Recall checks whether the word is ready without seeing it first.',
+        successTip: 'Use the English work word.',
+        targetSkill: 'vocabulary',
+        expectedResponse: 'shift',
+      },
+      {
+        type: 'word-order',
+        prompt: 'Order the words: my / starts / shift / early',
+        microLesson: 'A word becomes stronger when you can place it inside a real sentence.',
+        successTip: 'Start with my shift.',
+        targetSkill: 'grammar',
+        expectedResponse: 'my shift starts early',
+      },
+    ],
+  },
+  {
+    key: 'travel-vocabulary',
+    title: 'Vocabulary Growth: travel words',
+    exercises: [
+      {
+        type: 'vocabulary-recall',
+        prompt: 'Choose the meaning of "arrive".',
+        microLesson: 'Recognition checks whether the word is familiar before active recall.',
+        successTip: 'Pick the meaning about reaching a place.',
+        targetSkill: 'vocabulary',
+        expectedResponse: 'come to a place',
+        options: ['come to a place', 'drink coffee', 'ask again'],
+      },
+      {
+        type: 'vocabulary-recall',
+        prompt: 'Translate: prísť',
+        microLesson: 'Active recall makes the word available for real sentences.',
+        successTip: 'Use the travel verb from the first question.',
+        targetSkill: 'vocabulary',
+        expectedResponse: 'arrive',
+      },
+      {
+        type: 'word-order',
+        prompt: 'Order the words: I / arrive / at / work',
+        microLesson: 'Short practical sentences turn vocabulary into usable English.',
+        successTip: 'Start with I arrive.',
+        targetSkill: 'grammar',
+        expectedResponse: 'i arrive at work',
+      },
+    ],
+  },
+];
 
 function createTenMinuteListeningText(): string {
   const baseSentences = [
@@ -1321,7 +1657,10 @@ function createTenMinuteListeningText(): string {
     'That is real practice, and it counts.',
   ];
 
-  return Array.from({ length: 4 }, (_, index) => `Part ${index + 1}. ${baseSentences.join(' ')}`).join('\n\n');
+  return Array.from(
+    { length: 4 },
+    (_, index) => `Part ${index + 1}. ${baseSentences.join(' ')}`,
+  ).join('\n\n');
 }
 
 function normalizeWords(text: string): string[] {
@@ -1356,7 +1695,9 @@ function updateSkillState(
   skill: SkillArea,
   updatedAt: string,
 ): SkillState {
-  const skillResults = results.filter((result) => result.targetSkill === skill && result.completionState === 'completed');
+  const skillResults = results.filter(
+    (result) => result.targetSkill === skill && result.completionState === 'completed',
+  );
 
   if (skillResults.length === 0) {
     return current;
@@ -1383,20 +1724,27 @@ function updateSkillState(
 }
 
 function getConceptState(model: StudentModel, concept: LearningConcept): ConceptState {
-  return model.conceptLevels?.[concept] ?? createConceptState(concept, 0.3, chooseActivityForConcept(concept));
+  return (
+    model.conceptLevels?.[concept] ??
+    createConceptState(concept, 0.3, chooseActivityForConcept(concept))
+  );
 }
 
 function getRecommendedConcept(model: StudentModel, createdAt: string): LearningConcept {
   const refreshed = (['learning', 'reading', 'vocabulary'] as LearningConcept[]).map((concept) =>
     refreshConceptTimeSignals(getConceptState(model, concept), model.conceptHistory, createdAt),
   );
-  const urgent = refreshed.find((state) => state.reviewUrgency === 'now' || state.avoidancePattern !== 'none');
+  const urgent = refreshed.find(
+    (state) => state.reviewUrgency === 'now' || state.avoidancePattern !== 'none',
+  );
 
   if (urgent) {
     return urgent.concept;
   }
 
-  return refreshed.reduce((weakest, current) => (current.score.value < weakest.score.value ? current : weakest)).concept;
+  return refreshed.reduce((weakest, current) =>
+    current.score.value < weakest.score.value ? current : weakest,
+  ).concept;
 }
 
 function refreshConceptTimeSignals(
@@ -1404,15 +1752,28 @@ function refreshConceptTimeSignals(
   history: ConceptPracticeRecord[],
   createdAt: string,
 ): ConceptState {
-  const lastPractice = state.lastPracticedAt ?? findLastPracticeForConcept(history, state.concept)?.practicedAt;
+  const lastPractice =
+    state.lastPracticedAt ?? findLastPracticeForConcept(history, state.concept)?.practicedAt;
   const daysSincePractice = lastPractice ? daysBetween(lastPractice, createdAt) : 0;
   const recent = history.slice(-6);
   const practicedRecently = recent.some((record) => record.concept === state.concept);
-  const skippedRecently = recent.filter((record) => record.concept === state.concept && record.skippedCount + record.abandonedCount > 0).length;
+  const skippedRecently = recent.filter(
+    (record) => record.concept === state.concept && record.skippedCount + record.abandonedCount > 0,
+  ).length;
   const avoidancePattern: AvoidancePattern =
-    skippedRecently >= 2 ? 'repeated-skip' : history.length >= 4 && !practicedRecently ? 'stale' : state.avoidancePattern;
-  const retentionRisk: RetentionRisk = daysSincePractice >= 10 ? 'high' : daysSincePractice >= 5 ? 'medium' : 'low';
-  const reviewUrgency: ReviewUrgency = retentionRisk === 'high' || avoidancePattern !== 'none' ? 'now' : retentionRisk === 'medium' ? 'soon' : 'none';
+    skippedRecently >= 2
+      ? 'repeated-skip'
+      : history.length >= 4 && !practicedRecently
+        ? 'stale'
+        : state.avoidancePattern;
+  const retentionRisk: RetentionRisk =
+    daysSincePractice >= 10 ? 'high' : daysSincePractice >= 5 ? 'medium' : 'low';
+  const reviewUrgency: ReviewUrgency =
+    retentionRisk === 'high' || avoidancePattern !== 'none'
+      ? 'now'
+      : retentionRisk === 'medium'
+        ? 'soon'
+        : 'none';
 
   return {
     ...state,
@@ -1529,33 +1890,48 @@ function daysBetween(from: string, to: string): number {
   return Number.isNaN(delta) ? 0 : Math.max(0, Math.floor(delta / 86400000));
 }
 
-function createWeaknessSignals(model: StudentModel, results: ExerciseResult[], observedAt: string): LearningSignal[] {
+function createWeaknessSignals(
+  model: StudentModel,
+  results: ExerciseResult[],
+  observedAt: string,
+): LearningSignal[] {
   return getChangedSkills(results)
     .filter((skill) => getSkillState(model, skill).score.value < 0.45)
     .map((skill) => ({
       id: `weakness-${model.studentId}-${skill}`,
       skill,
       description: `${labelSkill(skill)} is currently fragile and should guide review.`,
-      evidenceIds: results.filter((result) => result.targetSkill === skill).flatMap((result) => result.evidenceEventIds),
+      evidenceIds: results
+        .filter((result) => result.targetSkill === skill)
+        .flatMap((result) => result.evidenceEventIds),
       confidence: getSkillState(model, skill).score.confidence,
       observedAt,
     }));
 }
 
-function createStrengthSignals(model: StudentModel, results: ExerciseResult[], observedAt: string): LearningSignal[] {
+function createStrengthSignals(
+  model: StudentModel,
+  results: ExerciseResult[],
+  observedAt: string,
+): LearningSignal[] {
   return getChangedSkills(results)
     .filter((skill) => getSkillState(model, skill).score.value > 0.7)
     .map((skill) => ({
       id: `strength-${model.studentId}-${skill}`,
       skill,
       description: `${labelSkill(skill)} is becoming reliable in recent practice.`,
-      evidenceIds: results.filter((result) => result.targetSkill === skill).flatMap((result) => result.evidenceEventIds),
+      evidenceIds: results
+        .filter((result) => result.targetSkill === skill)
+        .flatMap((result) => result.evidenceEventIds),
       confidence: getSkillState(model, skill).score.confidence,
       observedAt,
     }));
 }
 
-function mergeLearningSignals(existing: LearningSignal[], incoming: LearningSignal[]): LearningSignal[] {
+function mergeLearningSignals(
+  existing: LearningSignal[],
+  incoming: LearningSignal[],
+): LearningSignal[] {
   const signals = new Map(existing.map((signal) => [signal.id, signal]));
 
   for (const signal of incoming) {
@@ -1574,7 +1950,9 @@ function refreshReviewPriorities(
   const priorities = new Map(existing.map((priority) => [priority.id, priority]));
 
   for (const skill of changedSkills) {
-    const hasIncorrectResult = results.some((result) => result.targetSkill === skill && !result.correct);
+    const hasIncorrectResult = results.some(
+      (result) => result.targetSkill === skill && !result.correct,
+    );
 
     if (hasIncorrectResult) {
       priorities.set(`review-${skill}`, {
@@ -1590,7 +1968,11 @@ function refreshReviewPriorities(
   return Array.from(priorities.values());
 }
 
-function refreshLearningGoals(existing: LearningGoal[], weakestSkill: SkillArea, createdAt: string): LearningGoal[] {
+function refreshLearningGoals(
+  existing: LearningGoal[],
+  weakestSkill: SkillArea,
+  createdAt: string,
+): LearningGoal[] {
   const activeGoal = existing.find((goal) => goal.skill === weakestSkill);
 
   if (activeGoal) {

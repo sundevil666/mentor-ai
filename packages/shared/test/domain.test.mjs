@@ -203,6 +203,67 @@ describe('shared domain helpers', () => {
     assert.equal(lesson.exercises.length >= 3, true);
   });
 
+  it('keeps README concepts distinct and gives each concept real lesson content', () => {
+    const createdAt = '2026-06-28T08:00:00.000Z';
+    const concepts = ['learning', 'reading', 'vocabulary'];
+    const lessons = concepts.map((concept) => {
+      const plan = createLessonPlan(
+        initialStudentModel,
+        {
+          mode: 'home',
+          selectedConcept: concept,
+          manualConceptChoice: true,
+          isOffline: true,
+          speechAvailable: true,
+          availableMinutes: 8,
+        },
+        createdAt,
+      );
+
+      return generateLessonFromPlan(plan, createdAt);
+    });
+
+    assert.deepEqual(
+      lessons.map((lesson) => lesson.concept),
+      concepts,
+    );
+    assert.equal(new Set(lessons.map((lesson) => lesson.title)).size, 3);
+
+    for (const lesson of lessons) {
+      assert.equal(isLessonDeliverable(lesson), true);
+      assert.equal(lesson.exercises.length >= 3, true);
+    }
+  });
+
+  it('treats quick listening and speaking as Learning subcategory lessons', () => {
+    const createdAt = '2026-06-28T08:00:00.000Z';
+    const listeningPlan = createLessonPlan(
+      initialStudentModel,
+      { mode: 'listening', isOffline: true, speechAvailable: true, availableMinutes: 8 },
+      createdAt,
+    );
+    const speakingPlan = createLessonPlan(
+      initialStudentModel,
+      { mode: 'speaking', isOffline: true, speechAvailable: true, availableMinutes: 8 },
+      createdAt,
+    );
+    const listeningLesson = generateLessonFromPlan(listeningPlan, createdAt);
+    const speakingLesson = generateLessonFromPlan(speakingPlan, createdAt);
+
+    assert.equal(listeningLesson.concept, 'learning');
+    assert.equal(speakingLesson.concept, 'learning');
+    assert.equal(listeningLesson.title, 'Commute listening routine');
+    assert.equal(speakingLesson.title, 'Speaking confidence at work');
+    assert.equal(
+      listeningLesson.exercises.some((exercise) => exercise.type === 'listening-text'),
+      true,
+    );
+    assert.equal(
+      speakingLesson.exercises.some((exercise) => exercise.type === 'repeat-speaking'),
+      true,
+    );
+  });
+
   it('updates the Student Model from lesson evidence and changes the next plan', () => {
     const results = [
       {
@@ -254,7 +315,10 @@ describe('shared domain helpers', () => {
 
     assert.equal(updatedModel.version, 2);
     assert.equal(updatedModel.grammar.score.value < initialStudentModel.grammar.score.value, true);
-    assert.equal(updatedModel.reviewPriorities.some((priority) => priority.skill === 'grammar'), true);
+    assert.equal(
+      updatedModel.reviewPriorities.some((priority) => priority.skill === 'grammar'),
+      true,
+    );
     assert.equal(nextPlan.concept, 'reading');
     assert.equal(nextPlan.difficulty, 'supportive');
   });
@@ -284,7 +348,11 @@ describe('shared domain helpers', () => {
       results,
       '2026-06-28T08:03:00.000Z',
     );
-    const observation = createObservationFromResults(demoStudent.id, results, '2026-06-28T08:04:00.000Z');
+    const observation = createObservationFromResults(
+      demoStudent.id,
+      results,
+      '2026-06-28T08:04:00.000Z',
+    );
     const recommendation = createRecommendationFromModel(updatedModel, '2026-06-28T08:05:00.000Z');
 
     assert.equal(observation?.skill, 'speaking');
@@ -331,10 +399,18 @@ describe('shared domain helpers', () => {
       completedAt: '2026-06-28T08:01:00.000Z',
     }));
 
-    const updatedModel = updateStudentModelFromResults(initialStudentModel, results, '2026-06-28T08:04:00.000Z');
+    const updatedModel = updateStudentModelFromResults(
+      initialStudentModel,
+      results,
+      '2026-06-28T08:04:00.000Z',
+    );
 
     assert.equal(updatedModel.teacherDecision.levelDecision, 'increase');
-    assert.equal(updatedModel.conceptLevels.vocabulary.score.value > initialStudentModel.conceptLevels.vocabulary.score.value, true);
+    assert.equal(
+      updatedModel.conceptLevels.vocabulary.score.value >
+        initialStudentModel.conceptLevels.vocabulary.score.value,
+      true,
+    );
   });
 
   it('decreases a concept level after overload evidence', () => {
@@ -358,10 +434,18 @@ describe('shared domain helpers', () => {
       completedAt: '2026-06-28T08:01:00.000Z',
     }));
 
-    const updatedModel = updateStudentModelFromResults(initialStudentModel, results, '2026-06-28T08:04:00.000Z');
+    const updatedModel = updateStudentModelFromResults(
+      initialStudentModel,
+      results,
+      '2026-06-28T08:04:00.000Z',
+    );
 
     assert.equal(updatedModel.teacherDecision.levelDecision, 'decrease');
-    assert.equal(updatedModel.conceptLevels.reading.score.value < initialStudentModel.conceptLevels.reading.score.value, true);
+    assert.equal(
+      updatedModel.conceptLevels.reading.score.value <
+        initialStudentModel.conceptLevels.reading.score.value,
+      true,
+    );
   });
 
   it('holds a concept level when recognition is correct but slow', () => {
@@ -386,7 +470,13 @@ describe('shared domain helpers', () => {
 
     const decision = decideNextTeacherAction(
       initialStudentModel,
-      { mode: 'home', selectedConcept: 'vocabulary', isOffline: false, speechAvailable: true, availableMinutes: 6 },
+      {
+        mode: 'home',
+        selectedConcept: 'vocabulary',
+        isOffline: false,
+        speechAvailable: true,
+        availableMinutes: 6,
+      },
       [result],
       '2026-06-28T08:02:00.000Z',
     );
