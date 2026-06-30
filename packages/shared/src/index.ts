@@ -1283,13 +1283,22 @@ function instantiateLessonTemplate(
   return template.exercises.map((exercise, index) => ({
     ...exercise,
     id: `${plan.id}-${template.key}-${index + 1}`,
-    prompt: exercise.prompt.replaceAll('{reviewTarget}', reviewTarget),
-    expectedResponse: exercise.expectedResponse?.replaceAll(
-      '{reviewTarget}',
-      reviewTarget.toLowerCase().replace('?', ''),
-    ),
-    audioText: exercise.audioText?.replaceAll('{reviewTarget}', reviewTarget),
+    prompt: replaceTemplateValue(exercise.prompt, '{reviewTarget}', reviewTarget),
+    expectedResponse: exercise.expectedResponse
+      ? replaceTemplateValue(
+          exercise.expectedResponse,
+          '{reviewTarget}',
+          reviewTarget.toLowerCase().replace('?', ''),
+        )
+      : undefined,
+    audioText: exercise.audioText
+      ? replaceTemplateValue(exercise.audioText, '{reviewTarget}', reviewTarget)
+      : undefined,
   }));
+}
+
+function replaceTemplateValue(value: string, token: string, replacement: string): string {
+  return value.split(token).join(replacement);
 }
 
 const learningLessonTemplates: LessonTemplate[] = [

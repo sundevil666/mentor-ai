@@ -449,8 +449,9 @@ export const useAppStore = defineStore('app', {
       }
 
       const db = await mentorDb;
-      await db.put('learning-sessions', this.session);
-      await db.put('lessons', this.session.lesson);
+      const session = toStorageRecord(this.session);
+      await db.put('learning-sessions', session);
+      await db.put('lessons', session.lesson);
     },
 
     async persistStudentModel() {
@@ -754,6 +755,10 @@ function getCurrentDeviceSurface(): DeviceSurface {
   }
 
   return 'desktop';
+}
+
+function toStorageRecord<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function createActivitySnapshot(context: LearningContext, sessionId: string, observedAt: string): ActivitySnapshot {
