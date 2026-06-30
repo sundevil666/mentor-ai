@@ -273,14 +273,17 @@
           </div>
         </div>
 
-        <div class="lesson-actions">
+        <div
+          v-if="!isListeningPlayer"
+          class="lesson-actions"
+        >
           <span>{{ currentExercise.successTip }}</span>
           <q-btn
             color="primary"
             label="Continue"
             unelevated
-            :disable="!isListeningPlayer && answer.trim().length === 0"
-            @click="continueCurrentStep"
+            :disable="answer.trim().length === 0"
+            @click="submit"
           />
         </div>
       </section>
@@ -695,16 +698,6 @@ async function submit() {
   }
 
   await appStore.submitCurrentExercise(answer.value);
-}
-
-async function continueCurrentStep() {
-  if (isListeningPlayer.value) {
-    saveListeningPlaybackProgress();
-    await appStore.completeListeningStep();
-    return;
-  }
-
-  await submit();
 }
 
 async function playAudio() {
