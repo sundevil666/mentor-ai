@@ -461,8 +461,17 @@ body.body--dark {
 }
 
 .lesson-actions .q-btn {
+  align-self: center;
+  flex: 0 0 auto;
   min-height: 48px;
   padding: 0 24px;
+}
+
+.lesson-complete > .q-btn,
+.statistics-header > .q-btn,
+.voice-actions > .q-btn {
+  align-self: center;
+  flex: 0 0 auto;
 }
 
 .concept-choice {
@@ -695,6 +704,7 @@ body.body--dark {
   }
 
   .lesson-actions .q-btn {
+    align-self: stretch;
     font-size: 1rem;
     min-height: 52px;
     width: 100%;
@@ -756,6 +766,10 @@ body.body--dark {
   .voice-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .voice-actions > .q-btn {
+    align-self: stretch;
   }
 }
 
