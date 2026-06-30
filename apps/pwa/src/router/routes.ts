@@ -1,30 +1,35 @@
 import type { RouteRecordRaw } from 'vue-router';
+import MainLayout from 'layouts/MainLayout.vue';
+import DashboardPage from 'pages/DashboardPage.vue';
+import ErrorNotFound from 'pages/ErrorNotFound.vue';
+import SettingsPage from 'pages/SettingsPage.vue';
+import StatisticsPage from 'pages/StatisticsPage.vue';
 
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    component: () => import('layouts/MainLayout.vue'),
+    component: MainLayout,
     children: [
       {
         path: '',
         name: 'dashboard',
-        component: () => import('pages/DashboardPage.vue'),
+        component: DashboardPage,
       },
       {
         path: 'statistics',
         name: 'statistics',
-        component: () => import('pages/StatisticsPage.vue'),
+        component: StatisticsPage,
       },
       {
         path: 'settings',
         name: 'settings',
-        component: () => import('pages/SettingsPage.vue'),
+        component: SettingsPage,
       },
     ],
   },
   {
     path: '/:catchAll(.*)*',
-    component: () => import('pages/ErrorNotFound.vue'),
+    component: ErrorNotFound,
   },
 ];
 

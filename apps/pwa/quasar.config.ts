@@ -39,6 +39,7 @@ export default configure(() => ({
       cfg.clientsClaim = true;
       cfg.skipWaiting = true;
       cfg.navigateFallback = 'index.html';
+      cfg.navigateFallbackDenylist = [/^\/assets\//, /^\/api\//, /^\/sw\.js$/, /^\/manifest\.json$/];
       cfg.runtimeCaching = [
         {
           urlPattern: /^https?:\/\/localhost:\d+\/api\//,
