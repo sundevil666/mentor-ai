@@ -200,6 +200,7 @@ export interface LearningContext {
   mode: LearningMode;
   selectedConcept?: LearningConcept;
   manualConceptChoice?: boolean;
+  lessonTemplateKey?: string;
   isOffline: boolean;
   speechAvailable: boolean;
   availableMinutes: number;
@@ -217,6 +218,7 @@ export interface LessonPlan {
   concept: LearningConcept;
   conceptLevel: ConceptLevel;
   activityType: LearningActivityType;
+  lessonTemplateKey?: string;
   teacherDecision: TeacherDecision;
   goal: LearningGoal;
   teachingIntent: string;
@@ -770,6 +772,7 @@ export function createLessonPlan(
     concept,
     conceptLevel: conceptState.level,
     activityType: chooseActivityForConcept(concept, conceptState),
+    lessonTemplateKey: context.lessonTemplateKey,
     teacherDecision: {
       ...teacherDecision,
       concept,
@@ -1233,11 +1236,17 @@ function createConceptLessonTitle(plan: LessonPlan): string {
 
 function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercise[] {
   if (plan.concept === 'reading') {
-    return instantiateLessonTemplate(selectLessonTemplate(readingLessonTemplates, plan), plan);
+    return instantiateLessonTemplate(
+      selectLessonTemplate(readingLessonTemplates, plan),
+      plan,
+    );
   }
 
   if (plan.concept === 'vocabulary') {
-    return instantiateLessonTemplate(selectLessonTemplate(vocabularyLessonTemplates, plan), plan);
+    return instantiateLessonTemplate(
+      selectLessonTemplate(vocabularyLessonTemplates, plan),
+      plan,
+    );
   }
 
   if (plan.learningMode === 'listening' || plan.goal.skill === 'listening') {
@@ -1254,12 +1263,28 @@ interface LessonTemplate {
 }
 
 function selectLessonTemplate(templates: LessonTemplate[], plan: LessonPlan): LessonTemplate {
+  const requestedTemplate = plan.lessonTemplateKey
+    ? templates.find((template) => template.key === plan.lessonTemplateKey)
+    : undefined;
+
+  if (requestedTemplate) {
+    return requestedTemplate;
+  }
+
   const seed = `${plan.id}-${plan.learningMode}-${plan.activityType}-${plan.difficulty}`;
   const hash = Array.from(seed).reduce((sum, character) => sum + character.charCodeAt(0), 0);
   return templates[hash % templates.length] ?? templates[0];
 }
 
 function selectLearningLessonTemplate(plan: LessonPlan): LessonTemplate {
+  const requestedTemplate = plan.lessonTemplateKey
+    ? learningLessonTemplates.find((template) => template.key === plan.lessonTemplateKey)
+    : undefined;
+
+  if (requestedTemplate) {
+    return requestedTemplate;
+  }
+
   if (plan.learningMode === 'listening' || plan.goal.skill === 'listening') {
     return learningLessonTemplates[0];
   }

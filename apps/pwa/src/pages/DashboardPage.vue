@@ -135,6 +135,34 @@
             <q-tooltip>{{ concept.reason }}</q-tooltip>
           </q-btn>
         </div>
+
+        <div class="lesson-library">
+          <section
+            v-for="section in lessonSections"
+            :key="section.concept"
+            class="lesson-library__section"
+          >
+            <div class="lesson-library__heading">
+              <q-icon
+                :name="section.icon"
+                size="20px"
+              />
+              <span>{{ section.label }}</span>
+            </div>
+            <div class="lesson-library__grid">
+              <button
+                v-for="lesson in section.lessons"
+                :key="lesson.templateKey"
+                class="lesson-card"
+                type="button"
+                @click="startLessonChoice(section.concept, lesson.templateKey)"
+              >
+                <span>{{ lesson.title }}</span>
+                <strong>{{ lesson.focus }}</strong>
+              </button>
+            </div>
+          </section>
+        </div>
       </section>
 
       <section
@@ -384,6 +412,17 @@ import { readListeningProgressPreference, saveListeningProgressPreference } from
 import { useAppStore } from 'src/stores/app-store';
 
 type TrainingKey = 'listening' | 'speaking' | 'vocabulary';
+type LessonChoice = {
+  templateKey: string;
+  title: string;
+  focus: string;
+};
+type LessonSection = {
+  concept: LearningConcept;
+  label: string;
+  icon: string;
+  lessons: LessonChoice[];
+};
 type ListeningToken = {
   index: number;
   word: string;
@@ -552,6 +591,59 @@ const primaryTrainingModes: Array<{ key: TrainingKey; label: string; shortLabel:
     reason: 'Build recall when the session should be short, focused, or review-heavy.',
   },
 ];
+const lessonSections: LessonSection[] = [
+  {
+    concept: 'learning',
+    label: 'Learning',
+    icon: 'school',
+    lessons: [
+      {
+        templateKey: 'daily-guided',
+        title: 'Daily guided English',
+        focus: 'Grammar, listening, speaking, recall',
+      },
+      {
+        templateKey: 'work-speaking',
+        title: 'Speaking confidence at work',
+        focus: 'Low-pressure speech and question order',
+      },
+    ],
+  },
+  {
+    concept: 'reading',
+    label: 'Reading',
+    icon: 'menu_book',
+    lessons: [
+      {
+        templateKey: 'message-reading',
+        title: 'Short work message',
+        focus: 'Comprehension, changed detail, useful words',
+      },
+      {
+        templateKey: 'routine-reading',
+        title: 'Evening routine',
+        focus: 'Sequence, time meaning, action words',
+      },
+    ],
+  },
+  {
+    concept: 'vocabulary',
+    label: 'Vocabulary Growth',
+    icon: 'psychology',
+    lessons: [
+      {
+        templateKey: 'work-vocabulary',
+        title: 'Work words',
+        focus: 'Recognition, recall, sentence use',
+      },
+      {
+        templateKey: 'travel-vocabulary',
+        title: 'Travel words',
+        focus: 'Meaning, active recall, context',
+      },
+    ],
+  },
+];
 const recommendedTraining = computed(() => {
   const key = chooseRecommendedTraining();
   const training = primaryTrainingModes.find((item) => item.key === key) ?? primaryTrainingModes[0];
@@ -660,6 +752,26 @@ async function startConcept(concept: LearningConcept) {
     mode: suggestion.mode,
     selectedConcept: concept,
     manualConceptChoice: true,
+    isOffline: !navigator.onLine,
+    speechAvailable: 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window,
+    availableMinutes: suggestion.availableMinutes,
+    workShift: suggestion.workShift,
+    dayType: suggestion.dayType,
+    activityPace: suggestion.activityPace,
+    startedHour: suggestion.localHour,
+    activityReason: suggestion.reason,
+    shiftTiming: suggestion.shiftTiming,
+  });
+}
+
+async function startLessonChoice(concept: LearningConcept, lessonTemplateKey: string) {
+  answer.value = '';
+  const suggestion = currentSuggestion.value;
+  await appStore.startLesson({
+    mode: suggestion.mode,
+    selectedConcept: concept,
+    manualConceptChoice: true,
+    lessonTemplateKey,
     isOffline: !navigator.onLine,
     speechAvailable: 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window,
     availableMinutes: suggestion.availableMinutes,

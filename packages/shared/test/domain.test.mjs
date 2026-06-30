@@ -264,6 +264,36 @@ describe('shared domain helpers', () => {
     );
   });
 
+  it('can start a specific lesson template inside each README concept', () => {
+    const createdAt = '2026-06-28T08:00:00.000Z';
+    const choices = [
+      ['learning', 'work-speaking', 'Speaking confidence at work'],
+      ['reading', 'message-reading', 'Reading: short work message'],
+      ['vocabulary', 'travel-vocabulary', 'Vocabulary Growth: travel words'],
+    ];
+
+    for (const [concept, lessonTemplateKey, title] of choices) {
+      const plan = createLessonPlan(
+        initialStudentModel,
+        {
+          mode: 'home',
+          selectedConcept: concept,
+          manualConceptChoice: true,
+          lessonTemplateKey,
+          isOffline: true,
+          speechAvailable: true,
+          availableMinutes: 8,
+        },
+        createdAt,
+      );
+      const lesson = generateLessonFromPlan(plan, createdAt);
+
+      assert.equal(lesson.concept, concept);
+      assert.equal(lesson.title, title);
+      assert.equal(isLessonDeliverable(lesson), true);
+    }
+  });
+
   it('updates the Student Model from lesson evidence and changes the next plan', () => {
     const results = [
       {
