@@ -377,6 +377,7 @@ import type { LearningConcept, LearningMode, WorkShift } from '@mentor-ai/shared
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { inferActivitySuggestion } from 'src/services/activity-suggestion';
 import { createPreferredSpeechUtterance, speakWithPreferredVoice, waitForSpeechVoices } from 'src/services/speech-synthesis';
+import { readListeningProgressPreference, saveListeningProgressPreference } from 'src/services/user-preferences';
 import { useAppStore } from 'src/stores/app-store';
 
 type TrainingKey = 'listening' | 'speaking' | 'vocabulary';
@@ -416,6 +417,16 @@ const isListeningPlayer = computed(() => {
 });
 const listeningText = computed(() => currentExercise.value?.audioText ?? currentExercise.value?.prompt ?? '');
 const listeningTokens = computed(() => tokenizeListeningText(listeningText.value));
+const listeningProgressKey = computed(() => {
+  const session = appStore.session;
+  const exercise = currentExercise.value;
+
+  if (!session || !exercise || !isListeningPlayer.value) {
+    return null;
+  }
+
+  return `${session.lesson.id}:${exercise.id}`;
+});
 const sentenceStartWordIndexes = computed(() => getSentenceStartWordIndexes(listeningTokens.value));
 const listeningTitle = computed(() =>
   currentExercise.value?.type === 'listening-text' ? 'Listen and read' : currentExercise.value?.prompt ?? 'Listen',
@@ -426,16 +437,6 @@ const listeningProgressLabel = computed(() => {
   }
 
   return `Word ${Math.min(activeWordIndex.value + 1, listeningTokens.value.length)} / ${listeningTokens.value.length}`;
-});
-const audioReplayCount = computed(() => {
-  const session = appStore.session;
-  const exercise = currentExercise.value;
-
-  if (!session || !exercise) {
-    return 0;
-  }
-
-  return session.events.filter((event) => event.type === 'audio-replayed' && event.exerciseId === exercise.id).length;
 });
 const optionList = computed(
   () => currentExercise.value?.options?.map((option) => ({ label: option, value: option })) ?? [],
@@ -590,6 +591,9 @@ onMounted(async () => {
 
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
+  window.addEventListener('beforeunload', handlePageExit);
+  window.addEventListener('pagehide', handlePageExit);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
 });
 
 onUnmounted(() => {
@@ -597,17 +601,35 @@ onUnmounted(() => {
   resetListeningAutoScroll();
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
+  window.removeEventListener('beforeunload', handlePageExit);
+  window.removeEventListener('pagehide', handlePageExit);
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 
 watch(
   () => currentExercise.value?.id,
   () => {
     answer.value = '';
+    if (isListeningPlayer.value) {
+      restoreListeningPlayback();
+      return;
+    }
+
     resetListeningPlayback();
   },
 );
 
+watch(isListeningPlayer, (isActiveListeningPlayer) => {
+  if (isActiveListeningPlayer) {
+    restoreListeningPlayback();
+    return;
+  }
+
+  resetListeningPlayback();
+});
+
 watch([activeWordIndex, activeWordEndIndex], () => {
+  saveListeningPlaybackProgress();
   void scrollActiveListeningPhraseIntoView();
 });
 
@@ -677,6 +699,7 @@ async function submit() {
 
 async function continueCurrentStep() {
   if (isListeningPlayer.value) {
+    saveListeningPlaybackProgress();
     await appStore.completeListeningStep();
     return;
   }
@@ -819,7 +842,11 @@ function finishListeningPlayback(runId: number) {
   isListeningPaused.value = false;
 }
 
-function stopListeningAudio() {
+function stopListeningAudio(saveProgress = true) {
+  if (saveProgress) {
+    saveListeningPlaybackProgress();
+  }
+
   activeSpeechRunId.value += 1;
 
   if ('speechSynthesis' in window) {
@@ -835,6 +862,29 @@ function resetListeningPlayback() {
   activeWordIndex.value = 0;
   activeWordEndIndex.value = 0;
   resetListeningAutoScroll();
+}
+
+function restoreListeningPlayback() {
+  stopListeningAudio(false);
+  resetListeningAutoScroll();
+
+  const progressKey = listeningProgressKey.value;
+  const maxIndex = Math.max(listeningTokens.value.length - 1, 0);
+  const savedWordIndex = progressKey ? readListeningProgressPreference(progressKey)?.wordIndex : undefined;
+  const safeWordIndex = clampIndex(savedWordIndex ?? 0, 0, maxIndex);
+
+  activeWordIndex.value = safeWordIndex;
+  activeWordEndIndex.value = safeWordIndex;
+}
+
+function saveListeningPlaybackProgress() {
+  const progressKey = listeningProgressKey.value;
+
+  if (!progressKey || listeningTokens.value.length === 0) {
+    return;
+  }
+
+  saveListeningProgressPreference(progressKey, clampIndex(activeWordIndex.value, 0, listeningTokens.value.length - 1));
 }
 
 function handleListeningTextScroll() {
@@ -932,6 +982,7 @@ async function sync() {
 
 async function returnToLessonChoice() {
   answer.value = '';
+  stopListeningAudio();
   await appStore.returnToLessonChoice();
 }
 
@@ -945,6 +996,16 @@ function handleOnline() {
 
 function handleOffline() {
   appStore.setNetworkStatus(false);
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === 'hidden') {
+    stopListeningAudio();
+  }
+}
+
+function handlePageExit() {
+  stopListeningAudio();
 }
 
 function shiftLabel(shift: WorkShift): string {

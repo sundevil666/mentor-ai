@@ -3,10 +3,12 @@ import { beforeEach, describe, it } from 'node:test';
 
 import {
   clearLastRoutePreference,
+  readListeningProgressPreference,
   readLastRoutePreference,
   readPreferredWorkShift,
   readSpeechVoicePreference,
   readThemePreference,
+  saveListeningProgressPreference,
   saveLastRoutePreference,
   savePreferredWorkShift,
   saveSpeechVoicePreference,
@@ -76,6 +78,36 @@ describe('PWA user preferences', () => {
     document.cookie = 'mentor_ai_last_route=https%3A%2F%2Fevil.example; path=/';
 
     assert.equal(readLastRoutePreference(), null);
+  });
+
+  it('persists listening progress per lesson exercise', () => {
+    saveListeningProgressPreference('lesson-1:exercise-1', 42);
+    saveListeningProgressPreference('lesson-2:exercise-1', 7);
+
+    assert.equal(readListeningProgressPreference('lesson-1:exercise-1')?.wordIndex, 42);
+    assert.equal(readListeningProgressPreference('lesson-2:exercise-1')?.wordIndex, 7);
+    assert.match(document.cookie, /mentor_ai_listening_progress=/);
+  });
+
+  it('ignores invalid listening progress cookies and keys', () => {
+    document.cookie = 'mentor_ai_listening_progress=%7Bbad-json; path=/';
+
+    assert.equal(readListeningProgressPreference('lesson-1:exercise-1'), null);
+
+    saveListeningProgressPreference('../lesson', 10);
+    saveListeningProgressPreference('lesson-1:exercise-1', -1);
+
+    assert.equal(readListeningProgressPreference('../lesson'), null);
+    assert.equal(readListeningProgressPreference('lesson-1:exercise-1'), null);
+  });
+
+  it('keeps the newest listening progress entries', () => {
+    for (let index = 0; index < 105; index += 1) {
+      saveListeningProgressPreference(`lesson-${index}:exercise-1`, index);
+    }
+
+    assert.equal(readListeningProgressPreference('lesson-0:exercise-1'), null);
+    assert.equal(readListeningProgressPreference('lesson-104:exercise-1')?.wordIndex, 104);
   });
 });
 
