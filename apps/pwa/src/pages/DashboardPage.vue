@@ -399,6 +399,7 @@ const listeningTextElement = ref<HTMLElement | null>(null);
 const isListeningAutoScrollPaused = ref(false);
 let listeningAutoScrollPauseTimer: number | undefined;
 let isProgrammaticListeningScroll = false;
+let programmaticListeningScrollUntil = 0;
 
 const currentExercise = computed(() => appStore.currentExercise);
 const isListeningPlayer = computed(() => {
@@ -837,7 +838,7 @@ function resetListeningPlayback() {
 }
 
 function handleListeningTextScroll() {
-  if (isProgrammaticListeningScroll) {
+  if (isProgrammaticListeningScroll || Date.now() < programmaticListeningScrollUntil) {
     return;
   }
 
@@ -860,6 +861,7 @@ function pauseListeningAutoScroll() {
 function resetListeningAutoScroll() {
   isListeningAutoScrollPaused.value = false;
   isProgrammaticListeningScroll = false;
+  programmaticListeningScrollUntil = 0;
 
   if (listeningAutoScrollPauseTimer !== undefined) {
     window.clearTimeout(listeningAutoScrollPauseTimer);
@@ -887,18 +889,24 @@ async function scrollActiveListeningPhraseIntoView() {
   }
 
   const activeToken = container.querySelector<HTMLElement>(`[data-token-index="${activeWordIndex.value}"]`);
-  const activeEndToken = container.querySelector<HTMLElement>(`[data-token-index="${activeWordEndIndex.value}"]`);
 
   if (!activeToken) {
     return;
   }
 
-  const endToken = activeEndToken ?? activeToken;
-  const tokenTop = activeToken.offsetTop;
-  const tokenBottom = endToken.offsetTop + endToken.offsetHeight;
-  const phraseMiddle = tokenTop + (tokenBottom - tokenTop) / 2;
+  const containerRect = container.getBoundingClientRect();
+  const tokenRect = activeToken.getBoundingClientRect();
+  const tokenTop = tokenRect.top - containerRect.top;
+  const tokenBottom = tokenRect.bottom - containerRect.top;
+  const comfortTop = container.clientHeight * 0.22;
+  const comfortBottom = container.clientHeight * 0.58;
+
+  if (tokenTop >= comfortTop && tokenBottom <= comfortBottom) {
+    return;
+  }
+
   const targetScrollTop = clampIndex(
-    Math.round(phraseMiddle - container.clientHeight * 0.42),
+    Math.round(container.scrollTop + tokenTop - container.clientHeight * 0.36),
     0,
     Math.max(container.scrollHeight - container.clientHeight, 0),
   );
@@ -908,13 +916,14 @@ async function scrollActiveListeningPhraseIntoView() {
   }
 
   isProgrammaticListeningScroll = true;
+  programmaticListeningScrollUntil = Date.now() + 900;
   container.scrollTo({
     top: targetScrollTop,
     behavior: 'smooth',
   });
   window.setTimeout(() => {
     isProgrammaticListeningScroll = false;
-  }, 450);
+  }, 900);
 }
 
 async function sync() {
