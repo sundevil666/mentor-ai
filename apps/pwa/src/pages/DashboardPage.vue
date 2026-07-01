@@ -18,316 +18,334 @@
         <span>Model v{{ appStore.studentModel.version }}</span>
       </div>
 
-      <section
-        v-if="!appStore.isHydrated"
-        class="learning-start"
+      <transition
+        mode="out-in"
+        name="learning-state"
       >
-        <p class="learning-start__eyebrow">
-          Loading
-        </p>
-        <h1>Restoring your lesson</h1>
-      </section>
-
-      <section
-        v-else-if="!appStore.session"
-        class="learning-start"
-      >
-        <div class="training-mode-strip">
-          <q-btn
-            v-for="mode in primaryTrainingModes"
-            :key="mode.key"
-            class="training-mode-button"
-            color="primary"
-            outline
-            no-caps
-            :icon="mode.icon"
-            :label="mode.label"
-            @click="startTraining(mode.key)"
-          >
-            <q-tooltip>{{ mode.reason }}</q-tooltip>
-          </q-btn>
-        </div>
-
-        <div
-          v-if="remoteContinueOptions.length > 0"
-          class="handoff-actions"
+        <section
+          v-if="!appStore.isHydrated"
+          key="hydrating"
+          class="learning-start"
         >
-          <q-btn
-            v-for="handoff in remoteContinueOptions"
-            :key="handoff.id"
-            color="primary"
-            outline
-            no-caps
-            icon="devices"
-            :label="handoff.label"
-            @click="continueFromDevice(handoff.id)"
-          >
-            <q-tooltip>{{ handoff.detail }}</q-tooltip>
-          </q-btn>
-        </div>
+          <p class="learning-start__eyebrow">
+            Loading
+          </p>
+          <h1>Restoring your lesson</h1>
+        </section>
 
-        <p class="learning-start__eyebrow">
-          Activity check
-        </p>
-        <h1>{{ activityHeadline }}</h1>
-        <p>{{ currentSuggestion.reason }}</p>
-
-        <div class="activity-signal">
-          <span>{{ activityMeta }}</span>
-          <strong>{{ paceLabel }}</strong>
-        </div>
-
-        <div
-          v-if="shiftTimingRows.length > 0"
-          class="shift-timing-grid"
+        <section
+          v-else-if="!appStore.session"
+          key="choice"
+          class="learning-start"
         >
-          <div
-            v-for="item in shiftTimingRows"
-            :key="item.label"
-            class="shift-timing-item"
-          >
-            <span>{{ item.label }}</span>
-            <strong>{{ item.value }}</strong>
+          <div class="training-mode-strip">
+            <q-btn
+              v-for="mode in primaryTrainingModes"
+              :key="mode.key"
+              class="training-mode-button"
+              color="primary"
+              outline
+              no-caps
+              :icon="mode.icon"
+              :label="mode.label"
+              @click="startTraining(mode.key)"
+            >
+              <q-tooltip>{{ mode.reason }}</q-tooltip>
+            </q-btn>
           </div>
-        </div>
 
-        <div class="recommended-action">
-          <q-btn
-            class="recommended-action__button"
-            color="primary"
-            unelevated
-            no-caps
-            :icon="recommendedTraining.icon"
-            :label="recommendedTraining.label"
-            @click="startTraining(recommendedTraining.key)"
+          <div
+            v-if="remoteContinueOptions.length > 0"
+            class="handoff-actions"
           >
-            <q-tooltip>{{ recommendedTraining.reason }}</q-tooltip>
-          </q-btn>
-          <span>{{ recommendedTraining.reason }}</span>
-        </div>
+            <q-btn
+              v-for="handoff in remoteContinueOptions"
+              :key="handoff.id"
+              color="primary"
+              outline
+              no-caps
+              icon="devices"
+              :label="handoff.label"
+              @click="continueFromDevice(handoff.id)"
+            >
+              <q-tooltip>{{ handoff.detail }}</q-tooltip>
+            </q-btn>
+          </div>
 
-        <div class="concept-choice">
-          <q-btn
-            v-for="concept in conceptChoices"
-            :key="concept.value"
-            color="primary"
-            outline
-            no-caps
-            :icon="concept.icon"
-            :label="concept.label"
-            @click="startConcept(concept.value)"
-          >
-            <q-tooltip>{{ concept.reason }}</q-tooltip>
-          </q-btn>
-        </div>
+          <p class="learning-start__eyebrow">
+            Activity check
+          </p>
+          <h1>{{ activityHeadline }}</h1>
+          <p>{{ currentSuggestion.reason }}</p>
 
-        <div class="lesson-library">
-          <section
-            v-for="section in lessonSections"
-            :key="section.concept"
-            class="lesson-library__section"
+          <div class="activity-signal">
+            <span>{{ activityMeta }}</span>
+            <strong>{{ paceLabel }}</strong>
+          </div>
+
+          <div
+            v-if="shiftTimingRows.length > 0"
+            class="shift-timing-grid"
           >
-            <div class="lesson-library__heading">
-              <q-icon
-                :name="section.icon"
-                size="20px"
-              />
-              <span>{{ section.label }}</span>
+            <div
+              v-for="item in shiftTimingRows"
+              :key="item.label"
+              class="shift-timing-item"
+            >
+              <span>{{ item.label }}</span>
+              <strong>{{ item.value }}</strong>
             </div>
-            <div class="lesson-library__grid">
-              <button
-                v-for="lesson in section.lessons"
-                :key="lesson.templateKey"
-                class="lesson-card"
-                type="button"
-                @click="startLessonChoice(section.concept, lesson.templateKey)"
+          </div>
+
+          <div class="recommended-action">
+            <q-btn
+              class="recommended-action__button"
+              color="primary"
+              unelevated
+              no-caps
+              :icon="recommendedTraining.icon"
+              :label="recommendedTraining.label"
+              @click="startTraining(recommendedTraining.key)"
+            >
+              <q-tooltip>{{ recommendedTraining.reason }}</q-tooltip>
+            </q-btn>
+            <span>{{ recommendedTraining.reason }}</span>
+          </div>
+
+          <div class="concept-choice">
+            <q-btn
+              v-for="concept in conceptChoices"
+              :key="concept.value"
+              color="primary"
+              outline
+              no-caps
+              :icon="concept.icon"
+              :label="concept.label"
+              @click="startConcept(concept.value)"
+            >
+              <q-tooltip>{{ concept.reason }}</q-tooltip>
+            </q-btn>
+          </div>
+
+          <div class="lesson-library">
+            <section
+              v-for="section in lessonSections"
+              :key="section.concept"
+              class="lesson-library__section"
+            >
+              <div class="lesson-library__heading">
+                <q-icon
+                  :name="section.icon"
+                  size="20px"
+                />
+                <span>{{ section.label }}</span>
+              </div>
+              <div class="lesson-library__grid">
+                <button
+                  v-for="lesson in section.lessons"
+                  :key="lesson.templateKey"
+                  class="lesson-card"
+                  type="button"
+                  @click="startLessonChoice(section.concept, lesson.templateKey)"
+                >
+                  <span>{{ lesson.title }}</span>
+                  <strong>{{ lesson.focus }}</strong>
+                </button>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section
+          v-else-if="!appStore.isLessonComplete && currentExercise"
+          key="exercise"
+          class="lesson-stage"
+        >
+          <div class="lesson-nav">
+            <q-btn
+              color="primary"
+              outline
+              icon="arrow_back"
+              no-caps
+              label="Back to choice"
+              @click="returnToLessonChoice"
+            />
+            <span>{{ appStore.lessonProgress }}% complete</span>
+          </div>
+
+          <transition
+            mode="out-in"
+            name="exercise-state"
+          >
+            <div
+              v-if="!isListeningPlayer"
+              :key="currentExercise.id"
+              class="exercise-standard"
+            >
+              <div>
+                <p class="lesson-stage__eyebrow">
+                  {{ appStore.session.lesson.title }}
+                </p>
+                <h1>{{ currentExercise.prompt }}</h1>
+                <p>{{ currentExercise.microLesson }}</p>
+              </div>
+
+              <div
+                v-if="currentExercise.audioText"
+                class="audio-row"
               >
-                <span>{{ lesson.title }}</span>
-                <strong>{{ lesson.focus }}</strong>
-              </button>
-            </div>
-          </section>
-        </div>
-      </section>
+                <q-btn
+                  color="primary"
+                  flat
+                  icon="volume_up"
+                  round
+                  @click="playAudio"
+                >
+                  <q-tooltip>Play audio</q-tooltip>
+                </q-btn>
+                <span>{{ currentExercise.audioText }}</span>
+              </div>
 
-      <section
-        v-else-if="!appStore.isLessonComplete && currentExercise"
-        class="lesson-stage"
-      >
-        <div class="lesson-nav">
+              <q-option-group
+                v-if="currentExercise.options"
+                v-model="answer"
+                :options="optionList"
+                color="primary"
+              />
+              <q-input
+                v-else
+                v-model="answer"
+                :label="inputLabel"
+                outlined
+                autofocus
+                @keyup.enter="submit"
+              />
+
+              <div class="lesson-actions">
+                <span>{{ currentExercise.successTip }}</span>
+                <q-btn
+                  color="primary"
+                  label="Continue"
+                  unelevated
+                  :disable="answer.trim().length === 0"
+                  @click="submit"
+                />
+              </div>
+            </div>
+
+            <div
+              v-else
+              :key="listeningProgressKey ?? currentExercise.id"
+              class="listening-player"
+            >
+              <div class="listening-player__header">
+                <p class="lesson-stage__eyebrow">
+                  {{ appStore.session.lesson.title }}
+                </p>
+                <h1>{{ listeningTitle }}</h1>
+                <p>{{ currentExercise.microLesson }}</p>
+              </div>
+
+              <div
+                ref="listeningTextElement"
+                class="listening-player__text"
+                @scroll="handleListeningTextScroll"
+              >
+                <span
+                  v-for="token in listeningTokens"
+                  :key="token.index"
+                  :data-token-index="token.index"
+                  :class="[
+                    'listening-player__token',
+                    {
+                      'listening-player__token--active': token.index >= activeWordIndex && token.index <= activeWordEndIndex,
+                      'listening-player__token--past': token.index < activeWordIndex,
+                    },
+                  ]"
+                >{{ token.word }}{{ token.trailing }}</span>
+              </div>
+
+              <div class="listening-player__controls">
+                <q-btn
+                  color="primary"
+                  flat
+                  icon="keyboard_double_arrow_left"
+                  round
+                  @click="jumpSentence(-1)"
+                >
+                  <q-tooltip>Previous sentence</q-tooltip>
+                </q-btn>
+                <q-btn
+                  color="primary"
+                  flat
+                  icon="skip_previous"
+                  round
+                  @click="jumpWord(-1)"
+                >
+                  <q-tooltip>Previous word</q-tooltip>
+                </q-btn>
+                <q-btn
+                  color="primary"
+                  unelevated
+                  :icon="isListeningPaused ? 'play_arrow' : isListeningSpeaking ? 'pause' : 'play_arrow'"
+                  round
+                  @click="toggleListeningPlayback"
+                >
+                  <q-tooltip>{{ isListeningPaused ? 'Resume' : isListeningSpeaking ? 'Pause' : 'Play' }}</q-tooltip>
+                </q-btn>
+                <q-btn
+                  color="primary"
+                  flat
+                  icon="skip_next"
+                  round
+                  @click="jumpWord(1)"
+                >
+                  <q-tooltip>Next word</q-tooltip>
+                </q-btn>
+                <q-btn
+                  color="primary"
+                  flat
+                  icon="keyboard_double_arrow_right"
+                  round
+                  @click="jumpSentence(1)"
+                >
+                  <q-tooltip>Next sentence</q-tooltip>
+                </q-btn>
+                <span>{{ listeningProgressLabel }}</span>
+              </div>
+            </div>
+          </transition>
+        </section>
+
+        <section
+          v-else
+          key="complete"
+          class="lesson-complete"
+        >
+          <p class="lesson-complete__eyebrow">
+            Lesson complete
+          </p>
+          <h1>{{ appStore.latestRecommendation?.summary }}</h1>
+          <p>{{ appStore.latestRecommendation?.reason }}</p>
+          <p v-if="appStore.session?.observation">
+            {{ appStore.session.observation.description }}
+          </p>
+          <q-btn
+            color="primary"
+            label="Improve now"
+            unelevated
+            @click="startWithMode(currentSuggestion.mode)"
+          />
           <q-btn
             color="primary"
             outline
             icon="arrow_back"
-            no-caps
             label="Back to choice"
+            no-caps
             @click="returnToLessonChoice"
           />
-          <span>{{ appStore.lessonProgress }}% complete</span>
-        </div>
-
-        <div v-if="!isListeningPlayer">
-          <p class="lesson-stage__eyebrow">
-            {{ appStore.session.lesson.title }}
-          </p>
-          <h1>{{ currentExercise.prompt }}</h1>
-          <p>{{ currentExercise.microLesson }}</p>
-        </div>
-
-        <div
-          v-if="!isListeningPlayer && currentExercise.audioText"
-          class="audio-row"
-        >
-          <q-btn
-            color="primary"
-            flat
-            icon="volume_up"
-            round
-            @click="playAudio"
-          >
-            <q-tooltip>Play audio</q-tooltip>
-          </q-btn>
-          <span>{{ currentExercise.audioText }}</span>
-        </div>
-
-        <q-option-group
-          v-if="!isListeningPlayer && currentExercise.options"
-          v-model="answer"
-          :options="optionList"
-          color="primary"
-        />
-        <q-input
-          v-else-if="!isListeningPlayer"
-          v-model="answer"
-          :label="inputLabel"
-          outlined
-          autofocus
-          @keyup.enter="submit"
-        />
-
-        <div
-          v-else
-          class="listening-player"
-        >
-          <div class="listening-player__header">
-            <p class="lesson-stage__eyebrow">
-              {{ appStore.session.lesson.title }}
-            </p>
-            <h1>{{ listeningTitle }}</h1>
-            <p>{{ currentExercise.microLesson }}</p>
-          </div>
-
-          <div
-            ref="listeningTextElement"
-            class="listening-player__text"
-            @scroll="handleListeningTextScroll"
-          >
-            <span
-              v-for="token in listeningTokens"
-              :key="token.index"
-              :data-token-index="token.index"
-              :class="[
-                'listening-player__token',
-                {
-                  'listening-player__token--active': token.index >= activeWordIndex && token.index <= activeWordEndIndex,
-                  'listening-player__token--past': token.index < activeWordIndex,
-                },
-              ]"
-            >{{ token.word }}{{ token.trailing }}</span>
-          </div>
-
-          <div class="listening-player__controls">
-            <q-btn
-              color="primary"
-              flat
-              icon="keyboard_double_arrow_left"
-              round
-              @click="jumpSentence(-1)"
-            >
-              <q-tooltip>Previous sentence</q-tooltip>
-            </q-btn>
-            <q-btn
-              color="primary"
-              flat
-              icon="skip_previous"
-              round
-              @click="jumpWord(-1)"
-            >
-              <q-tooltip>Previous word</q-tooltip>
-            </q-btn>
-            <q-btn
-              color="primary"
-              unelevated
-              :icon="isListeningPaused ? 'play_arrow' : isListeningSpeaking ? 'pause' : 'play_arrow'"
-              round
-              @click="toggleListeningPlayback"
-            >
-              <q-tooltip>{{ isListeningPaused ? 'Resume' : isListeningSpeaking ? 'Pause' : 'Play' }}</q-tooltip>
-            </q-btn>
-            <q-btn
-              color="primary"
-              flat
-              icon="skip_next"
-              round
-              @click="jumpWord(1)"
-            >
-              <q-tooltip>Next word</q-tooltip>
-            </q-btn>
-            <q-btn
-              color="primary"
-              flat
-              icon="keyboard_double_arrow_right"
-              round
-              @click="jumpSentence(1)"
-            >
-              <q-tooltip>Next sentence</q-tooltip>
-            </q-btn>
-            <span>{{ listeningProgressLabel }}</span>
-          </div>
-        </div>
-
-        <div
-          v-if="!isListeningPlayer"
-          class="lesson-actions"
-        >
-          <span>{{ currentExercise.successTip }}</span>
-          <q-btn
-            color="primary"
-            label="Continue"
-            unelevated
-            :disable="answer.trim().length === 0"
-            @click="submit"
-          />
-        </div>
-      </section>
-
-      <section
-        v-else
-        class="lesson-complete"
-      >
-        <p class="lesson-complete__eyebrow">
-          Lesson complete
-        </p>
-        <h1>{{ appStore.latestRecommendation?.summary }}</h1>
-        <p>{{ appStore.latestRecommendation?.reason }}</p>
-        <p v-if="appStore.session?.observation">
-          {{ appStore.session.observation.description }}
-        </p>
-        <q-btn
-          color="primary"
-          label="Improve now"
-          unelevated
-          @click="startWithMode(currentSuggestion.mode)"
-        />
-        <q-btn
-          color="primary"
-          outline
-          icon="arrow_back"
-          label="Back to choice"
-          no-caps
-          @click="returnToLessonChoice"
-        />
-      </section>
+        </section>
+      </transition>
     </section>
   </q-page>
 </template>

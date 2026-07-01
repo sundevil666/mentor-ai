@@ -184,7 +184,7 @@ body.body--dark {
 }
 
 .learning-page {
-  align-items: center;
+  align-items: flex-start;
   display: flex;
   min-height: calc(100vh - 51px);
   padding: 24px;
@@ -328,6 +328,31 @@ body.body--dark {
   align-items: start;
   display: grid;
   gap: 24px;
+}
+
+.learning-state-enter-active,
+.learning-state-leave-active,
+.exercise-state-enter-active,
+.exercise-state-leave-active {
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.learning-state-enter-from,
+.learning-state-leave-to,
+.exercise-state-enter-from,
+.exercise-state-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.exercise-standard {
+  align-content: start;
+  align-items: start;
+  display: grid;
+  gap: 24px;
+  width: 100%;
 }
 
 .training-mode-strip {
@@ -799,12 +824,20 @@ body.body--dark {
 
 @media (prefers-reduced-motion: reduce) {
   .route-fade-enter-active,
-  .route-fade-leave-active {
+  .route-fade-leave-active,
+  .learning-state-enter-active,
+  .learning-state-leave-active,
+  .exercise-state-enter-active,
+  .exercise-state-leave-active {
     transition: none;
   }
 
   .route-fade-enter-from,
-  .route-fade-leave-to {
+  .route-fade-leave-to,
+  .learning-state-enter-from,
+  .learning-state-leave-to,
+  .exercise-state-enter-from,
+  .exercise-state-leave-to {
     opacity: 1;
     transform: none;
   }
