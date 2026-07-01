@@ -219,18 +219,34 @@
 
             <div
               v-else
-              :key="listeningProgressKey ?? currentExercise.id"
+              :key="currentExercise.id"
               class="listening-player"
             >
               <div class="listening-player__header">
-                <p class="lesson-stage__eyebrow">
-                  {{ appStore.session.lesson.title }}
-                </p>
-                <h1>{{ listeningTitle }}</h1>
-                <p>{{ currentExercise.microLesson }}</p>
+                <div>
+                  <p class="lesson-stage__eyebrow">
+                    {{ appStore.session.lesson.title }}
+                  </p>
+                  <h1>{{ selectedListeningItem?.title ?? listeningTitle }}</h1>
+                  <p>{{ currentExercise.microLesson }}</p>
+                </div>
+                <q-btn
+                  color="primary"
+                  flat
+                  :icon="isListeningPlaylistVisible ? 'playlist_remove' : 'playlist_play'"
+                  round
+                  @click="toggleListeningPlaylist"
+                >
+                  <q-tooltip>{{ isListeningPlaylistVisible ? 'Hide text list' : 'Show text list' }}</q-tooltip>
+                </q-btn>
               </div>
 
-              <div class="listening-player__body">
+              <div
+                :class="[
+                  'listening-player__body',
+                  { 'listening-player__body--playlist-hidden': !isListeningPlaylistVisible },
+                ]"
+              >
                 <aside class="listening-player__playlist">
                   <button
                     v-for="item in listeningPlaylist"
@@ -243,7 +259,6 @@
                     @click="selectListeningItem(item.id)"
                   >
                     <span>{{ item.title }}</span>
-                    <strong>{{ item.preview }}</strong>
                   </button>
                 </aside>
 
@@ -279,15 +294,7 @@
                 </q-btn>
                 <q-btn
                   color="primary"
-                  flat
-                  icon="skip_previous"
-                  round
-                  @click="jumpWord(-1)"
-                >
-                  <q-tooltip>Previous word</q-tooltip>
-                </q-btn>
-                <q-btn
-                  color="primary"
+                  class="listening-player__play-button"
                   unelevated
                   :icon="isListeningPaused ? 'play_arrow' : isListeningSpeaking ? 'pause' : 'play_arrow'"
                   round
@@ -308,20 +315,29 @@
                 <q-btn
                   color="primary"
                   flat
-                  icon="skip_next"
-                  round
-                  @click="jumpWord(1)"
-                >
-                  <q-tooltip>Next word</q-tooltip>
-                </q-btn>
-                <q-btn
-                  color="primary"
-                  flat
                   icon="keyboard_double_arrow_right"
                   round
                   @click="jumpSentence(1)"
                 >
                   <q-tooltip>Next sentence</q-tooltip>
+                </q-btn>
+                <q-btn
+                  color="primary"
+                  flat
+                  icon="skip_previous"
+                  round
+                  @click="jumpWord(-1)"
+                >
+                  <q-tooltip>Previous word</q-tooltip>
+                </q-btn>
+                <q-btn
+                  color="primary"
+                  flat
+                  icon="skip_next"
+                  round
+                  @click="jumpWord(1)"
+                >
+                  <q-tooltip>Next word</q-tooltip>
                 </q-btn>
                 <span>{{ listeningProgressLabel }}</span>
               </div>
@@ -400,7 +416,6 @@ type ListeningToken = {
 type ListeningPlaylistItem = {
   id: string;
   title: string;
-  preview: string;
   text: string;
 };
 
@@ -411,6 +426,7 @@ const activeWordEndIndex = ref(0);
 const isListeningSpeaking = ref(false);
 const isListeningPaused = ref(false);
 const isListeningRepeatEnabled = ref(false);
+const isListeningPlaylistVisible = ref(false);
 const selectedListeningItemId = ref<string | null>(null);
 const activeSpeechRunId = ref(0);
 const learningTransitionName = ref('learning-slide-forward');
@@ -452,7 +468,6 @@ const listeningPlaylist = computed<ListeningPlaylistItem[]>(() => {
       return {
         id: exercise.id,
         title: exercise.prompt || `Text ${index + 1}`,
-        preview: createListeningPreview(text),
         text,
       };
     })
@@ -781,6 +796,10 @@ function toggleListeningRepeat() {
   isListeningRepeatEnabled.value = !isListeningRepeatEnabled.value;
 }
 
+function toggleListeningPlaylist() {
+  isListeningPlaylistVisible.value = !isListeningPlaylistVisible.value;
+}
+
 async function startListeningAtWord(wordIndex: number) {
   const tokens = listeningTokens.value;
 
@@ -1035,12 +1054,6 @@ function handleVisibilityChange() {
 
 function handlePageExit() {
   stopListeningAudio();
-}
-
-function createListeningPreview(text: string): string {
-  const normalizedText = text.replace(/\s+/g, ' ').trim();
-
-  return normalizedText.length > 96 ? `${normalizedText.slice(0, 96)}...` : normalizedText;
 }
 
 function tokenizeListeningText(text: string): ListeningToken[] {
