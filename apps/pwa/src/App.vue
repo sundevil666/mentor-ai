@@ -16,14 +16,19 @@ import { useAppStore } from 'src/stores/app-store';
 const appStore = useAppStore();
 let stopUpdatePolling: (() => void) | undefined;
 let isReloadingForUpdate = false;
+let remoteSyncPollingTimer: number | undefined;
 
 onMounted(() => {
   window.addEventListener('mentor-ai:update-available', handleUpdateAvailable);
+  document.addEventListener('visibilitychange', handleVisibilitySync);
   stopUpdatePolling = startAppUpdatePolling(handleServerUpdateAvailable);
+  startRemoteSyncPolling();
 });
 
 onUnmounted(() => {
   window.removeEventListener('mentor-ai:update-available', handleUpdateAvailable);
+  document.removeEventListener('visibilitychange', handleVisibilitySync);
+  stopRemoteSyncPolling();
   stopUpdatePolling?.();
 });
 
@@ -80,5 +85,50 @@ async function handleServerUpdateAvailable(result: AppUpdateCheckResult) {
   window.setTimeout(() => {
     window.location.reload();
   }, 1200);
+}
+
+function startRemoteSyncPolling() {
+  void refreshRemoteProgress(false);
+  remoteSyncPollingTimer = window.setInterval(() => {
+    void refreshRemoteProgress(true);
+  }, 30000);
+}
+
+function stopRemoteSyncPolling() {
+  if (remoteSyncPollingTimer !== undefined) {
+    window.clearInterval(remoteSyncPollingTimer);
+    remoteSyncPollingTimer = undefined;
+  }
+}
+
+function handleVisibilitySync() {
+  if (document.visibilityState === 'visible') {
+    void refreshRemoteProgress(true);
+  }
+}
+
+async function refreshRemoteProgress(showNotification: boolean) {
+  if (!navigator.onLine) {
+    return;
+  }
+
+  if (!appStore.isHydrated) {
+    await appStore.hydrate();
+    return;
+  }
+
+  const hasRemoteProgress = await appStore.refreshRemoteLearningState();
+
+  if (!showNotification || !hasRemoteProgress) {
+    return;
+  }
+
+  Notify.create({
+    type: 'info',
+    icon: 'sync',
+    message: 'Learning progress synchronized',
+    caption: 'Mentor AI refreshed the latest progress from your other devices.',
+    timeout: 5000,
+  });
 }
 </script>

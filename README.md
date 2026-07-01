@@ -26,6 +26,38 @@ The PWA can run a complete demo learning session without the API:
 
 The implementation is still intentionally small: it uses deterministic demo lesson content, browser speech synthesis, and local text-based pronunciation focus detection, not production AI generation or advanced acoustic pronunciation scoring.
 
+## Cross-Device Synchronization Plan
+
+The goal is optional account-based continuity: a student can sign in with Google email only so Mentor AI can recognize the same person on multiple devices. Learning must still work without registration. Anonymous use remains local/offline-first; Google identity upgrades the same local queue into a private cloud-backed queue for that user.
+
+The synchronization contract is:
+
+- every learning action creates append-only evidence with stable IDs;
+- if the device is online and the user has a cloud identity, pending evidence uploads immediately;
+- if upload fails or the device is offline, evidence stays in IndexedDB and the header shows a pending-sync indicator;
+- when network returns, the app retries automatically before refreshing shared state;
+- every online device polls shared state and in-progress session handoffs, shows a short sync notification when newer progress appears, and lets the student continue from the latest remote lesson position;
+- sockets may be added later for faster realtime updates, but polling remains the fallback because mobile PWAs can sleep, lose push channels, or resume after long gaps.
+
+Merge rules must protect learning evidence rather than overwrite it:
+
+- completed exercise results from different offline devices are all accepted when their IDs are unique;
+- duplicate event/result IDs are acknowledged as duplicates and can be removed from the local queue;
+- Student Model updates are applied only when the remote version is newer or equal to the local version;
+- in-progress lesson handoff uses last-write-wins by `updatedAt` for the same user/device handoff;
+- if two offline devices made progress in different lessons, both evidence streams are synchronized and analytics sees them as separate sessions;
+- if two offline devices advanced the same lesson differently, the server keeps both event streams, the UI should prefer the newest handoff for continuing, and a future conflict view can offer "continue latest" or "finish local copy" without deleting either history.
+
+The first production identity slice should add Google OAuth with these boundaries:
+
+- Google email is optional and used only to derive a private application user record;
+- learning data is keyed by internal user ID, not by raw email in learning events;
+- local demo data should be migratable into the signed-in user after confirmation;
+- logout keeps local offline evidence available unless the student explicitly clears the device;
+- API requests should carry a server-validated session token, never a client-trusted student ID.
+
+This area is expected to evolve. Bugs should be recorded against the specific synchronization stage: identity, local queue, upload acknowledgement, remote polling, session handoff, analytics merge, or student-facing status.
+
 ## First Statistics Pass
 
 The next useful step is not to test the student. The next useful step is to let the MVP run through real learning sessions and collect enough product evidence to see where the application is still weak.

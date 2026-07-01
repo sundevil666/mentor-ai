@@ -31,7 +31,9 @@ interface SynchronizationResponse {
   statisticsSnapshots: StatisticsSnapshot[];
 }
 
-const apiBaseUrl = process.env.API_BASE_URL ?? (process.env.DEV ? 'http://localhost:4000' : '');
+const apiBaseUrl =
+  process.env.API_BASE_URL ??
+  (process.env.DEV || typeof window === 'undefined' ? 'http://localhost:4000' : '');
 
 export async function fetchStudentState(): Promise<StudentStateResponse> {
   const response = await fetch(`${apiBaseUrl}/api/student-state`);

@@ -16,6 +16,22 @@
           <q-tooltip>Back to lesson choice</q-tooltip>
         </q-btn>
         <q-toolbar-title>Mentor AI</q-toolbar-title>
+        <q-btn
+          class="sync-status-button"
+          dense
+          flat
+          :icon="syncStatusIcon"
+          round
+        >
+          <q-badge
+            v-if="appStore.pendingSyncCount > 0"
+            color="deep-orange-7"
+            floating
+          >
+            {{ appStore.pendingSyncCount }}
+          </q-badge>
+          <q-tooltip>{{ syncStatusTooltip }}</q-tooltip>
+        </q-btn>
         <q-tabs
           class="main-nav-tabs"
           dense
@@ -216,6 +232,28 @@ import { readThemePreference, saveThemePreference } from 'src/services/user-pref
 const appStore = useAppStore();
 const isDarkTheme = ref(false);
 const showInstallButton = computed(() => isAppleTouchDevice() && !isStandalonePwa());
+const syncStatusIcon = computed(() => {
+  if (appStore.pendingSyncCount > 0) {
+    return appStore.isOnline ? 'cloud_upload' : 'cloud_off';
+  }
+
+  return appStore.isSyncRefreshing ? 'sync' : 'cloud_done';
+});
+const syncStatusTooltip = computed(() => {
+  if (appStore.pendingSyncCount > 0 && !appStore.isOnline) {
+    return `${appStore.pendingSyncCount} learning updates are saved on this device and need internet.`;
+  }
+
+  if (appStore.pendingSyncCount > 0) {
+    return `${appStore.pendingSyncCount} learning updates are waiting to upload.`;
+  }
+
+  if (appStore.isSyncRefreshing) {
+    return 'Checking progress from your other devices.';
+  }
+
+  return 'Learning progress is synchronized.';
+});
 
 onMounted(async () => {
   isDarkTheme.value = readSavedTheme();

@@ -86,6 +86,8 @@ interface AppState {
   preferredWorkShift: WorkShift;
   pendingSyncEvents: number;
   lastSyncAt: string | null;
+  lastRemoteProgressAt: string | null;
+  isSyncRefreshing: boolean;
   updateNotifications: UpdateNotification[];
   sessionHandoffs: LearningSessionHandoff[];
   isHydrated: boolean;
@@ -106,6 +108,8 @@ export const useAppStore = defineStore('app', {
     preferredWorkShift: 'unknown',
     pendingSyncEvents: 0,
     lastSyncAt: null,
+    lastRemoteProgressAt: null,
+    isSyncRefreshing: false,
     updateNotifications: [],
     sessionHandoffs: [],
     isHydrated: false,
@@ -165,9 +169,7 @@ export const useAppStore = defineStore('app', {
       await this.pruneLocalStorage();
 
       if (this.isOnline) {
-        await this.syncPendingEvents();
-        await this.refreshSharedStudentState();
-        await this.refreshSessionHandoffs();
+        await this.refreshRemoteLearningState();
       }
     },
 
@@ -175,9 +177,7 @@ export const useAppStore = defineStore('app', {
       this.isOnline = isOnline;
 
       if (isOnline) {
-        void this.syncPendingEvents()
-          .then(() => this.refreshSharedStudentState())
-          .then(() => this.refreshSessionHandoffs());
+        void this.refreshRemoteLearningState();
       }
     },
 
@@ -338,6 +338,8 @@ export const useAppStore = defineStore('app', {
       this.activitySnapshots = [];
       this.preferredWorkShift = 'unknown';
       this.lastSyncAt = null;
+      this.lastRemoteProgressAt = null;
+      this.isSyncRefreshing = false;
       savePreferredWorkShift('unknown');
 
       await db.put('student-models', this.studentModel);
@@ -578,6 +580,36 @@ export const useAppStore = defineStore('app', {
         this.lastSyncAt = now();
       } catch {
         this.pendingSyncEvents = pendingEvents.length;
+      }
+    },
+
+    async refreshRemoteLearningState(): Promise<boolean> {
+      if (!this.isOnline || this.isSyncRefreshing) {
+        return false;
+      }
+
+      const previousModelVersion = this.studentModel.version;
+      const previousRemoteProgressAt = getLatestHandoffUpdate(this.sessionHandoffs);
+
+      this.isSyncRefreshing = true;
+
+      try {
+        await this.syncPendingEvents();
+        await this.refreshSharedStudentState();
+        await this.refreshSessionHandoffs();
+
+        const nextRemoteProgressAt = getLatestHandoffUpdate(this.sessionHandoffs);
+        const hasRemoteProgress =
+          this.studentModel.version > previousModelVersion ||
+          (nextRemoteProgressAt !== null && nextRemoteProgressAt !== previousRemoteProgressAt);
+
+        if (hasRemoteProgress) {
+          this.lastRemoteProgressAt = now();
+        }
+
+        return hasRemoteProgress;
+      } finally {
+        this.isSyncRefreshing = false;
       }
     },
 
@@ -912,6 +944,10 @@ function collectSpeechResults(events: QueuedLearningEvent[], fallbackResults: Sp
 
 function uniqueById<T extends { id: string }>(items: T[]): T[] {
   return Array.from(new Map(items.map((item) => [item.id, item])).values());
+}
+
+function getLatestHandoffUpdate(handoffs: LearningSessionHandoff[]): string | null {
+  return handoffs.map((handoff) => handoff.updatedAt).sort().at(-1) ?? null;
 }
 
 function toLearningEvent(event: QueuedLearningEvent): LearningEvent {
