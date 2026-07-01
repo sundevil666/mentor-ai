@@ -16,11 +16,12 @@ import {
 import { config } from '../config/env.js';
 import { learningStateRepository } from '../repositories/learning-state.repository.js';
 import { privateLessonRepository } from '../repositories/private-lesson.repository.js';
+import type { AuthenticatedUser } from './auth.service.js';
 import { aiTeacherService } from './ai-teacher.service.js';
 
 export const learningStateService = {
-  async getStudentState() {
-    const state = await learningStateRepository.read();
+  async getStudentState(user?: AuthenticatedUser) {
+    const state = await learningStateRepository.read(user);
 
     return {
       student: state.student,
@@ -29,8 +30,8 @@ export const learningStateService = {
     };
   },
 
-  async getCurrentLesson(context: LearningContext = defaultLearningContext()) {
-    const state = await learningStateRepository.read();
+  async getCurrentLesson(context: LearningContext = defaultLearningContext(), user?: AuthenticatedUser) {
+    const state = await learningStateRepository.read(user);
 
     if (state.currentLesson && isLessonSuitableForContext(state.currentLesson, context)) {
       return state.currentLesson;
@@ -51,23 +52,23 @@ export const learningStateService = {
     await learningStateRepository.write({
       ...state,
       currentLesson: lesson,
-    });
+    }, user);
 
     return lesson;
   },
 
-  async getRecommendations() {
-    const state = await learningStateRepository.read();
+  async getRecommendations(user?: AuthenticatedUser) {
+    const state = await learningStateRepository.read(user);
     return state.recommendations;
   },
 
-  async listSessionHandoffs() {
-    const state = await learningStateRepository.read();
+  async listSessionHandoffs(user?: AuthenticatedUser) {
+    const state = await learningStateRepository.read(user);
     return state.sessionHandoffs.filter((handoff) => handoff.studentId === state.student.id);
   },
 
-  async upsertSessionHandoff(handoff: LearningSessionHandoff) {
-    const state = await learningStateRepository.read();
+  async upsertSessionHandoff(handoff: LearningSessionHandoff, user?: AuthenticatedUser) {
+    const state = await learningStateRepository.read(user);
 
     if (handoff.studentId !== state.student.id) {
       throw new Error('Session handoff failed identity validation.');
@@ -82,13 +83,18 @@ export const learningStateService = {
     await learningStateRepository.write({
       ...state,
       sessionHandoffs,
-    });
+    }, user);
 
     return safeHandoff;
   },
 
-  async synchronize(events: LearningEvent[], exerciseResults: ExerciseResult[] = [], speechResults: SpeechResult[] = []) {
-    const state = await learningStateRepository.read();
+  async synchronize(
+    events: LearningEvent[],
+    exerciseResults: ExerciseResult[] = [],
+    speechResults: SpeechResult[] = [],
+    user?: AuthenticatedUser,
+  ) {
+    const state = await learningStateRepository.read(user);
     const acceptedEventIds = new Set(state.acceptedEvents.map((event) => event.id));
     const acceptedResultIds = new Set(state.exerciseResults.map((result) => result.id));
     const acceptedSpeechResultIds = new Set(state.speechResults.map((result) => result.id));
@@ -154,7 +160,7 @@ export const learningStateService = {
       teacherMemory: nextTeacherMemory,
       recommendations: nextRecommendations,
       acknowledgements: [...state.acknowledgements, ...acknowledgements],
-    });
+    }, user);
 
     return {
       acknowledgements,

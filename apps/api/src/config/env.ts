@@ -10,4 +10,10 @@ export const config = {
   personalStoragePath: process.env.PERSONAL_STORAGE_PATH ?? '.ai/private',
   databaseUrl: process.env.DATABASE_URL,
   lessonImportToken: process.env.LESSON_IMPORT_TOKEN,
+  googleClientId: process.env.GOOGLE_CLIENT_ID,
+  googleAllowedEmails: (process.env.GOOGLE_ALLOWED_EMAILS ?? '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean),
+  googleSessionSecret: process.env.GOOGLE_SESSION_SECRET ?? process.env.LESSON_IMPORT_TOKEN ?? 'mentor-ai-dev-secret',
 };

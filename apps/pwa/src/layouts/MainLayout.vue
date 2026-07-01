@@ -32,6 +32,54 @@
           </q-badge>
           <q-tooltip>{{ syncStatusTooltip }}</q-tooltip>
         </q-btn>
+        <q-btn
+          v-if="googleClientId && !appStore.authSession"
+          class="auth-button"
+          color="primary"
+          dense
+          flat
+          icon="login"
+          label="Google"
+          no-caps
+          @click="signInWithGoogle"
+        >
+          <q-tooltip>Sign in to sync only your learning data</q-tooltip>
+        </q-btn>
+        <q-btn
+          v-else-if="appStore.authSession"
+          class="auth-button"
+          dense
+          flat
+          icon="account_circle"
+          round
+        >
+          <q-tooltip>{{ appStore.authSession.user.email }}</q-tooltip>
+          <q-menu
+            anchor="bottom right"
+            self="top right"
+          >
+            <q-list dense>
+              <q-item>
+                <q-item-section>
+                  <q-item-label>{{ appStore.studentDisplayName }}</q-item-label>
+                  <q-item-label caption>
+                    {{ appStore.authSession.user.email }}
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+              <q-separator />
+              <q-item
+                clickable
+                @click="signOut"
+              >
+                <q-item-section avatar>
+                  <q-icon name="logout" />
+                </q-item-section>
+                <q-item-section>Sign out</q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+        </q-btn>
         <q-tabs
           class="main-nav-tabs"
           dense
@@ -227,10 +275,25 @@
 import { Dark } from 'quasar';
 import { computed, onMounted, ref } from 'vue';
 import { useAppStore } from 'src/stores/app-store';
+import { fetchAuthConfiguration, signInWithGoogleCredential } from 'src/services/auth';
 import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
+
+declare global {
+  interface Window {
+    google?: {
+      accounts?: {
+        id?: {
+          initialize(options: { client_id: string; callback(response: { credential?: string }): void }): void;
+          prompt(): void;
+        };
+      };
+    };
+  }
+}
 
 const appStore = useAppStore();
 const isDarkTheme = ref(false);
+const googleClientId = ref<string | null>(null);
 const showInstallButton = computed(() => isAppleTouchDevice() && !isStandalonePwa());
 const syncStatusIcon = computed(() => {
   if (appStore.pendingSyncCount > 0) {
@@ -258,6 +321,7 @@ const syncStatusTooltip = computed(() => {
 onMounted(async () => {
   isDarkTheme.value = readSavedTheme();
   Dark.set(isDarkTheme.value);
+  await loadAuthConfiguration();
 
   if (!appStore.isHydrated) {
     await appStore.hydrate();
@@ -284,6 +348,52 @@ function toggleTheme() {
   isDarkTheme.value = !isDarkTheme.value;
   Dark.set(isDarkTheme.value);
   saveThemePreference(isDarkTheme.value ? 'dark' : 'light');
+}
+
+async function loadAuthConfiguration() {
+  try {
+    const configuration = await fetchAuthConfiguration();
+    googleClientId.value = configuration.googleClientId;
+  } catch {
+    googleClientId.value = null;
+  }
+}
+
+async function signInWithGoogle() {
+  if (!googleClientId.value) {
+    return;
+  }
+
+  await loadGoogleIdentityScript();
+  window.google?.accounts?.id?.initialize({
+    client_id: googleClientId.value,
+    callback: (response) => {
+      if (response.credential) {
+        void signInWithGoogleCredential(response.credential).then((session) => appStore.signIn(session));
+      }
+    },
+  });
+  window.google?.accounts?.id?.prompt();
+}
+
+function signOut() {
+  void appStore.signOut();
+}
+
+function loadGoogleIdentityScript(): Promise<void> {
+  if (window.google?.accounts?.id) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Google Identity Services failed to load.'));
+    document.head.appendChild(script);
+  });
 }
 
 function readSavedTheme() {

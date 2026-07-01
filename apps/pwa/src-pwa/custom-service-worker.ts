@@ -22,6 +22,11 @@ type QueuedLearningEvent = {
   [key: string]: unknown;
 };
 
+type StoredAuthSession = {
+  id: string;
+  sessionToken: string;
+};
+
 const learningSyncTag = 'mentor-ai-learning-sync';
 
 self.skipWaiting();
@@ -63,6 +68,7 @@ async function syncPendingLearningEvents() {
   const db = await openMentorDb();
   const events = (await getAllFromStore(db, 'sync-queue')) as QueuedLearningEvent[];
   const pendingEvents = events.filter((event) => event.status === 'pending');
+  const authSession = (await getFromStore(db, 'auth-sessions', 'current')) as StoredAuthSession | undefined;
 
   if (pendingEvents.length === 0) {
     db.close();
@@ -73,6 +79,7 @@ async function syncPendingLearningEvents() {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...(authSession?.sessionToken ? { Authorization: `Bearer ${authSession.sessionToken}` } : {}),
     },
     body: JSON.stringify({
       events: pendingEvents.map(toLearningEvent),
@@ -105,6 +112,16 @@ async function syncPendingLearningEvents() {
 
   db.close();
   await notifyClientsLearningSyncFinished();
+}
+
+function getFromStore(db: IDBDatabase, storeName: string, key: string): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeName, 'readonly');
+    const request = transaction.objectStore(storeName).get(key);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+  });
 }
 
 function openMentorDb(): Promise<IDBDatabase> {

@@ -11,6 +11,8 @@
     "src/services/activity-suggestion.ts",
     "src/services/app-update.ts",
     "src/services/api-client.ts",
+    "src/services/auth.ts",
+    "src/services/indexed-db.ts",
     "src/services/storage-retention.ts",
     "test/*.test.ts"
   ]

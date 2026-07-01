@@ -2,9 +2,9 @@ import type { RequestHandler } from 'express';
 import type { ExerciseResult, LearningContext, LearningEvent, LearningSessionHandoff, SpeechResult } from '@mentor-ai/shared';
 import { learningStateService } from '../services/learning-state.service.js';
 
-export const getStudentState: RequestHandler = async (_req, res, next) => {
+export const getStudentState: RequestHandler = async (req, res, next) => {
   try {
-    res.json({ data: await learningStateService.getStudentState() });
+    res.json({ data: await learningStateService.getStudentState(req.authUser) });
   } catch (error) {
     next(error);
   }
@@ -12,23 +12,25 @@ export const getStudentState: RequestHandler = async (_req, res, next) => {
 
 export const getCurrentLesson: RequestHandler = async (req, res, next) => {
   try {
-    res.json({ data: await learningStateService.getCurrentLesson(req.body?.context as LearningContext | undefined) });
+    res.json({
+      data: await learningStateService.getCurrentLesson(req.body?.context as LearningContext | undefined, req.authUser),
+    });
   } catch (error) {
     next(error);
   }
 };
 
-export const getRecommendations: RequestHandler = async (_req, res, next) => {
+export const getRecommendations: RequestHandler = async (req, res, next) => {
   try {
-    res.json({ data: await learningStateService.getRecommendations() });
+    res.json({ data: await learningStateService.getRecommendations(req.authUser) });
   } catch (error) {
     next(error);
   }
 };
 
-export const listSessionHandoffs: RequestHandler = async (_req, res, next) => {
+export const listSessionHandoffs: RequestHandler = async (req, res, next) => {
   try {
-    res.json({ data: await learningStateService.listSessionHandoffs() });
+    res.json({ data: await learningStateService.listSessionHandoffs(req.authUser) });
   } catch (error) {
     next(error);
   }
@@ -36,7 +38,7 @@ export const listSessionHandoffs: RequestHandler = async (_req, res, next) => {
 
 export const upsertSessionHandoff: RequestHandler = async (req, res, next) => {
   try {
-    res.json({ data: await learningStateService.upsertSessionHandoff(req.body as LearningSessionHandoff) });
+    res.json({ data: await learningStateService.upsertSessionHandoff(req.body as LearningSessionHandoff, req.authUser) });
   } catch (error) {
     next(error);
   }
@@ -50,7 +52,7 @@ export const synchronizeLearningEvents: RequestHandler = async (req, res, next) 
       : [];
     const speechResults = Array.isArray(req.body?.speechResults) ? (req.body.speechResults as SpeechResult[]) : [];
 
-    res.json({ data: await learningStateService.synchronize(events, exerciseResults, speechResults) });
+    res.json({ data: await learningStateService.synchronize(events, exerciseResults, speechResults, req.authUser) });
   } catch (error) {
     next(error);
   }

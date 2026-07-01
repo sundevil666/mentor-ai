@@ -37,6 +37,12 @@ import { createActivityReason, inferActivitySuggestion } from 'src/services/acti
 import { registerLearningBackgroundSync } from 'src/services/background-sync';
 import { mentorDb } from 'src/services/indexed-db';
 import {
+  clearAuthSession,
+  readAuthSession,
+  saveAuthSession,
+  type AuthSession,
+} from 'src/services/auth';
+import {
   compactAcknowledgedSyncEvent,
   defaultRetentionPolicy,
   selectRecordsToPrune,
@@ -77,6 +83,9 @@ type QueuedLearningEvent = LearningEvent & {
 
 interface AppState {
   storageMode: StorageMode;
+  studentId: string;
+  studentDisplayName: string;
+  authSession: AuthSession | null;
   isOfflineReady: boolean;
   isOnline: boolean;
   studentModel: StudentModel;
@@ -99,6 +108,9 @@ const sessionStoreKey = 'active-session';
 export const useAppStore = defineStore('app', {
   state: (): AppState => ({
     storageMode: 'demo',
+    studentId: demoStudent.id,
+    studentDisplayName: demoStudent.displayName,
+    authSession: readAuthSession(),
     isOfflineReady: true,
     isOnline: typeof navigator === 'undefined' ? true : navigator.onLine,
     studentModel: initialStudentModel,
@@ -165,6 +177,7 @@ export const useAppStore = defineStore('app', {
         right.createdAt.localeCompare(left.createdAt),
       );
       this.isOnline = navigator.onLine;
+      this.authSession = readAuthSession();
       this.isHydrated = true;
 
       if (this.pendingSyncEvents > 0) {
@@ -192,8 +205,15 @@ export const useAppStore = defineStore('app', {
       const lesson = await this.loadLesson(learningContext, createdAt);
       const sessionId = sessionStoreKey;
       const firstExercise = lesson.exercises[0];
-      const startedEvent = createLearningEvent(sessionId, lesson, undefined, 'lesson-started', createdAt);
-      const firstExerciseEvent = createLearningEvent(sessionId, lesson, firstExercise?.id, 'exercise-started', createdAt);
+      const startedEvent = createLearningEvent(this.studentId, sessionId, lesson, undefined, 'lesson-started', createdAt);
+      const firstExerciseEvent = createLearningEvent(
+        this.studentId,
+        sessionId,
+        lesson,
+        firstExercise?.id,
+        'exercise-started',
+        createdAt,
+      );
 
       this.session = {
         id: sessionId,
@@ -208,7 +228,7 @@ export const useAppStore = defineStore('app', {
       };
       this.latestRecommendation = createRecommendationFromModel(this.studentModel, createdAt);
 
-      await this.persistActivitySnapshot(createActivitySnapshot(learningContext, sessionId, createdAt));
+      await this.persistActivitySnapshot(createActivitySnapshot(this.studentId, learningContext, sessionId, createdAt));
       await this.persistSession();
       await this.publishSessionHandoff();
     },
@@ -239,6 +259,7 @@ export const useAppStore = defineStore('app', {
       const submittedAt = now();
       const exercise = this.currentExercise;
       const finishedEvent = createLearningEvent(
+        this.studentId,
         this.session.id,
         this.session.lesson,
         exercise.id,
@@ -246,6 +267,7 @@ export const useAppStore = defineStore('app', {
         submittedAt,
       );
       const result = createExerciseResult(
+        this.studentId,
         this.session.id,
         this.session.lesson,
         exercise,
@@ -261,6 +283,7 @@ export const useAppStore = defineStore('app', {
       if (exercise.type === 'repeat-speaking') {
         this.session.speechResults.push(
           createSpeechResult(
+            this.studentId,
             this.session.id,
             exercise,
             response,
@@ -270,7 +293,14 @@ export const useAppStore = defineStore('app', {
           ),
         );
         this.session.events.push(
-          createLearningEvent(this.session.id, this.session.lesson, exercise.id, 'speech-attempted', submittedAt),
+          createLearningEvent(
+            this.studentId,
+            this.session.id,
+            this.session.lesson,
+            exercise.id,
+            'speech-attempted',
+            submittedAt,
+          ),
         );
       }
 
@@ -285,7 +315,14 @@ export const useAppStore = defineStore('app', {
       this.session.currentExerciseIndex = nextIndex;
       this.session.exerciseStartedAt = submittedAt;
       this.session.events.push(
-        createLearningEvent(this.session.id, this.session.lesson, nextExercise.id, 'exercise-started', submittedAt),
+        createLearningEvent(
+          this.studentId,
+          this.session.id,
+          this.session.lesson,
+          nextExercise.id,
+          'exercise-started',
+          submittedAt,
+        ),
       );
 
       await this.persistSession();
@@ -298,7 +335,14 @@ export const useAppStore = defineStore('app', {
       }
 
       this.session.events.push(
-        createLearningEvent(this.session.id, this.session.lesson, this.currentExercise.id, 'audio-replayed', now()),
+        createLearningEvent(
+          this.studentId,
+          this.session.id,
+          this.session.lesson,
+          this.currentExercise.id,
+          'audio-replayed',
+          now(),
+        ),
       );
 
       await this.persistSession();
@@ -354,6 +398,21 @@ export const useAppStore = defineStore('app', {
       await db.clear('sync-queue');
       await db.clear('concept-evidence');
       this.sessionHandoffs = [];
+    },
+
+    async signIn(session: AuthSession) {
+      saveAuthSession(session);
+      this.authSession = session;
+      this.studentId = session.user.id;
+      this.studentDisplayName = session.user.displayName;
+      await this.refreshRemoteLearningState();
+    },
+
+    async signOut() {
+      clearAuthSession();
+      this.authSession = null;
+      this.studentId = demoStudent.id;
+      this.studentDisplayName = demoStudent.displayName;
     },
 
     async recordUpdateNotification(version: string, message?: string) {
@@ -422,6 +481,7 @@ export const useAppStore = defineStore('app', {
       }
 
       const lessonFinishedEvent = createLearningEvent(
+        this.studentId,
         this.session.id,
         this.session.lesson,
         undefined,
@@ -429,7 +489,7 @@ export const useAppStore = defineStore('app', {
         completedAt,
       );
       const updatedModel = updateStudentModelFromResults(this.studentModel, this.session.results, completedAt);
-      const observation = createObservationFromResults(demoStudent.id, this.session.results, completedAt);
+      const observation = createObservationFromResults(this.studentId, this.session.results, completedAt);
       const recommendation = createRecommendationFromModel(updatedModel, completedAt);
 
       this.session.events.push(lessonFinishedEvent);
@@ -478,7 +538,7 @@ export const useAppStore = defineStore('app', {
 
       const snapshot: StatisticsSnapshot = {
         id: `statistics-${this.session.id}-${createdAt}`,
-        studentId: demoStudent.id,
+        studentId: this.studentId,
         sessionId: this.session.id,
         lessonId: this.session.lesson.id,
         accuracy: completed.length === 0 ? 0 : correct / completed.length,
@@ -499,10 +559,10 @@ export const useAppStore = defineStore('app', {
       };
 
       const db = await mentorDb;
-      await db.put('statistics', { ...snapshot, userId: demoStudent.id });
+      await db.put('statistics', { ...snapshot, userId: this.studentId });
       await db.put('concept-evidence', {
         id: `concept-${this.session.id}-${createdAt}`,
-        studentId: demoStudent.id,
+        studentId: this.studentId,
         lessonId: this.session.lesson.id,
         concept: this.session.lesson.concept,
         activityType: this.session.lesson.activityType,
@@ -512,7 +572,7 @@ export const useAppStore = defineStore('app', {
       });
       this.statisticsSnapshots = [...this.statisticsSnapshots, snapshot];
       await this.persistActivitySnapshot({
-        ...createActivitySnapshot(this.session.context, this.session.id, createdAt),
+        ...createActivitySnapshot(this.studentId, this.session.context, this.session.id, createdAt),
         lessonCompleted: true,
         completedExercises: snapshot.completedExercises,
         accuracy: snapshot.accuracy,
@@ -634,6 +694,8 @@ export const useAppStore = defineStore('app', {
     async refreshSharedStudentState() {
       try {
         const state = await fetchStudentState();
+        this.studentId = state.student.id;
+        this.studentDisplayName = state.student.displayName;
         await this.applySharedStudentState(state.studentModel, state.recommendation);
       } catch {
         return;
@@ -641,7 +703,7 @@ export const useAppStore = defineStore('app', {
     },
 
     async applySharedStudentState(studentModel: StudentModel, recommendation: Recommendation) {
-      if (studentModel.studentId !== demoStudent.id || studentModel.version < this.studentModel.version) {
+      if (studentModel.studentId !== this.studentId || studentModel.version < this.studentModel.version) {
         return;
       }
 
@@ -653,7 +715,7 @@ export const useAppStore = defineStore('app', {
     async refreshSessionHandoffs() {
       try {
         this.sessionHandoffs = (await fetchSessionHandoffs()).filter(
-          (handoff) => handoff.studentId === demoStudent.id && handoff.currentExerciseIndex < handoff.lesson.exercises.length,
+          (handoff) => handoff.studentId === this.studentId && handoff.currentExerciseIndex < handoff.lesson.exercises.length,
         );
       } catch {
         return;
@@ -665,7 +727,7 @@ export const useAppStore = defineStore('app', {
         return;
       }
 
-      const handoff = createSessionHandoff(this.session);
+      const handoff = createSessionHandoff(this.studentId, this.session);
 
       try {
         const savedHandoff = await upsertSessionHandoff(handoff);
@@ -679,7 +741,7 @@ export const useAppStore = defineStore('app', {
     },
 
     async continueSessionHandoff(handoff: LearningSessionHandoff) {
-      if (handoff.studentId !== demoStudent.id) {
+      if (handoff.studentId !== this.studentId) {
         return;
       }
 
@@ -782,10 +844,10 @@ function createDefaultLearningContext(
   };
 }
 
-function createSessionHandoff(session: LearningSessionState): LearningSessionHandoff {
+function createSessionHandoff(studentId: string, session: LearningSessionState): LearningSessionHandoff {
   return {
-    id: `handoff-${demoStudent.id}-${getCurrentDeviceSurface()}`,
-    studentId: demoStudent.id,
+    id: `handoff-${studentId}-${getCurrentDeviceSurface()}`,
+    studentId,
     sourceDevice: getCurrentDeviceSurface(),
     lesson: session.lesson,
     context: session.context,
@@ -811,7 +873,12 @@ function toStorageRecord<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function createActivitySnapshot(context: LearningContext, sessionId: string, observedAt: string): ActivitySnapshot {
+function createActivitySnapshot(
+  studentId: string,
+  context: LearningContext,
+  sessionId: string,
+  observedAt: string,
+): ActivitySnapshot {
   const observedDate = new Date(observedAt);
   const localHour = context.startedHour ?? observedDate.getHours();
   const weekday = observedDate.getDay();
@@ -823,7 +890,7 @@ function createActivitySnapshot(context: LearningContext, sessionId: string, obs
 
   return {
     id: `activity-${sessionId}-${observedAt}`,
-    studentId: demoStudent.id,
+    studentId,
     sessionId,
     observedAt,
     localHour,
@@ -857,6 +924,7 @@ function createUpdateMessage(version: string, createdAt: string): string {
 }
 
 function createLearningEvent(
+  studentId: string,
   sessionId: string,
   lesson: GeneratedLesson,
   exerciseId: string | undefined,
@@ -866,7 +934,7 @@ function createLearningEvent(
 ): LearningEvent {
   return {
     id: `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    studentId: demoStudent.id,
+    studentId,
     sessionId,
     lessonId: lesson.id,
     exerciseId,
@@ -883,6 +951,7 @@ function createLearningEvent(
 }
 
 function createExerciseResult(
+  studentId: string,
   sessionId: string,
   lesson: GeneratedLesson,
   exercise: Exercise,
@@ -893,7 +962,7 @@ function createExerciseResult(
 ): ExerciseResult {
   return {
     id: `result-${exercise.id}-${Date.now()}`,
-    studentId: demoStudent.id,
+    studentId,
     sessionId,
     lessonId: lesson.id,
     exerciseId: exercise.id,
@@ -927,6 +996,7 @@ function createExerciseResult(
 }
 
 function createSpeechResult(
+  studentId: string,
   sessionId: string,
   exercise: Exercise,
   response: string,
@@ -939,7 +1009,7 @@ function createSpeechResult(
 
   return {
     id: `speech-${exercise.id}-${Date.now()}`,
-    studentId: demoStudent.id,
+    studentId,
     sessionId,
     exerciseId: exercise.id,
     speechAvailable: 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window,

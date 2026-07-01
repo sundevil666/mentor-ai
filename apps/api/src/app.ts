@@ -3,6 +3,7 @@ import express from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { apiRouter } from './routes/index.js';
+import { attachAuthContext } from './middleware/auth-context.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { notFoundHandler } from './middleware/not-found-handler.js';
 
@@ -13,6 +14,7 @@ export const createApp = () => {
   app.use(cors());
   app.use(express.json());
   app.use(morgan('dev'));
+  app.use(attachAuthContext);
 
   app.use('/api', apiRouter);
   app.use(notFoundHandler);

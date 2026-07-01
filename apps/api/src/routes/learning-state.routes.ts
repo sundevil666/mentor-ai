@@ -8,8 +8,11 @@ import {
   synchronizeLearningEvents,
   upsertSessionHandoff,
 } from '../controllers/learning-state.controller.js';
+import { requireLearningIdentity } from '../middleware/auth-context.js';
 
 export const learningStateRouter = Router();
+
+learningStateRouter.use(requireLearningIdentity);
 
 learningStateRouter.get('/student-state', getStudentState);
 learningStateRouter.get('/lessons/current', getCurrentLesson);

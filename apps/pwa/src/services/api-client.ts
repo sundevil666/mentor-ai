@@ -12,6 +12,7 @@ import type {
   StudentModel,
   SynchronizationAcknowledgement,
 } from '@mentor-ai/shared';
+import { getAuthToken } from './auth.js';
 
 interface StudentStateResponse {
   student: Student;
@@ -36,7 +37,9 @@ const apiBaseUrl =
   (process.env.DEV || typeof window === 'undefined' ? 'http://localhost:4000' : '');
 
 export async function fetchStudentState(): Promise<StudentStateResponse> {
-  const response = await fetch(`${apiBaseUrl}/api/student-state`);
+  const response = await fetch(`${apiBaseUrl}/api/student-state`, {
+    headers: authHeaders(),
+  });
 
   if (!response.ok) {
     throw new Error('Student state request failed.');
@@ -51,6 +54,7 @@ export async function fetchCurrentLesson(context: LearningContext): Promise<Gene
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders(),
     },
     body: JSON.stringify({ context }),
   });
@@ -64,7 +68,9 @@ export async function fetchCurrentLesson(context: LearningContext): Promise<Gene
 }
 
 export async function fetchSessionHandoffs(): Promise<LearningSessionHandoff[]> {
-  const response = await fetch(`${apiBaseUrl}/api/session-handoffs`);
+  const response = await fetch(`${apiBaseUrl}/api/session-handoffs`, {
+    headers: authHeaders(),
+  });
 
   if (!response.ok) {
     throw new Error('Session handoffs request failed.');
@@ -79,6 +85,7 @@ export async function upsertSessionHandoff(handoff: LearningSessionHandoff): Pro
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders(),
     },
     body: JSON.stringify(handoff),
   });
@@ -100,6 +107,7 @@ export async function synchronizeLearningEvidence(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders(),
     },
     body: JSON.stringify({ events, exerciseResults, speechResults }),
   });
@@ -110,4 +118,10 @@ export async function synchronizeLearningEvidence(
 
   const body = (await response.json()) as ApiResponse<SynchronizationResponse>;
   return body.data;
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getAuthToken();
+
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }

@@ -20,6 +20,7 @@ import {
 } from '@mentor-ai/shared';
 import { config } from '../config/env.js';
 import { resolvePersonalStoragePath } from '../utils/storage-path.js';
+import type { AuthenticatedUser } from '../services/auth.service.js';
 
 interface LearningStateRecord {
   student: Student;
@@ -53,50 +54,57 @@ const demoState: LearningStateRecord = {
 };
 
 export const learningStateRepository = {
-  async read(): Promise<LearningStateRecord> {
+  async read(user?: AuthenticatedUser): Promise<LearningStateRecord> {
     if (config.storageMode === 'demo') {
-      return cloneState(demoState);
+      return createStateForUser(user);
     }
 
-    const filePath = stateFilePath();
+    const filePath = stateFilePath(user);
 
     try {
       const file = await readFile(filePath, 'utf8');
-      return normalizeState(JSON.parse(file) as Partial<LearningStateRecord>);
+      return normalizeState(JSON.parse(file) as Partial<LearningStateRecord>, user);
     } catch (error) {
       if (isMissingFileError(error)) {
-        await learningStateRepository.write(demoState);
-        return cloneState(demoState);
+        const initialState = createStateForUser(user);
+        await learningStateRepository.write(initialState, user);
+        return initialState;
       }
 
       throw error;
     }
   },
 
-  async write(state: LearningStateRecord): Promise<void> {
+  async write(state: LearningStateRecord, user?: AuthenticatedUser): Promise<void> {
     if (config.storageMode === 'demo') {
       Object.assign(demoState, cloneState(state));
       return;
     }
 
-    const filePath = stateFilePath();
+    const filePath = stateFilePath(user);
     await mkdir(path.dirname(filePath), { recursive: true });
     await writeFile(filePath, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
   },
 };
 
-function stateFilePath(): string {
-  return resolvePersonalStoragePath('learning-state.json');
+function stateFilePath(user?: AuthenticatedUser): string {
+  if (!user) {
+    return resolvePersonalStoragePath('learning-state.json');
+  }
+
+  return resolvePersonalStoragePath('users', sanitizePathSegment(user.id), 'learning-state.json');
 }
 
 function cloneState(state: LearningStateRecord): LearningStateRecord {
   return JSON.parse(JSON.stringify(state)) as LearningStateRecord;
 }
 
-function normalizeState(state: Partial<LearningStateRecord>): LearningStateRecord {
+function normalizeState(state: Partial<LearningStateRecord>, user?: AuthenticatedUser): LearningStateRecord {
+  const defaultState = createStateForUser(user);
+
   return {
-    student: state.student ?? demoState.student,
-    studentModel: state.studentModel ?? demoState.studentModel,
+    student: state.student ?? defaultState.student,
+    studentModel: state.studentModel ?? defaultState.studentModel,
     currentLesson: state.currentLesson,
     recommendations: state.recommendations ?? [],
     acceptedEvents: state.acceptedEvents ?? [],
@@ -109,6 +117,34 @@ function normalizeState(state: Partial<LearningStateRecord>): LearningStateRecor
     acknowledgements: state.acknowledgements ?? [],
     sessionHandoffs: state.sessionHandoffs ?? [],
   };
+}
+
+function createStateForUser(user?: AuthenticatedUser): LearningStateRecord {
+  if (!user) {
+    return cloneState(demoState);
+  }
+
+  const state = cloneState(demoState);
+  state.student = {
+    ...state.student,
+    id: user.id,
+    displayName: user.displayName,
+  };
+  state.studentModel = {
+    ...state.studentModel,
+    id: `${user.id}-model`,
+    studentId: user.id,
+  };
+  state.recommendations = state.recommendations.map((recommendation) => ({
+    ...recommendation,
+    studentId: user.id,
+  }));
+
+  return state;
+}
+
+function sanitizePathSegment(value: string): string {
+  return value.replace(/[^A-Za-z0-9_.-]/g, '-').slice(0, 80);
 }
 
 function isMissingFileError(error: unknown): boolean {
