@@ -19,8 +19,7 @@
       </div>
 
       <transition
-        mode="out-in"
-        name="learning-state"
+        :name="learningTransitionName"
       >
         <section
           v-if="!appStore.isHydrated"
@@ -160,8 +159,7 @@
           </div>
 
           <transition
-            mode="out-in"
-            name="exercise-state"
+            :name="exerciseTransitionName"
           >
             <div
               v-if="!isListeningPlayer"
@@ -379,6 +377,8 @@ const activeWordEndIndex = ref(0);
 const isListeningSpeaking = ref(false);
 const isListeningPaused = ref(false);
 const activeSpeechRunId = ref(0);
+const learningTransitionName = ref('learning-slide-forward');
+const exerciseTransitionName = ref('exercise-slide-forward');
 const listeningTextElement = ref<HTMLElement | null>(null);
 const isListeningAutoScrollPaused = ref(false);
 let listeningAutoScrollPauseTimer: number | undefined;
@@ -582,11 +582,13 @@ watch([activeWordIndex, activeWordEndIndex], () => {
 
 async function startWithMode(mode: LearningMode) {
   answer.value = '';
+  setForwardTransition();
   await appStore.startLesson(createLearningContext(currentSuggestion.value, { mode }));
 }
 
 async function startConcept(concept: LearningConcept) {
   answer.value = '';
+  setForwardTransition();
   await appStore.startLesson(createLearningContext(currentSuggestion.value, {
     selectedConcept: concept,
     manualConceptChoice: true,
@@ -595,6 +597,7 @@ async function startConcept(concept: LearningConcept) {
 
 async function startLessonChoice(concept: LearningConcept, lessonTemplateKey: string) {
   answer.value = '';
+  setForwardTransition();
   await appStore.startLesson(createLearningContext(currentSuggestion.value, {
     selectedConcept: concept,
     manualConceptChoice: true,
@@ -619,6 +622,7 @@ async function continueFromDevice(handoffId: string) {
   }
 
   answer.value = '';
+  setForwardTransition();
   await appStore.continueSessionHandoff(handoff);
 }
 
@@ -627,6 +631,7 @@ async function submit() {
     return;
   }
 
+  setForwardTransition();
   await appStore.submitCurrentExercise(answer.value);
 }
 
@@ -902,7 +907,18 @@ async function scrollActiveListeningPhraseIntoView() {
 async function returnToLessonChoice() {
   answer.value = '';
   stopListeningAudio();
+  setBackTransition();
   await appStore.returnToLessonChoice();
+}
+
+function setForwardTransition() {
+  learningTransitionName.value = 'learning-slide-forward';
+  exerciseTransitionName.value = 'exercise-slide-forward';
+}
+
+function setBackTransition() {
+  learningTransitionName.value = 'learning-slide-back';
+  exerciseTransitionName.value = 'exercise-slide-back';
 }
 
 function handleOnline() {
