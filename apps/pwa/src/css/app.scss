@@ -488,6 +488,61 @@ body.body--dark {
   gap: 10px;
 }
 
+.listening-player__body {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+}
+
+.listening-player__playlist {
+  background: var(--app-surface-soft);
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  max-height: min(38vh, 420px);
+  overflow: auto;
+  padding: 10px;
+}
+
+.listening-player__playlist-item {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--app-text);
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  text-align: left;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  width: 100%;
+}
+
+.listening-player__playlist-item:hover {
+  background: var(--app-surface);
+  border-color: var(--app-border-strong);
+}
+
+.listening-player__playlist-item--active {
+  background: #d8f3ea;
+  border-color: #2f9e83;
+  color: #10201d;
+}
+
+.listening-player__playlist-item span {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.listening-player__playlist-item strong {
+  color: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
 .listening-player__text {
   background: var(--app-surface);
   border: 1px solid var(--app-border);
@@ -830,16 +885,31 @@ body.body--dark {
     padding: 18px;
   }
 
+  .listening-player__body {
+    grid-template-columns: 1fr;
+  }
+
+  .listening-player__playlist {
+    display: flex;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .listening-player__playlist-item {
+    flex: 0 0 min(78vw, 260px);
+  }
+
   .listening-player__controls {
     display: grid;
     gap: 12px;
-    grid-template-columns: repeat(5, 52px);
+    grid-template-columns: repeat(6, 48px);
     justify-content: center;
   }
 
   .listening-player__controls .q-btn {
-    min-height: 52px;
-    min-width: 52px;
+    min-height: 48px;
+    min-width: 48px;
   }
 
   .listening-player__controls > span {

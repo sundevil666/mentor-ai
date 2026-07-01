@@ -230,23 +230,41 @@
                 <p>{{ currentExercise.microLesson }}</p>
               </div>
 
-              <div
-                ref="listeningTextElement"
-                class="listening-player__text"
-                @scroll="handleListeningTextScroll"
-              >
-                <span
-                  v-for="token in listeningTokens"
-                  :key="token.index"
-                  :data-token-index="token.index"
-                  :class="[
-                    'listening-player__token',
-                    {
-                      'listening-player__token--active': token.index >= activeWordIndex && token.index <= activeWordEndIndex,
-                      'listening-player__token--past': token.index < activeWordIndex,
-                    },
-                  ]"
-                >{{ token.word }}{{ token.trailing }}</span>
+              <div class="listening-player__body">
+                <aside class="listening-player__playlist">
+                  <button
+                    v-for="item in listeningPlaylist"
+                    :key="item.id"
+                    :class="[
+                      'listening-player__playlist-item',
+                      { 'listening-player__playlist-item--active': item.id === selectedListeningItem?.id },
+                    ]"
+                    type="button"
+                    @click="selectListeningItem(item.id)"
+                  >
+                    <span>{{ item.title }}</span>
+                    <strong>{{ item.preview }}</strong>
+                  </button>
+                </aside>
+
+                <div
+                  ref="listeningTextElement"
+                  class="listening-player__text"
+                  @scroll="handleListeningTextScroll"
+                >
+                  <span
+                    v-for="token in listeningTokens"
+                    :key="token.index"
+                    :data-token-index="token.index"
+                    :class="[
+                      'listening-player__token',
+                      {
+                        'listening-player__token--active': token.index >= activeWordIndex && token.index <= activeWordEndIndex,
+                        'listening-player__token--past': token.index < activeWordIndex,
+                      },
+                    ]"
+                  >{{ token.word }}{{ token.trailing }}</span>
+                </div>
               </div>
 
               <div class="listening-player__controls">
@@ -276,6 +294,16 @@
                   @click="toggleListeningPlayback"
                 >
                   <q-tooltip>{{ isListeningPaused ? 'Resume' : isListeningSpeaking ? 'Pause' : 'Play' }}</q-tooltip>
+                </q-btn>
+                <q-btn
+                  :color="isListeningRepeatEnabled ? 'secondary' : 'primary'"
+                  :flat="!isListeningRepeatEnabled"
+                  :unelevated="isListeningRepeatEnabled"
+                  icon="repeat"
+                  round
+                  @click="toggleListeningRepeat"
+                >
+                  <q-tooltip>{{ isListeningRepeatEnabled ? 'Repeat is on' : 'Repeat selected text' }}</q-tooltip>
                 </q-btn>
                 <q-btn
                   color="primary"
@@ -369,6 +397,12 @@ type ListeningToken = {
   start: number;
   end: number;
 };
+type ListeningPlaylistItem = {
+  id: string;
+  title: string;
+  preview: string;
+  text: string;
+};
 
 const appStore = useAppStore();
 const answer = ref('');
@@ -376,6 +410,8 @@ const activeWordIndex = ref(0);
 const activeWordEndIndex = ref(0);
 const isListeningSpeaking = ref(false);
 const isListeningPaused = ref(false);
+const isListeningRepeatEnabled = ref(false);
+const selectedListeningItemId = ref<string | null>(null);
 const activeSpeechRunId = ref(0);
 const learningTransitionName = ref('learning-slide-forward');
 const exerciseTransitionName = ref('exercise-slide-forward');
@@ -398,17 +434,46 @@ const isListeningPlayer = computed(() => {
       Boolean(currentExercise.value.audioText))
   );
 });
-const listeningText = computed(() => currentExercise.value?.audioText ?? currentExercise.value?.prompt ?? '');
+const listeningPlaylist = computed<ListeningPlaylistItem[]>(() => {
+  const lesson = appStore.session?.lesson;
+
+  if (!lesson) {
+    return [];
+  }
+
+  return lesson.exercises
+    .map((exercise, index) => {
+      const text = (exercise.audioText ?? (exercise.type === 'listening-text' ? exercise.prompt : '')).trim();
+
+      if (!text) {
+        return null;
+      }
+
+      return {
+        id: exercise.id,
+        title: exercise.prompt || `Text ${index + 1}`,
+        preview: createListeningPreview(text),
+        text,
+      };
+    })
+    .filter((item): item is ListeningPlaylistItem => item !== null);
+});
+const selectedListeningItem = computed(() => {
+  const playlist = listeningPlaylist.value;
+
+  return playlist.find((item) => item.id === selectedListeningItemId.value) ?? playlist[0] ?? null;
+});
+const listeningText = computed(() => selectedListeningItem.value?.text ?? currentExercise.value?.audioText ?? currentExercise.value?.prompt ?? '');
 const listeningTokens = computed(() => tokenizeListeningText(listeningText.value));
 const listeningProgressKey = computed(() => {
   const session = appStore.session;
-  const exercise = currentExercise.value;
+  const item = selectedListeningItem.value;
 
-  if (!session || !exercise || !isListeningPlayer.value) {
+  if (!session || !item || !isListeningPlayer.value) {
     return null;
   }
 
-  return `${session.lesson.id}:${exercise.id}`;
+  return `${session.lesson.id}:${item.id}`;
 });
 const sentenceStartWordIndexes = computed(() => getSentenceStartWordIndexes(listeningTokens.value));
 const listeningTitle = computed(() =>
@@ -558,6 +623,7 @@ watch(
   () => {
     answer.value = '';
     if (isListeningPlayer.value) {
+      selectedListeningItemId.value = currentExercise.value?.id ?? listeningPlaylist.value[0]?.id ?? null;
       restoreListeningPlayback();
       return;
     }
@@ -568,11 +634,23 @@ watch(
 
 watch(isListeningPlayer, (isActiveListeningPlayer) => {
   if (isActiveListeningPlayer) {
+    selectedListeningItemId.value = currentExercise.value?.id ?? listeningPlaylist.value[0]?.id ?? null;
     restoreListeningPlayback();
     return;
   }
 
   resetListeningPlayback();
+});
+
+watch(listeningPlaylist, (playlist) => {
+  if (!isListeningPlayer.value || playlist.length === 0) {
+    selectedListeningItemId.value = null;
+    return;
+  }
+
+  if (!playlist.some((item) => item.id === selectedListeningItemId.value)) {
+    selectedListeningItemId.value = currentExercise.value?.id ?? playlist[0]?.id ?? null;
+  }
 });
 
 watch([activeWordIndex, activeWordEndIndex], () => {
@@ -690,6 +768,19 @@ async function jumpSentence(direction: -1 | 1) {
   await startListeningAtWord(sentenceStarts[nextSentenceIndex] ?? 0);
 }
 
+function selectListeningItem(itemId: string) {
+  if (itemId === selectedListeningItemId.value) {
+    return;
+  }
+
+  selectedListeningItemId.value = itemId;
+  restoreListeningPlayback();
+}
+
+function toggleListeningRepeat() {
+  isListeningRepeatEnabled.value = !isListeningRepeatEnabled.value;
+}
+
 async function startListeningAtWord(wordIndex: number) {
   const tokens = listeningTokens.value;
 
@@ -748,7 +839,7 @@ function speakListeningPhrase(wordIndex: number, runId: number) {
       return;
     }
 
-    finishListeningPlayback(runId);
+    finishListeningPlayback(runId, false);
   };
   utterance.onerror = () => {
     if (runId !== activeSpeechRunId.value) {
@@ -761,8 +852,15 @@ function speakListeningPhrase(wordIndex: number, runId: number) {
   window.speechSynthesis.speak(utterance);
 }
 
-function finishListeningPlayback(runId: number) {
+function finishListeningPlayback(runId: number, allowRepeat = true) {
   if (runId !== activeSpeechRunId.value) {
+    return;
+  }
+
+  if (allowRepeat && isListeningRepeatEnabled.value && listeningTokens.value.length > 0 && 'speechSynthesis' in window) {
+    activeWordIndex.value = 0;
+    activeWordEndIndex.value = 0;
+    window.setTimeout(() => speakListeningPhrase(0, runId), 220);
     return;
   }
 
@@ -937,6 +1035,12 @@ function handleVisibilityChange() {
 
 function handlePageExit() {
   stopListeningAudio();
+}
+
+function createListeningPreview(text: string): string {
+  const normalizedText = text.replace(/\s+/g, ' ').trim();
+
+  return normalizedText.length > 96 ? `${normalizedText.slice(0, 96)}...` : normalizedText;
 }
 
 function tokenizeListeningText(text: string): ListeningToken[] {
