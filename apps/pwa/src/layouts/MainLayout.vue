@@ -288,8 +288,7 @@
     <q-page-container class="app-page-container">
       <router-view v-slot="{ Component, route }">
         <transition
-          mode="out-in"
-          name="route-fade"
+          :name="routeTransitionName"
         >
           <component
             :is="Component"
@@ -304,6 +303,7 @@
 <script setup lang="ts">
 import { Dark, Notify } from 'quasar';
 import { computed, onMounted, ref } from 'vue';
+import { onBeforeRouteUpdate, type RouteLocationNormalizedLoaded } from 'vue-router';
 import { useAppStore } from 'src/stores/app-store';
 import { fetchAuthConfiguration, signInWithGoogleCredential } from 'src/services/auth';
 import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
@@ -324,6 +324,7 @@ declare global {
 const appStore = useAppStore();
 const isDarkTheme = ref(false);
 const googleClientId = ref<string | null>(null);
+const routeTransitionName = ref('route-slide-forward');
 const showInstallButton = computed(() => isAppleTouchDevice() && !isStandalonePwa());
 const syncStatusIcon = computed(() => {
   if (appStore.pendingSyncCount > 0) {
@@ -358,8 +359,20 @@ onMounted(async () => {
   }
 });
 
+onBeforeRouteUpdate((to, from) => {
+  routeTransitionName.value = getRouteOrder(to) < getRouteOrder(from)
+    ? 'route-slide-back'
+    : 'route-slide-forward';
+});
+
 function formatDate(value: string) {
   return new Date(value).toLocaleString();
+}
+
+function getRouteOrder(route: RouteLocationNormalizedLoaded) {
+  const order = route.meta.routeOrder;
+
+  return typeof order === 'number' ? order : 0;
 }
 
 function markRead(id: string) {
