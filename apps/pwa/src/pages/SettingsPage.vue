@@ -35,6 +35,30 @@
 
       <section class="settings-section">
         <div class="settings-section__heading">
+          <q-icon name="query_stats" />
+          <span>Shift analytics</span>
+        </div>
+        <div class="activity-signal">
+          <span>{{ activityMeta }}</span>
+          <strong>{{ paceLabel }}</strong>
+        </div>
+        <div
+          v-if="shiftTimingRows.length > 0"
+          class="shift-timing-grid shift-timing-grid--settings"
+        >
+          <div
+            v-for="item in shiftTimingRows"
+            :key="item.label"
+            class="shift-timing-item"
+          >
+            <span>{{ item.label }}</span>
+            <strong>{{ item.value }}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <div class="settings-section__heading">
           <q-icon name="record_voice_over" />
           <span>Voice</span>
         </div>
@@ -93,6 +117,12 @@ import {
   waitForSpeechVoices,
   type SpeechVoiceOption,
 } from 'src/services/speech-synthesis';
+import {
+  createCurrentActivitySuggestion,
+  createShiftTimingRows,
+  formatActivityMeta,
+  formatPaceLabel,
+} from 'src/services/learning-context';
 import { clearLastRoutePreference, readSpeechVoicePreference, saveSpeechVoicePreference } from 'src/services/user-preferences';
 import { useAppStore } from 'src/stores/app-store';
 
@@ -119,6 +149,12 @@ const voiceStatus = computed(() => {
 
   return `${voiceOptions.value.length} voice${voiceOptions.value.length === 1 ? '' : 's'} available.`;
 });
+const currentSuggestion = computed(() =>
+  createCurrentActivitySuggestion(appStore.preferredWorkShift, appStore.activitySnapshots),
+);
+const activityMeta = computed(() => formatActivityMeta(currentSuggestion.value));
+const paceLabel = computed(() => formatPaceLabel(currentSuggestion.value));
+const shiftTimingRows = computed(() => createShiftTimingRows(currentSuggestion.value));
 
 onMounted(async () => {
   if (!appStore.isHydrated) {

@@ -92,33 +92,7 @@
             no-caps
             :to="{ name: 'dashboard' }"
           />
-          <q-route-tab
-            icon="query_stats"
-            label="Statistics"
-            no-caps
-            :to="{ name: 'statistics' }"
-          />
         </q-tabs>
-        <q-btn
-          class="settings-nav-button"
-          dense
-          flat
-          icon="settings"
-          label="Settings"
-          no-caps
-          :to="{ name: 'settings' }"
-        >
-          <q-tooltip>Settings</q-tooltip>
-        </q-btn>
-        <q-btn
-          class="theme-toggle-button"
-          flat
-          :icon="isDarkTheme ? 'light_mode' : 'dark_mode'"
-          round
-          @click="toggleTheme"
-        >
-          <q-tooltip>{{ isDarkTheme ? 'Day theme' : 'Night theme' }}</q-tooltip>
-        </q-btn>
         <q-btn
           v-if="showInstallButton"
           class="ios-install-button"
@@ -262,6 +236,52 @@
         >
           Offline first
         </q-badge>
+        <q-btn
+          class="more-nav-button"
+          flat
+          icon="more_vert"
+          round
+        >
+          <q-tooltip>More</q-tooltip>
+          <q-menu
+            anchor="bottom right"
+            self="top right"
+          >
+            <q-list
+              class="more-nav-menu"
+              dense
+            >
+              <q-item
+                clickable
+                :to="{ name: 'statistics' }"
+              >
+                <q-item-section avatar>
+                  <q-icon name="query_stats" />
+                </q-item-section>
+                <q-item-section>Statistics</q-item-section>
+              </q-item>
+              <q-item
+                clickable
+                :to="{ name: 'settings' }"
+              >
+                <q-item-section avatar>
+                  <q-icon name="settings" />
+                </q-item-section>
+                <q-item-section>Settings</q-item-section>
+              </q-item>
+              <q-separator />
+              <q-item
+                clickable
+                @click="toggleTheme"
+              >
+                <q-item-section avatar>
+                  <q-icon :name="isDarkTheme ? 'light_mode' : 'dark_mode'" />
+                </q-item-section>
+                <q-item-section>{{ isDarkTheme ? 'Day theme' : 'Night theme' }}</q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+        </q-btn>
       </q-toolbar>
     </q-header>
 

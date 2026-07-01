@@ -1,48 +1,21 @@
 import type { RequestHandler } from 'express';
 import type { ExerciseResult, LearningContext, LearningEvent, LearningSessionHandoff, SpeechResult } from '@mentor-ai/shared';
 import { learningStateService } from '../services/learning-state.service.js';
+import { sendData } from './http-response.js';
 
-export const getStudentState: RequestHandler = async (req, res, next) => {
-  try {
-    res.json({ data: await learningStateService.getStudentState(req.authUser) });
-  } catch (error) {
-    next(error);
-  }
-};
+export const getStudentState: RequestHandler = sendData((req) => learningStateService.getStudentState(req.authUser));
 
-export const getCurrentLesson: RequestHandler = async (req, res, next) => {
-  try {
-    res.json({
-      data: await learningStateService.getCurrentLesson(req.body?.context as LearningContext | undefined, req.authUser),
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+export const getCurrentLesson: RequestHandler = sendData((req) =>
+  learningStateService.getCurrentLesson(req.body?.context as LearningContext | undefined, req.authUser),
+);
 
-export const getRecommendations: RequestHandler = async (req, res, next) => {
-  try {
-    res.json({ data: await learningStateService.getRecommendations(req.authUser) });
-  } catch (error) {
-    next(error);
-  }
-};
+export const getRecommendations: RequestHandler = sendData((req) => learningStateService.getRecommendations(req.authUser));
 
-export const listSessionHandoffs: RequestHandler = async (req, res, next) => {
-  try {
-    res.json({ data: await learningStateService.listSessionHandoffs(req.authUser) });
-  } catch (error) {
-    next(error);
-  }
-};
+export const listSessionHandoffs: RequestHandler = sendData((req) => learningStateService.listSessionHandoffs(req.authUser));
 
-export const upsertSessionHandoff: RequestHandler = async (req, res, next) => {
-  try {
-    res.json({ data: await learningStateService.upsertSessionHandoff(req.body as LearningSessionHandoff, req.authUser) });
-  } catch (error) {
-    next(error);
-  }
-};
+export const upsertSessionHandoff: RequestHandler = sendData((req) =>
+  learningStateService.upsertSessionHandoff(req.body as LearningSessionHandoff, req.authUser),
+);
 
 export const synchronizeLearningEvents: RequestHandler = async (req, res, next) => {
   try {
@@ -58,6 +31,4 @@ export const synchronizeLearningEvents: RequestHandler = async (req, res, next) 
   }
 };
 
-export const getConfiguration: RequestHandler = (_req, res) => {
-  res.json({ data: learningStateService.getConfiguration() });
-};
+export const getConfiguration: RequestHandler = sendData(() => learningStateService.getConfiguration());

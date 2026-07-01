@@ -38,22 +38,6 @@
           key="choice"
           class="learning-start"
         >
-          <div class="training-mode-strip">
-            <q-btn
-              v-for="mode in primaryTrainingModes"
-              :key="mode.key"
-              class="training-mode-button"
-              color="primary"
-              outline
-              no-caps
-              :icon="mode.icon"
-              :label="mode.label"
-              @click="startTraining(mode.key)"
-            >
-              <q-tooltip>{{ mode.reason }}</q-tooltip>
-            </q-btn>
-          </div>
-
           <div
             v-if="remoteContinueOptions.length > 0"
             class="handoff-actions"
@@ -83,20 +67,6 @@
             <strong>{{ paceLabel }}</strong>
           </div>
 
-          <div
-            v-if="shiftTimingRows.length > 0"
-            class="shift-timing-grid"
-          >
-            <div
-              v-for="item in shiftTimingRows"
-              :key="item.label"
-              class="shift-timing-item"
-            >
-              <span>{{ item.label }}</span>
-              <strong>{{ item.value }}</strong>
-            </div>
-          </div>
-
           <div class="recommended-action">
             <q-btn
               class="recommended-action__button"
@@ -110,6 +80,22 @@
               <q-tooltip>{{ recommendedTraining.reason }}</q-tooltip>
             </q-btn>
             <span>{{ recommendedTraining.reason }}</span>
+          </div>
+
+          <div class="training-mode-strip">
+            <q-btn
+              v-for="mode in primaryTrainingModes"
+              :key="mode.key"
+              class="training-mode-button"
+              color="primary"
+              outline
+              no-caps
+              :icon="mode.icon"
+              :label="mode.label"
+              @click="startTraining(mode.key)"
+            >
+              <q-tooltip>{{ mode.reason }}</q-tooltip>
+            </q-btn>
           </div>
 
           <div class="concept-choice">
@@ -351,14 +337,22 @@
 </template>
 
 <script setup lang="ts">
-import type { LearningConcept, LearningMode, WorkShift } from '@mentor-ai/shared';
+import type { LearningConcept, LearningMode } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { inferActivitySuggestion } from 'src/services/activity-suggestion';
+import {
+  chooseRecommendedTraining,
+  createCurrentActivitySuggestion,
+  createLearningContext,
+  findTrainingMode,
+  formatActivityMeta,
+  formatPaceLabel,
+  primaryTrainingModes,
+  type TrainingKey,
+} from 'src/services/learning-context';
 import { createPreferredSpeechUtterance, speakWithPreferredVoice, waitForSpeechVoices } from 'src/services/speech-synthesis';
 import { readListeningProgressPreference, saveListeningProgressPreference } from 'src/services/user-preferences';
 import { useAppStore } from 'src/stores/app-store';
 
-type TrainingKey = 'listening' | 'speaking' | 'vocabulary';
 type LessonChoice = {
   templateKey: string;
   title: string;
@@ -440,30 +434,13 @@ const syncColor = computed(() => {
   return appStore.isOnline ? 'teal-8' : 'grey-7';
 });
 const currentSuggestion = computed(() =>
-  inferActivitySuggestion(new Date(), appStore.preferredWorkShift, appStore.activitySnapshots),
+  createCurrentActivitySuggestion(appStore.preferredWorkShift, appStore.activitySnapshots),
 );
 const activityHeadline = computed(() => {
   return `Best now: ${recommendedTraining.value.shortLabel}`;
 });
-const paceLabel = computed(() => {
-  switch (currentSuggestion.value.activityPace) {
-    case 'passive':
-      return 'Light review';
-    case 'steady':
-      return 'Steady lesson';
-    case 'active':
-      return 'Active practice';
-    case 'deep':
-      return 'Deep listening';
-    default:
-      return 'Steady lesson';
-  }
-});
-const activityMeta = computed(() => {
-  const day = currentSuggestion.value.dayType === 'weekend' ? 'Weekend' : 'Weekday';
-  const minutes = `${currentSuggestion.value.availableMinutes} min`;
-  return `${day} · ${shiftLabel(currentSuggestion.value.workShift)} · ${minutes}`;
-});
+const paceLabel = computed(() => formatPaceLabel(currentSuggestion.value));
+const activityMeta = computed(() => formatActivityMeta(currentSuggestion.value));
 const remoteContinueOptions = computed(() =>
   appStore.remoteSessionHandoffs.map((handoff) => ({
     id: handoff.id,
@@ -471,20 +448,6 @@ const remoteContinueOptions = computed(() =>
     detail: `${handoff.lesson.title} · ${Math.min(handoff.currentExerciseIndex + 1, handoff.lesson.exercises.length)}/${handoff.lesson.exercises.length}`,
   })),
 );
-const shiftTimingRows = computed(() => {
-  const timing = currentSuggestion.value.shiftTiming;
-
-  if (!timing) {
-    return [];
-  }
-
-  return [
-    { label: 'Shift', value: `${timing.startsAt}-${timing.endsAt}` },
-    { label: 'Leave home', value: timing.leaveHomeAt },
-    { label: 'Bus', value: `${timing.busLeavesAt}-${timing.busArrivesAt}` },
-    { label: 'Headphones off', value: timing.headphonesOffAt },
-  ];
-});
 const conceptChoices: Array<{ value: LearningConcept; label: string; icon: string; reason: string }> = [
   {
     value: 'learning',
@@ -503,29 +466,6 @@ const conceptChoices: Array<{ value: LearningConcept; label: string; icon: strin
     label: 'Vocabulary Growth',
     icon: 'psychology',
     reason: 'Recall, recognition, and words in context.',
-  },
-];
-const primaryTrainingModes: Array<{ key: TrainingKey; label: string; shortLabel: string; icon: string; reason: string }> = [
-  {
-    key: 'listening',
-    label: 'Listening',
-    shortLabel: 'Listening',
-    icon: 'headphones',
-    reason: 'Listen first when the window is passive, weekend-sized, or good for audio practice.',
-  },
-  {
-    key: 'speaking',
-    label: 'Speaking',
-    shortLabel: 'Speaking',
-    icon: 'record_voice_over',
-    reason: 'Use active speaking when you have enough energy and can answer aloud.',
-  },
-  {
-    key: 'vocabulary',
-    label: 'Vocabulary',
-    shortLabel: 'Vocabulary',
-    icon: 'psychology',
-    reason: 'Build recall when the session should be short, focused, or review-heavy.',
   },
 ];
 const lessonSections: LessonSection[] = [
@@ -582,8 +522,8 @@ const lessonSections: LessonSection[] = [
   },
 ];
 const recommendedTraining = computed(() => {
-  const key = chooseRecommendedTraining();
-  const training = primaryTrainingModes.find((item) => item.key === key) ?? primaryTrainingModes[0];
+  const key = chooseRecommendedTraining(currentSuggestion.value, appStore.studentModel);
+  const training = findTrainingMode(key);
 
   return {
     ...training,
@@ -642,58 +582,24 @@ watch([activeWordIndex, activeWordEndIndex], () => {
 
 async function startWithMode(mode: LearningMode) {
   answer.value = '';
-  const suggestion = currentSuggestion.value;
-  await appStore.startLesson({
-    mode,
-    isOffline: !navigator.onLine,
-    speechAvailable: 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window,
-    availableMinutes: suggestion.availableMinutes,
-    workShift: suggestion.workShift,
-    dayType: suggestion.dayType,
-    activityPace: suggestion.activityPace,
-    startedHour: suggestion.localHour,
-    activityReason: suggestion.reason,
-    shiftTiming: suggestion.shiftTiming,
-  });
+  await appStore.startLesson(createLearningContext(currentSuggestion.value, { mode }));
 }
 
 async function startConcept(concept: LearningConcept) {
   answer.value = '';
-  const suggestion = currentSuggestion.value;
-  await appStore.startLesson({
-    mode: suggestion.mode,
+  await appStore.startLesson(createLearningContext(currentSuggestion.value, {
     selectedConcept: concept,
     manualConceptChoice: true,
-    isOffline: !navigator.onLine,
-    speechAvailable: 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window,
-    availableMinutes: suggestion.availableMinutes,
-    workShift: suggestion.workShift,
-    dayType: suggestion.dayType,
-    activityPace: suggestion.activityPace,
-    startedHour: suggestion.localHour,
-    activityReason: suggestion.reason,
-    shiftTiming: suggestion.shiftTiming,
-  });
+  }));
 }
 
 async function startLessonChoice(concept: LearningConcept, lessonTemplateKey: string) {
   answer.value = '';
-  const suggestion = currentSuggestion.value;
-  await appStore.startLesson({
-    mode: suggestion.mode,
+  await appStore.startLesson(createLearningContext(currentSuggestion.value, {
     selectedConcept: concept,
     manualConceptChoice: true,
     lessonTemplateKey,
-    isOffline: !navigator.onLine,
-    speechAvailable: 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window,
-    availableMinutes: suggestion.availableMinutes,
-    workShift: suggestion.workShift,
-    dayType: suggestion.dayType,
-    activityPace: suggestion.activityPace,
-    startedHour: suggestion.localHour,
-    activityReason: suggestion.reason,
-    shiftTiming: suggestion.shiftTiming,
-  });
+  }));
 }
 
 async function startTraining(training: TrainingKey) {
@@ -1015,45 +921,6 @@ function handleVisibilityChange() {
 
 function handlePageExit() {
   stopListeningAudio();
-}
-
-function shiftLabel(shift: WorkShift): string {
-  switch (shift) {
-    case 'first':
-      return '1st shift';
-    case 'second':
-      return '2nd shift';
-    case 'third':
-      return '3rd shift';
-    case 'off':
-      return 'day off';
-    case 'unknown':
-      return 'shift unknown';
-  }
-}
-
-function chooseRecommendedTraining(): TrainingKey {
-  const suggestion = currentSuggestion.value;
-
-  if (suggestion.mode === 'listening' || suggestion.dayType === 'weekend') {
-    return 'listening';
-  }
-
-  if (suggestion.activityPace === 'passive' || suggestion.mode === 'review') {
-    return 'vocabulary';
-  }
-
-  if (suggestion.activityPace === 'active' || suggestion.workShift === 'second' || suggestion.workShift === 'third') {
-    return 'speaking';
-  }
-
-  const weakest = [
-    { key: 'vocabulary' as const, value: appStore.studentModel.vocabulary.score.value },
-    { key: 'listening' as const, value: appStore.studentModel.listening.score.value },
-    { key: 'speaking' as const, value: appStore.studentModel.speaking.score.value },
-  ].sort((left, right) => left.value - right.value)[0];
-
-  return weakest.key;
 }
 
 function tokenizeListeningText(text: string): ListeningToken[] {

@@ -44,7 +44,8 @@ body.body--dark {
 .home-nav-button,
 .ios-install-button,
 .settings-nav-button,
-.update-log-button {
+.update-log-button,
+.more-nav-button {
   color: var(--app-primary);
 }
 
@@ -162,6 +163,12 @@ body.body--dark {
 
 .update-log__empty {
   padding: 18px 16px;
+}
+
+.more-nav-menu {
+  background: var(--app-surface);
+  color: var(--app-text);
+  min-width: 220px;
 }
 
 .app-page-container {
@@ -606,8 +613,8 @@ body.body--dark {
   display: grid;
   gap: 12px;
   justify-items: center;
-  margin: 8px 0;
-  min-height: 190px;
+  margin: 4px 0 0;
+  min-height: 168px;
   text-align: center;
 }
 
@@ -649,6 +656,10 @@ body.body--dark {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.shift-timing-grid--settings {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .shift-timing-item {

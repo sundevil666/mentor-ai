@@ -100,4 +100,3 @@ function isAuthSession(value: AuthSession): value is AuthSession {
     typeof value.user.email === 'string'
   );
 }
-import { mentorDb } from './indexed-db';
