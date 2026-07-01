@@ -265,8 +265,18 @@
       </q-toolbar>
     </q-header>
 
-    <q-page-container>
-      <router-view />
+    <q-page-container class="app-page-container">
+      <router-view v-slot="{ Component, route }">
+        <transition
+          mode="out-in"
+          name="route-fade"
+        >
+          <component
+            :is="Component"
+            :key="route.name ?? route.fullPath"
+          />
+        </transition>
+      </router-view>
     </q-page-container>
   </q-layout>
 </template>

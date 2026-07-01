@@ -164,6 +164,25 @@ body.body--dark {
   padding: 18px 16px;
 }
 
+.app-page-container {
+  background: var(--app-bg);
+  min-height: 100vh;
+  overflow-x: clip;
+}
+
+.route-fade-enter-active,
+.route-fade-leave-active {
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.route-fade-enter-from,
+.route-fade-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
 .learning-page {
   align-items: center;
   display: flex;
@@ -775,6 +794,19 @@ body.body--dark {
 
   .voice-actions > .q-btn {
     align-self: stretch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-fade-enter-active,
+  .route-fade-leave-active {
+    transition: none;
+  }
+
+  .route-fade-enter-from,
+  .route-fade-leave-to {
+    opacity: 1;
+    transform: none;
   }
 }
 
