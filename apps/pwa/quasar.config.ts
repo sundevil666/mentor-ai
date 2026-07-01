@@ -29,31 +29,14 @@ export default configure(() => ({
     port: 9000,
   },
   pwa: {
-    workboxMode: 'GenerateSW',
+    workboxMode: 'InjectManifest',
+    extendPWACustomSWConf(cfg) {
+      cfg.target = 'es2022';
+    },
     injectPwaMetaTags: true,
     swFilename: 'sw.js',
     manifestFilename: 'manifest.json',
     useCredentialsForManifestTag: false,
-    extendGenerateSWOptions(cfg) {
-      cfg.cleanupOutdatedCaches = true;
-      cfg.clientsClaim = true;
-      cfg.skipWaiting = true;
-      cfg.navigateFallback = 'index.html';
-      cfg.navigateFallbackDenylist = [/^\/assets\//, /^\/api\//, /^\/sw\.js$/, /^\/manifest\.json$/];
-      cfg.runtimeCaching = [
-        {
-          urlPattern: /^https?:\/\/localhost:\d+\/api\//,
-          handler: 'NetworkFirst',
-          options: {
-            cacheName: 'mentor-ai-api',
-            expiration: {
-              maxEntries: 60,
-              maxAgeSeconds: 60 * 60 * 24,
-            },
-          },
-        },
-      ];
-    },
     manifest: {
       name: 'Mentor AI',
       short_name: 'Mentor AI',

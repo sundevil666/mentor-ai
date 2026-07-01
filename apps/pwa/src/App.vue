@@ -21,6 +21,7 @@ let remoteSyncPollingTimer: number | undefined;
 onMounted(() => {
   window.addEventListener('mentor-ai:update-available', handleUpdateAvailable);
   document.addEventListener('visibilitychange', handleVisibilitySync);
+  navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
   stopUpdatePolling = startAppUpdatePolling(handleServerUpdateAvailable);
   startRemoteSyncPolling();
 });
@@ -28,6 +29,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('mentor-ai:update-available', handleUpdateAvailable);
   document.removeEventListener('visibilitychange', handleVisibilitySync);
+  navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
   stopRemoteSyncPolling();
   stopUpdatePolling?.();
 });
@@ -103,6 +105,12 @@ function stopRemoteSyncPolling() {
 
 function handleVisibilitySync() {
   if (document.visibilityState === 'visible') {
+    void refreshRemoteProgress(true);
+  }
+}
+
+function handleServiceWorkerMessage(event: MessageEvent) {
+  if (event.data?.type === 'mentor-ai:learning-sync-finished') {
     void refreshRemoteProgress(true);
   }
 }

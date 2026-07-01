@@ -34,6 +34,7 @@ import {
   upsertSessionHandoff,
 } from 'src/services/api-client';
 import { createActivityReason, inferActivitySuggestion } from 'src/services/activity-suggestion';
+import { registerLearningBackgroundSync } from 'src/services/background-sync';
 import { mentorDb } from 'src/services/indexed-db';
 import {
   compactAcknowledgedSyncEvent,
@@ -165,6 +166,10 @@ export const useAppStore = defineStore('app', {
       );
       this.isOnline = navigator.onLine;
       this.isHydrated = true;
+
+      if (this.pendingSyncEvents > 0) {
+        await this.registerBackgroundSync();
+      }
 
       await this.pruneLocalStorage();
 
@@ -541,6 +546,10 @@ export const useAppStore = defineStore('app', {
 
       const queuedEvents = await db.getAll('sync-queue');
       this.pendingSyncEvents = queuedEvents.filter((event) => event.status === 'pending').length;
+
+      if (this.pendingSyncEvents > 0) {
+        await this.registerBackgroundSync();
+      }
     },
 
     async syncPendingEvents() {
@@ -580,6 +589,15 @@ export const useAppStore = defineStore('app', {
         this.lastSyncAt = now();
       } catch {
         this.pendingSyncEvents = pendingEvents.length;
+        await this.registerBackgroundSync();
+      }
+    },
+
+    async registerBackgroundSync() {
+      try {
+        await registerLearningBackgroundSync();
+      } catch {
+        return;
       }
     },
 
