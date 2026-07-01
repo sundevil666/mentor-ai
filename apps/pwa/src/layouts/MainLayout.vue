@@ -33,7 +33,7 @@
           <q-tooltip>{{ syncStatusTooltip }}</q-tooltip>
         </q-btn>
         <q-btn
-          v-if="googleClientId && !appStore.authSession"
+          v-if="!appStore.authSession"
           class="auth-button"
           color="primary"
           dense
@@ -272,7 +272,7 @@
 </template>
 
 <script setup lang="ts">
-import { Dark } from 'quasar';
+import { Dark, Notify } from 'quasar';
 import { computed, onMounted, ref } from 'vue';
 import { useAppStore } from 'src/stores/app-store';
 import { fetchAuthConfiguration, signInWithGoogleCredential } from 'src/services/auth';
@@ -361,6 +361,13 @@ async function loadAuthConfiguration() {
 
 async function signInWithGoogle() {
   if (!googleClientId.value) {
+    Notify.create({
+      type: 'warning',
+      icon: 'login',
+      message: 'Google sign-in is not configured yet',
+      caption: 'Set GOOGLE_CLIENT_ID and GOOGLE_ALLOWED_EMAILS on the backend.',
+      timeout: 7000,
+    });
     return;
   }
 
