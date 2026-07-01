@@ -305,6 +305,8 @@ body.body--dark {
 .learning-start,
 .lesson-stage,
 .lesson-complete {
+  align-content: start;
+  align-items: start;
   display: grid;
   gap: 24px;
 }
@@ -463,6 +465,7 @@ body.body--dark {
 .lesson-actions .q-btn {
   align-self: center;
   flex: 0 0 auto;
+  height: 48px;
   min-height: 48px;
   padding: 0 24px;
 }
@@ -472,6 +475,7 @@ body.body--dark {
 .voice-actions > .q-btn {
   align-self: center;
   flex: 0 0 auto;
+  height: 48px;
 }
 
 .concept-choice {
@@ -706,6 +710,7 @@ body.body--dark {
   .lesson-actions .q-btn {
     align-self: stretch;
     font-size: 1rem;
+    height: 52px;
     min-height: 52px;
     width: 100%;
   }
