@@ -35,6 +35,25 @@ describe('learning state service', () => {
     assert.equal(lesson.exercises[0].audioText.split(/\s+/).length >= 1100, true);
   });
 
+  it('does not reuse the cached listening lesson for speaking mode', async () => {
+    const listeningLesson = await learningStateService.getCurrentLesson({
+      mode: 'listening',
+      isOffline: false,
+      speechAvailable: true,
+      availableMinutes: 8,
+    });
+    const speakingLesson = await learningStateService.getCurrentLesson({
+      mode: 'speaking',
+      isOffline: false,
+      speechAvailable: true,
+      availableMinutes: 8,
+    });
+
+    assert.equal(listeningLesson.exercises[0].type, 'listening-text');
+    assert.equal(speakingLesson.title, 'Speaking confidence at work');
+    assert.equal(speakingLesson.exercises.some((exercise) => exercise.type === 'repeat-speaking'), true);
+  });
+
   it('does not reuse the cached current lesson when a lesson card requests a specific template', async () => {
     const readingLesson = await learningStateService.getCurrentLesson({
       mode: 'home',

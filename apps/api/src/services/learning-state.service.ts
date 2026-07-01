@@ -42,7 +42,7 @@ export const learningStateService = {
     const selectedLesson =
       context.lessonTemplateKey
         ? generateLessonFromPlan(aiTeacherService.planLesson(state.studentModel, context, createdAt), createdAt)
-        : context.mode === 'listening'
+        : context.mode === 'listening' || context.mode === 'speaking'
         ? (await privateLessonRepository.findNextForMode(context.mode, completedLessonIds)) ??
           generateLessonFromPlan(aiTeacherService.planLesson(state.studentModel, context, createdAt), createdAt)
         : (await privateLessonRepository.findNextForStudent(state.studentModel, completedLessonIds)) ??
@@ -202,8 +202,12 @@ function isLessonSuitableForContext(lesson: GeneratedLesson, context: LearningCo
     return false;
   }
 
+  if (context.mode === 'speaking') {
+    return isSpeakingLesson(lesson);
+  }
+
   if (context.mode !== 'listening') {
-    return true;
+    return lesson.lessonTemplateKey === undefined || lesson.lessonTemplateKey !== 'commute-listening';
   }
 
   const firstExercise = lesson.exercises[0];
@@ -217,6 +221,26 @@ function isLessonSuitableForContext(lesson: GeneratedLesson, context: LearningCo
             typeof firstExercise.audioText === 'string' &&
             firstExercise.audioText.trim().length > 0)),
     )
+  );
+}
+
+function isSpeakingLesson(lesson: GeneratedLesson): boolean {
+  const firstExercise = lesson.exercises[0];
+  const secondExercise = lesson.exercises[1];
+
+  return (
+    !isListeningLesson(lesson) &&
+    (firstExercise?.type === 'repeat-speaking' ||
+      (firstExercise?.type === 'review' && secondExercise?.type === 'repeat-speaking') ||
+      /\bspeaking\b/i.test(`${lesson.id} ${lesson.title} ${lesson.activityType}`))
+  );
+}
+
+function isListeningLesson(lesson: GeneratedLesson): boolean {
+  return lesson.exercises.some(
+    (exercise) =>
+      exercise.type === 'listening-text' ||
+      (exercise.targetSkill === 'listening' && typeof exercise.audioText === 'string' && exercise.audioText.trim().length > 0),
   );
 }
 

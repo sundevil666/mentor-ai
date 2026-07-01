@@ -1251,7 +1251,15 @@ function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercis
     );
   }
 
-  if (plan.learningMode === 'listening' || plan.goal.skill === 'listening') {
+  if (plan.learningMode === 'listening') {
+    return instantiateLessonTemplate(learningLessonTemplates[0], plan, reviewTarget);
+  }
+
+  if (plan.learningMode === 'speaking') {
+    return instantiateLessonTemplate(learningLessonTemplates[1], plan, reviewTarget);
+  }
+
+  if (plan.goal.skill === 'listening') {
     return instantiateLessonTemplate(learningLessonTemplates[0], plan, reviewTarget);
   }
 
@@ -1287,11 +1295,19 @@ function selectLearningLessonTemplate(plan: LessonPlan): LessonTemplate {
     return requestedTemplate;
   }
 
-  if (plan.learningMode === 'listening' || plan.goal.skill === 'listening') {
+  if (plan.learningMode === 'listening') {
     return learningLessonTemplates[0];
   }
 
-  if (plan.learningMode === 'speaking' || plan.goal.skill === 'speaking') {
+  if (plan.learningMode === 'speaking') {
+    return learningLessonTemplates[1];
+  }
+
+  if (plan.goal.skill === 'listening') {
+    return learningLessonTemplates[0];
+  }
+
+  if (plan.goal.skill === 'speaking') {
     return learningLessonTemplates[1];
   }
 

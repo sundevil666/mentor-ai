@@ -148,6 +148,10 @@ function findLessonForMode(lessons: GeneratedLesson[], mode: LearningMode): Gene
     return lessons.find(startsWithListeningStep) ?? lessons.find(isListeningLesson);
   }
 
+  if (mode === 'speaking') {
+    return lessons.find(isSpeakingLesson);
+  }
+
   return lessons[0];
 }
 
@@ -172,6 +176,18 @@ function isListeningLesson(lesson: GeneratedLesson): boolean {
         (exercise.targetSkill === 'listening' && typeof exercise.audioText === 'string' && exercise.audioText.trim().length > 0),
     ) ||
     /\blistening\b/i.test(`${lesson.id} ${lesson.title} ${lesson.activityType}`)
+  );
+}
+
+function isSpeakingLesson(lesson: GeneratedLesson): boolean {
+  const firstExercise = lesson.exercises[0];
+  const secondExercise = lesson.exercises[1];
+
+  return (
+    !isListeningLesson(lesson) &&
+    (firstExercise?.type === 'repeat-speaking' ||
+      (firstExercise?.type === 'review' && secondExercise?.type === 'repeat-speaking') ||
+      /\bspeaking\b/i.test(`${lesson.id} ${lesson.title} ${lesson.activityType}`))
   );
 }
 
