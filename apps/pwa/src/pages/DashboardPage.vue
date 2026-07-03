@@ -264,7 +264,10 @@
 
                 <div
                   ref="listeningTextElement"
-                  class="listening-player__text"
+                  :class="[
+                    'listening-player__text',
+                    { 'listening-player__text--translation-visible': isListeningTranslationVisible },
+                  ]"
                   @scroll="handleListeningTextScroll"
                 >
                   <span
@@ -280,6 +283,14 @@
                     ]"
                   >{{ token.word }}{{ token.trailing }}</span>
                 </div>
+              </div>
+
+              <div
+                v-if="isListeningTranslationVisible"
+                class="listening-player__translation"
+                aria-live="polite"
+              >
+                <span>{{ activeListeningSentenceTranslation }}</span>
               </div>
 
               <div class="listening-player__controls">
@@ -311,6 +322,16 @@
                   @click="toggleListeningRepeat"
                 >
                   <q-tooltip>{{ isListeningRepeatEnabled ? 'Repeat is on' : 'Repeat selected text' }}</q-tooltip>
+                </q-btn>
+                <q-btn
+                  :color="isListeningTranslationVisible ? 'secondary' : 'primary'"
+                  :flat="!isListeningTranslationVisible"
+                  :unelevated="isListeningTranslationVisible"
+                  icon="translate"
+                  round
+                  @click="toggleListeningTranslation"
+                >
+                  <q-tooltip>{{ isListeningTranslationVisible ? 'Hide translation' : 'Translate sentence' }}</q-tooltip>
                 </q-btn>
                 <q-btn
                   color="primary"
@@ -426,6 +447,7 @@ const activeWordEndIndex = ref(0);
 const isListeningSpeaking = ref(false);
 const isListeningPaused = ref(false);
 const isListeningRepeatEnabled = ref(false);
+const isListeningTranslationVisible = ref(false);
 const isListeningPlaylistVisible = ref(false);
 const selectedListeningItemId = ref<string | null>(null);
 const activeSpeechRunId = ref(0);
@@ -491,6 +513,8 @@ const listeningProgressKey = computed(() => {
   return `${session.lesson.id}:${item.id}`;
 });
 const sentenceStartWordIndexes = computed(() => getSentenceStartWordIndexes(listeningTokens.value));
+const activeListeningSentence = computed(() => getListeningSentenceAtWord(activeWordIndex.value, listeningTokens.value));
+const activeListeningSentenceTranslation = computed(() => translateListeningSentence(activeListeningSentence.value));
 const listeningTitle = computed(() =>
   currentExercise.value?.type === 'listening-text' ? 'Listen and read' : currentExercise.value?.prompt ?? 'Listen',
 );
@@ -796,6 +820,11 @@ function toggleListeningRepeat() {
   isListeningRepeatEnabled.value = !isListeningRepeatEnabled.value;
 }
 
+function toggleListeningTranslation() {
+  isListeningTranslationVisible.value = !isListeningTranslationVisible.value;
+  void scrollActiveListeningPhraseIntoView();
+}
+
 function toggleListeningPlaylist() {
   isListeningPlaylistVisible.value = !isListeningPlaylistVisible.value;
 }
@@ -906,6 +935,7 @@ function resetListeningPlayback() {
   stopListeningAudio();
   activeWordIndex.value = 0;
   activeWordEndIndex.value = 0;
+  isListeningTranslationVisible.value = false;
   resetListeningAutoScroll();
 }
 
@@ -992,16 +1022,10 @@ async function scrollActiveListeningPhraseIntoView() {
   const containerRect = container.getBoundingClientRect();
   const tokenRect = activeToken.getBoundingClientRect();
   const tokenTop = tokenRect.top - containerRect.top;
-  const tokenBottom = tokenRect.bottom - containerRect.top;
-  const comfortTop = container.clientHeight * 0.22;
-  const comfortBottom = container.clientHeight * 0.58;
-
-  if (tokenTop >= comfortTop && tokenBottom <= comfortBottom) {
-    return;
-  }
+  const tokenCenter = tokenTop + tokenRect.height / 2;
 
   const targetScrollTop = clampIndex(
-    Math.round(container.scrollTop + tokenTop - container.clientHeight * 0.36),
+    Math.round(container.scrollTop + tokenCenter - container.clientHeight * 0.5),
     0,
     Math.max(container.scrollHeight - container.clientHeight, 0),
   );
@@ -1100,6 +1124,42 @@ function getSentenceStartWordIndexes(tokens: ListeningToken[]): number[] {
   return Array.from(new Set(starts));
 }
 
+function getListeningSentenceAtWord(wordIndex: number, tokens: ListeningToken[]): string {
+  if (tokens.length === 0) {
+    return '';
+  }
+
+  const safeWordIndex = clampIndex(wordIndex, 0, tokens.length - 1);
+  let startIndex = safeWordIndex;
+  let endIndex = safeWordIndex;
+
+  while (startIndex > 0 && !endsSentence(tokens[startIndex - 1])) {
+    startIndex -= 1;
+  }
+
+  while (endIndex < tokens.length - 1 && !endsSentence(tokens[endIndex])) {
+    endIndex += 1;
+  }
+
+  return tokens
+    .slice(startIndex, endIndex + 1)
+    .map((token) => `${token.word}${token.trailing}`)
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function translateListeningSentence(sentence: string): string {
+  const normalizedSentence = normalizeListeningSentence(sentence);
+  const translation = listeningSentenceTranslations[normalizedSentence];
+
+  return translation ?? sentence;
+}
+
+function normalizeListeningSentence(sentence: string): string {
+  return sentence.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
 function clampIndex(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
@@ -1156,4 +1216,97 @@ function findLastNumberIndex(values: number[], maxValue: number): number {
 
   return -1;
 }
+
+const listeningSentenceTranslations: Record<string, string> = {
+  [normalizeListeningSentence('This morning I am going to work, and I want to use my travel time for English.')]:
+    'Сегодня утром я еду на работу и хочу использовать время в дороге для английского.',
+  [normalizeListeningSentence('I leave home with my bag, my phone, and my headphones.')]:
+    'Я выхожу из дома с сумкой, телефоном и наушниками.',
+  [normalizeListeningSentence('The street is quiet, but the bus stop is already a little busy.')]:
+    'На улице тихо, но на автобусной остановке уже немного людно.',
+  [normalizeListeningSentence('I check the time and I see that I have ten minutes before the bus arrives.')]:
+    'Я смотрю на время и вижу, что до прихода автобуса у меня есть десять минут.',
+  [normalizeListeningSentence('I decide to listen to a simple English story and read the text at the same time.')]:
+    'Я решаю послушать простую английскую историю и одновременно читать текст.',
+  [normalizeListeningSentence('When I hear a new word, I do not stop immediately.')]:
+    'Когда я слышу новое слово, я не останавливаюсь сразу.',
+  [normalizeListeningSentence('First, I listen to the whole sentence and try to understand the main idea.')]:
+    'Сначала я слушаю все предложение и пытаюсь понять главную мысль.',
+  [normalizeListeningSentence('Then I replay the sentence and look at the word again.')]:
+    'Потом я повторно включаю предложение и снова смотрю на слово.',
+  [normalizeListeningSentence('This helps me connect the sound, the spelling, and the meaning.')]:
+    'Это помогает мне связать звучание, написание и значение.',
+  [normalizeListeningSentence('On the bus, I sit near the window and lower the volume a little.')]:
+    'В автобусе я сажусь у окна и немного уменьшаю громкость.',
+  [normalizeListeningSentence('I can hear the voice clearly, but I can also hear the world around me.')]:
+    'Я хорошо слышу голос, но также слышу мир вокруг себя.',
+  [normalizeListeningSentence('The speaker talks about a normal day, simple plans, and small choices.')]:
+    'Диктор говорит об обычном дне, простых планах и маленьких выборах.',
+  [normalizeListeningSentence('I hear phrases like I will take the bus, I need a coffee, and I will start work soon.')]:
+    'Я слышу фразы вроде: я поеду на автобусе, мне нужен кофе, и я скоро начну работать.',
+  [normalizeListeningSentence('These phrases are useful because I can say them in my own life.')]:
+    'Эти фразы полезны, потому что я могу сказать их в своей жизни.',
+  [normalizeListeningSentence('I repeat some words quietly in my head, but I do not need to speak loudly.')]:
+    'Я тихо повторяю некоторые слова про себя, но мне не нужно говорить громко.',
+  [normalizeListeningSentence('The goal is not to understand every word perfectly.')]:
+    'Цель не в том, чтобы идеально понять каждое слово.',
+  [normalizeListeningSentence('The goal is to stay with the text, catch the rhythm, and understand more each time.')]:
+    'Цель в том, чтобы оставаться с текстом, улавливать ритм и каждый раз понимать больше.',
+  [normalizeListeningSentence('After two minutes, the story feels easier.')]:
+    'Через две минуты история кажется легче.',
+  [normalizeListeningSentence('I notice the same words again and again: morning, bus, work, listen, today, and later.')]:
+    'Я снова и снова замечаю одни и те же слова: morning, bus, work, listen, today и later.',
+  [normalizeListeningSentence('Repeated words become friendly because my ears meet them many times.')]:
+    'Повторяющиеся слова становятся знакомыми, потому что мои уши встречают их много раз.',
+  [normalizeListeningSentence('When the bus turns onto the main road, I move to the next paragraph.')]:
+    'Когда автобус поворачивает на главную дорогу, я перехожу к следующему абзацу.',
+  [normalizeListeningSentence('The text talks about a person planning a small English routine.')]:
+    'В тексте говорится о человеке, который планирует маленькую привычку для английского.',
+  [normalizeListeningSentence('The person listens for ten minutes in the morning and reads for five minutes in the evening.')]:
+    'Этот человек слушает десять минут утром и читает пять минут вечером.',
+  [normalizeListeningSentence('This routine is small, but it is easy to repeat.')]:
+    'Эта привычка маленькая, но ее легко повторять.',
+  [normalizeListeningSentence('A small routine every day is stronger than a hard lesson once a month.')]:
+    'Небольшая ежедневная привычка сильнее, чем тяжелый урок раз в месяц.',
+  [normalizeListeningSentence('I like this idea because I am often tired after work.')]:
+    'Мне нравится эта идея, потому что после работы я часто устаю.',
+  [normalizeListeningSentence('If I only have a little energy, I can still listen and read.')]:
+    'Если у меня мало энергии, я все равно могу слушать и читать.',
+  [normalizeListeningSentence('If I have more energy, I can repeat sentences and answer questions.')]:
+    'Если у меня больше энергии, я могу повторять предложения и отвечать на вопросы.',
+  [normalizeListeningSentence('The voice says that progress can feel slow, but listening grows quietly.')]:
+    'Голос говорит, что прогресс может казаться медленным, но навык слушания растет незаметно.',
+  [normalizeListeningSentence('One day a phrase is difficult, and later the same phrase feels normal.')]:
+    'В один день фраза трудная, а позже та же фраза кажется обычной.',
+  [normalizeListeningSentence('I look at the highlighted words and follow them with my eyes.')]:
+    'Я смотрю на выделенные слова и слежу за ними глазами.',
+  [normalizeListeningSentence('When the highlight moves, I know exactly where the voice is.')]:
+    'Когда выделение двигается, я точно знаю, где сейчас голос.',
+  [normalizeListeningSentence('If I lose my place, I go back one sentence and listen again.')]:
+    'Если я теряю место, я возвращаюсь на одно предложение назад и слушаю снова.',
+  [normalizeListeningSentence('If one word is unclear, I go back one word and hear it again.')]:
+    'Если одно слово непонятно, я возвращаюсь на одно слово назад и слушаю его снова.',
+  [normalizeListeningSentence('This makes listening active, but still calm.')]:
+    'Это делает слушание активным, но все еще спокойным.',
+  [normalizeListeningSentence('Near the end of the ride, I understand the story better than at the beginning.')]:
+    'Ближе к концу поездки я понимаю историю лучше, чем в начале.',
+  [normalizeListeningSentence('I can remember the main idea: use small moments, listen often, and read while listening.')]:
+    'Я могу запомнить главную мысль: использовать короткие моменты, часто слушать и читать во время слушания.',
+  [normalizeListeningSentence('I do not need perfect grammar in my head while I listen.')]:
+    'Пока я слушаю, мне не нужна идеальная грамматика в голове.',
+  [normalizeListeningSentence('I need attention, patience, and a simple text that I can finish.')]:
+    'Мне нужны внимание, терпение и простой текст, который я могу закончить.',
+  [normalizeListeningSentence('When I arrive at work, I stop the audio and save my progress.')]:
+    'Когда я прихожу на работу, я останавливаю аудио и сохраняю прогресс.',
+  [normalizeListeningSentence('Later, I can return to the same text and it will feel easier.')]:
+    'Позже я могу вернуться к тому же тексту, и он будет казаться легче.',
+  [normalizeListeningSentence('The same listening text can teach me new sounds on the first day and confidence on the second day.')]:
+    'Один и тот же текст для слушания может в первый день учить новым звукам, а во второй давать уверенность.',
+  [normalizeListeningSentence('Every replay is useful evidence because it shows what my ears are training.')]:
+    'Каждое повторное прослушивание полезно, потому что показывает, что тренируют мои уши.',
+  [normalizeListeningSentence('Today I listened, read, and stayed with English for ten minutes.')]:
+    'Сегодня я слушал, читал и оставался с английским десять минут.',
+  [normalizeListeningSentence('That is real practice, and it counts.')]:
+    'Это настоящая практика, и она засчитывается.',
+};
 </script>
