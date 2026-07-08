@@ -81,64 +81,41 @@
             <span>{{ recommendedTraining.reason }}</span>
           </div>
 
-          <div class="training-mode-strip">
-            <q-btn
-              v-for="mode in primaryTrainingModes"
-              :key="mode.key"
-              class="training-mode-button"
-              color="primary"
-              outline
-              no-caps
-              :icon="mode.icon"
-              :label="mode.label"
-              @click="startTraining(mode.key)"
-            >
-              <q-tooltip>{{ mode.reason }}</q-tooltip>
-            </q-btn>
-          </div>
-
-          <div class="concept-choice">
-            <q-btn
-              v-for="concept in conceptChoices"
-              :key="concept.value"
-              color="primary"
-              outline
-              no-caps
-              :icon="concept.icon"
-              :label="concept.label"
-              @click="startConcept(concept.value)"
-            >
-              <q-tooltip>{{ concept.reason }}</q-tooltip>
-            </q-btn>
-          </div>
-
-          <div class="lesson-library">
-            <section
-              v-for="section in lessonSections"
-              :key="section.concept"
-              class="lesson-library__section"
-            >
-              <div class="lesson-library__heading">
-                <q-icon
-                  :name="section.icon"
-                  size="20px"
-                />
-                <span>{{ section.label }}</span>
-              </div>
-              <div class="lesson-library__grid">
-                <button
-                  v-for="lesson in section.lessons"
-                  :key="lesson.templateKey"
-                  class="lesson-card"
-                  type="button"
-                  @click="startLessonChoice(section.concept, lesson.templateKey)"
-                >
-                  <span>{{ lesson.title }}</span>
-                  <strong>{{ lesson.focus }}</strong>
-                </button>
-              </div>
-            </section>
-          </div>
+          <q-expansion-item
+            class="lesson-library-expander"
+            dense-toggle
+            icon="tune"
+            label="Specific lesson"
+            switch-toggle-side
+          >
+            <div class="lesson-library">
+              <section
+                v-for="section in lessonSections"
+                :key="section.concept"
+                class="lesson-library__section"
+              >
+                <div class="lesson-library__heading">
+                  <q-icon
+                    :name="section.icon"
+                    size="20px"
+                  />
+                  <span>{{ section.label }}</span>
+                </div>
+                <div class="lesson-library__grid">
+                  <button
+                    v-for="lesson in section.lessons"
+                    :key="lesson.templateKey"
+                    class="lesson-card"
+                    type="button"
+                    @click="startLessonChoice(section.concept, lesson.templateKey)"
+                  >
+                    <span>{{ lesson.title }}</span>
+                    <strong>{{ lesson.focus }}</strong>
+                  </button>
+                </div>
+              </section>
+            </div>
+          </q-expansion-item>
         </section>
 
         <section
@@ -396,6 +373,25 @@
         </section>
       </transition>
     </section>
+
+    <nav
+      class="mobile-start-dock"
+      aria-label="Start lesson"
+    >
+      <button
+        v-for="item in quickStartItems"
+        :key="item.key"
+        class="mobile-start-dock__button"
+        type="button"
+        @click="item.start"
+      >
+        <q-icon
+          :name="item.icon"
+          size="24px"
+        />
+        <span>{{ item.label }}</span>
+      </button>
+    </nav>
   </q-page>
 </template>
 
@@ -409,7 +405,6 @@ import {
   findTrainingMode,
   formatActivityMeta,
   formatPaceLabel,
-  primaryTrainingModes,
   type TrainingKey,
 } from 'src/services/learning-context';
 import { createPreferredSpeechUtterance, speakWithPreferredVoice, waitForSpeechVoices } from 'src/services/speech-synthesis';
@@ -438,6 +433,12 @@ type ListeningPlaylistItem = {
   id: string;
   title: string;
   text: string;
+};
+type QuickStartItem = {
+  key: string;
+  label: string;
+  icon: string;
+  start: () => void;
 };
 
 const appStore = useAppStore();
@@ -552,26 +553,6 @@ const remoteContinueOptions = computed(() =>
     detail: `${handoff.lesson.title} · ${Math.min(handoff.currentExerciseIndex + 1, handoff.lesson.exercises.length)}/${handoff.lesson.exercises.length}`,
   })),
 );
-const conceptChoices: Array<{ value: LearningConcept; label: string; icon: string; reason: string }> = [
-  {
-    value: 'learning',
-    label: 'Learning',
-    icon: 'school',
-    reason: 'Grammar, listening, speaking, correction, and review together.',
-  },
-  {
-    value: 'reading',
-    label: 'Reading',
-    icon: 'menu_book',
-    reason: 'A short text with comprehension and unknown-word evidence.',
-  },
-  {
-    value: 'vocabulary',
-    label: 'Vocabulary Growth',
-    icon: 'psychology',
-    reason: 'Recall, recognition, and words in context.',
-  },
-];
 const lessonSections: LessonSection[] = [
   {
     concept: 'learning',
@@ -635,6 +616,40 @@ const recommendedTraining = computed(() => {
     reason: `${training.reason} ${currentSuggestion.value.reason}`,
   };
 });
+const quickStartItems = computed<QuickStartItem[]>(() => [
+  {
+    key: 'listening',
+    label: 'Listen',
+    icon: 'headphones',
+    start: () => {
+      void startTraining('listening');
+    },
+  },
+  {
+    key: 'speaking',
+    label: 'Speak',
+    icon: 'record_voice_over',
+    start: () => {
+      void startTraining('speaking');
+    },
+  },
+  {
+    key: 'vocabulary',
+    label: 'Words',
+    icon: 'psychology',
+    start: () => {
+      void startTraining('vocabulary');
+    },
+  },
+  {
+    key: 'reading',
+    label: 'Read',
+    icon: 'menu_book',
+    start: () => {
+      void startConcept('reading');
+    },
+  },
+]);
 onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();
