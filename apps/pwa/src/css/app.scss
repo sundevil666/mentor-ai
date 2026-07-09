@@ -321,6 +321,19 @@ body.body--dark {
   text-align: center;
 }
 
+.level-trend {
+  align-items: center;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  color: var(--app-text);
+  display: inline-flex;
+  font-weight: 700;
+  gap: 5px;
+  min-height: 30px;
+  padding: 4px 9px;
+}
+
 .learning-overview {
   display: grid;
   gap: 12px;
@@ -415,6 +428,59 @@ body.body--dark {
   display: grid;
   gap: 24px;
   width: 100%;
+}
+
+.dialogue-drill {
+  align-content: start;
+  align-items: start;
+  display: grid;
+  gap: 20px;
+  width: 100%;
+}
+
+.dialogue-drill__prompt,
+.dialogue-drill__native {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  width: 100%;
+}
+
+.dialogue-drill__prompt span,
+.dialogue-drill__native span {
+  color: var(--app-accent);
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.dialogue-drill__prompt strong,
+.dialogue-drill__native strong {
+  color: var(--app-text-strong);
+  font-size: 1.35rem;
+  line-height: 1.35;
+}
+
+.dialogue-drill__recorder {
+  align-items: center;
+  background: var(--app-surface-soft);
+  border: 1px solid var(--app-border-strong);
+  border-radius: 8px;
+  color: var(--app-muted-strong);
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  width: 100%;
+}
+
+.dialogue-drill__recorder > span {
+  flex: 1;
+  font-size: 0.95rem;
+  line-height: 1.35;
 }
 
 .handoff-actions {
@@ -1042,6 +1108,21 @@ body.body--dark {
     margin-bottom: 18px;
     overflow-x: auto;
     white-space: nowrap;
+  }
+
+  .dialogue-drill__recorder {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr 48px;
+  }
+
+  .dialogue-drill__recorder > span {
+    grid-column: 1 / -1;
+  }
+
+  .dialogue-drill__prompt strong,
+  .dialogue-drill__native strong {
+    font-size: 1.15rem;
   }
 
   .recommended-action {

@@ -13,6 +13,11 @@
           {{ appStore.isOnline ? 'Online' : 'Offline' }}
         </q-badge>
         <span>Model v{{ appStore.studentModel.version }}</span>
+        <span class="level-trend">
+          <q-icon :name="levelTrend.icon" size="18px" />
+          {{ levelTrend.level }} · {{ levelTrend.daysLabel }}
+          <q-tooltip>{{ levelTrend.tooltip }}</q-tooltip>
+        </span>
       </div>
 
       <transition :name="learningTransitionName">
@@ -113,7 +118,65 @@
           </div>
 
           <transition :name="exerciseTransitionName">
-            <div v-if="!isListeningPlayer" :key="currentExercise.id" class="exercise-standard">
+            <div
+              v-if="isDialogueTranslationExercise"
+              :key="currentExercise.id"
+              class="dialogue-drill"
+            >
+              <div>
+                <p class="lesson-stage__eyebrow">
+                  {{ appStore.session.lesson.title }}
+                </p>
+                <h1>{{ currentExercise.prompt }}</h1>
+                <p>{{ currentExercise.microLesson }}</p>
+              </div>
+
+              <div class="dialogue-drill__prompt">
+                <span>{{ currentExercise.phraseFocus ?? 'spoken pattern' }}</span>
+                <strong>{{ currentExercise.nativePrompt }}</strong>
+              </div>
+
+              <div class="dialogue-drill__recorder">
+                <q-btn
+                  color="primary"
+                  :icon="isRecognizingSpeech ? 'graphic_eq' : 'mic'"
+                  :label="isRecognizingSpeech ? 'Listening...' : 'Record answer'"
+                  unelevated
+                  no-caps
+                  :disable="!speechRecognitionAvailable || isRecognizingSpeech"
+                  @click="recordDialogueAnswer"
+                />
+                <q-btn color="primary" flat icon="volume_up" round @click="playAudio">
+                  <q-tooltip>Play native answer</q-tooltip>
+                </q-btn>
+                <span>{{ speechSupportMessage }}</span>
+              </div>
+
+              <q-input
+                v-model="answer"
+                label="Recognized text or typed answer"
+                outlined
+                @keyup.enter="submit"
+              />
+
+              <div v-if="currentExercise.audioText" class="dialogue-drill__native">
+                <span>Native answer</span>
+                <strong>{{ currentExercise.audioText }}</strong>
+              </div>
+
+              <div class="lesson-actions">
+                <span>{{ currentExercise.successTip }}</span>
+                <q-btn
+                  color="primary"
+                  label="Continue"
+                  unelevated
+                  :disable="answer.trim().length === 0"
+                  @click="submit"
+                />
+              </div>
+            </div>
+
+            <div v-else-if="!isListeningPlayer" :key="currentExercise.id" class="exercise-standard">
               <div>
                 <p class="lesson-stage__eyebrow">
                   {{ appStore.session.lesson.title }}
@@ -347,7 +410,7 @@
 </template>
 
 <script setup lang="ts">
-import type { LearningConcept, LearningMode } from '@mentor-ai/shared';
+import type { ConceptLevel, LearningConcept, LearningMode, StudentModel } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
   chooseRecommendedTraining,
@@ -363,6 +426,11 @@ import {
   speakWithPreferredVoice,
   waitForSpeechVoices,
 } from 'src/services/speech-synthesis';
+import {
+  isSpeechRecognitionAvailable,
+  recognizeSpeechOnce,
+  stopSpeechRecognition,
+} from 'src/services/speech-recognition';
 import {
   readListeningProgressPreference,
   saveListeningProgressPreference,
@@ -408,6 +476,8 @@ const isListeningPaused = ref(false);
 const isListeningRepeatEnabled = ref(false);
 const isListeningTranslationVisible = ref(false);
 const isListeningPlaylistVisible = ref(false);
+const isRecognizingSpeech = ref(false);
+const speechRecognitionError = ref('');
 const selectedListeningItemId = ref<string | null>(null);
 const activeSpeechRunId = ref(0);
 const learningTransitionName = ref('learning-slide-forward');
@@ -431,6 +501,22 @@ const isListeningPlayer = computed(() => {
       Boolean(currentExercise.value.audioText))
   );
 });
+const isDialogueTranslationExercise = computed(
+  () => currentExercise.value?.type === 'dialogue-translation',
+);
+const speechRecognitionAvailable = computed(() => isSpeechRecognitionAvailable());
+const speechSupportMessage = computed(() => {
+  if (speechRecognitionError.value) {
+    return speechRecognitionError.value;
+  }
+
+  if (!speechRecognitionAvailable.value) {
+    return 'Voice recognition is not available on this device. Type the answer here instead.';
+  }
+
+  return 'Desktop Chrome/Edge can record and turn your answer into text.';
+});
+const levelTrend = computed(() => createLevelTrend(appStore.studentModel));
 const listeningPlaylist = computed<ListeningPlaylistItem[]>(() => {
   const lesson = appStore.session?.lesson;
 
@@ -546,6 +632,11 @@ const lessonSections: LessonSection[] = [
         focus: 'Low-pressure speech and question order',
       },
       {
+        templateKey: 'weekly-phrase-dialogue',
+        title: 'Weekly phrase dialogue',
+        focus: 'Short dialogue, voice translation, native phrase checks',
+      },
+      {
         templateKey: 'morning-questions-listening',
         title: 'Morning questions',
         focus: 'Question words, time meaning, word order',
@@ -655,6 +746,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   stopListeningAudio();
+  stopSpeechRecognition();
   resetListeningAutoScroll();
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
@@ -667,6 +759,9 @@ watch(
   () => currentExercise.value?.id,
   () => {
     answer.value = '';
+    speechRecognitionError.value = '';
+    stopSpeechRecognition();
+    isRecognizingSpeech.value = false;
     if (isListeningPlayer.value) {
       selectedListeningItemId.value =
         currentExercise.value?.id ?? listeningPlaylist.value[0]?.id ?? null;
@@ -762,6 +857,27 @@ async function submit() {
 
   setForwardTransition();
   await appStore.submitCurrentExercise(answer.value);
+}
+
+async function recordDialogueAnswer() {
+  if (!speechRecognitionAvailable.value || isRecognizingSpeech.value) {
+    return;
+  }
+
+  speechRecognitionError.value = '';
+  isRecognizingSpeech.value = true;
+
+  try {
+    const result = await recognizeSpeechOnce('en-US');
+    answer.value = result.transcript;
+  } catch (error) {
+    speechRecognitionError.value =
+      error instanceof Error
+        ? error.message
+        : 'Speech recognition failed. Type the answer here instead.';
+  } finally {
+    isRecognizingSpeech.value = false;
+  }
 }
 
 async function playAudio() {
@@ -1185,6 +1301,39 @@ function translateListeningSentence(sentence: string): string {
   const translation = listeningSentenceTranslations[normalizedSentence];
 
   return translation ?? sentence;
+}
+
+function createLevelTrend(studentModel: StudentModel) {
+  const learningState = studentModel.conceptLevels.learning;
+  const decision = studentModel.teacherDecision.levelDecision;
+  const practicedAt = learningState.lastPracticedAt ?? studentModel.teacherDecision.createdAt;
+  const daysInProcess = Math.max(
+    0,
+    Math.floor((Date.now() - Date.parse(practicedAt)) / 86_400_000),
+  );
+
+  return {
+    level: conceptLevelToCefr(learningState.level),
+    icon:
+      decision === 'increase'
+        ? 'arrow_upward'
+        : decision === 'decrease'
+          ? 'arrow_downward'
+          : 'arrow_forward',
+    daysLabel: `${daysInProcess}d`,
+    tooltip: `${studentModel.teacherDecision.reason} Days in this level process: ${daysInProcess}.`,
+  };
+}
+
+function conceptLevelToCefr(level: ConceptLevel): string {
+  switch (level) {
+    case 'foundation':
+      return 'A1';
+    case 'developing':
+      return 'A2';
+    case 'confident':
+      return 'B1';
+  }
 }
 
 function normalizeListeningSentence(sentence: string): string {

@@ -280,7 +280,7 @@ export const useAppStore = defineStore('app', {
       this.session.events.push(finishedEvent);
       this.session.results.push(result);
 
-      if (exercise.type === 'repeat-speaking') {
+      if (exercise.type === 'repeat-speaking' || exercise.type === 'dialogue-translation') {
         this.session.speechResults.push(
           createSpeechResult(
             this.studentId,

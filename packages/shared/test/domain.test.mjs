@@ -294,12 +294,13 @@ describe('shared domain helpers', () => {
     }
   });
 
-  it('keeps two or three testable lessons available for each lesson category', () => {
+  it('keeps testable lessons available for each lesson category', () => {
     const createdAt = '2026-06-28T08:00:00.000Z';
     const categoryChoices = {
       learning: [
         ['daily-guided', 'Daily guided English'],
         ['work-speaking', 'Speaking confidence at work'],
+        ['weekly-phrase-dialogue', 'Weekly phrase dialogue'],
         ['morning-questions-listening', 'Listening: morning questions'],
       ],
       reading: [
@@ -315,7 +316,7 @@ describe('shared domain helpers', () => {
     };
 
     for (const [concept, choices] of Object.entries(categoryChoices)) {
-      assert.equal(choices.length >= 2 && choices.length <= 3, true);
+      assert.equal(choices.length >= 2, true);
 
       for (const [lessonTemplateKey, title] of choices) {
         const plan = createLessonPlan(
@@ -341,7 +342,7 @@ describe('shared domain helpers', () => {
     }
   });
 
-  it('keeps listening and speaking practice modes backed by three lesson templates', () => {
+  it('keeps listening and speaking practice modes backed by lesson templates', () => {
     const createdAt = '2026-06-28T08:00:00.000Z';
     const modeChoices = {
       listening: [
@@ -351,6 +352,7 @@ describe('shared domain helpers', () => {
       ],
       speaking: [
         ['work-speaking', 'Speaking confidence at work'],
+        ['weekly-phrase-dialogue', 'Weekly phrase dialogue'],
         ['daily-speaking', 'Speaking: daily routine'],
         ['polite-speaking', 'Speaking: polite requests'],
       ],

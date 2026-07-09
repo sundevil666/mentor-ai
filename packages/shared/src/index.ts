@@ -57,6 +57,7 @@ export type ExerciseType =
   | 'listening-text'
   | 'listening-comprehension'
   | 'repeat-speaking'
+  | 'dialogue-translation'
   | 'review';
 
 export type LearningEventType =
@@ -265,6 +266,8 @@ export interface Exercise {
   expectedResponse?: string;
   options?: string[];
   audioText?: string;
+  nativePrompt?: string;
+  phraseFocus?: string;
 }
 
 export interface LocalEvaluationRule {
@@ -658,6 +661,10 @@ export function isLessonDeliverable(lesson: GeneratedLesson): boolean {
 export function scoreExercise(exercise: Exercise, response: string): boolean {
   if (exercise.type === 'listening-text') {
     return response.trim().length > 0;
+  }
+
+  if (exercise.type === 'dialogue-translation') {
+    return normalizeWords(response).join(' ') === normalizeWords(exercise.expectedResponse ?? '').join(' ');
   }
 
   const expected = exercise.expectedResponse?.trim().toLowerCase();
@@ -1475,6 +1482,67 @@ const learningLessonTemplates: LessonTemplate[] = [
     ],
   },
   {
+    key: 'weekly-phrase-dialogue',
+    title: 'Weekly phrase dialogue',
+    exercises: [
+      {
+        type: 'listening-text',
+        prompt: 'Listen to the short work dialogue',
+        microLesson:
+          'This week focuses on useful chunks: run into, figure out, pick up, and get back to.',
+        successTip: 'Listen once for the story, then replay any phrase that feels useful.',
+        targetSkill: 'listening',
+        expectedResponse: 'listened',
+        audioText:
+          'Mia: Hey, I ran into Pavel near the station this morning. He said the new schedule is confusing.\nTom: I know. I tried to figure it out yesterday, but the app was slow.\nMia: I can pick up the printed schedule after work if that helps.\nTom: That would help a lot. Could you get back to me when you see the early shift times?\nMia: Sure. If I figure it out, I will send you a photo.',
+      },
+      {
+        type: 'dialogue-translation',
+        prompt: 'Say it in English',
+        nativePrompt: 'Я случайно встретил Павла возле станции.',
+        microLesson: 'Run into means meet someone by chance. It sounds natural in everyday speech.',
+        successTip: 'Native answer: I ran into Pavel near the station.',
+        targetSkill: 'speaking',
+        expectedResponse: 'i ran into pavel near the station',
+        audioText: 'I ran into Pavel near the station.',
+        phraseFocus: 'run into',
+      },
+      {
+        type: 'dialogue-translation',
+        prompt: 'Say it in English',
+        nativePrompt: 'Я пытался разобраться с расписанием вчера.',
+        microLesson: 'Figure out means understand or solve something after thinking.',
+        successTip: 'Native answer: I tried to figure out the schedule yesterday.',
+        targetSkill: 'speaking',
+        expectedResponse: 'i tried to figure out the schedule yesterday',
+        audioText: 'I tried to figure out the schedule yesterday.',
+        phraseFocus: 'figure out',
+      },
+      {
+        type: 'dialogue-translation',
+        prompt: 'Say it in English',
+        nativePrompt: 'Я могу забрать распечатанное расписание после работы.',
+        microLesson: 'Pick up often means collect something from a place.',
+        successTip: 'Native answer: I can pick up the printed schedule after work.',
+        targetSkill: 'speaking',
+        expectedResponse: 'i can pick up the printed schedule after work',
+        audioText: 'I can pick up the printed schedule after work.',
+        phraseFocus: 'pick up',
+      },
+      {
+        type: 'dialogue-translation',
+        prompt: 'Say it in English',
+        nativePrompt: 'Напиши мне, когда увидишь время ранней смены.',
+        microLesson: 'Get back to me means answer later when you have the information.',
+        successTip: 'Native answer: Get back to me when you see the early shift times.',
+        targetSkill: 'speaking',
+        expectedResponse: 'get back to me when you see the early shift times',
+        audioText: 'Get back to me when you see the early shift times.',
+        phraseFocus: 'get back to me',
+      },
+    ],
+  },
+  {
     key: 'morning-questions-listening',
     title: 'Listening: morning questions',
     exercises: [
@@ -1612,6 +1680,7 @@ const listeningLessonTemplates: LessonTemplate[] = [
 
 const speakingLessonTemplates: LessonTemplate[] = [
   learningLessonTemplates[1],
+  learningLessonTemplates[3],
   {
     key: 'daily-speaking',
     title: 'Speaking: daily routine',
