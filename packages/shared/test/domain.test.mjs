@@ -300,7 +300,7 @@ describe('shared domain helpers', () => {
       learning: [
         ['daily-guided', 'Daily guided English'],
         ['work-speaking', 'Speaking confidence at work'],
-        ['weekly-phrase-dialogue', 'Weekly phrase dialogue'],
+        ['weekly-weak-spots-dialogue', 'Weekly weak spots dialogue'],
         ['morning-questions-listening', 'Listening: morning questions'],
       ],
       reading: [
@@ -352,7 +352,7 @@ describe('shared domain helpers', () => {
       ],
       speaking: [
         ['work-speaking', 'Speaking confidence at work'],
-        ['weekly-phrase-dialogue', 'Weekly phrase dialogue'],
+        ['weekly-weak-spots-dialogue', 'Weekly weak spots dialogue'],
         ['daily-speaking', 'Speaking: daily routine'],
         ['polite-speaking', 'Speaking: polite requests'],
       ],

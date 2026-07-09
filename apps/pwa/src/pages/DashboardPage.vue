@@ -632,9 +632,9 @@ const lessonSections: LessonSection[] = [
         focus: 'Low-pressure speech and question order',
       },
       {
-        templateKey: 'weekly-phrase-dialogue',
-        title: 'Weekly phrase dialogue',
-        focus: 'Short dialogue, voice translation, native phrase checks',
+        templateKey: 'weekly-weak-spots-dialogue',
+        title: 'Weekly weak spots dialogue',
+        focus: 'Question order, prepositions, requests, natural chunks',
       },
       {
         templateKey: 'morning-questions-listening',
