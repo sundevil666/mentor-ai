@@ -294,6 +294,91 @@ describe('shared domain helpers', () => {
     }
   });
 
+  it('keeps two or three testable lessons available for each lesson category', () => {
+    const createdAt = '2026-06-28T08:00:00.000Z';
+    const categoryChoices = {
+      learning: [
+        ['daily-guided', 'Daily guided English'],
+        ['work-speaking', 'Speaking confidence at work'],
+        ['morning-questions-listening', 'Listening: morning questions'],
+      ],
+      reading: [
+        ['message-reading', 'Reading: short work message'],
+        ['routine-reading', 'Reading: evening routine'],
+        ['cafe-reading', 'Reading: afternoon cafe'],
+      ],
+      vocabulary: [
+        ['work-vocabulary', 'Vocabulary Growth: work words'],
+        ['travel-vocabulary', 'Vocabulary Growth: travel words'],
+        ['greetings-vocabulary', 'Vocabulary Growth: greetings'],
+      ],
+    };
+
+    for (const [concept, choices] of Object.entries(categoryChoices)) {
+      assert.equal(choices.length >= 2 && choices.length <= 3, true);
+
+      for (const [lessonTemplateKey, title] of choices) {
+        const plan = createLessonPlan(
+          initialStudentModel,
+          {
+            mode: 'home',
+            selectedConcept: concept,
+            manualConceptChoice: true,
+            lessonTemplateKey,
+            isOffline: true,
+            speechAvailable: true,
+            availableMinutes: 8,
+          },
+          createdAt,
+        );
+        const lesson = generateLessonFromPlan(plan, createdAt);
+
+        assert.equal(lesson.concept, concept);
+        assert.equal(lesson.title, title);
+        assert.equal(isLessonDeliverable(lesson), true);
+        assert.equal(lesson.exercises.length >= 3, true);
+      }
+    }
+  });
+
+  it('keeps listening and speaking practice modes backed by three lesson templates', () => {
+    const createdAt = '2026-06-28T08:00:00.000Z';
+    const modeChoices = {
+      listening: [
+        ['commute-listening', 'Commute listening routine'],
+        ['morning-questions-listening', 'Listening: morning questions'],
+        ['shop-listening', 'Listening: small shop request'],
+      ],
+      speaking: [
+        ['work-speaking', 'Speaking confidence at work'],
+        ['daily-speaking', 'Speaking: daily routine'],
+        ['polite-speaking', 'Speaking: polite requests'],
+      ],
+    };
+
+    for (const [mode, choices] of Object.entries(modeChoices)) {
+      for (const [lessonTemplateKey, title] of choices) {
+        const plan = createLessonPlan(
+          initialStudentModel,
+          {
+            mode,
+            lessonTemplateKey,
+            isOffline: true,
+            speechAvailable: true,
+            availableMinutes: 8,
+          },
+          createdAt,
+        );
+        const lesson = generateLessonFromPlan(plan, createdAt);
+
+        assert.equal(lesson.concept, 'learning');
+        assert.equal(lesson.title, title);
+        assert.equal(isLessonDeliverable(lesson), true);
+        assert.equal(lesson.exercises.length >= 3, true);
+      }
+    }
+  });
+
   it('updates the Student Model from lesson evidence and changes the next plan', () => {
     const results = [
       {

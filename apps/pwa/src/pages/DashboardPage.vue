@@ -9,38 +9,20 @@
         >
           {{ syncLabel }}
         </q-badge>
-        <q-badge
-          class="network-status-badge"
-          :color="appStore.isOnline ? 'teal-8' : 'negative'"
-        >
+        <q-badge class="network-status-badge" :color="appStore.isOnline ? 'teal-8' : 'negative'">
           {{ appStore.isOnline ? 'Online' : 'Offline' }}
         </q-badge>
         <span>Model v{{ appStore.studentModel.version }}</span>
       </div>
 
-      <transition
-        :name="learningTransitionName"
-      >
-        <section
-          v-if="!appStore.isHydrated"
-          key="hydrating"
-          class="learning-start"
-        >
-          <p class="learning-start__eyebrow">
-            Loading
-          </p>
+      <transition :name="learningTransitionName">
+        <section v-if="!appStore.isHydrated" key="hydrating" class="learning-start">
+          <p class="learning-start__eyebrow">Loading</p>
           <h1>Restoring your lesson</h1>
         </section>
 
-        <section
-          v-else-if="!appStore.session"
-          key="choice"
-          class="learning-start"
-        >
-          <div
-            v-if="remoteContinueOptions.length > 0"
-            class="handoff-actions"
-          >
+        <section v-else-if="!appStore.session" key="choice" class="learning-start">
+          <div v-if="remoteContinueOptions.length > 0" class="handoff-actions">
             <q-btn
               v-for="handoff in remoteContinueOptions"
               :key="handoff.id"
@@ -55,9 +37,7 @@
             </q-btn>
           </div>
 
-          <p class="learning-start__eyebrow">
-            Activity check
-          </p>
+          <p class="learning-start__eyebrow">Activity check</p>
           <h1>{{ activityHeadline }}</h1>
           <p>{{ currentSuggestion.reason }}</p>
 
@@ -95,10 +75,7 @@
                 class="lesson-library__section"
               >
                 <div class="lesson-library__heading">
-                  <q-icon
-                    :name="section.icon"
-                    size="20px"
-                  />
+                  <q-icon :name="section.icon" size="20px" />
                   <span>{{ section.label }}</span>
                 </div>
                 <div class="lesson-library__grid">
@@ -135,14 +112,8 @@
             <span>{{ appStore.lessonProgress }}% complete</span>
           </div>
 
-          <transition
-            :name="exerciseTransitionName"
-          >
-            <div
-              v-if="!isListeningPlayer"
-              :key="currentExercise.id"
-              class="exercise-standard"
-            >
+          <transition :name="exerciseTransitionName">
+            <div v-if="!isListeningPlayer" :key="currentExercise.id" class="exercise-standard">
               <div>
                 <p class="lesson-stage__eyebrow">
                   {{ appStore.session.lesson.title }}
@@ -151,17 +122,8 @@
                 <p>{{ currentExercise.microLesson }}</p>
               </div>
 
-              <div
-                v-if="currentExercise.audioText"
-                class="audio-row"
-              >
-                <q-btn
-                  color="primary"
-                  flat
-                  icon="volume_up"
-                  round
-                  @click="playAudio"
-                >
+              <div v-if="currentExercise.audioText" class="audio-row">
+                <q-btn color="primary" flat icon="volume_up" round @click="playAudio">
                   <q-tooltip>Play audio</q-tooltip>
                 </q-btn>
                 <span>{{ currentExercise.audioText }}</span>
@@ -194,11 +156,7 @@
               </div>
             </div>
 
-            <div
-              v-else
-              :key="currentExercise.id"
-              class="listening-player"
-            >
+            <div v-else :key="currentExercise.id" class="listening-player">
               <div class="listening-player__header">
                 <div>
                   <p class="lesson-stage__eyebrow">
@@ -214,7 +172,9 @@
                   round
                   @click="toggleListeningPlaylist"
                 >
-                  <q-tooltip>{{ isListeningPlaylistVisible ? 'Hide text list' : 'Show text list' }}</q-tooltip>
+                  <q-tooltip>{{
+                    isListeningPlaylistVisible ? 'Hide text list' : 'Show text list'
+                  }}</q-tooltip>
                 </q-btn>
               </div>
 
@@ -230,7 +190,10 @@
                     :key="item.id"
                     :class="[
                       'listening-player__playlist-item',
-                      { 'listening-player__playlist-item--active': item.id === selectedListeningItem?.id },
+                      {
+                        'listening-player__playlist-item--active':
+                          item.id === selectedListeningItem?.id,
+                      },
                     ]"
                     type="button"
                     @click="selectListeningItem(item.id)"
@@ -243,7 +206,9 @@
                   ref="listeningTextElement"
                   :class="[
                     'listening-player__text',
-                    { 'listening-player__text--translation-visible': isListeningTranslationVisible },
+                    {
+                      'listening-player__text--translation-visible': isListeningTranslationVisible,
+                    },
                   ]"
                   @scroll="handleListeningTextScroll"
                 >
@@ -254,11 +219,13 @@
                     :class="[
                       'listening-player__token',
                       {
-                        'listening-player__token--active': token.index >= activeWordIndex && token.index <= activeWordEndIndex,
+                        'listening-player__token--active':
+                          token.index >= activeWordIndex && token.index <= activeWordEndIndex,
                         'listening-player__token--past': token.index < activeWordIndex,
                       },
                     ]"
-                  >{{ token.word }}{{ token.trailing }}</span>
+                    >{{ token.word }}{{ token.trailing }}</span
+                  >
                 </div>
               </div>
 
@@ -284,11 +251,15 @@
                   color="primary"
                   class="listening-player__play-button"
                   unelevated
-                  :icon="isListeningPaused ? 'play_arrow' : isListeningSpeaking ? 'pause' : 'play_arrow'"
+                  :icon="
+                    isListeningPaused ? 'play_arrow' : isListeningSpeaking ? 'pause' : 'play_arrow'
+                  "
                   round
                   @click="toggleListeningPlayback"
                 >
-                  <q-tooltip>{{ isListeningPaused ? 'Resume' : isListeningSpeaking ? 'Pause' : 'Play' }}</q-tooltip>
+                  <q-tooltip>{{
+                    isListeningPaused ? 'Resume' : isListeningSpeaking ? 'Pause' : 'Play'
+                  }}</q-tooltip>
                 </q-btn>
                 <q-btn
                   :color="isListeningRepeatEnabled ? 'secondary' : 'primary'"
@@ -298,7 +269,9 @@
                   round
                   @click="toggleListeningRepeat"
                 >
-                  <q-tooltip>{{ isListeningRepeatEnabled ? 'Repeat is on' : 'Repeat selected text' }}</q-tooltip>
+                  <q-tooltip>{{
+                    isListeningRepeatEnabled ? 'Repeat is on' : 'Repeat selected text'
+                  }}</q-tooltip>
                 </q-btn>
                 <q-btn
                   :color="isListeningTranslationVisible ? 'secondary' : 'primary'"
@@ -308,7 +281,9 @@
                   round
                   @click="toggleListeningTranslation"
                 >
-                  <q-tooltip>{{ isListeningTranslationVisible ? 'Hide translation' : 'Translate sentence' }}</q-tooltip>
+                  <q-tooltip>{{
+                    isListeningTranslationVisible ? 'Hide translation' : 'Translate sentence'
+                  }}</q-tooltip>
                 </q-btn>
                 <q-btn
                   color="primary"
@@ -319,22 +294,10 @@
                 >
                   <q-tooltip>Next sentence</q-tooltip>
                 </q-btn>
-                <q-btn
-                  color="primary"
-                  flat
-                  icon="skip_previous"
-                  round
-                  @click="jumpWord(-1)"
-                >
+                <q-btn color="primary" flat icon="skip_previous" round @click="jumpWord(-1)">
                   <q-tooltip>Previous word</q-tooltip>
                 </q-btn>
-                <q-btn
-                  color="primary"
-                  flat
-                  icon="skip_next"
-                  round
-                  @click="jumpWord(1)"
-                >
+                <q-btn color="primary" flat icon="skip_next" round @click="jumpWord(1)">
                   <q-tooltip>Next word</q-tooltip>
                 </q-btn>
                 <span>{{ listeningProgressLabel }}</span>
@@ -343,14 +306,8 @@
           </transition>
         </section>
 
-        <section
-          v-else
-          key="complete"
-          class="lesson-complete"
-        >
-          <p class="lesson-complete__eyebrow">
-            Lesson complete
-          </p>
+        <section v-else key="complete" class="lesson-complete">
+          <p class="lesson-complete__eyebrow">Lesson complete</p>
           <h1>{{ appStore.latestRecommendation?.summary }}</h1>
           <p>{{ appStore.latestRecommendation?.reason }}</p>
           <p v-if="appStore.session?.observation">
@@ -374,10 +331,7 @@
       </transition>
     </section>
 
-    <nav
-      class="mobile-start-dock"
-      aria-label="Start lesson"
-    >
+    <nav class="mobile-start-dock" aria-label="Start lesson">
       <button
         v-for="item in quickStartItems"
         :key="item.key"
@@ -385,10 +339,7 @@
         type="button"
         @click="item.start"
       >
-        <q-icon
-          :name="item.icon"
-          size="24px"
-        />
+        <q-icon :name="item.icon" size="24px" />
         <span>{{ item.label }}</span>
       </button>
     </nav>
@@ -407,8 +358,15 @@ import {
   formatPaceLabel,
   type TrainingKey,
 } from 'src/services/learning-context';
-import { createPreferredSpeechUtterance, speakWithPreferredVoice, waitForSpeechVoices } from 'src/services/speech-synthesis';
-import { readListeningProgressPreference, saveListeningProgressPreference } from 'src/services/user-preferences';
+import {
+  createPreferredSpeechUtterance,
+  speakWithPreferredVoice,
+  waitForSpeechVoices,
+} from 'src/services/speech-synthesis';
+import {
+  readListeningProgressPreference,
+  saveListeningProgressPreference,
+} from 'src/services/user-preferences';
 import { useAppStore } from 'src/stores/app-store';
 
 type LessonChoice = {
@@ -482,7 +440,9 @@ const listeningPlaylist = computed<ListeningPlaylistItem[]>(() => {
 
   return lesson.exercises
     .map((exercise, index) => {
-      const text = (exercise.audioText ?? (exercise.type === 'listening-text' ? exercise.prompt : '')).trim();
+      const text = (
+        exercise.audioText ?? (exercise.type === 'listening-text' ? exercise.prompt : '')
+      ).trim();
 
       if (!text) {
         return null;
@@ -501,7 +461,13 @@ const selectedListeningItem = computed(() => {
 
   return playlist.find((item) => item.id === selectedListeningItemId.value) ?? playlist[0] ?? null;
 });
-const listeningText = computed(() => selectedListeningItem.value?.text ?? currentExercise.value?.audioText ?? currentExercise.value?.prompt ?? '');
+const listeningText = computed(
+  () =>
+    selectedListeningItem.value?.text ??
+    currentExercise.value?.audioText ??
+    currentExercise.value?.prompt ??
+    '',
+);
 const listeningTokens = computed(() => tokenizeListeningText(listeningText.value));
 const listeningProgressKey = computed(() => {
   const session = appStore.session;
@@ -514,10 +480,16 @@ const listeningProgressKey = computed(() => {
   return `${session.lesson.id}:${item.id}`;
 });
 const sentenceStartWordIndexes = computed(() => getSentenceStartWordIndexes(listeningTokens.value));
-const activeListeningSentence = computed(() => getListeningSentenceAtWord(activeWordIndex.value, listeningTokens.value));
-const activeListeningSentenceTranslation = computed(() => translateListeningSentence(activeListeningSentence.value));
+const activeListeningSentence = computed(() =>
+  getListeningSentenceAtWord(activeWordIndex.value, listeningTokens.value),
+);
+const activeListeningSentenceTranslation = computed(() =>
+  translateListeningSentence(activeListeningSentence.value),
+);
 const listeningTitle = computed(() =>
-  currentExercise.value?.type === 'listening-text' ? 'Listen and read' : currentExercise.value?.prompt ?? 'Listen',
+  currentExercise.value?.type === 'listening-text'
+    ? 'Listen and read'
+    : (currentExercise.value?.prompt ?? 'Listen'),
 );
 const listeningProgressLabel = computed(() => {
   if (listeningTokens.value.length === 0) {
@@ -529,8 +501,12 @@ const listeningProgressLabel = computed(() => {
 const optionList = computed(
   () => currentExercise.value?.options?.map((option) => ({ label: option, value: option })) ?? [],
 );
-const inputLabel = computed(() => (currentExercise.value?.type === 'repeat-speaking' ? 'What did you say?' : 'Your answer'));
-const syncLabel = computed(() => (appStore.pendingSyncCount > 0 ? `${appStore.pendingSyncCount} pending` : 'Offline ready'));
+const inputLabel = computed(() =>
+  currentExercise.value?.type === 'repeat-speaking' ? 'What did you say?' : 'Your answer',
+);
+const syncLabel = computed(() =>
+  appStore.pendingSyncCount > 0 ? `${appStore.pendingSyncCount} pending` : 'Offline ready',
+);
 const syncColor = computed(() => {
   if (appStore.pendingSyncCount > 0) {
     return appStore.isOnline ? 'amber-8' : 'deep-orange-7';
@@ -569,6 +545,11 @@ const lessonSections: LessonSection[] = [
         title: 'Speaking confidence at work',
         focus: 'Low-pressure speech and question order',
       },
+      {
+        templateKey: 'morning-questions-listening',
+        title: 'Morning questions',
+        focus: 'Question words, time meaning, word order',
+      },
     ],
   },
   {
@@ -586,6 +567,11 @@ const lessonSections: LessonSection[] = [
         title: 'Evening routine',
         focus: 'Sequence, time meaning, action words',
       },
+      {
+        templateKey: 'cafe-reading',
+        title: 'Afternoon cafe',
+        focus: 'Main idea, place words, short reading',
+      },
     ],
   },
   {
@@ -602,6 +588,11 @@ const lessonSections: LessonSection[] = [
         templateKey: 'travel-vocabulary',
         title: 'Travel words',
         focus: 'Meaning, active recall, context',
+      },
+      {
+        templateKey: 'greetings-vocabulary',
+        title: 'Greetings',
+        focus: 'Recognition, polite recall, phrase use',
       },
     ],
   },
@@ -677,7 +668,8 @@ watch(
   () => {
     answer.value = '';
     if (isListeningPlayer.value) {
-      selectedListeningItemId.value = currentExercise.value?.id ?? listeningPlaylist.value[0]?.id ?? null;
+      selectedListeningItemId.value =
+        currentExercise.value?.id ?? listeningPlaylist.value[0]?.id ?? null;
       restoreListeningPlayback();
       return;
     }
@@ -688,7 +680,8 @@ watch(
 
 watch(isListeningPlayer, (isActiveListeningPlayer) => {
   if (isActiveListeningPlayer) {
-    selectedListeningItemId.value = currentExercise.value?.id ?? listeningPlaylist.value[0]?.id ?? null;
+    selectedListeningItemId.value =
+      currentExercise.value?.id ?? listeningPlaylist.value[0]?.id ?? null;
     restoreListeningPlayback();
     return;
   }
@@ -721,20 +714,24 @@ async function startWithMode(mode: LearningMode) {
 async function startConcept(concept: LearningConcept) {
   answer.value = '';
   setForwardTransition();
-  await appStore.startLesson(createLearningContext(currentSuggestion.value, {
-    selectedConcept: concept,
-    manualConceptChoice: true,
-  }));
+  await appStore.startLesson(
+    createLearningContext(currentSuggestion.value, {
+      selectedConcept: concept,
+      manualConceptChoice: true,
+    }),
+  );
 }
 
 async function startLessonChoice(concept: LearningConcept, lessonTemplateKey: string) {
   answer.value = '';
   setForwardTransition();
-  await appStore.startLesson(createLearningContext(currentSuggestion.value, {
-    selectedConcept: concept,
-    manualConceptChoice: true,
-    lessonTemplateKey,
-  }));
+  await appStore.startLesson(
+    createLearningContext(currentSuggestion.value, {
+      selectedConcept: concept,
+      manualConceptChoice: true,
+      lessonTemplateKey,
+    }),
+  );
 }
 
 async function startTraining(training: TrainingKey) {
@@ -816,8 +813,15 @@ async function jumpSentence(direction: -1 | 1) {
     return;
   }
 
-  const currentSentenceIndex = Math.max(0, findLastNumberIndex(sentenceStarts, activeWordIndex.value));
-  const nextSentenceIndex = clampIndex(currentSentenceIndex + direction, 0, sentenceStarts.length - 1);
+  const currentSentenceIndex = Math.max(
+    0,
+    findLastNumberIndex(sentenceStarts, activeWordIndex.value),
+  );
+  const nextSentenceIndex = clampIndex(
+    currentSentenceIndex + direction,
+    0,
+    sentenceStarts.length - 1,
+  );
 
   await startListeningAtWord(sentenceStarts[nextSentenceIndex] ?? 0);
 }
@@ -920,7 +924,12 @@ function finishListeningPlayback(runId: number, allowRepeat = true) {
     return;
   }
 
-  if (allowRepeat && isListeningRepeatEnabled.value && listeningTokens.value.length > 0 && 'speechSynthesis' in window) {
+  if (
+    allowRepeat &&
+    isListeningRepeatEnabled.value &&
+    listeningTokens.value.length > 0 &&
+    'speechSynthesis' in window
+  ) {
     activeWordIndex.value = 0;
     activeWordEndIndex.value = 0;
     window.setTimeout(() => speakListeningPhrase(0, runId), 220);
@@ -960,7 +969,9 @@ function restoreListeningPlayback() {
 
   const progressKey = listeningProgressKey.value;
   const maxIndex = Math.max(listeningTokens.value.length - 1, 0);
-  const savedWordIndex = progressKey ? readListeningProgressPreference(progressKey)?.wordIndex : undefined;
+  const savedWordIndex = progressKey
+    ? readListeningProgressPreference(progressKey)?.wordIndex
+    : undefined;
   const safeWordIndex = clampIndex(savedWordIndex ?? 0, 0, maxIndex);
 
   activeWordIndex.value = safeWordIndex;
@@ -974,7 +985,10 @@ function saveListeningPlaybackProgress() {
     return;
   }
 
-  saveListeningProgressPreference(progressKey, clampIndex(activeWordIndex.value, 0, listeningTokens.value.length - 1));
+  saveListeningProgressPreference(
+    progressKey,
+    clampIndex(activeWordIndex.value, 0, listeningTokens.value.length - 1),
+  );
 }
 
 function handleListeningTextScroll() {
@@ -1028,7 +1042,9 @@ async function scrollActiveListeningPhraseIntoView() {
     return;
   }
 
-  const activeToken = container.querySelector<HTMLElement>(`[data-token-index="${activeWordIndex.value}"]`);
+  const activeToken = container.querySelector<HTMLElement>(
+    `[data-token-index="${activeWordIndex.value}"]`,
+  );
 
   if (!activeToken) {
     return;
@@ -1179,7 +1195,10 @@ function clampIndex(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function createListeningPhrase(wordIndex: number, tokens: ListeningToken[]): { startIndex: number; endIndex: number; text: string } {
+function createListeningPhrase(
+  wordIndex: number,
+  tokens: ListeningToken[],
+): { startIndex: number; endIndex: number; text: string } {
   const startIndex = clampIndex(wordIndex, 0, Math.max(tokens.length - 1, 0));
   let endIndex = startIndex;
 
@@ -1233,66 +1252,83 @@ function findLastNumberIndex(values: number[], maxValue: number): number {
 }
 
 const listeningSentenceTranslations: Record<string, string> = {
-  [normalizeListeningSentence('This morning I am going to work, and I want to use my travel time for English.')]:
-    'Сегодня утром я еду на работу и хочу использовать время в дороге для английского.',
+  [normalizeListeningSentence(
+    'This morning I am going to work, and I want to use my travel time for English.',
+  )]: 'Сегодня утром я еду на работу и хочу использовать время в дороге для английского.',
   [normalizeListeningSentence('I leave home with my bag, my phone, and my headphones.')]:
     'Я выхожу из дома с сумкой, телефоном и наушниками.',
   [normalizeListeningSentence('The street is quiet, but the bus stop is already a little busy.')]:
     'На улице тихо, но на автобусной остановке уже немного людно.',
-  [normalizeListeningSentence('I check the time and I see that I have ten minutes before the bus arrives.')]:
-    'Я смотрю на время и вижу, что до прихода автобуса у меня есть десять минут.',
-  [normalizeListeningSentence('I decide to listen to a simple English story and read the text at the same time.')]:
-    'Я решаю послушать простую английскую историю и одновременно читать текст.',
+  [normalizeListeningSentence(
+    'I check the time and I see that I have ten minutes before the bus arrives.',
+  )]: 'Я смотрю на время и вижу, что до прихода автобуса у меня есть десять минут.',
+  [normalizeListeningSentence(
+    'I decide to listen to a simple English story and read the text at the same time.',
+  )]: 'Я решаю послушать простую английскую историю и одновременно читать текст.',
   [normalizeListeningSentence('When I hear a new word, I do not stop immediately.')]:
     'Когда я слышу новое слово, я не останавливаюсь сразу.',
-  [normalizeListeningSentence('First, I listen to the whole sentence and try to understand the main idea.')]:
-    'Сначала я слушаю все предложение и пытаюсь понять главную мысль.',
+  [normalizeListeningSentence(
+    'First, I listen to the whole sentence and try to understand the main idea.',
+  )]: 'Сначала я слушаю все предложение и пытаюсь понять главную мысль.',
   [normalizeListeningSentence('Then I replay the sentence and look at the word again.')]:
     'Потом я повторно включаю предложение и снова смотрю на слово.',
   [normalizeListeningSentence('This helps me connect the sound, the spelling, and the meaning.')]:
     'Это помогает мне связать звучание, написание и значение.',
   [normalizeListeningSentence('On the bus, I sit near the window and lower the volume a little.')]:
     'В автобусе я сажусь у окна и немного уменьшаю громкость.',
-  [normalizeListeningSentence('I can hear the voice clearly, but I can also hear the world around me.')]:
-    'Я хорошо слышу голос, но также слышу мир вокруг себя.',
-  [normalizeListeningSentence('The speaker talks about a normal day, simple plans, and small choices.')]:
-    'Диктор говорит об обычном дне, простых планах и маленьких выборах.',
-  [normalizeListeningSentence('I hear phrases like I will take the bus, I need a coffee, and I will start work soon.')]:
-    'Я слышу фразы вроде: я поеду на автобусе, мне нужен кофе, и я скоро начну работать.',
+  [normalizeListeningSentence(
+    'I can hear the voice clearly, but I can also hear the world around me.',
+  )]: 'Я хорошо слышу голос, но также слышу мир вокруг себя.',
+  [normalizeListeningSentence(
+    'The speaker talks about a normal day, simple plans, and small choices.',
+  )]: 'Диктор говорит об обычном дне, простых планах и маленьких выборах.',
+  [normalizeListeningSentence(
+    'I hear phrases like I will take the bus, I need a coffee, and I will start work soon.',
+  )]: 'Я слышу фразы вроде: я поеду на автобусе, мне нужен кофе, и я скоро начну работать.',
   [normalizeListeningSentence('These phrases are useful because I can say them in my own life.')]:
     'Эти фразы полезны, потому что я могу сказать их в своей жизни.',
-  [normalizeListeningSentence('I repeat some words quietly in my head, but I do not need to speak loudly.')]:
-    'Я тихо повторяю некоторые слова про себя, но мне не нужно говорить громко.',
+  [normalizeListeningSentence(
+    'I repeat some words quietly in my head, but I do not need to speak loudly.',
+  )]: 'Я тихо повторяю некоторые слова про себя, но мне не нужно говорить громко.',
   [normalizeListeningSentence('The goal is not to understand every word perfectly.')]:
     'Цель не в том, чтобы идеально понять каждое слово.',
-  [normalizeListeningSentence('The goal is to stay with the text, catch the rhythm, and understand more each time.')]:
-    'Цель в том, чтобы оставаться с текстом, улавливать ритм и каждый раз понимать больше.',
+  [normalizeListeningSentence(
+    'The goal is to stay with the text, catch the rhythm, and understand more each time.',
+  )]: 'Цель в том, чтобы оставаться с текстом, улавливать ритм и каждый раз понимать больше.',
   [normalizeListeningSentence('After two minutes, the story feels easier.')]:
     'Через две минуты история кажется легче.',
-  [normalizeListeningSentence('I notice the same words again and again: morning, bus, work, listen, today, and later.')]:
-    'Я снова и снова замечаю одни и те же слова: morning, bus, work, listen, today и later.',
-  [normalizeListeningSentence('Repeated words become friendly because my ears meet them many times.')]:
-    'Повторяющиеся слова становятся знакомыми, потому что мои уши встречают их много раз.',
-  [normalizeListeningSentence('When the bus turns onto the main road, I move to the next paragraph.')]:
-    'Когда автобус поворачивает на главную дорогу, я перехожу к следующему абзацу.',
+  [normalizeListeningSentence(
+    'I notice the same words again and again: morning, bus, work, listen, today, and later.',
+  )]: 'Я снова и снова замечаю одни и те же слова: morning, bus, work, listen, today и later.',
+  [normalizeListeningSentence(
+    'Repeated words become friendly because my ears meet them many times.',
+  )]: 'Повторяющиеся слова становятся знакомыми, потому что мои уши встречают их много раз.',
+  [normalizeListeningSentence(
+    'When the bus turns onto the main road, I move to the next paragraph.',
+  )]: 'Когда автобус поворачивает на главную дорогу, я перехожу к следующему абзацу.',
   [normalizeListeningSentence('The text talks about a person planning a small English routine.')]:
     'В тексте говорится о человеке, который планирует маленькую привычку для английского.',
-  [normalizeListeningSentence('The person listens for ten minutes in the morning and reads for five minutes in the evening.')]:
-    'Этот человек слушает десять минут утром и читает пять минут вечером.',
+  [normalizeListeningSentence(
+    'The person listens for ten minutes in the morning and reads for five minutes in the evening.',
+  )]: 'Этот человек слушает десять минут утром и читает пять минут вечером.',
   [normalizeListeningSentence('This routine is small, but it is easy to repeat.')]:
     'Эта привычка маленькая, но ее легко повторять.',
-  [normalizeListeningSentence('A small routine every day is stronger than a hard lesson once a month.')]:
-    'Небольшая ежедневная привычка сильнее, чем тяжелый урок раз в месяц.',
+  [normalizeListeningSentence(
+    'A small routine every day is stronger than a hard lesson once a month.',
+  )]: 'Небольшая ежедневная привычка сильнее, чем тяжелый урок раз в месяц.',
   [normalizeListeningSentence('I like this idea because I am often tired after work.')]:
     'Мне нравится эта идея, потому что после работы я часто устаю.',
   [normalizeListeningSentence('If I only have a little energy, I can still listen and read.')]:
     'Если у меня мало энергии, я все равно могу слушать и читать.',
-  [normalizeListeningSentence('If I have more energy, I can repeat sentences and answer questions.')]:
-    'Если у меня больше энергии, я могу повторять предложения и отвечать на вопросы.',
-  [normalizeListeningSentence('The voice says that progress can feel slow, but listening grows quietly.')]:
-    'Голос говорит, что прогресс может казаться медленным, но навык слушания растет незаметно.',
-  [normalizeListeningSentence('One day a phrase is difficult, and later the same phrase feels normal.')]:
-    'В один день фраза трудная, а позже та же фраза кажется обычной.',
+  [normalizeListeningSentence(
+    'If I have more energy, I can repeat sentences and answer questions.',
+  )]: 'Если у меня больше энергии, я могу повторять предложения и отвечать на вопросы.',
+  [normalizeListeningSentence(
+    'The voice says that progress can feel slow, but listening grows quietly.',
+  )]: 'Голос говорит, что прогресс может казаться медленным, но навык слушания растет незаметно.',
+  [normalizeListeningSentence(
+    'One day a phrase is difficult, and later the same phrase feels normal.',
+  )]: 'В один день фраза трудная, а позже та же фраза кажется обычной.',
   [normalizeListeningSentence('I look at the highlighted words and follow them with my eyes.')]:
     'Я смотрю на выделенные слова и слежу за ними глазами.',
   [normalizeListeningSentence('When the highlight moves, I know exactly where the voice is.')]:
@@ -1303,9 +1339,12 @@ const listeningSentenceTranslations: Record<string, string> = {
     'Если одно слово непонятно, я возвращаюсь на одно слово назад и слушаю его снова.',
   [normalizeListeningSentence('This makes listening active, but still calm.')]:
     'Это делает слушание активным, но все еще спокойным.',
-  [normalizeListeningSentence('Near the end of the ride, I understand the story better than at the beginning.')]:
-    'Ближе к концу поездки я понимаю историю лучше, чем в начале.',
-  [normalizeListeningSentence('I can remember the main idea: use small moments, listen often, and read while listening.')]:
+  [normalizeListeningSentence(
+    'Near the end of the ride, I understand the story better than at the beginning.',
+  )]: 'Ближе к концу поездки я понимаю историю лучше, чем в начале.',
+  [normalizeListeningSentence(
+    'I can remember the main idea: use small moments, listen often, and read while listening.',
+  )]:
     'Я могу запомнить главную мысль: использовать короткие моменты, часто слушать и читать во время слушания.',
   [normalizeListeningSentence('I do not need perfect grammar in my head while I listen.')]:
     'Пока я слушаю, мне не нужна идеальная грамматика в голове.',
@@ -1315,10 +1354,13 @@ const listeningSentenceTranslations: Record<string, string> = {
     'Когда я прихожу на работу, я останавливаю аудио и сохраняю прогресс.',
   [normalizeListeningSentence('Later, I can return to the same text and it will feel easier.')]:
     'Позже я могу вернуться к тому же тексту, и он будет казаться легче.',
-  [normalizeListeningSentence('The same listening text can teach me new sounds on the first day and confidence on the second day.')]:
+  [normalizeListeningSentence(
+    'The same listening text can teach me new sounds on the first day and confidence on the second day.',
+  )]:
     'Один и тот же текст для слушания может в первый день учить новым звукам, а во второй давать уверенность.',
-  [normalizeListeningSentence('Every replay is useful evidence because it shows what my ears are training.')]:
-    'Каждое повторное прослушивание полезно, потому что показывает, что тренируют мои уши.',
+  [normalizeListeningSentence(
+    'Every replay is useful evidence because it shows what my ears are training.',
+  )]: 'Каждое повторное прослушивание полезно, потому что показывает, что тренируют мои уши.',
   [normalizeListeningSentence('Today I listened, read, and stayed with English for ten minutes.')]:
     'Сегодня я слушал, читал и оставался с английским десять минут.',
   [normalizeListeningSentence('That is real practice, and it counts.')]:

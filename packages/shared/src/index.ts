@@ -1238,29 +1238,35 @@ function createConceptLessonTitle(plan: LessonPlan): string {
 
 function createConceptExercises(plan: LessonPlan, reviewTarget: string): Exercise[] {
   if (plan.concept === 'reading') {
-    return instantiateLessonTemplate(
-      selectLessonTemplate(readingLessonTemplates, plan),
-      plan,
-    );
+    return instantiateLessonTemplate(selectLessonTemplate(readingLessonTemplates, plan), plan);
   }
 
   if (plan.concept === 'vocabulary') {
-    return instantiateLessonTemplate(
-      selectLessonTemplate(vocabularyLessonTemplates, plan),
-      plan,
-    );
+    return instantiateLessonTemplate(selectLessonTemplate(vocabularyLessonTemplates, plan), plan);
   }
 
   if (plan.learningMode === 'listening') {
-    return instantiateLessonTemplate(learningLessonTemplates[0], plan, reviewTarget);
+    return instantiateLessonTemplate(
+      selectModeLessonTemplate(listeningLessonTemplates, plan),
+      plan,
+      reviewTarget,
+    );
   }
 
   if (plan.learningMode === 'speaking') {
-    return instantiateLessonTemplate(learningLessonTemplates[1], plan, reviewTarget);
+    return instantiateLessonTemplate(
+      selectModeLessonTemplate(speakingLessonTemplates, plan),
+      plan,
+      reviewTarget,
+    );
   }
 
   if (plan.goal.skill === 'listening') {
-    return instantiateLessonTemplate(learningLessonTemplates[0], plan, reviewTarget);
+    return instantiateLessonTemplate(
+      selectModeLessonTemplate(listeningLessonTemplates, plan),
+      plan,
+      reviewTarget,
+    );
   }
 
   return instantiateLessonTemplate(selectLearningLessonTemplate(plan), plan, reviewTarget);
@@ -1296,19 +1302,19 @@ function selectLearningLessonTemplate(plan: LessonPlan): LessonTemplate {
   }
 
   if (plan.learningMode === 'listening') {
-    return learningLessonTemplates[0];
+    return selectModeLessonTemplate(listeningLessonTemplates, plan);
   }
 
   if (plan.learningMode === 'speaking') {
-    return learningLessonTemplates[1];
+    return selectModeLessonTemplate(speakingLessonTemplates, plan);
   }
 
   if (plan.goal.skill === 'listening') {
-    return learningLessonTemplates[0];
+    return selectModeLessonTemplate(listeningLessonTemplates, plan);
   }
 
   if (plan.goal.skill === 'speaking') {
-    return learningLessonTemplates[1];
+    return selectModeLessonTemplate(speakingLessonTemplates, plan);
   }
 
   if (plan.goal.skill === 'vocabulary') {
@@ -1316,6 +1322,14 @@ function selectLearningLessonTemplate(plan: LessonPlan): LessonTemplate {
   }
 
   return selectLessonTemplate(learningLessonTemplates, plan);
+}
+
+function selectModeLessonTemplate(templates: LessonTemplate[], plan: LessonPlan): LessonTemplate {
+  const requestedTemplate = plan.lessonTemplateKey
+    ? templates.find((template) => template.key === plan.lessonTemplateKey)
+    : undefined;
+
+  return requestedTemplate ?? templates[0];
 }
 
 function instantiateLessonTemplate(
@@ -1457,6 +1471,207 @@ const learningLessonTemplates: LessonTemplate[] = [
         targetSkill: 'speaking',
         expectedResponse: 'where are you',
         audioText: 'Where are you?',
+      },
+    ],
+  },
+  {
+    key: 'morning-questions-listening',
+    title: 'Listening: morning questions',
+    exercises: [
+      {
+        type: 'listening-comprehension',
+        prompt: 'Listen and choose the question you hear.',
+        microLesson: 'Question words carry the meaning. Listen first for where, when, or what.',
+        successTip: 'Replay once, then choose the full question.',
+        targetSkill: 'listening',
+        expectedResponse: 'when do you start work',
+        options: ['when do you start work', 'where do you live', 'what do you drink'],
+        audioText: 'When do you start work?',
+      },
+      {
+        type: 'vocabulary-recall',
+        prompt: 'Which word asks about time: where, when, or what?',
+        microLesson: 'When points to time. Where points to place. What points to a thing.',
+        successTip: 'Choose the word that asks about time.',
+        targetSkill: 'vocabulary',
+        expectedResponse: 'when',
+        options: ['where', 'when', 'what'],
+      },
+      {
+        type: 'word-order',
+        prompt: 'Order the words: when / you / do / start / work',
+        microLesson: 'Many present simple questions use question word + do + person + verb.',
+        successTip: 'Start with when do you.',
+        targetSkill: 'grammar',
+        expectedResponse: 'when do you start work',
+      },
+    ],
+  },
+  {
+    key: 'daily-speaking',
+    title: 'Speaking: daily routine',
+    exercises: [
+      {
+        type: 'review',
+        prompt: 'Review: say or type "{reviewTarget}".',
+        microLesson: 'A short familiar phrase makes the first spoken step easier.',
+        successTip: 'Copy the phrase calmly before the new sentence.',
+        targetSkill: 'review',
+        expectedResponse: '{reviewTarget}',
+      },
+      {
+        type: 'repeat-speaking',
+        prompt: 'Repeat: I go to work in the morning.',
+        microLesson: 'Speak in chunks: I go / to work / in the morning.',
+        successTip: 'Keep the rhythm slow and even.',
+        targetSkill: 'speaking',
+        expectedResponse: 'i go to work in the morning',
+        audioText: 'I go to work in the morning.',
+      },
+      {
+        type: 'word-order',
+        prompt: 'Order the words: I / to / work / go / morning / in / the',
+        microLesson: 'Simple routine sentences often use person + action + time.',
+        successTip: 'Start with I go to work.',
+        targetSkill: 'grammar',
+        expectedResponse: 'i go to work in the morning',
+      },
+    ],
+  },
+];
+
+const listeningLessonTemplates: LessonTemplate[] = [
+  learningLessonTemplates[0],
+  {
+    key: 'morning-questions-listening',
+    title: 'Listening: morning questions',
+    exercises: [
+      {
+        type: 'listening-comprehension',
+        prompt: 'Listen and choose the question you hear.',
+        microLesson: 'Question words carry the meaning. Listen first for where, when, or what.',
+        successTip: 'Replay once, then choose the full question.',
+        targetSkill: 'listening',
+        expectedResponse: 'when do you start work',
+        options: ['when do you start work', 'where do you live', 'what do you drink'],
+        audioText: 'When do you start work?',
+      },
+      {
+        type: 'vocabulary-recall',
+        prompt: 'Which word asks about time: where, when, or what?',
+        microLesson: 'When points to time. Where points to place. What points to a thing.',
+        successTip: 'Choose the word that asks about time.',
+        targetSkill: 'vocabulary',
+        expectedResponse: 'when',
+        options: ['where', 'when', 'what'],
+      },
+      {
+        type: 'word-order',
+        prompt: 'Order the words: when / you / do / start / work',
+        microLesson: 'Many present simple questions use question word + do + person + verb.',
+        successTip: 'Start with when do you.',
+        targetSkill: 'grammar',
+        expectedResponse: 'when do you start work',
+      },
+    ],
+  },
+  {
+    key: 'shop-listening',
+    title: 'Listening: small shop request',
+    exercises: [
+      {
+        type: 'listening-comprehension',
+        prompt: 'Listen and choose what the speaker wants.',
+        microLesson: 'In a request, listen for the object after want or need.',
+        successTip: 'Choose the item you hear.',
+        targetSkill: 'listening',
+        expectedResponse: 'a bottle of water',
+        options: ['a bottle of water', 'a cup of tea', 'a bus ticket'],
+        audioText: 'I want a bottle of water, please.',
+      },
+      {
+        type: 'vocabulary-recall',
+        prompt: 'Translate: voda',
+        microLesson: 'Everyday shop words become useful quickly because you can repeat them often.',
+        successTip: 'Use the English word from the listening sentence.',
+        targetSkill: 'vocabulary',
+        expectedResponse: 'water',
+      },
+      {
+        type: 'repeat-speaking',
+        prompt: 'Repeat: I want a bottle of water, please.',
+        microLesson: 'Repeating a polite request connects listening with speaking.',
+        successTip: 'Say the sentence in two parts: I want / a bottle of water, please.',
+        targetSkill: 'speaking',
+        expectedResponse: 'i want a bottle of water please',
+        audioText: 'I want a bottle of water, please.',
+      },
+    ],
+  },
+];
+
+const speakingLessonTemplates: LessonTemplate[] = [
+  learningLessonTemplates[1],
+  {
+    key: 'daily-speaking',
+    title: 'Speaking: daily routine',
+    exercises: [
+      {
+        type: 'review',
+        prompt: 'Review: say or type "{reviewTarget}".',
+        microLesson: 'A short familiar phrase makes the first spoken step easier.',
+        successTip: 'Copy the phrase calmly before the new sentence.',
+        targetSkill: 'review',
+        expectedResponse: '{reviewTarget}',
+      },
+      {
+        type: 'repeat-speaking',
+        prompt: 'Repeat: I go to work in the morning.',
+        microLesson: 'Speak in chunks: I go / to work / in the morning.',
+        successTip: 'Keep the rhythm slow and even.',
+        targetSkill: 'speaking',
+        expectedResponse: 'i go to work in the morning',
+        audioText: 'I go to work in the morning.',
+      },
+      {
+        type: 'word-order',
+        prompt: 'Order the words: I / to / work / go / morning / in / the',
+        microLesson: 'Simple routine sentences often use person + action + time.',
+        successTip: 'Start with I go to work.',
+        targetSkill: 'grammar',
+        expectedResponse: 'i go to work in the morning',
+      },
+    ],
+  },
+  {
+    key: 'polite-speaking',
+    title: 'Speaking: polite requests',
+    exercises: [
+      {
+        type: 'review',
+        prompt: 'Review: say or type "please".',
+        microLesson: 'Polite words make short English sentences easier to use in real life.',
+        successTip: 'Type or say the word clearly.',
+        targetSkill: 'review',
+        expectedResponse: 'please',
+      },
+      {
+        type: 'repeat-speaking',
+        prompt: 'Repeat: Could you repeat that, please?',
+        microLesson: 'This phrase is useful when listening is difficult.',
+        successTip: 'Pause after repeat, then finish with that, please.',
+        targetSkill: 'speaking',
+        expectedResponse: 'could you repeat that please',
+        audioText: 'Could you repeat that, please?',
+      },
+      {
+        type: 'vocabulary-recall',
+        prompt: 'Which word means say again: repeat, arrive, or cook?',
+        microLesson: 'Useful repair words help you keep a conversation alive.',
+        successTip: 'Choose the word from the spoken phrase.',
+        targetSkill: 'vocabulary',
+        expectedResponse: 'repeat',
+        options: ['repeat', 'arrive', 'cook'],
       },
     ],
   },
