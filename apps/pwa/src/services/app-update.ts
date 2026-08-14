@@ -13,9 +13,18 @@ export interface AppUpdateCheckResult {
   notification: UpdateNotification | null;
 }
 
+export interface PendingAppUpdate {
+  targetVersion: string;
+  requestedAt: string;
+  lessonTitle?: string;
+  exerciseNumber?: number;
+  exerciseCount?: number;
+}
+
 const manifestUrl = process.env.APP_UPDATE_MANIFEST_URL ?? '/app-update.json';
 const currentVersion = process.env.APP_VERSION ?? '0.1.0';
 const checkIntervalMs = Number(process.env.APP_UPDATE_CHECK_INTERVAL_MS ?? 60 * 1000);
+const updateReloadRequestKey = 'mentor-ai:update-reload-requested';
 
 let intervalId: number | undefined;
 let inFlightCheck: Promise<AppUpdateCheckResult | null> | null = null;
@@ -134,6 +143,32 @@ export async function activatePendingServiceWorkerUpdate(timeoutMs = 8000): Prom
 
     navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange, { once: true });
   });
+}
+
+export function rememberPendingAppUpdate(update: PendingAppUpdate): void {
+  window.localStorage.setItem(updateReloadRequestKey, JSON.stringify(update));
+}
+
+export function consumePendingAppUpdate(): PendingAppUpdate | null {
+  const raw = window.localStorage.getItem(updateReloadRequestKey);
+
+  if (!raw) {
+    return null;
+  }
+
+  window.localStorage.removeItem(updateReloadRequestKey);
+
+  try {
+    const value = JSON.parse(raw) as Partial<PendingAppUpdate>;
+
+    if (typeof value.targetVersion !== 'string' || typeof value.requestedAt !== 'string') {
+      return null;
+    }
+
+    return value as PendingAppUpdate;
+  } catch {
+    return null;
+  }
 }
 
 export async function showSystemUpdateNotification(notification: UpdateNotification) {

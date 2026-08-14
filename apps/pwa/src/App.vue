@@ -5,8 +5,11 @@
 <script setup lang="ts">
 import { Notify } from 'quasar';
 import { onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
 import {
   activatePendingServiceWorkerUpdate,
+  consumePendingAppUpdate,
+  rememberPendingAppUpdate,
   startAppUpdatePolling,
   showSystemUpdateNotification,
   type AppUpdateCheckResult,
@@ -14,16 +17,20 @@ import {
 import { useAppStore } from 'src/stores/app-store';
 
 const appStore = useAppStore();
+const router = useRouter();
 let stopUpdatePolling: (() => void) | undefined;
 let isReloadingForUpdate = false;
+let offeredUpdateVersion: string | null = null;
+let dismissUpdatePrompt: (() => void) | undefined;
 let remoteSyncPollingTimer: number | undefined;
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('mentor-ai:update-available', handleUpdateAvailable);
   document.addEventListener('visibilitychange', handleVisibilitySync);
   navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
   stopUpdatePolling = startAppUpdatePolling(handleServerUpdateAvailable);
   startRemoteSyncPolling();
+  await showCompletedUpdateNotification();
 });
 
 onUnmounted(() => {
@@ -34,35 +41,94 @@ onUnmounted(() => {
   stopUpdatePolling?.();
 });
 
-async function handleUpdateAvailable(event: Event) {
-  if (!appStore.isHydrated) {
-    await appStore.hydrate();
+function handleUpdateAvailable() {
+  showUpdatePrompt('new version');
+}
+
+function handleServerUpdateAvailable(result: AppUpdateCheckResult) {
+  if (isReloadingForUpdate) {
+    return;
   }
 
-  const version = event instanceof CustomEvent && typeof event.detail?.version === 'string' ? event.detail.version : 'unknown';
-  const notification = await appStore.recordUpdateNotification(version);
+  showUpdatePrompt(result.manifest.version, result.notification?.message);
 
-  await showSystemUpdateNotification(notification);
-  Notify.create({
-    type: 'positive',
+  if (document.visibilityState !== 'visible' && result.notification) {
+    void showSystemUpdateNotification(result.notification);
+  }
+}
+
+function showUpdatePrompt(version: string, message?: string) {
+  if (offeredUpdateVersion === version || isReloadingForUpdate) {
+    return;
+  }
+
+  offeredUpdateVersion = version;
+  dismissUpdatePrompt?.();
+  dismissUpdatePrompt = Notify.create({
+    type: 'info',
+    position: 'bottom',
     icon: 'system_update_alt',
-    message: 'Update installed successfully',
-    caption: notification.message,
-    timeout: 10000,
+    message: 'A Mentor AI update is ready',
+    caption: message ?? 'Your current lesson and progress will be restored after the update.',
+    timeout: 0,
     actions: [
       {
-        label: 'Viewed',
+        label: 'Update',
         color: 'white',
         handler: () => {
-          void appStore.markUpdateNotificationRead(notification.id);
+          void installUpdate(version);
+        },
+      },
+      {
+        label: 'Later',
+        color: 'white',
+        handler: () => {
+          offeredUpdateVersion = null;
         },
       },
     ],
   });
 }
 
-async function handleServerUpdateAvailable(result: AppUpdateCheckResult) {
+async function installUpdate(version: string) {
   if (isReloadingForUpdate) {
+    return;
+  }
+
+  isReloadingForUpdate = true;
+
+  if (!appStore.isHydrated) {
+    await appStore.hydrate();
+  }
+
+  const lessonProgress = await appStore.prepareForAppUpdate();
+
+  if (appStore.session) {
+    await router.replace({ name: 'dashboard' });
+  }
+
+  rememberPendingAppUpdate({
+    targetVersion: version,
+    requestedAt: new Date().toISOString(),
+    ...lessonProgress,
+  });
+
+  Notify.create({
+    type: 'info',
+    position: 'bottom',
+    icon: 'sync',
+    message: 'Saving progress and updating…',
+    timeout: 0,
+  });
+
+  await activatePendingServiceWorkerUpdate();
+  window.setTimeout(() => window.location.reload(), 1000);
+}
+
+async function showCompletedUpdateNotification() {
+  const pendingUpdate = consumePendingAppUpdate();
+
+  if (!pendingUpdate) {
     return;
   }
 
@@ -70,23 +136,26 @@ async function handleServerUpdateAvailable(result: AppUpdateCheckResult) {
     await appStore.hydrate();
   }
 
-  const notification = await appStore.recordUpdateNotification(result.manifest.version, result.notification?.message);
-  isReloadingForUpdate = true;
+  const installedVersion = process.env.APP_VERSION ?? pendingUpdate.targetVersion;
+  const progressCaption = pendingUpdate.lessonTitle
+    ? `${pendingUpdate.lessonTitle} · exercise ${pendingUpdate.exerciseNumber}/${pendingUpdate.exerciseCount} restored.`
+    : 'The latest application version is now active.';
+  const notification = await appStore.recordUpdateNotification(
+    installedVersion,
+    `Mentor AI was updated. ${progressCaption}`,
+  );
 
-  await showSystemUpdateNotification(notification);
-
+  if (document.visibilityState !== 'visible') {
+    await showSystemUpdateNotification(notification);
+  }
   Notify.create({
-    type: 'info',
-    icon: 'system_update_alt',
-    message: 'Updating Mentor AI',
-    caption: notification.message,
-    timeout: 5000,
+    type: 'positive',
+    position: 'bottom',
+    icon: 'check_circle',
+    message: 'Mentor AI was updated',
+    caption: progressCaption,
+    timeout: 10000,
   });
-
-  await activatePendingServiceWorkerUpdate();
-  window.setTimeout(() => {
-    window.location.reload();
-  }, 1200);
 }
 
 function startRemoteSyncPolling() {

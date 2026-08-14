@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-import { checkForAppUpdate } from '../src/services/app-update.js';
+import { checkForAppUpdate, consumePendingAppUpdate, rememberPendingAppUpdate } from '../src/services/app-update.js';
 
 describe('PWA app update checks', () => {
   const localStorageData = new Map<string, string>();
@@ -20,6 +20,9 @@ describe('PWA app update checks', () => {
           },
           setItem(key: string, value: string) {
             localStorageData.set(key, value);
+          },
+          removeItem(key: string) {
+            localStorageData.delete(key);
           },
         },
       },
@@ -69,6 +72,19 @@ describe('PWA app update checks', () => {
     assert.match(firstResult?.notification?.message ?? '', /New lessons are available/);
     assert.equal(secondResult?.notification, null);
     assert.equal(serviceWorkerUpdates, 1);
+  });
+
+  it('remembers lesson progress across the update reload exactly once', () => {
+    rememberPendingAppUpdate({
+      targetVersion: '0.2.0',
+      requestedAt: '2026-08-14T10:00:00.000Z',
+      lessonTitle: 'Small Talk',
+      exerciseNumber: 3,
+      exerciseCount: 8,
+    });
+
+    assert.equal(consumePendingAppUpdate()?.exerciseNumber, 3);
+    assert.equal(consumePendingAppUpdate(), null);
   });
 });
 

@@ -469,6 +469,18 @@ export const useAppStore = defineStore('app', {
       return notification;
     },
 
+    async prepareForAppUpdate() {
+      await this.persistSession();
+
+      return this.session
+        ? {
+            lessonTitle: this.session.lesson.title,
+            exerciseNumber: Math.min(this.session.currentExerciseIndex + 1, this.session.lesson.exercises.length),
+            exerciseCount: this.session.lesson.exercises.length,
+          }
+        : {};
+    },
+
     async markUpdateNotificationRead(id: string) {
       const notification = this.updateNotifications.find((item) => item.id === id);
 

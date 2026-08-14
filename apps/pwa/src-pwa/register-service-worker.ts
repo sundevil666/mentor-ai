@@ -1,9 +1,10 @@
 import { register } from 'register-service-worker';
 
+const updateReloadRequestKey = 'mentor-ai:update-reload-requested';
 let refreshing = false;
 
 navigator.serviceWorker?.addEventListener('controllerchange', () => {
-  if (refreshing) {
+  if (refreshing || window.localStorage.getItem(updateReloadRequestKey) === null) {
     return;
   }
 
@@ -32,10 +33,6 @@ register(process.env.SERVICE_WORKER_FILE, {
         },
       }),
     );
-
-    void navigator.serviceWorker.getRegistration().then((registration) => {
-      registration?.waiting?.postMessage({ type: 'mentor-ai:skip-waiting' });
-    });
 
     return undefined;
   },
