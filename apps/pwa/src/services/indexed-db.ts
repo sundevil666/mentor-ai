@@ -1,6 +1,6 @@
 import { openDB } from 'idb';
 
-export const mentorDb = openDB('mentor-ai', 8, {
+export const mentorDb = openDB('mentor-ai', 9, {
   upgrade(db, oldVersion) {
     if (!db.objectStoreNames.contains('lessons')) {
       db.createObjectStore('lessons', { keyPath: 'id' });
@@ -26,8 +26,14 @@ export const mentorDb = openDB('mentor-ai', 8, {
       db.createObjectStore('student-models', { keyPath: 'id' });
     }
 
+    // The store key identifies the one locally restorable session. The value's
+    // `id` remains a unique learning-session id used by evidence and analytics.
+    if (oldVersion > 0 && oldVersion < 9 && db.objectStoreNames.contains('learning-sessions')) {
+      db.deleteObjectStore('learning-sessions');
+    }
+
     if (!db.objectStoreNames.contains('learning-sessions')) {
-      db.createObjectStore('learning-sessions', { keyPath: 'id' });
+      db.createObjectStore('learning-sessions');
     }
 
     if (!db.objectStoreNames.contains('concept-evidence')) {

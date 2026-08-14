@@ -31,6 +31,8 @@ export type ActivityPace = 'passive' | 'steady' | 'active' | 'deep';
 
 export type DeviceSurface = 'mobile' | 'desktop';
 
+export type PreferredLessonDevice = 'iphone' | 'mac';
+
 export interface WorkShiftSchedule {
   shift: WorkShift;
   startsAtMinutes: number;
@@ -220,6 +222,7 @@ export interface LessonPlan {
   conceptLevel: ConceptLevel;
   activityType: LearningActivityType;
   lessonTemplateKey?: string;
+  preferredDevice?: PreferredLessonDevice;
   teacherDecision: TeacherDecision;
   goal: LearningGoal;
   teachingIntent: string;
@@ -238,6 +241,7 @@ export interface GeneratedLesson {
   conceptLevel: ConceptLevel;
   activityType: LearningActivityType;
   lessonTemplateKey?: string;
+  preferredDevice?: PreferredLessonDevice;
   teacherDecision: TeacherDecision;
   title: string;
   purpose: string;
@@ -781,6 +785,7 @@ export function createLessonPlan(
     conceptLevel: conceptState.level,
     activityType: chooseActivityForConcept(concept, conceptState),
     lessonTemplateKey: context.lessonTemplateKey,
+    preferredDevice: getPreferredLessonDevice(context.lessonTemplateKey, context.mode),
     teacherDecision: {
       ...teacherDecision,
       concept,
@@ -810,9 +815,10 @@ export function generateLessonFromPlan(plan: LessonPlan, createdAt: string): Gen
     conceptLevel: plan.conceptLevel,
     activityType: plan.activityType,
     lessonTemplateKey: plan.lessonTemplateKey,
+    preferredDevice: plan.preferredDevice,
     teacherDecision: plan.teacherDecision,
     title: createConceptLessonTitle(plan),
-    purpose: plan.goal.purpose,
+    purpose: createLessonPurpose(plan),
     targetSkills: plan.targetSkills,
     estimatedMinutes: plan.learningMode === 'bus' ? 4 : 6,
     exercises,
@@ -828,6 +834,32 @@ export function generateLessonFromPlan(plan: LessonPlan, createdAt: string): Gen
     },
     createdAt,
   };
+}
+
+export function getPreferredLessonDevice(
+  lessonTemplateKey?: string,
+  learningMode?: LearningMode,
+): PreferredLessonDevice | undefined {
+  const macLessonTemplates = new Set(['work-speaking', 'weekly-weak-spots-dialogue']);
+  const iphoneLessonTemplates = new Set(['commute-listening', 'morning-questions-listening']);
+
+  if (lessonTemplateKey && macLessonTemplates.has(lessonTemplateKey)) {
+    return 'mac';
+  }
+
+  if (lessonTemplateKey && iphoneLessonTemplates.has(lessonTemplateKey)) {
+    return 'iphone';
+  }
+
+  if (!lessonTemplateKey && learningMode === 'speaking') {
+    return 'mac';
+  }
+
+  if (!lessonTemplateKey && (learningMode === 'listening' || learningMode === 'bus' || learningMode === 'walking')) {
+    return 'iphone';
+  }
+
+  return undefined;
 }
 
 export function updateStudentModelFromResults(
@@ -1216,19 +1248,16 @@ function createGoalPurpose(skill: SkillArea): string {
   }
 }
 
-function createLessonTitle(skill: SkillArea): string {
-  switch (skill) {
-    case 'grammar':
-      return 'Question word order practice';
-    case 'listening':
-      return 'Short question listening';
-    case 'speaking':
-      return 'Speaking confidence practice';
-    case 'review':
-      return 'Focused review';
-    case 'vocabulary':
-      return 'Greeting recall practice';
+function createLessonPurpose(plan: LessonPlan): string {
+  if (plan.concept === 'reading') {
+    return 'Build practical reading comprehension and carry useful words into later review.';
   }
+
+  if (plan.concept === 'vocabulary') {
+    return 'Recognize, recall, and use practical English words in context.';
+  }
+
+  return plan.goal.purpose;
 }
 
 function createConceptLessonTitle(plan: LessonPlan): string {

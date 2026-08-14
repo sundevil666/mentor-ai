@@ -26,6 +26,15 @@ The PWA can run a complete demo learning session without the API:
 
 The implementation is still intentionally small: it uses deterministic demo lesson content, browser speech synthesis, and local text-based pronunciation focus detection, not production AI generation or advanced acoustic pronunciation scoring.
 
+## Temporary First-Use Diagnostics
+
+During the first test sessions, open the browser developer console and filter for
+`[Mentor AI diagnostics]`. The PWA logs hydration, lesson source, lesson/session
+start and completion, exercise outcomes, and synchronization success or failure.
+The diagnostics deliberately exclude typed or spoken answer text, authentication
+tokens, email addresses, and other private learner data. Remove the diagnostics
+service and its store calls after the initial product-validation period.
+
 ## Cross-Device Synchronization Plan
 
 The goal is optional account-based continuity: a student can sign in with Google email only so Mentor AI can recognize the same person on multiple devices. Learning must still work without registration. Anonymous use remains local/offline-first; Google identity upgrades the same local queue into a private cloud-backed queue for that user.

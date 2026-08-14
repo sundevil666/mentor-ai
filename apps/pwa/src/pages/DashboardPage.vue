@@ -91,7 +91,18 @@
                     type="button"
                     @click="startLessonChoice(section.concept, lesson.templateKey)"
                   >
-                    <span>{{ lesson.title }}</span>
+                    <span class="lesson-card__title">
+                      {{ lesson.title }}
+                      <q-icon
+                        v-if="lesson.preferredDevice"
+                        :name="deviceRecommendation(lesson.preferredDevice).icon"
+                        size="18px"
+                        class="lesson-device-icon"
+                        :aria-label="deviceRecommendation(lesson.preferredDevice).label"
+                      >
+                        <q-tooltip>{{ deviceRecommendation(lesson.preferredDevice).tooltip }}</q-tooltip>
+                      </q-icon>
+                    </span>
                     <strong>{{ lesson.focus }}</strong>
                   </button>
                 </div>
@@ -126,6 +137,14 @@
               <div>
                 <p class="lesson-stage__eyebrow">
                   {{ appStore.session.lesson.title }}
+                  <q-icon
+                    v-if="appStore.session.lesson.preferredDevice"
+                    :name="deviceRecommendation(appStore.session.lesson.preferredDevice).icon"
+                    size="18px"
+                    class="lesson-device-icon"
+                  >
+                    <q-tooltip>{{ deviceRecommendation(appStore.session.lesson.preferredDevice).tooltip }}</q-tooltip>
+                  </q-icon>
                 </p>
                 <h1>{{ currentExercise.prompt }}</h1>
                 <p>{{ currentExercise.microLesson }}</p>
@@ -180,6 +199,14 @@
               <div>
                 <p class="lesson-stage__eyebrow">
                   {{ appStore.session.lesson.title }}
+                  <q-icon
+                    v-if="appStore.session.lesson.preferredDevice"
+                    :name="deviceRecommendation(appStore.session.lesson.preferredDevice).icon"
+                    size="18px"
+                    class="lesson-device-icon"
+                  >
+                    <q-tooltip>{{ deviceRecommendation(appStore.session.lesson.preferredDevice).tooltip }}</q-tooltip>
+                  </q-icon>
                 </p>
                 <h1>{{ currentExercise.prompt }}</h1>
                 <p>{{ currentExercise.microLesson }}</p>
@@ -224,6 +251,14 @@
                 <div>
                   <p class="lesson-stage__eyebrow">
                     {{ appStore.session.lesson.title }}
+                    <q-icon
+                      v-if="appStore.session.lesson.preferredDevice"
+                      :name="deviceRecommendation(appStore.session.lesson.preferredDevice).icon"
+                      size="18px"
+                      class="lesson-device-icon"
+                    >
+                      <q-tooltip>{{ deviceRecommendation(appStore.session.lesson.preferredDevice).tooltip }}</q-tooltip>
+                    </q-icon>
                   </p>
                   <h1>{{ selectedListeningItem?.title ?? listeningTitle }}</h1>
                   <p>{{ currentExercise.microLesson }}</p>
@@ -410,7 +445,14 @@
 </template>
 
 <script setup lang="ts">
-import type { ConceptLevel, LearningConcept, LearningMode, StudentModel } from '@mentor-ai/shared';
+import type {
+  ConceptLevel,
+  LearningConcept,
+  LearningMode,
+  PreferredLessonDevice,
+  StudentModel,
+} from '@mentor-ai/shared';
+import { getPreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
   chooseRecommendedTraining,
@@ -441,6 +483,7 @@ type LessonChoice = {
   templateKey: string;
   title: string;
   focus: string;
+  preferredDevice?: PreferredLessonDevice;
 };
 type LessonSection = {
   concept: LearningConcept;
@@ -630,16 +673,19 @@ const lessonSections: LessonSection[] = [
         templateKey: 'work-speaking',
         title: 'Speaking confidence at work',
         focus: 'Low-pressure speech and question order',
+        preferredDevice: getPreferredLessonDevice('work-speaking'),
       },
       {
         templateKey: 'weekly-weak-spots-dialogue',
         title: 'Weekly weak spots dialogue',
         focus: 'Question order, prepositions, requests, natural chunks',
+        preferredDevice: getPreferredLessonDevice('weekly-weak-spots-dialogue'),
       },
       {
         templateKey: 'morning-questions-listening',
         title: 'Morning questions',
         focus: 'Question words, time meaning, word order',
+        preferredDevice: getPreferredLessonDevice('morning-questions-listening'),
       },
     ],
   },
@@ -688,6 +734,20 @@ const lessonSections: LessonSection[] = [
     ],
   },
 ];
+
+function deviceRecommendation(device: PreferredLessonDevice) {
+  return device === 'mac'
+    ? {
+        icon: 'laptop_mac',
+        label: 'Mac preferred',
+        tooltip: 'Mac is preferred for more reliable voice recognition and detailed answers.',
+      }
+    : {
+        icon: 'phone_iphone',
+        label: 'iPhone preferred',
+        tooltip: 'iPhone is preferred for convenient listening on the move.',
+      };
+}
 const recommendedTraining = computed(() => {
   const key = chooseRecommendedTraining(currentSuggestion.value, appStore.studentModel);
   const training = findTrainingMode(key);

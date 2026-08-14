@@ -521,6 +521,11 @@ body.body--dark {
   text-transform: uppercase;
 }
 
+.lesson-stage__eyebrow .lesson-device-icon {
+  margin-left: 5px;
+  vertical-align: -3px;
+}
+
 .audio-row {
   align-items: center;
   background: var(--app-surface-soft);
@@ -803,11 +808,23 @@ body.body--dark {
   transform: translateY(-1px);
 }
 
-.lesson-card span {
+.lesson-card > span {
   color: var(--app-text-strong);
   font-size: 1rem;
   font-weight: 800;
   line-height: 1.25;
+}
+
+.lesson-card__title {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+  justify-content: space-between;
+}
+
+.lesson-device-icon {
+  color: var(--app-accent);
+  flex: 0 0 auto;
 }
 
 .lesson-card strong {

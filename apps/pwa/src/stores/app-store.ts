@@ -35,6 +35,7 @@ import {
 } from 'src/services/api-client';
 import { createActivityReason, inferActivitySuggestion } from 'src/services/activity-suggestion';
 import { registerLearningBackgroundSync } from 'src/services/background-sync';
+import { logDiagnostic } from 'src/services/diagnostics';
 import { mentorDb } from 'src/services/indexed-db';
 import {
   clearAuthSession,
@@ -180,6 +181,13 @@ export const useAppStore = defineStore('app', {
       this.authSession = readAuthSession();
       this.isHydrated = true;
 
+      logDiagnostic('app.hydrated', {
+        hasActiveSession: this.session !== null,
+        modelVersion: this.studentModel.version,
+        pendingSyncEvents: this.pendingSyncEvents,
+        storageMode: this.storageMode,
+      });
+
       if (this.pendingSyncEvents > 0) {
         await this.registerBackgroundSync();
       }
@@ -203,7 +211,7 @@ export const useAppStore = defineStore('app', {
       const createdAt = now();
       const learningContext = context ?? createDefaultLearningContext(this.activitySnapshots, this.preferredWorkShift);
       const lesson = await this.loadLesson(learningContext, createdAt);
-      const sessionId = sessionStoreKey;
+      const sessionId = createSessionId(createdAt);
       const firstExercise = lesson.exercises[0];
       const startedEvent = createLearningEvent(this.studentId, sessionId, lesson, undefined, 'lesson-started', createdAt);
       const firstExerciseEvent = createLearningEvent(
@@ -231,19 +239,31 @@ export const useAppStore = defineStore('app', {
       await this.persistActivitySnapshot(createActivitySnapshot(this.studentId, learningContext, sessionId, createdAt));
       await this.persistSession();
       await this.publishSessionHandoff();
+      logDiagnostic('lesson.started', {
+        sessionId,
+        lessonId: lesson.id,
+        concept: lesson.concept,
+        exerciseCount: lesson.exercises.length,
+        online: navigator.onLine,
+      });
     },
 
     async loadLesson(context: LearningContext, createdAt: string): Promise<GeneratedLesson> {
       if (navigator.onLine) {
         try {
-          return await fetchCurrentLesson(context);
-        } catch (_error) {
+          const lesson = await fetchCurrentLesson(context);
+          logDiagnostic('lesson.loaded', { lessonId: lesson.id, source: 'api' });
+          return lesson;
+        } catch (error) {
+          logDiagnostic('lesson.api_fallback', { reason: getErrorMessage(error) }, 'warn');
           // Keep offline-first practice usable when the API is temporarily unavailable.
         }
       }
 
       const plan = createLessonPlan(this.studentModel, context, createdAt);
-      return generateLessonFromPlan(plan, createdAt);
+      const lesson = generateLessonFromPlan(plan, createdAt);
+      logDiagnostic('lesson.loaded', { lessonId: lesson.id, source: 'local' });
+      return lesson;
     },
 
     async setPreferredWorkShift(workShift: WorkShift) {
@@ -279,6 +299,13 @@ export const useAppStore = defineStore('app', {
 
       this.session.events.push(finishedEvent);
       this.session.results.push(result);
+      logDiagnostic('exercise.completed', {
+        sessionId: this.session.id,
+        lessonId: this.session.lesson.id,
+        exerciseId: exercise.id,
+        correct: result.correct,
+        responseTimeMs: result.responseTimeMs,
+      });
 
       if (exercise.type === 'repeat-speaking' || exercise.type === 'dialogue-translation') {
         this.session.speechResults.push(
@@ -508,6 +535,14 @@ export const useAppStore = defineStore('app', {
       if (navigator.onLine) {
         await this.syncPendingEvents();
       }
+
+      logDiagnostic('lesson.completed', {
+        sessionId: this.session.id,
+        lessonId: this.session.lesson.id,
+        exerciseCount: this.session.results.length,
+        modelVersion: this.studentModel.version,
+        pendingSyncEvents: this.pendingSyncEvents,
+      });
     },
 
     async persistSession() {
@@ -517,7 +552,7 @@ export const useAppStore = defineStore('app', {
 
       const db = await mentorDb;
       const session = toStorageRecord(this.session);
-      await db.put('learning-sessions', session);
+      await db.put('learning-sessions', session, sessionStoreKey);
       await db.put('lessons', session.lesson);
     },
 
@@ -647,8 +682,17 @@ export const useAppStore = defineStore('app', {
         const updatedQueue = await db.getAll('sync-queue');
         this.pendingSyncEvents = updatedQueue.filter((event) => event.status === 'pending').length;
         this.lastSyncAt = now();
-      } catch {
+        logDiagnostic('sync.completed', {
+          acceptedCount: result.acceptedCount,
+          pendingSyncEvents: this.pendingSyncEvents,
+          modelVersion: result.studentModelVersion,
+        });
+      } catch (error) {
         this.pendingSyncEvents = pendingEvents.length;
+        logDiagnostic('sync.failed', {
+          pendingSyncEvents: pendingEvents.length,
+          reason: getErrorMessage(error),
+        }, 'warn');
         await this.registerBackgroundSync();
       }
     },
@@ -746,7 +790,7 @@ export const useAppStore = defineStore('app', {
       }
 
       this.session = {
-        id: sessionStoreKey,
+        id: handoff.events[0]?.sessionId ?? createSessionId(handoff.startedAt),
         lesson: handoff.lesson,
         context: handoff.context,
         currentExerciseIndex: handoff.currentExerciseIndex,
@@ -1059,4 +1103,16 @@ function toLearningEvent(event: QueuedLearningEvent): LearningEvent {
 
 function now(): string {
   return new Date().toISOString();
+}
+
+function createSessionId(createdAt: string): string {
+  const randomPart = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2, 12);
+
+  return `session-${createdAt.replace(/\D/g, '')}-${randomPart}`;
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Unknown error';
 }

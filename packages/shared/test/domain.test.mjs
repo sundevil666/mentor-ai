@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   createLessonPlan,
+  getPreferredLessonDevice,
   decideNextTeacherAction,
   analyzePronunciationAttempt,
   createObservationFromResults,
@@ -267,12 +268,12 @@ describe('shared domain helpers', () => {
   it('can start a specific lesson template inside each README concept', () => {
     const createdAt = '2026-06-28T08:00:00.000Z';
     const choices = [
-      ['learning', 'work-speaking', 'Speaking confidence at work'],
-      ['reading', 'message-reading', 'Reading: short work message'],
-      ['vocabulary', 'travel-vocabulary', 'Vocabulary Growth: travel words'],
+      ['learning', 'work-speaking', 'Speaking confidence at work', 'confidence'],
+      ['reading', 'message-reading', 'Reading: short work message', 'reading comprehension'],
+      ['vocabulary', 'travel-vocabulary', 'Vocabulary Growth: travel words', 'words in context'],
     ];
 
-    for (const [concept, lessonTemplateKey, title] of choices) {
+    for (const [concept, lessonTemplateKey, title, purposeFragment] of choices) {
       const plan = createLessonPlan(
         initialStudentModel,
         {
@@ -290,6 +291,7 @@ describe('shared domain helpers', () => {
 
       assert.equal(lesson.concept, concept);
       assert.equal(lesson.title, title);
+      assert.match(lesson.purpose.toLowerCase(), new RegExp(purposeFragment));
       assert.equal(isLessonDeliverable(lesson), true);
     }
   });
@@ -647,5 +649,13 @@ describe('shared domain helpers', () => {
 
     assert.equal(plan.concept, 'learning');
     assert.equal(plan.activityType, 'recovery-check');
+  });
+
+  it('recommends a device only when the lesson benefits from one', () => {
+    assert.equal(getPreferredLessonDevice('work-speaking'), 'mac');
+    assert.equal(getPreferredLessonDevice('morning-questions-listening'), 'iphone');
+    assert.equal(getPreferredLessonDevice('daily-guided'), undefined);
+    assert.equal(getPreferredLessonDevice(undefined, 'speaking'), 'mac');
+    assert.equal(getPreferredLessonDevice(undefined, 'listening'), 'iphone');
   });
 });
