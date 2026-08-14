@@ -296,6 +296,38 @@ body.body--dark {
   text-transform: uppercase;
 }
 
+.version-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.version-grid div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.version-grid span,
+.version-note {
+  color: var(--app-muted);
+  font-size: 0.8rem;
+}
+
+.version-grid strong {
+  overflow-wrap: anywhere;
+}
+
+.version-note {
+  margin: 12px 0 0;
+}
+
+@media (max-width: 560px) {
+  .version-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .voice-actions {
   align-items: center;
   color: var(--app-muted-strong);

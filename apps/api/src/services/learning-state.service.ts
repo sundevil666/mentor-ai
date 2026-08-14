@@ -180,12 +180,15 @@ export const learningStateService = {
     };
   },
 
-  getConfiguration() {
+  async getConfiguration() {
+    const lessonLibrary = await privateLessonRepository.getLibraryMetadata();
+
     return {
       storageMode: config.storageMode,
       supportedLanguages: ['en'],
       synchronizationProtocolVersion: 1,
       lessonSchemaVersion: 1,
+      lessonLibrary,
       speech: {
         advancedPronunciationScoring: false,
       },

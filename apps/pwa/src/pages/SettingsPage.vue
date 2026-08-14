@@ -19,6 +19,30 @@
 
       <section class="settings-section">
         <div class="settings-section__heading">
+          <q-icon name="info" />
+          <span>Versions</span>
+        </div>
+        <div class="version-grid">
+          <div>
+            <span>Application</span>
+            <strong>{{ appVersion }}</strong>
+          </div>
+          <div>
+            <span>Lessons</span>
+            <strong>{{ lessonVersion }}</strong>
+          </div>
+          <div>
+            <span>Available lessons</span>
+            <strong>{{ lessonCount }}</strong>
+          </div>
+        </div>
+        <p class="version-note">
+          Updates are checked and installed automatically.
+        </p>
+      </section>
+
+      <section class="settings-section">
+        <div class="settings-section__heading">
           <q-icon name="schedule" />
           <span>Learning context</span>
         </div>
@@ -125,8 +149,12 @@ import {
 } from 'src/services/learning-context';
 import { clearLastRoutePreference, readSpeechVoicePreference, saveSpeechVoicePreference } from 'src/services/user-preferences';
 import { useAppStore } from 'src/stores/app-store';
+import { fetchAppConfiguration } from 'src/services/api-client';
 
 const appStore = useAppStore();
+const appVersion = process.env.APP_VERSION ?? 'development';
+const lessonVersion = ref('Checking…');
+const lessonCount = ref('—');
 const router = useRouter();
 const selectedShift = ref<WorkShift>('unknown');
 const selectedVoiceURI = ref<string | null>(readSpeechVoicePreference());
@@ -162,6 +190,7 @@ onMounted(async () => {
   }
 
   selectedShift.value = appStore.preferredWorkShift;
+  await loadVersions();
   await waitForSpeechVoices();
   refreshVoices();
 
@@ -169,6 +198,16 @@ onMounted(async () => {
     window.speechSynthesis.addEventListener('voiceschanged', refreshVoices);
   }
 });
+
+async function loadVersions() {
+  try {
+    const configuration = await fetchAppConfiguration();
+    lessonVersion.value = configuration.lessonLibrary.version;
+    lessonCount.value = String(configuration.lessonLibrary.lessonCount);
+  } catch {
+    lessonVersion.value = 'Unavailable offline';
+  }
+}
 
 onUnmounted(() => {
   if ('speechSynthesis' in window) {

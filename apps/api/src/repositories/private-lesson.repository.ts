@@ -1,4 +1,4 @@
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, stat } from 'node:fs/promises';
 import type { GeneratedLesson, LearningConcept, LearningMode, LessonSummary, StudentModel } from '@mentor-ai/shared';
 import { resolvePersonalStoragePath } from '../utils/storage-path.js';
 import { getPostgresPool } from './postgres-client.js';
@@ -6,6 +6,28 @@ import { getPostgresPool } from './postgres-client.js';
 const lessonDirectory = resolvePersonalStoragePath('lessons');
 
 export const privateLessonRepository = {
+  async getLibraryMetadata(): Promise<{ version: string; updatedAt: string | null; lessonCount: number }> {
+    const databaseMetadata = await findDatabaseLibraryMetadata();
+
+    if (databaseMetadata.lessonCount > 0) {
+      return databaseMetadata;
+    }
+
+    try {
+      const lessons = await this.findAll();
+      const fileMetadata = await stat(resolvePersonalStoragePath('lessons', 'lessons.json'));
+      const updatedAt = fileMetadata.mtime.toISOString();
+
+      return { version: toDateVersion(updatedAt), updatedAt, lessonCount: lessons.length };
+    } catch (error) {
+      if (!isMissingFileError(error)) {
+        throw error;
+      }
+
+      return { version: 'built-in', updatedAt: null, lessonCount: 0 };
+    }
+  },
+
   async findAll(): Promise<GeneratedLesson[]> {
     const databaseLessons = await findAllDatabaseLessons();
 
@@ -137,6 +159,36 @@ async function findAllDatabaseLessons(): Promise<GeneratedLesson[]> {
   );
 
   return result.rows.map((row) => row.lesson).filter(isGeneratedLesson);
+}
+
+async function findDatabaseLibraryMetadata(): Promise<{ version: string; updatedAt: string | null; lessonCount: number }> {
+  const pool = getPostgresPool();
+
+  if (!pool) {
+    return { version: 'built-in', updatedAt: null, lessonCount: 0 };
+  }
+
+  await ensurePrivateLessonsTable();
+  const result = await pool.query<{ updated_at: Date | string | null; lesson_count: string }>(
+    `
+      SELECT MAX(updated_at) AS updated_at, COUNT(*)::text AS lesson_count
+      FROM private_lessons
+      WHERE is_active = true
+    `,
+  );
+  const row = result.rows[0];
+  const lessonCount = Number(row?.lesson_count ?? 0);
+  const updatedAt = row?.updated_at ? new Date(row.updated_at).toISOString() : null;
+
+  return {
+    version: updatedAt ? toDateVersion(updatedAt) : 'built-in',
+    updatedAt,
+    lessonCount,
+  };
+}
+
+function toDateVersion(value: string): string {
+  return value.slice(0, 10);
 }
 
 function findLessonByConcept(lessons: GeneratedLesson[], concept: LearningConcept): GeneratedLesson | undefined {

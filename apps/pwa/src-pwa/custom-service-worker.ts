@@ -59,6 +59,11 @@ self.addEventListener('sync', (event: Event) => {
 });
 
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'mentor-ai:skip-waiting') {
+    event.waitUntil(self.skipWaiting());
+    return;
+  }
+
   if (event.data?.type === 'mentor-ai:sync-learning') {
     event.waitUntil(syncPendingLearningEvents());
   }

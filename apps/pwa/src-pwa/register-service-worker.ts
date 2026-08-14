@@ -1,5 +1,16 @@
 import { register } from 'register-service-worker';
 
+let refreshing = false;
+
+navigator.serviceWorker?.addEventListener('controllerchange', () => {
+  if (refreshing) {
+    return;
+  }
+
+  refreshing = true;
+  window.location.reload();
+});
+
 register(process.env.SERVICE_WORKER_FILE, {
   ready() {
     return undefined;
@@ -21,6 +32,10 @@ register(process.env.SERVICE_WORKER_FILE, {
         },
       }),
     );
+
+    void navigator.serviceWorker.getRegistration().then((registration) => {
+      registration?.waiting?.postMessage({ type: 'mentor-ai:skip-waiting' });
+    });
 
     return undefined;
   },

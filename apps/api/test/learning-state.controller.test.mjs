@@ -18,6 +18,8 @@ describe('learning state controllers', () => {
     assert.equal(res.body.data.supportedLanguages.includes('en'), true);
     assert.equal(res.body.data.synchronizationProtocolVersion, 1);
     assert.equal(res.body.data.speech.advancedPronunciationScoring, false);
+    assert.equal(typeof res.body.data.lessonLibrary.version, 'string');
+    assert.equal(typeof res.body.data.lessonLibrary.lessonCount, 'number');
   });
 
   it('returns current student state and lessons through controllers', async () => {

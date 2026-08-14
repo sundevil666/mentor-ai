@@ -32,6 +32,14 @@ interface SynchronizationResponse {
   statisticsSnapshots: StatisticsSnapshot[];
 }
 
+export interface AppConfiguration {
+  lessonLibrary: {
+    version: string;
+    updatedAt: string | null;
+    lessonCount: number;
+  };
+}
+
 const apiBaseUrl =
   process.env.API_BASE_URL ??
   (process.env.DEV || typeof window === 'undefined' ? 'http://localhost:4000' : '');
@@ -46,6 +54,20 @@ export async function fetchStudentState(): Promise<StudentStateResponse> {
   }
 
   const body = (await response.json()) as ApiResponse<StudentStateResponse>;
+  return body.data;
+}
+
+export async function fetchAppConfiguration(): Promise<AppConfiguration> {
+  const response = await fetch(`${apiBaseUrl}/api/configuration?t=${Date.now()}`, {
+    cache: 'no-store',
+    headers: authHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('App configuration request failed.');
+  }
+
+  const body = (await response.json()) as ApiResponse<AppConfiguration>;
   return body.data;
 }
 

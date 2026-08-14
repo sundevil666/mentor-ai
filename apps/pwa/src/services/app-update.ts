@@ -111,6 +111,10 @@ export async function activatePendingServiceWorkerUpdate(timeoutMs = 8000): Prom
 
   await registration.update();
 
+  if (registration.waiting) {
+    registration.waiting.postMessage({ type: 'mentor-ai:skip-waiting' });
+  }
+
   if (!navigator.serviceWorker.controller) {
     return 'unsupported';
   }
