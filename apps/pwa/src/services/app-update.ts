@@ -1,4 +1,5 @@
 import type { UpdateNotification } from 'src/stores/app-store';
+import { formatDisplayDate } from './date-format.js';
 
 export interface AppUpdateManifest {
   version: string;
@@ -190,22 +191,8 @@ function isNewVersion(version: string): boolean {
 }
 
 function createUpdateAvailableMessage(manifest: AppUpdateManifest): string {
-  const releasedAt = manifest.releasedAt ? ` Released ${formatDate(manifest.releasedAt)}.` : '';
+  const releasedAt = manifest.releasedAt ? ` Released ${formatDisplayDate(manifest.releasedAt)}.` : '';
   const firstNote = manifest.notes?.[0] ? ` ${manifest.notes[0]}` : '';
 
   return `Mentor AI ${manifest.version} is ready to install.${releasedAt}${firstNote}`;
-}
-
-function formatDate(value: string): string {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleDateString(undefined, {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
 }

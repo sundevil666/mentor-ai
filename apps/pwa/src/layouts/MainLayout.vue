@@ -307,6 +307,7 @@ import { onBeforeRouteUpdate, type RouteLocationNormalizedLoaded } from 'vue-rou
 import { useAppStore } from 'src/stores/app-store';
 import { fetchAuthConfiguration, signInWithGoogleCredential } from 'src/services/auth';
 import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
+import { formatDisplayDate } from 'src/services/date-format';
 
 declare global {
   interface Window {
@@ -366,7 +367,7 @@ onBeforeRouteUpdate((to, from) => {
 });
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleString();
+  return formatDisplayDate(value);
 }
 
 function getRouteOrder(route: RouteLocationNormalizedLoaded) {

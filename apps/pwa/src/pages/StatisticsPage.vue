@@ -86,6 +86,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
 import { useAppStore } from 'src/stores/app-store';
+import { formatDisplayDate } from 'src/services/date-format';
 
 const appStore = useAppStore();
 
@@ -108,7 +109,7 @@ const syncDetail = computed(() => {
     return 'Evidence is queued locally and ready to send to the Mentor AI API.';
   }
 
-  return appStore.lastSyncAt ? `Last sync ${new Date(appStore.lastSyncAt).toLocaleString()}.` : 'No pending evidence.';
+  return appStore.lastSyncAt ? `Last sync ${formatDisplayDate(appStore.lastSyncAt)}.` : 'No pending evidence.';
 });
 const pronunciationSummary = computed(() => {
   const latest = appStore.latestStatistics;

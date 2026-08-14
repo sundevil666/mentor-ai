@@ -50,6 +50,7 @@ import {
   type RetentionRecord,
 } from 'src/services/storage-retention';
 import { readPreferredWorkShift, savePreferredWorkShift } from 'src/services/user-preferences';
+import { formatDisplayDate } from 'src/services/date-format';
 
 interface LearningSessionState {
   id: string;
@@ -952,19 +953,7 @@ function createActivitySnapshot(
 }
 
 function createUpdateMessage(version: string, createdAt: string): string {
-  const date = new Date(createdAt);
-  const formattedDate = date.toLocaleDateString(undefined, {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
-  const formattedTime = date.toLocaleTimeString(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
-  return `Mentor AI was updated to version ${version} on ${formattedDate} at ${formattedTime}.`;
+  return `Mentor AI was updated to version ${version} on ${formatDisplayDate(createdAt)}.`;
 }
 
 function createLearningEvent(

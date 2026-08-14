@@ -150,6 +150,7 @@ import {
 import { clearLastRoutePreference, readSpeechVoicePreference, saveSpeechVoicePreference } from 'src/services/user-preferences';
 import { useAppStore } from 'src/stores/app-store';
 import { fetchAppConfiguration } from 'src/services/api-client';
+import { formatDisplayDate } from 'src/services/date-format';
 
 const appStore = useAppStore();
 const appVersion = process.env.APP_VERSION ?? 'development';
@@ -202,7 +203,9 @@ onMounted(async () => {
 async function loadVersions() {
   try {
     const configuration = await fetchAppConfiguration();
-    lessonVersion.value = configuration.lessonLibrary.version;
+    lessonVersion.value = configuration.lessonLibrary.updatedAt
+      ? formatDisplayDate(configuration.lessonLibrary.updatedAt)
+      : configuration.lessonLibrary.version;
     lessonCount.value = String(configuration.lessonLibrary.lessonCount);
   } catch {
     lessonVersion.value = 'Unavailable offline';
