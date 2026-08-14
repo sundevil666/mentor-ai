@@ -17,6 +17,24 @@
         </q-btn>
         <q-toolbar-title>Mentor AI</q-toolbar-title>
         <q-btn
+          class="app-update-button"
+          dense
+          flat
+          :color="appStore.availableAppUpdate ? 'amber-4' : undefined"
+          :disable="!appStore.availableAppUpdate || appStore.isAppUpdateInstalling"
+          :icon="appStore.isAppUpdateInstalling ? 'sync' : 'system_update_alt'"
+          round
+          @click="installAvailableUpdate"
+        >
+          <q-badge
+            v-if="appStore.availableAppUpdate && !appStore.isAppUpdateInstalling"
+            color="red-7"
+            floating
+            rounded
+          />
+          <q-tooltip>{{ appUpdateTooltip }}</q-tooltip>
+        </q-btn>
+        <q-btn
           class="sync-status-button"
           dense
           flat
@@ -327,6 +345,17 @@ const isDarkTheme = ref(false);
 const googleClientId = ref<string | null>(null);
 const routeTransitionName = ref('route-slide-forward');
 const showInstallButton = computed(() => isAppleTouchDevice() && !isStandalonePwa());
+const appUpdateTooltip = computed(() => {
+  if (appStore.isAppUpdateInstalling) {
+    return 'Saving progress and installing the update.';
+  }
+
+  if (appStore.availableAppUpdate) {
+    return `Update ${appStore.availableAppUpdate.version} is ready. Click to install.`;
+  }
+
+  return 'Mentor AI is up to date.';
+});
 const syncStatusIcon = computed(() => {
   if (appStore.pendingSyncCount > 0) {
     return appStore.isOnline ? 'cloud_upload' : 'cloud_off';
@@ -382,6 +411,10 @@ function markRead(id: string) {
 
 function markAllRead() {
   void appStore.markAllUpdateNotificationsRead();
+}
+
+function installAvailableUpdate() {
+  window.dispatchEvent(new CustomEvent('mentor-ai:install-update'));
 }
 
 function returnToLessonChoice() {

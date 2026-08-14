@@ -101,6 +101,8 @@ interface AppState {
   lastRemoteProgressAt: string | null;
   isSyncRefreshing: boolean;
   updateNotifications: UpdateNotification[];
+  availableAppUpdate: { version: string; message?: string } | null;
+  isAppUpdateInstalling: boolean;
   sessionHandoffs: LearningSessionHandoff[];
   isHydrated: boolean;
 }
@@ -126,6 +128,8 @@ export const useAppStore = defineStore('app', {
     lastRemoteProgressAt: null,
     isSyncRefreshing: false,
     updateNotifications: [],
+    availableAppUpdate: null,
+    isAppUpdateInstalling: false,
     sessionHandoffs: [],
     isHydrated: false,
   }),
@@ -155,6 +159,14 @@ export const useAppStore = defineStore('app', {
   },
 
   actions: {
+    setAvailableAppUpdate(version: string, message?: string) {
+      this.availableAppUpdate = { version, message };
+    },
+
+    setAppUpdateInstalling(isInstalling: boolean) {
+      this.isAppUpdateInstalling = isInstalling;
+    },
+
     async hydrate() {
       const db = await mentorDb;
       const savedModel = await db.get('student-models', initialStudentModel.id);
