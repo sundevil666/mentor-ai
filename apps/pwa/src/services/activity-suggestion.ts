@@ -90,7 +90,7 @@ function inferShiftFromHistory(snapshots: ActivitySnapshot[], dayType: 'weekday'
     .filter(([shift]) => shift !== 'unknown')
     .sort((left, right) => right[1] - left[1]);
 
-  return ranked[0]?.[1] > 0 ? ranked[0][0] : matching.at(-1)?.workShift ?? 'unknown';
+  return ranked[0]?.[1] > 0 ? ranked[0][0] : matching[matching.length - 1]?.workShift ?? 'unknown';
 }
 
 function inferHistoricalPace(

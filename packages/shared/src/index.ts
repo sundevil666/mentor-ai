@@ -2062,7 +2062,7 @@ function createPronunciationIssue(
 }
 
 function wordsLookClose(expected: string, heard: string): boolean {
-  return expected[0] === heard[0] || expected.at(-1) === heard.at(-1);
+  return expected[0] === heard[0] || expected[expected.length - 1] === heard[heard.length - 1];
 }
 
 function updateSkillState(

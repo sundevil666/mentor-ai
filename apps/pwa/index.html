@@ -14,6 +14,50 @@
     <link rel="alternate icon" href="/icons/icon-192x192.png" type="image/png" />
     <link rel="apple-touch-icon" href="/icons/apple-icon-180x180.png" />
     <script>
+      // The app targets Safari 14, but Vue/Quasar and application code can call
+      // newer built-ins that syntax transpilation does not provide.
+      if (!Array.prototype.at) {
+        Object.defineProperty(Array.prototype, 'at', {
+          configurable: true,
+          writable: true,
+          value: function (index) {
+            var length = this.length >>> 0;
+            var position = Number(index) || 0;
+            position = position < 0 ? Math.ceil(position) : Math.floor(position);
+            position = position >= 0 ? position : length + position;
+            return position < 0 || position >= length ? undefined : this[position];
+          }
+        });
+      }
+
+      if (!Object.hasOwn) {
+        Object.defineProperty(Object, 'hasOwn', {
+          configurable: true,
+          writable: true,
+          value: function (object, property) {
+            return Object.prototype.hasOwnProperty.call(Object(object), property);
+          }
+        });
+      }
+
+      function showMentorStartupError() {
+        window.setTimeout(function () {
+          var app = document.getElementById('q-app');
+          if (!app || app.childNodes.length > 0) {
+            return;
+          }
+
+          app.innerHTML = '<main style="box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:32px 20px;text-align:center;color:#10201d">' +
+            '<h1 style="font-size:22px">Mentor AI could not start</h1>' +
+            '<p>Please close this tab, reopen Mentor AI, and try once more.</p>' +
+            '<button onclick="window.location.reload()" style="background:#0f766e;border:0;border-radius:8px;color:white;font-size:17px;padding:12px 20px">Reload</button>' +
+            '</main>';
+        }, 1200);
+      }
+
+      window.addEventListener('error', showMentorStartupError);
+      window.addEventListener('unhandledrejection', showMentorStartupError);
+
       // Mobile Safari can restore stale HTML after a service-worker update. Recover once
       // when that HTML points at a JavaScript bundle that no longer exists.
       window.addEventListener('error', function (event) {

@@ -160,8 +160,8 @@ export const useAppStore = defineStore('app', {
       return Math.round((completedExercises / state.session.lesson.exercises.length) * 100);
     },
     completedLessonsCount: (state): number => state.statisticsSnapshots.length,
-    latestStatistics: (state): StatisticsSnapshot | null => state.statisticsSnapshots.at(-1) ?? null,
-    latestActivitySnapshot: (state): ActivitySnapshot | null => state.activitySnapshots.at(-1) ?? null,
+    latestStatistics: (state): StatisticsSnapshot | null => state.statisticsSnapshots[state.statisticsSnapshots.length - 1] ?? null,
+    latestActivitySnapshot: (state): ActivitySnapshot | null => state.activitySnapshots[state.activitySnapshots.length - 1] ?? null,
     unreadUpdateNotificationCount: (state): number =>
       state.updateNotifications.filter((notification) => notification.readAt === null).length,
     latestUpdateNotification: (state): UpdateNotification | null => state.updateNotifications[0] ?? null,
@@ -195,7 +195,9 @@ export const useAppStore = defineStore('app', {
       this.activitySnapshots = (activitySnapshots as ActivitySnapshot[]).sort((left, right) =>
         left.observedAt.localeCompare(right.observedAt),
       );
-      this.preferredWorkShift = readPreferredWorkShift() ?? this.activitySnapshots.at(-1)?.workShift ?? 'unknown';
+      this.preferredWorkShift = readPreferredWorkShift()
+        ?? this.activitySnapshots[this.activitySnapshots.length - 1]?.workShift
+        ?? 'unknown';
       this.pendingSyncEvents = queuedEvents.filter((event) => event.status === 'pending').length;
       this.updateNotifications = (updateNotifications as UpdateNotification[]).sort((left, right) =>
         right.createdAt.localeCompare(left.createdAt),
@@ -1129,7 +1131,8 @@ function uniqueById<T extends { id: string }>(items: T[]): T[] {
 }
 
 function getLatestHandoffUpdate(handoffs: LearningSessionHandoff[]): string | null {
-  return handoffs.map((handoff) => handoff.updatedAt).sort().at(-1) ?? null;
+  const sortedDates = handoffs.map((handoff) => handoff.updatedAt).sort();
+  return sortedDates[sortedDates.length - 1] ?? null;
 }
 
 function toLearningEvent(event: QueuedLearningEvent): LearningEvent {
