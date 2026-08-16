@@ -3,6 +3,8 @@ import { describe, it } from 'node:test';
 
 import type { ActivitySnapshot, WorkShift } from '@mentor-ai/shared';
 import { inferActivitySuggestion } from '../src/services/activity-suggestion.js';
+import { createCurrentActivitySuggestion } from '../src/services/learning-context.js';
+import type { MyShiftActivity } from '../src/services/my-shift.js';
 
 describe('PWA activity suggestion', () => {
   it('keeps first-shift mornings light and short', () => {
@@ -47,7 +49,51 @@ describe('PWA activity suggestion', () => {
     assert.equal(suggestion.activityPace, 'deep');
     assert.equal(suggestion.reason.includes('Recent activity history'), true);
   });
+
+  it('chooses hands-free listening during a My Shift commute', () => {
+    const activity = createMyShiftActivity('workday', 'commute', '2026-06-29T07:00:00.000Z', '2026-06-29T07:45:00.000Z');
+    const suggestion = createCurrentActivitySuggestion('unknown', [], new Date('2026-06-29T07:15:00.000Z'), activity);
+
+    assert.equal(suggestion.mode, 'listening');
+    assert.equal(suggestion.activityPace, 'passive');
+    assert.equal(suggestion.availableMinutes, 30);
+    assert.match(suggestion.reason, /commuting/);
+  });
+
+  it('chooses speaking-friendly practice on a My Shift day off', () => {
+    const activity = createMyShiftActivity('day_off', 'day_off', '2026-07-05T00:00:00.000Z', '2026-07-06T00:00:00.000Z');
+    const suggestion = createCurrentActivitySuggestion('unknown', [], new Date('2026-07-05T11:00:00.000Z'), activity);
+
+    assert.equal(suggestion.workShift, 'off');
+    assert.equal(suggestion.mode, 'home');
+    assert.equal(suggestion.activityPace, 'deep');
+    assert.match(suggestion.reason, /speaking aloud/);
+  });
 });
+
+function createMyShiftActivity(
+  dayType: string,
+  type: 'commute' | 'day_off',
+  startsAt: string,
+  endsAt: string,
+): MyShiftActivity {
+  return {
+    schemaVersion: '1.0',
+    generatedAt: startsAt,
+    dataVersion: 'test',
+    user: { id: 'test', timezone: 'UTC', locale: 'en' },
+    range: { from: startsAt.slice(0, 10), to: startsAt.slice(0, 10) },
+    days: [
+      {
+        date: startsAt.slice(0, 10),
+        dayType,
+        shift: null,
+        timeline: [{ type, startsAt, endsAt, lessonAvailability: 'recommended' }],
+        recommendedLearningWindows: [],
+      },
+    ],
+  };
+}
 
 function createSnapshot(workShift: WorkShift, observedAt: string): ActivitySnapshot {
   const date = new Date(observedAt);

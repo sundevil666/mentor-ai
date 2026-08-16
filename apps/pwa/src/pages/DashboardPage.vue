@@ -644,7 +644,7 @@ const syncColor = computed(() => {
   return appStore.isOnline ? 'teal-8' : 'grey-7';
 });
 const currentSuggestion = computed(() =>
-  createCurrentActivitySuggestion(appStore.preferredWorkShift, appStore.activitySnapshots),
+  createCurrentActivitySuggestion(appStore.preferredWorkShift, appStore.activitySnapshots, new Date(), appStore.myShiftActivity),
 );
 const activityHeadline = computed(() => {
   return `Best now: ${recommendedTraining.value.shortLabel}`;

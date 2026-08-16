@@ -1,5 +1,6 @@
 import type { ActivitySnapshot, LearningContext, StudentModel, WorkShift } from '@mentor-ai/shared';
-import { inferActivitySuggestion, type ActivitySuggestion } from 'src/services/activity-suggestion';
+import { inferActivitySuggestion, type ActivitySuggestion } from './activity-suggestion.js';
+import { findCurrentMyShiftDay, type MyShiftActivity } from './my-shift.js';
 
 export type TrainingKey = 'listening' | 'speaking' | 'vocabulary';
 
@@ -44,8 +45,76 @@ export function createCurrentActivitySuggestion(
   preferredWorkShift: WorkShift,
   activitySnapshots: ActivitySnapshot[],
   date = new Date(),
+  myShiftActivity: MyShiftActivity | null = null,
 ): ActivitySuggestion {
-  return inferActivitySuggestion(date, preferredWorkShift, activitySnapshots);
+  const fallback = inferActivitySuggestion(date, preferredWorkShift, activitySnapshots);
+  const day = findCurrentMyShiftDay(myShiftActivity, date);
+
+  if (!day) return fallback;
+
+  const current = day.timeline.find((item) => date >= new Date(item.startsAt) && date < new Date(item.endsAt));
+  const nextWindow = day.recommendedLearningWindows
+    .filter((window) => new Date(window.endsAt) > date)
+    .sort((left, right) => right.priority - left.priority)[0];
+  const workShift = day.dayType === 'day_off' ? 'off' : inferRemoteShift(day.shift?.startsAt) ?? fallback.workShift;
+
+  if (current?.type === 'commute') {
+    return {
+      ...fallback,
+      workShift,
+      activityPace: 'passive',
+      mode: 'listening',
+      availableMinutes: durationMinutes(date, current.endsAt, 30),
+      reason: 'My Shift shows that you are commuting, so this window is reserved for hands-free listening.',
+    };
+  }
+
+  if (current?.type === 'work') {
+    return {
+      ...fallback,
+      workShift,
+      activityPace: 'passive',
+      mode: 'review',
+      availableMinutes: 3,
+      reason: 'My Shift shows that you are at work. Only a very short review is suggested now.',
+    };
+  }
+
+  if (day.dayType === 'day_off' || current?.type === 'day_off') {
+    return {
+      ...fallback,
+      workShift: 'off',
+      activityPace: 'deep',
+      mode: 'home',
+      availableMinutes: nextWindow?.recommendedDurationMinutes ?? 12,
+      reason: 'My Shift shows a day off, so this is a good window for speaking aloud and deeper practice.',
+    };
+  }
+
+  if (nextWindow && new Date(nextWindow.startsAt) <= date) {
+    return {
+      ...fallback,
+      workShift,
+      activityPace: 'active',
+      mode: 'home',
+      availableMinutes: nextWindow.recommendedDurationMinutes,
+      reason: `My Shift recommends this learning window: ${nextWindow.reason}.`,
+    };
+  }
+
+  return { ...fallback, workShift, reason: `My Shift schedule is connected. ${fallback.reason}` };
+}
+
+function inferRemoteShift(startsAt?: string): WorkShift | null {
+  if (!startsAt) return null;
+  const hour = new Date(startsAt).getHours();
+  if (hour >= 4 && hour < 10) return 'first';
+  if (hour >= 10 && hour < 18) return 'second';
+  return 'third';
+}
+
+function durationMinutes(from: Date, endsAt: string, maximum: number): number {
+  return Math.max(3, Math.min(maximum, Math.floor((new Date(endsAt).getTime() - from.getTime()) / 60_000)));
 }
 
 export function createLearningContext(

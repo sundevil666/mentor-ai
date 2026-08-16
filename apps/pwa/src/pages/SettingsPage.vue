@@ -46,6 +46,19 @@
           <q-icon name="schedule" />
           <span>Learning context</span>
         </div>
+        <div class="voice-actions">
+          <q-btn
+            color="primary"
+            :icon="myShiftConnected ? 'sync' : 'link'"
+            :label="myShiftConnected ? 'Sync My Shift' : 'Connect My Shift'"
+            no-caps
+            unelevated
+            :disable="!myShiftConfigured || myShiftBusy"
+            :loading="myShiftBusy"
+            @click="handleMyShiftAction"
+          />
+          <span>{{ myShiftStatus }}</span>
+        </div>
         <q-select
           v-model="selectedShift"
           :options="shiftOptions"
@@ -151,6 +164,12 @@ import { clearLastRoutePreference, readSpeechVoicePreference, saveSpeechVoicePre
 import { useAppStore } from 'src/stores/app-store';
 import { fetchAppConfiguration } from 'src/services/api-client';
 import { formatDisplayDate } from 'src/services/date-format';
+import {
+  beginMyShiftConnection,
+  completeMyShiftConnection,
+  isMyShiftConfigured,
+  isMyShiftConnected,
+} from 'src/services/my-shift';
 
 const appStore = useAppStore();
 const appVersion = process.env.APP_VERSION ?? 'development';
@@ -159,6 +178,10 @@ const lessonCount = ref('—');
 const router = useRouter();
 const selectedShift = ref<WorkShift>('unknown');
 const selectedVoiceURI = ref<string | null>(readSpeechVoicePreference());
+const myShiftConfigured = isMyShiftConfigured();
+const myShiftConnected = ref(isMyShiftConnected());
+const myShiftBusy = ref(false);
+const myShiftMessage = ref('');
 const voiceOptions = ref<SpeechVoiceOption[]>([]);
 const shiftOptions: Array<{ label: string; value: WorkShift }> = [
   { label: 'Unknown', value: 'unknown' },
@@ -179,13 +202,20 @@ const voiceStatus = computed(() => {
   return `${voiceOptions.value.length} voice${voiceOptions.value.length === 1 ? '' : 's'} available.`;
 });
 const currentSuggestion = computed(() =>
-  createCurrentActivitySuggestion(appStore.preferredWorkShift, appStore.activitySnapshots),
+  createCurrentActivitySuggestion(appStore.preferredWorkShift, appStore.activitySnapshots, new Date(), appStore.myShiftActivity),
 );
+const myShiftStatus = computed(() => {
+  if (myShiftMessage.value) return myShiftMessage.value;
+  if (!myShiftConfigured) return 'Client ID must be configured before connecting.';
+  if (appStore.myShiftSyncError) return appStore.myShiftSyncError;
+  return myShiftConnected.value ? 'Connected. Your schedule guides lesson timing.' : 'Use your My Shift account to share activity.';
+});
 const activityMeta = computed(() => formatActivityMeta(currentSuggestion.value));
 const paceLabel = computed(() => formatPaceLabel(currentSuggestion.value));
 const shiftTimingRows = computed(() => createShiftTimingRows(currentSuggestion.value));
 
 onMounted(async () => {
+  await finishMyShiftCallback();
   if (!appStore.isHydrated) {
     await appStore.hydrate();
   }
@@ -199,6 +229,41 @@ onMounted(async () => {
     window.speechSynthesis.addEventListener('voiceschanged', refreshVoices);
   }
 });
+
+async function finishMyShiftCallback() {
+  const code = typeof router.currentRoute.value.query.code === 'string' ? router.currentRoute.value.query.code : null;
+  const state = typeof router.currentRoute.value.query.state === 'string' ? router.currentRoute.value.query.state : null;
+  if (!code || !state) return;
+
+  myShiftBusy.value = true;
+  try {
+    await completeMyShiftConnection(code, state);
+    myShiftConnected.value = true;
+    myShiftMessage.value = 'Connected successfully.';
+    await router.replace({ name: 'settings' });
+    await appStore.refreshMyShiftActivity();
+  } catch (error) {
+    myShiftMessage.value = error instanceof Error ? error.message : 'Connection failed.';
+  } finally {
+    myShiftBusy.value = false;
+  }
+}
+
+async function handleMyShiftAction() {
+  myShiftBusy.value = true;
+  try {
+    if (!myShiftConnected.value) {
+      await beginMyShiftConnection();
+      return;
+    }
+    await appStore.refreshMyShiftActivity();
+    myShiftMessage.value = appStore.myShiftSyncError ?? 'Schedule synchronized.';
+  } catch (error) {
+    myShiftMessage.value = error instanceof Error ? error.message : 'My Shift request failed.';
+  } finally {
+    myShiftBusy.value = false;
+  }
+}
 
 async function loadVersions() {
   try {

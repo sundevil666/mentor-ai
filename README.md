@@ -67,6 +67,12 @@ The first production identity slice should add Google OAuth with these boundarie
 
 The current Google sign-in implementation uses `GOOGLE_CLIENT_ID`, `GOOGLE_ALLOWED_EMAILS`, and `GOOGLE_SESSION_SECRET`. When those variables are set, cloud learning routes require a valid Google sign-in session and only allow emails from the allowlist. Each allowed Google account is mapped to an internal user ID and stored under its own private learning-state file.
 
+My Shift schedule context is enabled with `MY_SHIFT_CLIENT_ID`. Register the production callback
+`https://<mentor-host>/settings` (and the equivalent local HTTPS callback when needed) in My Shift,
+then set the issued client ID in the build environment. The PWA uses OAuth 2.0 with PKCE and the
+`activity:read` scope; it never sends the user's email as an Activity API key. Commutes select
+hands-free listening, work periods allow only short review, and days off favor speaking practice.
+
 Safari and iOS background behavior cannot be made 100% reliable with PWA code alone. Web Background Sync is best-effort and may not run while the app is fully suspended. The reliable iOS path is a native shell such as Capacitor with BackgroundTasks, silent/visible push notifications, and the same durable IndexedDB/native queue contract. The PWA must still retry immediately on foreground, `online`, visibility return, and service-worker background sync where supported.
 
 This area is expected to evolve. Bugs should be recorded against the specific synchronization stage: identity, local queue, upload acknowledgement, remote polling, session handoff, analytics merge, or student-facing status.

@@ -13,6 +13,7 @@ export default configure(() => ({
   build: {
     env: {
       APP_VERSION: appVersion,
+      MY_SHIFT_CLIENT_ID: process.env.MY_SHIFT_CLIENT_ID ?? '',
     },
     target: {
       browser: ['es2022', 'firefox115', 'chrome115', 'safari14'],

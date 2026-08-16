@@ -34,6 +34,7 @@ import {
   upsertSessionHandoff,
 } from 'src/services/api-client';
 import { createActivityReason, inferActivitySuggestion } from 'src/services/activity-suggestion';
+import { createCurrentActivitySuggestion } from 'src/services/learning-context';
 import { registerLearningBackgroundSync } from 'src/services/background-sync';
 import { logDiagnostic } from 'src/services/diagnostics';
 import { mentorDb } from 'src/services/indexed-db';
@@ -51,6 +52,11 @@ import {
 } from 'src/services/storage-retention';
 import { readPreferredWorkShift, savePreferredWorkShift } from 'src/services/user-preferences';
 import { formatDisplayDate } from 'src/services/date-format';
+import {
+  fetchMyShiftActivity,
+  isMyShiftConnected,
+  type MyShiftActivity,
+} from 'src/services/my-shift';
 
 interface LearningSessionState {
   id: string;
@@ -96,6 +102,8 @@ interface AppState {
   statisticsSnapshots: StatisticsSnapshot[];
   activitySnapshots: ActivitySnapshot[];
   preferredWorkShift: WorkShift;
+  myShiftActivity: MyShiftActivity | null;
+  myShiftSyncError: string | null;
   pendingSyncEvents: number;
   lastSyncAt: string | null;
   lastRemoteProgressAt: string | null;
@@ -123,6 +131,8 @@ export const useAppStore = defineStore('app', {
     statisticsSnapshots: [],
     activitySnapshots: [],
     preferredWorkShift: 'unknown',
+    myShiftActivity: null,
+    myShiftSyncError: null,
     pendingSyncEvents: 0,
     lastSyncAt: null,
     lastRemoteProgressAt: null,
@@ -208,6 +218,7 @@ export const useAppStore = defineStore('app', {
       await this.pruneLocalStorage();
 
       if (this.isOnline) {
+        await this.refreshMyShiftActivity();
         await this.refreshRemoteLearningState();
       }
     },
@@ -216,13 +227,15 @@ export const useAppStore = defineStore('app', {
       this.isOnline = isOnline;
 
       if (isOnline) {
+        void this.refreshMyShiftActivity();
         void this.refreshRemoteLearningState();
       }
     },
 
     async startLesson(context?: LearningContext) {
       const createdAt = now();
-      const learningContext = context ?? createDefaultLearningContext(this.activitySnapshots, this.preferredWorkShift);
+      const learningContext =
+        context ?? createDefaultLearningContext(this.activitySnapshots, this.preferredWorkShift, this.myShiftActivity);
       const lesson = await this.loadLesson(learningContext, createdAt);
       const sessionId = createSessionId(createdAt);
       const firstExercise = lesson.exercises[0];
@@ -282,6 +295,22 @@ export const useAppStore = defineStore('app', {
     async setPreferredWorkShift(workShift: WorkShift) {
       this.preferredWorkShift = workShift;
       savePreferredWorkShift(workShift);
+    },
+
+    async refreshMyShiftActivity() {
+      if (!navigator.onLine || !isMyShiftConnected()) return;
+
+      const today = new Date();
+      const from = toLocalDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1));
+      const to = toLocalDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7));
+
+      try {
+        this.myShiftActivity = await fetchMyShiftActivity(from, to);
+        this.myShiftSyncError = null;
+      } catch (error) {
+        this.myShiftSyncError = getErrorMessage(error);
+        logDiagnostic('my_shift.sync_failed', { reason: this.myShiftSyncError }, 'warn');
+      }
     },
 
     async submitCurrentExercise(response: string) {
@@ -896,8 +925,9 @@ async function pruneStore(
 function createDefaultLearningContext(
   snapshots: ActivitySnapshot[] = [],
   preferredWorkShift: WorkShift = 'unknown',
+  myShiftActivity: MyShiftActivity | null = null,
 ): LearningContext {
-  const suggestion = inferActivitySuggestion(new Date(), preferredWorkShift, snapshots);
+  const suggestion = createCurrentActivitySuggestion(preferredWorkShift, snapshots, new Date(), myShiftActivity);
 
   return {
     mode: suggestion.mode,
@@ -911,6 +941,13 @@ function createDefaultLearningContext(
     activityReason: suggestion.reason,
     shiftTiming: suggestion.shiftTiming,
   };
+}
+
+function toLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function createSessionHandoff(studentId: string, session: LearningSessionState): LearningSessionHandoff {
