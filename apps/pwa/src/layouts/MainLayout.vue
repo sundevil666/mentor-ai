@@ -117,49 +117,47 @@
           color="primary"
           dense
           flat
-          icon="ios_share"
+          :icon="installButtonIcon"
           label="Install"
           no-caps
+          @click="installPwa"
         >
-          <q-tooltip>Install on iPhone</q-tooltip>
-          <q-menu
-            anchor="bottom right"
-            self="top right"
-            class="ios-install-menu"
-          >
-            <div class="ios-install">
-              <div class="ios-install__icon">
-                <img
-                  src="/icons/apple-icon-180x180.png"
-                  alt=""
-                >
+          <q-tooltip>Install Mentor AI on this device</q-tooltip>
+          <q-dialog v-model="showInstallHelp">
+            <q-card
+              class="ios-install-menu"
+            >
+              <div class="ios-install">
+                <div class="ios-install__icon">
+                  <img
+                    src="/icons/apple-icon-180x180.png"
+                    alt=""
+                  >
+                </div>
+                <div class="ios-install__copy">
+                  <strong>Install Mentor AI</strong>
+                  <span>{{ installHelpDescription }}</span>
+                </div>
+                <q-list dense>
+                  <q-item
+                    v-for="step in installHelpSteps"
+                    :key="step.text"
+                  >
+                    <q-item-section avatar>
+                      <q-icon :name="step.icon" />
+                    </q-item-section>
+                    <q-item-section>{{ step.text }}</q-item-section>
+                  </q-item>
+                </q-list>
+                <q-btn
+                  v-close-popup
+                  color="primary"
+                  label="Got it"
+                  no-caps
+                />
               </div>
-              <div class="ios-install__copy">
-                <strong>Install Mentor AI</strong>
-                <span>On iPhone, open Share and choose Add to Home Screen.</span>
-              </div>
-              <q-list dense>
-                <q-item>
-                  <q-item-section avatar>
-                    <q-icon name="ios_share" />
-                  </q-item-section>
-                  <q-item-section>Tap Share in Safari.</q-item-section>
-                </q-item>
-                <q-item>
-                  <q-item-section avatar>
-                    <q-icon name="add_box" />
-                  </q-item-section>
-                  <q-item-section>Choose Add to Home Screen.</q-item-section>
-                </q-item>
-                <q-item>
-                  <q-item-section avatar>
-                    <q-icon name="check_circle" />
-                  </q-item-section>
-                  <q-item-section>Open Mentor AI from the new icon.</q-item-section>
-                </q-item>
-              </q-list>
-            </div>
-          </q-menu>
+            </q-card>
+          </q-dialog>
         </q-btn>
         <q-btn
           class="update-log-button"
@@ -320,12 +318,17 @@
 
 <script setup lang="ts">
 import { Dark, Notify } from 'quasar';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { onBeforeRouteUpdate, type RouteLocationNormalizedLoaded } from 'vue-router';
 import { useAppStore } from 'src/stores/app-store';
 import { fetchAuthConfiguration, signInWithGoogleCredential } from 'src/services/auth';
 import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
 import { formatDisplayDate } from 'src/services/date-format';
+import {
+  getInstallHelp,
+  isStandalonePwa,
+  type BeforeInstallPromptEvent,
+} from 'src/services/pwa-install';
 
 declare global {
   interface Window {
@@ -344,7 +347,42 @@ const appStore = useAppStore();
 const isDarkTheme = ref(false);
 const googleClientId = ref<string | null>(null);
 const routeTransitionName = ref('route-slide-forward');
-const showInstallButton = computed(() => isAppleTouchDevice() && !isStandalonePwa());
+const deferredInstallPrompt = ref<BeforeInstallPromptEvent | null>(null);
+const isPwaInstalled = ref(false);
+const showInstallHelp = ref(false);
+const showInstallButton = computed(() => !isPwaInstalled.value);
+const installButtonIcon = computed(() => deferredInstallPrompt.value ? 'install_mobile' : 'add_to_home_screen');
+const installHelp = computed(() => getInstallHelp());
+const installHelpDescription = computed(() => {
+  if (installHelp.value === 'ios-safari') {
+    return 'Safari installs web apps through the Share menu.';
+  }
+  if (installHelp.value === 'ios-browser') {
+    return 'On iPhone and iPad, open this page in Safari to install it as an app.';
+  }
+  return 'Use your browser menu to install Mentor AI as an app.';
+});
+const installHelpSteps = computed(() => {
+  if (installHelp.value === 'ios-safari') {
+    return [
+      { icon: 'ios_share', text: 'Tap Share in the Safari toolbar.' },
+      { icon: 'add_box', text: 'Choose Add to Home Screen.' },
+      { icon: 'check_circle', text: 'Tap Add, then open Mentor AI from its new icon.' },
+    ];
+  }
+  if (installHelp.value === 'ios-browser') {
+    return [
+      { icon: 'more_horiz', text: 'Open this page in Safari.' },
+      { icon: 'ios_share', text: 'Tap Share in Safari.' },
+      { icon: 'add_box', text: 'Choose Add to Home Screen, then tap Add.' },
+    ];
+  }
+  return [
+    { icon: 'more_vert', text: 'Open your browser menu.' },
+    { icon: 'install_mobile', text: 'Choose Install app or Add to Home screen.' },
+    { icon: 'check_circle', text: 'Confirm the installation.' },
+  ];
+});
 const appUpdateTooltip = computed(() => {
   if (appStore.isAppUpdateInstalling) {
     return 'Saving progress and installing the update.';
@@ -380,6 +418,9 @@ const syncStatusTooltip = computed(() => {
 });
 
 onMounted(async () => {
+  isPwaInstalled.value = isStandalonePwa();
+  window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  window.addEventListener('appinstalled', handleAppInstalled);
   isDarkTheme.value = readSavedTheme();
   Dark.set(isDarkTheme.value);
   await loadAuthConfiguration();
@@ -387,6 +428,11 @@ onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();
   }
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  window.removeEventListener('appinstalled', handleAppInstalled);
 });
 
 onBeforeRouteUpdate((to, from) => {
@@ -415,6 +461,33 @@ function markAllRead() {
 
 function installAvailableUpdate() {
   window.dispatchEvent(new CustomEvent('mentor-ai:install-update'));
+}
+
+function handleBeforeInstallPrompt(event: Event) {
+  event.preventDefault();
+  deferredInstallPrompt.value = event as BeforeInstallPromptEvent;
+}
+
+function handleAppInstalled() {
+  deferredInstallPrompt.value = null;
+  isPwaInstalled.value = true;
+  showInstallHelp.value = false;
+  Notify.create({ type: 'positive', icon: 'check_circle', message: 'Mentor AI installed' });
+}
+
+async function installPwa() {
+  const prompt = deferredInstallPrompt.value;
+  if (!prompt) {
+    showInstallHelp.value = true;
+    return;
+  }
+
+  await prompt.prompt();
+  const choice = await prompt.userChoice;
+  deferredInstallPrompt.value = null;
+  if (choice.outcome === 'dismissed') {
+    Notify.create({ message: 'Installation cancelled', caption: 'You can install Mentor AI later.', timeout: 3500 });
+  }
 }
 
 function returnToLessonChoice() {
@@ -494,19 +567,4 @@ function readSavedTheme() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
-function isAppleTouchDevice() {
-  if (typeof navigator === 'undefined') {
-    return false;
-  }
-
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-}
-
-function isStandalonePwa() {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  return window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
-}
 </script>
