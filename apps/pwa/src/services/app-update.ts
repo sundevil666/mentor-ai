@@ -171,6 +171,13 @@ export function consumePendingAppUpdate(): PendingAppUpdate | null {
   }
 }
 
+export function createAppUpdateReloadUrl(locationValue: Location, version: string): string {
+  const url = new URL(locationValue.href);
+  url.searchParams.set('app-update', version);
+  url.searchParams.set('cache-bust', Date.now().toString());
+  return url.toString();
+}
+
 export async function showSystemUpdateNotification(notification: UpdateNotification) {
   if (!('Notification' in window) || Notification.permission !== 'granted') {
     return;

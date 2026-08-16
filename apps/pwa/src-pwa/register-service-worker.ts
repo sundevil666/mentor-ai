@@ -9,8 +9,23 @@ navigator.serviceWorker?.addEventListener('controllerchange', () => {
   }
 
   refreshing = true;
-  window.location.reload();
+  const pendingUpdate = readPendingUpdateVersion();
+  const url = new URL(window.location.href);
+  url.searchParams.set('app-update', pendingUpdate);
+  url.searchParams.set('cache-bust', Date.now().toString());
+  window.location.replace(url);
 });
+
+function readPendingUpdateVersion() {
+  const rawValue = window.localStorage.getItem(updateReloadRequestKey);
+
+  try {
+    const value = rawValue ? JSON.parse(rawValue) as { targetVersion?: unknown } : null;
+    return typeof value?.targetVersion === 'string' ? value.targetVersion : Date.now().toString();
+  } catch {
+    return Date.now().toString();
+  }
+}
 
 register(process.env.SERVICE_WORKER_FILE, {
   ready() {

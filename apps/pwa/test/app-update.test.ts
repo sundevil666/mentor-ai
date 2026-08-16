@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-import { checkForAppUpdate, consumePendingAppUpdate, rememberPendingAppUpdate } from '../src/services/app-update.js';
+import {
+  checkForAppUpdate,
+  consumePendingAppUpdate,
+  createAppUpdateReloadUrl,
+  rememberPendingAppUpdate,
+} from '../src/services/app-update.js';
 
 describe('PWA app update checks', () => {
   const localStorageData = new Map<string, string>();
@@ -85,6 +90,19 @@ describe('PWA app update checks', () => {
 
     assert.equal(consumePendingAppUpdate()?.exerciseNumber, 3);
     assert.equal(consumePendingAppUpdate(), null);
+  });
+
+  it('forces update reloads through a fresh URL while preserving the current page', () => {
+    const reloadUrl = new URL(createAppUpdateReloadUrl(
+      { href: 'https://mentor.example/settings?language=en#theme' } as Location,
+      '0.2.0+abc',
+    ));
+
+    assert.equal(reloadUrl.pathname, '/settings');
+    assert.equal(reloadUrl.searchParams.get('language'), 'en');
+    assert.equal(reloadUrl.searchParams.get('app-update'), '0.2.0+abc');
+    assert.ok(reloadUrl.searchParams.has('cache-bust'));
+    assert.equal(reloadUrl.hash, '#theme');
   });
 });
 

@@ -9,6 +9,7 @@ import { useRouter } from 'vue-router';
 import {
   activatePendingServiceWorkerUpdate,
   consumePendingAppUpdate,
+  createAppUpdateReloadUrl,
   rememberPendingAppUpdate,
   startAppUpdatePolling,
   showSystemUpdateNotification,
@@ -98,7 +99,7 @@ async function installUpdate(version: string) {
   });
 
   await activatePendingServiceWorkerUpdate();
-  window.setTimeout(() => window.location.reload(), 1000);
+  window.location.replace(createAppUpdateReloadUrl(window.location, version));
 }
 
 async function showCompletedUpdateNotification() {
@@ -107,6 +108,8 @@ async function showCompletedUpdateNotification() {
   if (!pendingUpdate) {
     return;
   }
+
+  removeUpdateReloadParameters();
 
   if (!appStore.isHydrated) {
     await appStore.hydrate();
@@ -132,6 +135,13 @@ async function showCompletedUpdateNotification() {
     caption: progressCaption,
     timeout: 10000,
   });
+}
+
+function removeUpdateReloadParameters() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('app-update');
+  url.searchParams.delete('cache-bust');
+  window.history.replaceState(window.history.state, '', url);
 }
 
 function startRemoteSyncPolling() {

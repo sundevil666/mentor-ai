@@ -19,6 +19,13 @@
       "continue": true
     },
     {
+      "src": "^/(?:index\\.html)?$",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      },
+      "continue": true
+    },
+    {
       "handle": "filesystem"
     },
     {

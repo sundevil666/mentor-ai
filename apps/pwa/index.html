@@ -13,6 +13,28 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="alternate icon" href="/icons/icon-192x192.png" type="image/png" />
     <link rel="apple-touch-icon" href="/icons/apple-icon-180x180.png" />
+    <script>
+      // Mobile Safari can restore stale HTML after a service-worker update. Recover once
+      // when that HTML points at a JavaScript bundle that no longer exists.
+      window.addEventListener('error', function (event) {
+        var target = event.target;
+        var isScriptFailure = target && target.tagName === 'SCRIPT' && target.src;
+        var recoveryKey = 'mentor-ai:asset-recovery-attempted';
+
+        if (!isScriptFailure || window.sessionStorage.getItem(recoveryKey) === 'true') {
+          return;
+        }
+
+        window.sessionStorage.setItem(recoveryKey, 'true');
+        var recoveryUrl = new URL(window.location.href);
+        recoveryUrl.searchParams.set('cache-bust', Date.now().toString());
+        navigator.serviceWorker && navigator.serviceWorker.getRegistration().then(function (registration) {
+          return registration && registration.update();
+        }).finally(function () {
+          window.location.replace(recoveryUrl.toString());
+        });
+      }, true);
+    </script>
   </head>
   <body>
     <!-- quasar:entry-point -->
