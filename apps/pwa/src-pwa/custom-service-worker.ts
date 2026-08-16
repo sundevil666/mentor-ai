@@ -29,6 +29,7 @@ type StoredAuthSession = {
 
 const learningSyncTag = 'mentor-ai-learning-sync';
 
+self.skipWaiting();
 clientsClaim();
 
 cleanupOutdatedCaches();
