@@ -149,10 +149,23 @@
                     <q-item-section>{{ step.text }}</q-item-section>
                   </q-item>
                 </q-list>
+                <div
+                  v-if="installHelp === 'ios-safari'"
+                  class="ios-install__next-action"
+                >
+                  <q-icon
+                    name="ios_share"
+                    size="28px"
+                  />
+                  <span>
+                    Closing this guide does not install the app. Next, tap the Safari Share button.
+                  </span>
+                </div>
                 <q-btn
                   v-close-popup
                   color="primary"
-                  label="Got it"
+                  :icon="installHelp === 'ios-safari' ? 'ios_share' : undefined"
+                  :label="installHelpActionLabel"
                   no-caps
                 />
               </div>
@@ -355,12 +368,19 @@ const installButtonIcon = computed(() => deferredInstallPrompt.value ? 'install_
 const installHelp = computed(() => getInstallHelp());
 const installHelpDescription = computed(() => {
   if (installHelp.value === 'ios-safari') {
-    return 'Safari installs web apps through the Share menu.';
+    return 'Three manual Safari actions are required. The website cannot press them for you.';
   }
   if (installHelp.value === 'ios-browser') {
     return 'On iPhone and iPad, open this page in Safari to install it as an app.';
   }
   return 'Use your browser menu to install Mentor AI as an app.';
+});
+const installHelpActionLabel = computed(() => {
+  if (installHelp.value === 'ios-safari') {
+    return 'Close, then tap Share';
+  }
+
+  return 'Close guide';
 });
 const installHelpSteps = computed(() => {
   if (installHelp.value === 'ios-safari') {

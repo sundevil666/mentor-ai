@@ -114,6 +114,24 @@ body.body--dark {
   line-height: 1.4;
 }
 
+.ios-install__next-action {
+  align-items: center;
+  background: var(--app-surface-soft);
+  border: 1px solid var(--app-border-strong);
+  border-radius: 10px;
+  color: var(--app-text-strong);
+  display: flex;
+  font-size: 0.95rem;
+  gap: 12px;
+  line-height: 1.4;
+  padding: 12px;
+}
+
+.ios-install__next-action .q-icon {
+  color: var(--app-primary);
+  flex: 0 0 auto;
+}
+
 .update-log-button {
   margin-right: 8px;
 }
