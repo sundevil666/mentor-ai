@@ -440,3 +440,7 @@ Use Learning Events and Exercise Results together during backend analytics so au
 ## Consistent neural listening voice
 
 Replaced operating-system Web Speech synthesis with Kokoro 82M running locally through WebAssembly. Listening now uses the same `af_heart` American English voice on desktop and mobile instead of exposing a device-dependent voice picker. The quantized model is downloaded on first use, cached by the browser, and the TTS runtime is lazy-loaded so it does not delay the normal application startup. Existing listening pause, resume, repeat, sentence navigation, and progress behavior now controls generated neural audio.
+
+## Practical feedback build and background listening
+
+Removed the short demo-style lesson choices from the learner-facing dashboard. The feedback build now exposes a complete work conversation drill and a ten-minute commute listening session. Generated Kokoro speech is packaged as a normal media track instead of an `AudioContext` buffer, the PWA no longer stops it when the document becomes hidden, and Media Session metadata provides play and pause controls on supported lock screens.

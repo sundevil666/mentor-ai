@@ -1353,11 +1353,7 @@ function selectLearningLessonTemplate(plan: LessonPlan): LessonTemplate {
     return selectModeLessonTemplate(speakingLessonTemplates, plan);
   }
 
-  if (plan.goal.skill === 'vocabulary') {
-    return learningLessonTemplates[2];
-  }
-
-  return selectLessonTemplate(learningLessonTemplates, plan);
+  return learningLessonTemplates[3];
 }
 
 function selectModeLessonTemplate(templates: LessonTemplate[], plan: LessonPlan): LessonTemplate {
@@ -1719,8 +1715,8 @@ const listeningLessonTemplates: LessonTemplate[] = [
 ];
 
 const speakingLessonTemplates: LessonTemplate[] = [
-  learningLessonTemplates[1],
   learningLessonTemplates[3],
+  learningLessonTemplates[1],
   {
     key: 'daily-speaking',
     title: 'Speaking: daily routine',

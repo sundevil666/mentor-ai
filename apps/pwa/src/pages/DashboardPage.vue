@@ -663,75 +663,20 @@ const remoteContinueOptions = computed(() =>
 const lessonSections: LessonSection[] = [
   {
     concept: 'learning',
-    label: 'Learning',
+    label: 'Real practice',
     icon: 'school',
     lessons: [
       {
-        templateKey: 'daily-guided',
-        title: 'Daily guided English',
-        focus: 'Grammar, listening, speaking, recall',
-      },
-      {
-        templateKey: 'work-speaking',
-        title: 'Speaking confidence at work',
-        focus: 'Low-pressure speech and question order',
-        preferredDevice: getPreferredLessonDevice('work-speaking'),
-      },
-      {
         templateKey: 'weekly-weak-spots-dialogue',
-        title: 'Weekly weak spots dialogue',
-        focus: 'Question order, prepositions, requests, natural chunks',
+        title: 'Work conversation',
+        focus: 'Five complete spoken phrases for a real workday',
         preferredDevice: getPreferredLessonDevice('weekly-weak-spots-dialogue'),
       },
       {
-        templateKey: 'morning-questions-listening',
-        title: 'Morning questions',
-        focus: 'Question words, time meaning, word order',
-        preferredDevice: getPreferredLessonDevice('morning-questions-listening'),
-      },
-    ],
-  },
-  {
-    concept: 'reading',
-    label: 'Reading',
-    icon: 'menu_book',
-    lessons: [
-      {
-        templateKey: 'message-reading',
-        title: 'Short work message',
-        focus: 'Comprehension, changed detail, useful words',
-      },
-      {
-        templateKey: 'routine-reading',
-        title: 'Evening routine',
-        focus: 'Sequence, time meaning, action words',
-      },
-      {
-        templateKey: 'cafe-reading',
-        title: 'Afternoon cafe',
-        focus: 'Main idea, place words, short reading',
-      },
-    ],
-  },
-  {
-    concept: 'vocabulary',
-    label: 'Vocabulary Growth',
-    icon: 'psychology',
-    lessons: [
-      {
-        templateKey: 'work-vocabulary',
-        title: 'Work words',
-        focus: 'Recognition, recall, sentence use',
-      },
-      {
-        templateKey: 'travel-vocabulary',
-        title: 'Travel words',
-        focus: 'Meaning, active recall, context',
-      },
-      {
-        templateKey: 'greetings-vocabulary',
-        title: 'Greetings',
-        focus: 'Recognition, polite recall, phrase use',
+        templateKey: 'commute-listening',
+        title: 'Commute listening',
+        focus: 'A complete ten-minute listening session',
+        preferredDevice: getPreferredLessonDevice('commute-listening'),
       },
     ],
   },
@@ -777,22 +722,6 @@ const quickStartItems = computed<QuickStartItem[]>(() => [
       void startTraining('speaking');
     },
   },
-  {
-    key: 'vocabulary',
-    label: 'Words',
-    icon: 'psychology',
-    start: () => {
-      void startTraining('vocabulary');
-    },
-  },
-  {
-    key: 'reading',
-    label: 'Read',
-    icon: 'menu_book',
-    start: () => {
-      void startConcept('reading');
-    },
-  },
 ]);
 onMounted(async () => {
   if (!appStore.isHydrated) {
@@ -802,8 +731,6 @@ onMounted(async () => {
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
   window.addEventListener('beforeunload', handlePageExit);
-  window.addEventListener('pagehide', handlePageExit);
-  document.addEventListener('visibilitychange', handleVisibilityChange);
 });
 
 onUnmounted(() => {
@@ -813,8 +740,6 @@ onUnmounted(() => {
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
   window.removeEventListener('beforeunload', handlePageExit);
-  window.removeEventListener('pagehide', handlePageExit);
-  document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 
 watch(
@@ -1052,32 +977,33 @@ async function speakListeningPhrase(wordIndex: number, runId: number) {
     return;
   }
 
-  const phrase = createListeningPhrase(wordIndex, tokens);
-  const token = tokens[phrase.startIndex];
+  const token = tokens[wordIndex];
 
   if (!token) {
     finishListeningPlayback(runId);
     return;
   }
 
-  activeWordIndex.value = phrase.startIndex;
-  activeWordEndIndex.value = phrase.endIndex;
-  await speakWithPreferredVoice(phrase.text, {
+  const playbackTokens = tokens.slice(wordIndex);
+  const playbackText = playbackTokens.map((item) => `${item.word}${item.trailing}`).join('');
+  activeWordIndex.value = wordIndex;
+  activeWordEndIndex.value = wordIndex;
+  await speakWithPreferredVoice(playbackText, {
+    mediaTitle: selectedListeningItem.value?.title ?? 'English listening practice',
+    onTimeUpdate: (currentTime, duration) => {
+      if (runId !== activeSpeechRunId.value || !Number.isFinite(duration) || duration <= 0) {
+        return;
+      }
+
+      const progressIndex = Math.min(
+        playbackTokens.length - 1,
+        Math.floor((currentTime / duration) * playbackTokens.length),
+      );
+      activeWordIndex.value = wordIndex + progressIndex;
+      activeWordEndIndex.value = activeWordIndex.value;
+    },
     onEnd: () => {
       if (runId !== activeSpeechRunId.value) {
-        return;
-      }
-
-      const nextWordIndex = phrase.endIndex + 1;
-
-      if (nextWordIndex >= 0 && nextWordIndex < tokens.length && !isListeningPaused.value) {
-        window.setTimeout(() => void speakListeningPhrase(nextWordIndex, runId), getPhrasePauseMs(phrase));
-        return;
-      }
-
-      if (isListeningPaused.value) {
-        activeWordIndex.value = nextWordIndex < tokens.length ? nextWordIndex : phrase.startIndex;
-        activeWordEndIndex.value = activeWordIndex.value;
         return;
       }
 
@@ -1104,7 +1030,7 @@ function finishListeningPlayback(runId: number, allowRepeat = true) {
   ) {
     activeWordIndex.value = 0;
     activeWordEndIndex.value = 0;
-    window.setTimeout(() => void speakListeningPhrase(0, runId), 220);
+    void speakListeningPhrase(0, runId);
     return;
   }
 
@@ -1271,12 +1197,6 @@ function handleOffline() {
   appStore.setNetworkStatus(false);
 }
 
-function handleVisibilityChange() {
-  if (document.visibilityState === 'hidden') {
-    stopListeningAudio();
-  }
-}
-
 function handlePageExit() {
   stopListeningAudio();
 }
@@ -1398,50 +1318,8 @@ function clampIndex(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function createListeningPhrase(
-  wordIndex: number,
-  tokens: ListeningToken[],
-): { startIndex: number; endIndex: number; text: string } {
-  const startIndex = clampIndex(wordIndex, 0, Math.max(tokens.length - 1, 0));
-  let endIndex = startIndex;
-
-  while (endIndex < tokens.length - 1 && !endsSentence(tokens[endIndex])) {
-    endIndex += 1;
-  }
-
-  const phraseText = tokens
-    .slice(startIndex, endIndex + 1)
-    .map((token) => `${token.word}${token.trailing}`)
-    .join('')
-    .trim();
-
-  return {
-    startIndex,
-    endIndex,
-    text: phraseText,
-  };
-}
-
 function endsSentence(token: ListeningToken): boolean {
   return /\n/.test(token.trailing) || /[.!?]["')\]]*$/.test(token.word);
-}
-
-function getPhrasePauseMs(phrase: { endIndex: number }): number {
-  const token = listeningTokens.value[phrase.endIndex];
-
-  if (!token) {
-    return 0;
-  }
-
-  if (/\n/.test(token.trailing)) {
-    return 320;
-  }
-
-  if (/[.!?]["')\]]*$/.test(token.word)) {
-    return 180;
-  }
-
-  return 120;
 }
 
 function findLastNumberIndex(values: number[], maxValue: number): number {

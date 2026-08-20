@@ -8,18 +8,20 @@ export type SpeechModelStatus = 'idle' | 'loading' | 'ready' | 'error';
 export interface SpeechPlaybackHandlers {
   onEnd?: () => void;
   onError?: (error: Error) => void;
+  onTimeUpdate?: (currentTime: number, duration: number) => void;
+  mediaTitle?: string;
 }
 
 let modelPromise: Promise<KokoroInstance> | null = null;
-let audioContext: AudioContext | null = null;
-let activeSource: AudioBufferSourceNode | null = null;
+let activeAudio: HTMLAudioElement | null = null;
+let activeAudioUrl: string | null = null;
 let activeRequestId = 0;
 let modelStatus: SpeechModelStatus = 'idle';
 let modelProgress = 0;
 const statusListeners = new Set<() => void>();
 
 export function isSpeechSynthesisAvailable() {
-  return typeof window !== 'undefined' && 'AudioContext' in window && 'WebAssembly' in window;
+  return typeof window !== 'undefined' && 'Audio' in window && 'WebAssembly' in window;
 }
 
 export function getSpeechModelStatus() {
@@ -74,13 +76,11 @@ export async function speakWithPreferredVoice(
     return false;
   }
 
-  const context = getAudioContext();
   const requestId = activeRequestId + 1;
   activeRequestId = requestId;
-  stopActiveSource();
+  stopActiveAudio();
 
   try {
-    await context.resume();
     const model = await prepareSpeechModel();
     const generated = await model.generate(trimmedText, { voice: VOICE_ID, speed: 1 });
 
@@ -88,24 +88,40 @@ export async function speakWithPreferredVoice(
       return false;
     }
 
-    const buffer = context.createBuffer(1, generated.audio.length, generated.sampling_rate);
-    buffer.copyToChannel(new Float32Array(generated.audio), 0);
-    const source = context.createBufferSource();
-    source.buffer = buffer;
-    source.connect(context.destination);
-    source.onended = () => {
-      if (activeSource !== source) {
+    const audioUrl = URL.createObjectURL(
+      createWaveBlob(new Float32Array(generated.audio), generated.sampling_rate),
+    );
+    const audio = new Audio(audioUrl);
+    audio.preload = 'auto';
+    audio.setAttribute('playsinline', '');
+    audio.onended = () => {
+      if (activeAudio !== audio) {
         return;
       }
 
-      activeSource = null;
+      clearActiveAudio();
       handlers.onEnd?.();
     };
-    activeSource = source;
-    source.start();
+    audio.onerror = () => {
+      if (activeAudio !== audio) {
+        return;
+      }
+
+      clearActiveAudio();
+      handlers.onError?.(new Error('Could not play generated speech.'));
+    };
+    audio.ontimeupdate = () => {
+      handlers.onTimeUpdate?.(audio.currentTime, audio.duration);
+      updateMediaPosition(audio);
+    };
+    activeAudio = audio;
+    activeAudioUrl = audioUrl;
+    configureMediaSession(audio, handlers.mediaTitle ?? 'Mentor AI listening');
+    await audio.play();
     return true;
   } catch (error) {
     if (requestId === activeRequestId) {
+      stopActiveAudio();
       handlers.onError?.(toError(error));
     }
     return false;
@@ -113,40 +129,106 @@ export async function speakWithPreferredVoice(
 }
 
 export async function pauseSpeech() {
-  if (audioContext?.state === 'running') {
-    await audioContext.suspend();
-  }
+  activeAudio?.pause();
 }
 
 export async function resumeSpeech() {
-  if (audioContext?.state === 'suspended') {
-    await audioContext.resume();
-    return true;
+  if (!activeAudio) {
+    return false;
   }
 
-  return activeSource !== null;
+  await activeAudio.play();
+  return true;
 }
 
 export function stopSpeech() {
   activeRequestId += 1;
-  stopActiveSource();
+  stopActiveAudio();
 }
 
-function getAudioContext() {
-  audioContext ??= new AudioContext();
-  return audioContext;
+function createWaveBlob(samples: Float32Array, sampleRate: number) {
+  const bytesPerSample = 2;
+  const buffer = new ArrayBuffer(44 + samples.length * bytesPerSample);
+  const view = new DataView(buffer);
+  writeAscii(view, 0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * bytesPerSample, true);
+  writeAscii(view, 8, 'WAVE');
+  writeAscii(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * bytesPerSample, true);
+  view.setUint16(32, bytesPerSample, true);
+  view.setUint16(34, 16, true);
+  writeAscii(view, 36, 'data');
+  view.setUint32(40, samples.length * bytesPerSample, true);
+
+  samples.forEach((sample, index) => {
+    const normalized = Math.max(-1, Math.min(1, sample));
+    view.setInt16(
+      44 + index * bytesPerSample,
+      normalized < 0 ? normalized * 0x8000 : normalized * 0x7fff,
+      true,
+    );
+  });
+
+  return new Blob([buffer], { type: 'audio/wav' });
 }
 
-function stopActiveSource() {
-  if (!activeSource) {
+function writeAscii(view: DataView, offset: number, value: string) {
+  Array.from(value).forEach((character, index) => {
+    view.setUint8(offset + index, character.charCodeAt(0));
+  });
+}
+
+function configureMediaSession(audio: HTMLAudioElement, title: string) {
+  if (!('mediaSession' in navigator)) {
     return;
   }
 
-  const source = activeSource;
-  activeSource = null;
-  source.onended = null;
-  source.stop();
-  source.disconnect();
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title,
+    artist: 'Mentor AI',
+    album: 'English practice',
+  });
+  navigator.mediaSession.setActionHandler('play', () => void audio.play());
+  navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+  navigator.mediaSession.setActionHandler('stop', stopSpeech);
+}
+
+function updateMediaPosition(audio: HTMLAudioElement) {
+  if (!('mediaSession' in navigator) || !Number.isFinite(audio.duration) || audio.duration <= 0) {
+    return;
+  }
+
+  navigator.mediaSession.setPositionState({
+    duration: audio.duration,
+    playbackRate: audio.playbackRate,
+    position: Math.min(audio.currentTime, audio.duration),
+  });
+}
+
+function stopActiveAudio() {
+  if (activeAudio) {
+    activeAudio.onended = null;
+    activeAudio.onerror = null;
+    activeAudio.ontimeupdate = null;
+    activeAudio.pause();
+    activeAudio.removeAttribute('src');
+    activeAudio.load();
+  }
+
+  clearActiveAudio();
+}
+
+function clearActiveAudio() {
+  activeAudio = null;
+
+  if (activeAudioUrl) {
+    URL.revokeObjectURL(activeAudioUrl);
+    activeAudioUrl = null;
+  }
 }
 
 function setModelStatus(status: SpeechModelStatus, progress: number) {

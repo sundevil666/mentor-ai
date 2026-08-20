@@ -175,7 +175,7 @@ export function chooseRecommendedTraining(suggestion: ActivitySuggestion, studen
   }
 
   if (suggestion.activityPace === 'passive' || suggestion.mode === 'review') {
-    return 'vocabulary';
+    return 'listening';
   }
 
   if (suggestion.activityPace === 'active' || suggestion.workShift === 'second' || suggestion.workShift === 'third') {
@@ -183,7 +183,6 @@ export function chooseRecommendedTraining(suggestion: ActivitySuggestion, studen
   }
 
   return [
-    { key: 'vocabulary' as const, value: studentModel.vocabulary.score.value },
     { key: 'listening' as const, value: studentModel.listening.score.value },
     { key: 'speaking' as const, value: studentModel.speaking.score.value },
   ].sort((left, right) => left.value - right.value)[0].key;
