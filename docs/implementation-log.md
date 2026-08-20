@@ -437,3 +437,6 @@ Statistics still derive audio replay counts from Exercise Results only indirectl
 ### Future Improvements
 
 Use Learning Events and Exercise Results together during backend analytics so audio replay, interruption, hint, and retry patterns can influence Observations and Teacher Memory.
+## Consistent neural listening voice
+
+Replaced operating-system Web Speech synthesis with Kokoro 82M running locally through WebAssembly. Listening now uses the same `af_heart` American English voice on desktop and mobile instead of exposing a device-dependent voice picker. The quantized model is downloaded on first use, cached by the browser, and the TTS runtime is lazy-loaded so it does not delay the normal application startup. Existing listening pause, resume, repeat, sentence navigation, and progress behavior now controls generated neural audio.

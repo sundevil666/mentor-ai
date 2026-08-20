@@ -1,127 +1,160 @@
-import { readSpeechVoicePreference } from './user-preferences';
+const MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX';
+const VOICE_ID = 'af_heart' as const;
 
-export type SpeechVoiceOption = {
-  label: string;
-  value: string;
-  description: string;
-  voice: SpeechSynthesisVoice;
-};
+type KokoroInstance = Awaited<ReturnType<typeof import('kokoro-js').KokoroTTS.from_pretrained>>;
 
-const femaleVoiceHints = [
-  'allison',
-  'ava',
-  'carmit',
-  'damayanti',
-  'fiona',
-  'joana',
-  'karen',
-  'kathy',
-  'kyoko',
-  'laura',
-  'lekha',
-  'luciana',
-  'mariska',
-  'mei-jia',
-  'melina',
-  'milena',
-  'moira',
-  'monica',
-  'nora',
-  'paulina',
-  'samantha',
-  'sara',
-  'satu',
-  'serena',
-  'shelley',
-  'susan',
-  'tessa',
-  'ting-ting',
-  'veena',
-  'victoria',
-  'yuna',
-  'zira',
-  'woman',
-  'girl',
-  'female',
-];
+export type SpeechModelStatus = 'idle' | 'loading' | 'ready' | 'error';
 
-export function getAvailableSpeechVoices(): SpeechSynthesisVoice[] {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    return [];
-  }
-
-  return window.speechSynthesis.getVoices();
+export interface SpeechPlaybackHandlers {
+  onEnd?: () => void;
+  onError?: (error: Error) => void;
 }
 
-export async function waitForSpeechVoices(timeoutMs = 1200): Promise<SpeechSynthesisVoice[]> {
-  const voices = getAvailableSpeechVoices();
+let modelPromise: Promise<KokoroInstance> | null = null;
+let audioContext: AudioContext | null = null;
+let activeSource: AudioBufferSourceNode | null = null;
+let activeRequestId = 0;
+let modelStatus: SpeechModelStatus = 'idle';
+let modelProgress = 0;
+const statusListeners = new Set<() => void>();
 
-  if (voices.length > 0 || typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    return voices;
+export function isSpeechSynthesisAvailable() {
+  return typeof window !== 'undefined' && 'AudioContext' in window && 'WebAssembly' in window;
+}
+
+export function getSpeechModelStatus() {
+  return { status: modelStatus, progress: modelProgress } as const;
+}
+
+export function subscribeToSpeechModelStatus(listener: () => void) {
+  statusListeners.add(listener);
+  return () => statusListeners.delete(listener);
+}
+
+export async function prepareSpeechModel() {
+  if (!isSpeechSynthesisAvailable()) {
+    throw new Error('Neural speech is not supported by this browser.');
   }
 
-  return new Promise((resolve) => {
-    const timeout = window.setTimeout(() => {
-      window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged);
-      resolve(getAvailableSpeechVoices());
-    }, timeoutMs);
+  if (!modelPromise) {
+    setModelStatus('loading', 0);
+    modelPromise = import('kokoro-js')
+      .then(({ KokoroTTS }) =>
+        KokoroTTS.from_pretrained(MODEL_ID, {
+          dtype: 'q8',
+          device: 'wasm',
+          progress_callback: (progress) => {
+            if (progress.status === 'progress' && typeof progress.progress === 'number') {
+              setModelStatus('loading', Math.round(progress.progress));
+            }
+          },
+        }),
+      )
+      .then((model) => {
+        setModelStatus('ready', 100);
+        return model;
+      })
+      .catch((error: unknown) => {
+        modelPromise = null;
+        setModelStatus('error', 0);
+        throw toError(error);
+      });
+  }
 
-    function handleVoicesChanged() {
-      window.clearTimeout(timeout);
-      window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged);
-      resolve(getAvailableSpeechVoices());
+  return modelPromise;
+}
+
+export async function speakWithPreferredVoice(
+  text: string,
+  handlers: SpeechPlaybackHandlers = {},
+) {
+  const trimmedText = text.trim();
+
+  if (!trimmedText) {
+    return false;
+  }
+
+  const context = getAudioContext();
+  const requestId = activeRequestId + 1;
+  activeRequestId = requestId;
+  stopActiveSource();
+
+  try {
+    await context.resume();
+    const model = await prepareSpeechModel();
+    const generated = await model.generate(trimmedText, { voice: VOICE_ID, speed: 1 });
+
+    if (requestId !== activeRequestId) {
+      return false;
     }
 
-    window.speechSynthesis.addEventListener('voiceschanged', handleVoicesChanged);
-  });
+    const buffer = context.createBuffer(1, generated.audio.length, generated.sampling_rate);
+    buffer.copyToChannel(new Float32Array(generated.audio), 0);
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(context.destination);
+    source.onended = () => {
+      if (activeSource !== source) {
+        return;
+      }
+
+      activeSource = null;
+      handlers.onEnd?.();
+    };
+    activeSource = source;
+    source.start();
+    return true;
+  } catch (error) {
+    if (requestId === activeRequestId) {
+      handlers.onError?.(toError(error));
+    }
+    return false;
+  }
 }
 
-export function getFemaleSpeechVoiceOptions(voices = getAvailableSpeechVoices()): SpeechVoiceOption[] {
-  const likelyFemaleVoices = voices.filter(isLikelyFemaleVoice);
-  const options = likelyFemaleVoices.length > 0 ? likelyFemaleVoices : voices;
-
-  return options
-    .slice()
-    .sort((left, right) => formatVoiceLabel(left).localeCompare(formatVoiceLabel(right)))
-    .map((voice) => ({
-      label: formatVoiceLabel(voice),
-      value: voice.voiceURI,
-      description: `${voice.lang}${voice.localService ? ' · device' : ' · browser'}`,
-      voice,
-    }));
+export async function pauseSpeech() {
+  if (audioContext?.state === 'running') {
+    await audioContext.suspend();
+  }
 }
 
-export function speakWithPreferredVoice(text: string) {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    return null;
+export async function resumeSpeech() {
+  if (audioContext?.state === 'suspended') {
+    await audioContext.resume();
+    return true;
   }
 
-  const utterance = createPreferredSpeechUtterance(text);
-
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(utterance);
-
-  return utterance;
+  return activeSource !== null;
 }
 
-export function createPreferredSpeechUtterance(text: string) {
-  const utterance = new SpeechSynthesisUtterance(text);
-  const preferredVoiceURI = readSpeechVoicePreference();
-  const voice = getAvailableSpeechVoices().find((item) => item.voiceURI === preferredVoiceURI);
+export function stopSpeech() {
+  activeRequestId += 1;
+  stopActiveSource();
+}
 
-  if (voice) {
-    utterance.voice = voice;
-    utterance.lang = voice.lang;
+function getAudioContext() {
+  audioContext ??= new AudioContext();
+  return audioContext;
+}
+
+function stopActiveSource() {
+  if (!activeSource) {
+    return;
   }
 
-  return utterance;
+  const source = activeSource;
+  activeSource = null;
+  source.onended = null;
+  source.stop();
+  source.disconnect();
 }
 
-function isLikelyFemaleVoice(voice: SpeechSynthesisVoice) {
-  const searchable = `${voice.name} ${voice.voiceURI}`.toLowerCase();
-  return femaleVoiceHints.some((hint) => searchable.includes(hint));
+function setModelStatus(status: SpeechModelStatus, progress: number) {
+  modelStatus = status;
+  modelProgress = progress;
+  statusListeners.forEach((listener) => listener());
 }
 
-function formatVoiceLabel(voice: SpeechSynthesisVoice) {
-  return `${voice.name} (${voice.lang})`;
+function toError(error: unknown) {
+  return error instanceof Error ? error : new Error('Could not generate speech.');
 }

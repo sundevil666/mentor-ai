@@ -464,9 +464,11 @@ import {
   type TrainingKey,
 } from 'src/services/learning-context';
 import {
-  createPreferredSpeechUtterance,
+  isSpeechSynthesisAvailable,
+  pauseSpeech,
+  resumeSpeech,
   speakWithPreferredVoice,
-  waitForSpeechVoices,
+  stopSpeech,
 } from 'src/services/speech-synthesis';
 import {
   isSpeechRecognitionAvailable,
@@ -943,20 +945,20 @@ async function recordDialogueAnswer() {
 async function playAudio() {
   const text = currentExercise.value?.audioText;
 
-  if (text && 'speechSynthesis' in window) {
-    speakWithPreferredVoice(text);
+  if (text && isSpeechSynthesisAvailable()) {
+    await speakWithPreferredVoice(text);
   }
 
   await appStore.replayAudio();
 }
 
 async function toggleListeningPlayback() {
-  if (!('speechSynthesis' in window)) {
+  if (!isSpeechSynthesisAvailable()) {
     return;
   }
 
   if (isListeningSpeaking.value && !isListeningPaused.value) {
-    window.speechSynthesis.pause();
+    await pauseSpeech();
     isListeningPaused.value = true;
     return;
   }
@@ -964,8 +966,7 @@ async function toggleListeningPlayback() {
   if (isListeningSpeaking.value && isListeningPaused.value) {
     isListeningPaused.value = false;
 
-    if (window.speechSynthesis.paused || window.speechSynthesis.speaking) {
-      window.speechSynthesis.resume();
+    if (await resumeSpeech()) {
       return;
     }
 
@@ -1027,11 +1028,10 @@ function toggleListeningPlaylist() {
 async function startListeningAtWord(wordIndex: number) {
   const tokens = listeningTokens.value;
 
-  if (tokens.length === 0 || !('speechSynthesis' in window)) {
+  if (tokens.length === 0 || !isSpeechSynthesisAvailable()) {
     return;
   }
 
-  await waitForSpeechVoices();
   const safeWordIndex = clampIndex(wordIndex, 0, tokens.length - 1);
   const runId = activeSpeechRunId.value + 1;
 
@@ -1040,15 +1040,15 @@ async function startListeningAtWord(wordIndex: number) {
   activeWordEndIndex.value = safeWordIndex;
   isListeningSpeaking.value = true;
   isListeningPaused.value = false;
-  window.speechSynthesis.cancel();
-  speakListeningPhrase(safeWordIndex, runId);
+  stopSpeech();
+  void speakListeningPhrase(safeWordIndex, runId);
   await appStore.replayAudio();
 }
 
-function speakListeningPhrase(wordIndex: number, runId: number) {
+async function speakListeningPhrase(wordIndex: number, runId: number) {
   const tokens = listeningTokens.value;
 
-  if (tokens.length === 0 || runId !== activeSpeechRunId.value || !('speechSynthesis' in window)) {
+  if (tokens.length === 0 || runId !== activeSpeechRunId.value || !isSpeechSynthesisAvailable()) {
     return;
   }
 
@@ -1060,39 +1060,35 @@ function speakListeningPhrase(wordIndex: number, runId: number) {
     return;
   }
 
-  const utterance = createPreferredSpeechUtterance(phrase.text);
-
   activeWordIndex.value = phrase.startIndex;
   activeWordEndIndex.value = phrase.endIndex;
-  utterance.onend = () => {
-    if (runId !== activeSpeechRunId.value) {
-      return;
-    }
+  await speakWithPreferredVoice(phrase.text, {
+    onEnd: () => {
+      if (runId !== activeSpeechRunId.value) {
+        return;
+      }
 
-    const nextWordIndex = phrase.endIndex + 1;
+      const nextWordIndex = phrase.endIndex + 1;
 
-    if (nextWordIndex >= 0 && nextWordIndex < tokens.length && !isListeningPaused.value) {
-      window.setTimeout(() => speakListeningPhrase(nextWordIndex, runId), getPhrasePauseMs(phrase));
-      return;
-    }
+      if (nextWordIndex >= 0 && nextWordIndex < tokens.length && !isListeningPaused.value) {
+        window.setTimeout(() => void speakListeningPhrase(nextWordIndex, runId), getPhrasePauseMs(phrase));
+        return;
+      }
 
-    if (isListeningPaused.value) {
-      activeWordIndex.value = nextWordIndex < tokens.length ? nextWordIndex : phrase.startIndex;
-      activeWordEndIndex.value = activeWordIndex.value;
-      return;
-    }
+      if (isListeningPaused.value) {
+        activeWordIndex.value = nextWordIndex < tokens.length ? nextWordIndex : phrase.startIndex;
+        activeWordEndIndex.value = activeWordIndex.value;
+        return;
+      }
 
-    finishListeningPlayback(runId, false);
-  };
-  utterance.onerror = () => {
-    if (runId !== activeSpeechRunId.value) {
-      return;
-    }
-
-    finishListeningPlayback(runId);
-  };
-
-  window.speechSynthesis.speak(utterance);
+      finishListeningPlayback(runId, false);
+    },
+    onError: () => {
+      if (runId === activeSpeechRunId.value) {
+        finishListeningPlayback(runId);
+      }
+    },
+  });
 }
 
 function finishListeningPlayback(runId: number, allowRepeat = true) {
@@ -1104,11 +1100,11 @@ function finishListeningPlayback(runId: number, allowRepeat = true) {
     allowRepeat &&
     isListeningRepeatEnabled.value &&
     listeningTokens.value.length > 0 &&
-    'speechSynthesis' in window
+    isSpeechSynthesisAvailable()
   ) {
     activeWordIndex.value = 0;
     activeWordEndIndex.value = 0;
-    window.setTimeout(() => speakListeningPhrase(0, runId), 220);
+    window.setTimeout(() => void speakListeningPhrase(0, runId), 220);
     return;
   }
 
@@ -1123,9 +1119,7 @@ function stopListeningAudio(saveProgress = true) {
 
   activeSpeechRunId.value += 1;
 
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-  }
+  stopSpeech();
 
   isListeningSpeaking.value = false;
   isListeningPaused.value = false;

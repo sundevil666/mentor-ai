@@ -24,7 +24,7 @@ The PWA can run a complete demo learning session without the API:
 - shows offline/online state, pending evidence, lesson progress, skill scores, latest accuracy, and manual sync/reset controls;
 - queues learning evidence while offline and sends it to the API when available.
 
-The implementation is still intentionally small: it uses deterministic demo lesson content, browser speech synthesis, and local text-based pronunciation focus detection, not production AI generation or advanced acoustic pronunciation scoring.
+The implementation is still intentionally small: it uses deterministic demo lesson content, a locally cached Kokoro neural voice for consistent playback across devices, and local text-based pronunciation focus detection, not production AI generation or advanced acoustic pronunciation scoring.
 
 ## Temporary First-Use Diagnostics
 
