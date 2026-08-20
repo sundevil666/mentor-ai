@@ -743,6 +743,11 @@ body.body--dark {
   text-align: right;
 }
 
+.listening-player__continue {
+  min-height: 52px;
+  width: 100%;
+}
+
 .lesson-nav {
   align-items: center;
   border-bottom: 1px solid var(--app-border);
@@ -909,6 +914,105 @@ body.body--dark {
   max-width: 520px;
 }
 
+.priority-lesson {
+  background: linear-gradient(145deg, var(--app-surface) 0%, var(--app-surface-active) 100%);
+  border: 1px solid var(--app-border-strong);
+  border-radius: 20px;
+  box-shadow: 0 18px 48px rgba(15, 118, 110, 0.1);
+  display: grid;
+  gap: 22px;
+  overflow: hidden;
+  padding: 24px;
+  width: 100%;
+}
+
+.priority-lesson__topline,
+.priority-lesson__signals {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.priority-lesson__topline span,
+.priority-lesson__signals span {
+  align-items: center;
+  color: var(--app-accent);
+  display: inline-flex;
+  font-size: 0.85rem;
+  font-weight: 800;
+  gap: 6px;
+}
+
+.priority-lesson__topline strong {
+  background: var(--app-surface-soft);
+  border-radius: 999px;
+  color: var(--app-text-strong);
+  padding: 6px 10px;
+}
+
+.priority-lesson__body {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 64px 1fr;
+}
+
+.priority-lesson__icon {
+  align-items: center;
+  background: var(--app-primary);
+  border-radius: 18px;
+  color: white;
+  display: flex;
+  height: 64px;
+  justify-content: center;
+  width: 64px;
+}
+
+.priority-lesson__skill {
+  color: var(--app-accent);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.priority-lesson h2 {
+  color: var(--app-text-strong);
+  font-size: clamp(1.5rem, 4vw, 2.1rem);
+  line-height: 1.15;
+  margin: 6px 0 10px;
+}
+
+.priority-lesson p {
+  color: var(--app-muted-strong);
+  line-height: 1.55;
+  margin: 0;
+  max-width: 680px;
+}
+
+.priority-lesson__signals {
+  border-top: 1px solid var(--app-border);
+  justify-content: flex-start;
+  padding-top: 16px;
+}
+
+.priority-lesson__signals span {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  color: var(--app-muted-strong);
+  padding: 6px 10px;
+}
+
+.priority-lesson__button {
+  border-radius: 12px;
+  font-size: 1.08rem;
+  min-height: 62px;
+  width: 100%;
+}
+
 .mobile-start-dock {
   align-items: center;
   background: color-mix(in srgb, var(--app-surface) 94%, transparent);
@@ -1067,9 +1171,53 @@ body.body--dark {
 }
 
 @media (max-width: 640px) {
+  .app-header .q-toolbar {
+    min-height: 48px;
+    padding: 0 6px;
+  }
+
+  .app-header .q-toolbar__title,
+  .app-header .app-update-button,
+  .app-header .sync-status-button,
+  .app-header .main-nav-tabs {
+    display: none;
+  }
+
+  .app-header .auth-button .q-btn__content > .block,
+  .app-header .ios-install-button .q-btn__content > .block {
+    display: none !important;
+  }
+
+  .app-header .auth-button .q-icon,
+  .app-header .ios-install-button .q-icon {
+    margin: 0;
+  }
+
+  .app-header .auth-button,
+  .app-header .ios-install-button,
+  .app-header .update-log-button {
+    margin-right: 0;
+  }
+
   .learning-page {
     align-items: flex-start;
-    padding: 16px 16px 112px;
+    padding: 12px 14px 96px;
+  }
+
+  .priority-lesson {
+    border-radius: 16px;
+    gap: 18px;
+    padding: 18px;
+  }
+
+  .priority-lesson__body {
+    grid-template-columns: 1fr;
+  }
+
+  .priority-lesson__icon {
+    border-radius: 14px;
+    height: 52px;
+    width: 52px;
   }
 
   .settings-page,
@@ -1080,7 +1228,57 @@ body.body--dark {
   .learning-start h1,
   .lesson-stage h1,
   .lesson-complete h1 {
-    font-size: 2.125rem;
+    font-size: 1.85rem;
+  }
+
+  .lesson-stage {
+    gap: 12px;
+  }
+
+  .exercise-standard,
+  .dialogue-drill {
+    gap: 12px;
+  }
+
+  .dialogue-drill > div:first-child {
+    display: grid;
+    gap: 6px;
+  }
+
+  .dialogue-drill__prompt,
+  .dialogue-drill__native {
+    gap: 5px;
+    padding: 12px;
+  }
+
+  .dialogue-drill__recorder {
+    padding: 10px;
+  }
+
+  .lesson-nav {
+    min-height: 44px;
+  }
+
+  .lesson-nav .q-btn {
+    min-height: 40px;
+  }
+
+  .listening-player {
+    gap: 10px;
+  }
+
+  .listening-player__header,
+  .listening-player__header > div {
+    gap: 6px;
+  }
+
+  .listening-player__header p {
+    font-size: 0.94rem;
+    line-height: 1.4;
+  }
+
+  .listening-player__header .lesson-stage__eyebrow {
+    font-size: 0.78rem;
   }
 
   .lesson-actions {
@@ -1105,13 +1303,21 @@ body.body--dark {
   }
 
   .listening-player__text {
-    font-size: 1.48rem;
-    max-height: min(52vh, 560px);
-    padding: min(18vh, 130px) 20px min(36vh, 280px);
+    font-size: 1.18rem;
+    height: clamp(220px, 38dvh, 320px);
+    line-height: 1.65;
+    max-height: none;
+    overscroll-behavior: contain;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 18px;
+    scroll-padding: 40% 0;
+    -webkit-overflow-scrolling: touch;
   }
 
   .listening-player__text--translation-visible {
-    padding-bottom: min(46vh, 360px);
+    height: clamp(180px, 30dvh, 260px);
+    padding-bottom: 18px;
   }
 
   .listening-player__translation {
@@ -1136,25 +1342,34 @@ body.body--dark {
 
   .listening-player__controls {
     display: grid;
-    gap: 12px;
-    grid-template-columns: repeat(7, 48px);
-    justify-content: center;
+    bottom: 0;
+    gap: 4px;
+    grid-template-columns: repeat(5, minmax(44px, 1fr));
+    padding: 8px;
   }
 
   .listening-player__play-button {
-    min-height: 56px;
-    min-width: 56px;
+    min-height: 48px;
+    min-width: 48px;
   }
 
   .listening-player__controls .q-btn {
-    min-height: 48px;
-    min-width: 48px;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .listening-player__controls .listening-player__word-control {
+    display: none;
   }
 
   .listening-player__controls > span {
     grid-column: 1 / -1;
     margin-left: 0;
     text-align: center;
+  }
+
+  .listening-player__continue {
+    min-height: 50px;
   }
 
   .handoff-actions .q-btn,
@@ -1212,6 +1427,7 @@ body.body--dark {
     padding: 8px 8px max(8px, env(safe-area-inset-bottom));
     transform: none;
     width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .mobile-start-dock__button {
@@ -1235,6 +1451,17 @@ body.body--dark {
 
   .voice-actions > .q-btn {
     align-self: stretch;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .listening-player__controls {
+    position: static;
+  }
+
+  .listening-player__text {
+    max-height: 220px;
+    padding: 20px;
   }
 }
 

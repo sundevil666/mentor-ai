@@ -1,7 +1,7 @@
 <template>
   <q-page class="learning-page">
     <section class="learning-shell">
-      <div class="learning-status">
+      <div v-if="!appStore.session" class="learning-status">
         <q-badge
           class="network-status-badge"
           :color="syncColor"
@@ -42,29 +42,39 @@
             </q-btn>
           </div>
 
-          <p class="learning-start__eyebrow">Activity check</p>
-          <h1>{{ activityHeadline }}</h1>
-          <p>{{ currentSuggestion.reason }}</p>
+          <p class="learning-start__eyebrow">Your next lesson</p>
+          <h1>No searching. Start with this.</h1>
 
-          <div class="activity-signal">
-            <span>{{ activityMeta }}</span>
-            <strong>{{ paceLabel }}</strong>
-          </div>
-
-          <div class="recommended-action">
+          <article class="priority-lesson">
+            <div class="priority-lesson__topline">
+              <span><q-icon name="auto_awesome" /> {{ priorityLesson.phaseLabel }}</span>
+              <strong>{{ currentSuggestion.availableMinutes }} min</strong>
+            </div>
+            <div class="priority-lesson__body">
+              <div class="priority-lesson__icon">
+                <q-icon :name="recommendedTraining.icon" size="34px" />
+              </div>
+              <div>
+                <span class="priority-lesson__skill">Priority · {{ priorityLesson.skillLabel }}</span>
+                <h2>{{ priorityLesson.title }}</h2>
+                <p>{{ priorityLesson.reason }}</p>
+              </div>
+            </div>
+            <div class="priority-lesson__signals">
+              <span>{{ activityMeta }}</span>
+              <span>{{ paceLabel }}</span>
+              <span>{{ priorityLesson.evidenceCount }} answers observed</span>
+            </div>
             <q-btn
-              class="recommended-action__button"
+              class="priority-lesson__button"
               color="primary"
               unelevated
               no-caps
-              :icon="recommendedTraining.icon"
-              :label="recommendedTraining.label"
-              @click="startTraining(recommendedTraining.key)"
-            >
-              <q-tooltip>{{ recommendedTraining.reason }}</q-tooltip>
-            </q-btn>
-            <span>{{ recommendedTraining.reason }}</span>
-          </div>
+              icon-right="arrow_forward"
+              label="Do this lesson first"
+              @click="startTraining(priorityLesson.trainingKey)"
+            />
+          </article>
 
           <q-expansion-item
             class="lesson-library-expander"
@@ -184,7 +194,6 @@
               </div>
 
               <div class="lesson-actions">
-                <span>{{ currentExercise.successTip }}</span>
                 <q-btn
                   color="primary"
                   label="Continue"
@@ -392,14 +401,36 @@
                 >
                   <q-tooltip>Next sentence</q-tooltip>
                 </q-btn>
-                <q-btn color="primary" flat icon="skip_previous" round @click="jumpWord(-1)">
+                <q-btn
+                  class="listening-player__word-control"
+                  color="primary"
+                  flat
+                  icon="skip_previous"
+                  round
+                  @click="jumpWord(-1)"
+                >
                   <q-tooltip>Previous word</q-tooltip>
                 </q-btn>
-                <q-btn color="primary" flat icon="skip_next" round @click="jumpWord(1)">
+                <q-btn
+                  class="listening-player__word-control"
+                  color="primary"
+                  flat
+                  icon="skip_next"
+                  round
+                  @click="jumpWord(1)"
+                >
                   <q-tooltip>Next word</q-tooltip>
                 </q-btn>
                 <span>{{ listeningProgressLabel }}</span>
               </div>
+              <q-btn
+                class="listening-player__continue"
+                color="primary"
+                label="Continue"
+                no-caps
+                unelevated
+                @click="completeListeningExercise"
+              />
             </div>
           </transition>
         </section>
@@ -429,7 +460,7 @@
       </transition>
     </section>
 
-    <nav class="mobile-start-dock" aria-label="Start lesson">
+    <nav v-if="!appStore.session" class="mobile-start-dock" aria-label="Start lesson">
       <button
         v-for="item in quickStartItems"
         :key="item.key"
@@ -455,7 +486,7 @@ import type {
 import { getPreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
-  chooseRecommendedTraining,
+  createPriorityLesson,
   createCurrentActivitySuggestion,
   createLearningContext,
   findTrainingMode,
@@ -539,12 +570,7 @@ const isListeningPlayer = computed(() => {
     return false;
   }
 
-  return (
-    currentExercise.value.type === 'listening-text' ||
-    (appStore.session.context.mode === 'listening' &&
-      currentExercise.value.targetSkill === 'listening' &&
-      Boolean(currentExercise.value.audioText))
-  );
+  return currentExercise.value.type === 'listening-text';
 });
 const isDialogueTranslationExercise = computed(
   () => currentExercise.value?.type === 'dialogue-translation',
@@ -648,9 +674,6 @@ const syncColor = computed(() => {
 const currentSuggestion = computed(() =>
   createCurrentActivitySuggestion(appStore.preferredWorkShift, appStore.activitySnapshots, new Date(), appStore.myShiftActivity),
 );
-const activityHeadline = computed(() => {
-  return `Best now: ${recommendedTraining.value.shortLabel}`;
-});
 const paceLabel = computed(() => formatPaceLabel(currentSuggestion.value));
 const activityMeta = computed(() => formatActivityMeta(currentSuggestion.value));
 const remoteContinueOptions = computed(() =>
@@ -696,7 +719,7 @@ function deviceRecommendation(device: PreferredLessonDevice) {
       };
 }
 const recommendedTraining = computed(() => {
-  const key = chooseRecommendedTraining(currentSuggestion.value, appStore.studentModel);
+  const key = priorityLesson.value.trainingKey;
   const training = findTrainingMode(key);
 
   return {
@@ -705,6 +728,7 @@ const recommendedTraining = computed(() => {
     reason: `${training.reason} ${currentSuggestion.value.reason}`,
   };
 });
+const priorityLesson = computed(() => createPriorityLesson(appStore.studentModel));
 const quickStartItems = computed<QuickStartItem[]>(() => [
   {
     key: 'listening',
@@ -745,6 +769,7 @@ onUnmounted(() => {
 watch(
   () => currentExercise.value?.id,
   () => {
+    void nextTick(() => window.scrollTo({ top: 0, behavior: 'auto' }));
     answer.value = '';
     speechRecognitionError.value = '';
     stopSpeechRecognition();
@@ -844,6 +869,12 @@ async function submit() {
 
   setForwardTransition();
   await appStore.submitCurrentExercise(answer.value);
+}
+
+async function completeListeningExercise() {
+  answer.value = 'listened';
+  stopListeningAudio();
+  await submit();
 }
 
 async function recordDialogueAnswer() {

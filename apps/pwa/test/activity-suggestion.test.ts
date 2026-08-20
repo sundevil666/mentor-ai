@@ -1,12 +1,29 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import type { ActivitySnapshot, WorkShift } from '@mentor-ai/shared';
+import { initialStudentModel, type ActivitySnapshot, type WorkShift } from '@mentor-ai/shared';
 import { inferActivitySuggestion } from '../src/services/activity-suggestion.js';
-import { createCurrentActivitySuggestion } from '../src/services/learning-context.js';
+import {
+  createCurrentActivitySuggestion,
+  createPriorityLesson,
+} from '../src/services/learning-context.js';
 import type { MyShiftActivity } from '../src/services/my-shift.js';
 
 describe('PWA activity suggestion', () => {
+  it('starts by calibrating the skill with the least evidence', () => {
+    const model = structuredClone(initialStudentModel);
+    model.listening.evidenceCount = 2;
+    model.speaking.evidenceCount = 0;
+    model.vocabulary.evidenceCount = 1;
+    model.grammar.evidenceCount = 1;
+
+    const lesson = createPriorityLesson(model);
+
+    assert.equal(lesson.trainingKey, 'speaking');
+    assert.equal(lesson.skillLabel, 'Speaking');
+    assert.equal(lesson.phaseLabel, 'Getting to know your weak spots');
+  });
+
   it('keeps first-shift mornings light and short', () => {
     const suggestion = inferActivitySuggestion(new Date('2026-06-29T07:30:00'), 'first');
 
