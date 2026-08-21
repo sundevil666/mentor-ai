@@ -99,32 +99,10 @@
           <q-icon name="record_voice_over" />
           <span>Voice</span>
         </div>
-        <q-select
-          v-model="selectedVoiceURI"
-          :options="voiceOptions"
-          emit-value
-          map-options
-          option-label="label"
-          option-value="value"
-          label="Listening voice"
-          outlined
-          :disable="voiceOptions.length === 0"
-          @update:model-value="saveVoice"
-        >
-          <template #option="scope">
-            <q-item v-bind="scope.itemProps">
-              <q-item-section avatar>
-                <q-icon name="record_voice_over" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>{{ scope.opt.label }}</q-item-label>
-                <q-item-label caption>
-                  {{ scope.opt.description }}
-                </q-item-label>
-              </q-item-section>
-            </q-item>
-          </template>
-        </q-select>
+        <div class="activity-signal">
+          <span>Kokoro Heart · American English</span>
+          <strong>Same voice on every device</strong>
+        </div>
 
         <div class="voice-actions">
           <q-btn
@@ -133,7 +111,8 @@
             label="Test"
             no-caps
             unelevated
-            :disable="!selectedVoiceURI"
+            :disable="!speechAvailable || voiceState.status === 'loading'"
+            :loading="voiceState.status === 'loading'"
             @click="testVoice"
           />
           <span>{{ voiceStatus }}</span>
@@ -148,11 +127,10 @@ import type { WorkShift } from '@mentor-ai/shared';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
-  getAvailableSpeechVoices,
-  getFemaleSpeechVoiceOptions,
+  getSpeechModelStatus,
+  isSpeechSynthesisAvailable,
   speakWithPreferredVoice,
-  waitForSpeechVoices,
-  type SpeechVoiceOption,
+  subscribeToSpeechModelStatus,
 } from 'src/services/speech-synthesis';
 import {
   createCurrentActivitySuggestion,
@@ -160,7 +138,7 @@ import {
   formatActivityMeta,
   formatPaceLabel,
 } from 'src/services/learning-context';
-import { clearLastRoutePreference, readSpeechVoicePreference, saveSpeechVoicePreference } from 'src/services/user-preferences';
+import { clearLastRoutePreference } from 'src/services/user-preferences';
 import { useAppStore } from 'src/stores/app-store';
 import { fetchAppConfiguration } from 'src/services/api-client';
 import { formatDisplayDate } from 'src/services/date-format';
@@ -177,12 +155,15 @@ const lessonVersion = ref('Checking…');
 const lessonCount = ref('—');
 const router = useRouter();
 const selectedShift = ref<WorkShift>('unknown');
-const selectedVoiceURI = ref<string | null>(readSpeechVoicePreference());
 const myShiftConfigured = isMyShiftConfigured();
 const myShiftConnected = ref(isMyShiftConnected());
 const myShiftBusy = ref(false);
 const myShiftMessage = ref('');
-const voiceOptions = ref<SpeechVoiceOption[]>([]);
+const speechAvailable = isSpeechSynthesisAvailable();
+const voiceState = ref(getSpeechModelStatus());
+const unsubscribeVoiceStatus = subscribeToSpeechModelStatus(() => {
+  voiceState.value = getSpeechModelStatus();
+});
 const shiftOptions: Array<{ label: string; value: WorkShift }> = [
   { label: 'Unknown', value: 'unknown' },
   { label: 'First shift', value: 'first' },
@@ -191,15 +172,23 @@ const shiftOptions: Array<{ label: string; value: WorkShift }> = [
   { label: 'Day off', value: 'off' },
 ];
 const voiceStatus = computed(() => {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    return 'Speech synthesis is not available in this browser.';
+  if (!speechAvailable) {
+    return 'Neural speech is not available in this browser.';
   }
 
-  if (voiceOptions.value.length === 0) {
-    return 'No browser voices loaded yet.';
+  if (voiceState.value.status === 'loading') {
+    return `Downloading the voice model… ${voiceState.value.progress}%`;
   }
 
-  return `${voiceOptions.value.length} voice${voiceOptions.value.length === 1 ? '' : 's'} available.`;
+  if (voiceState.value.status === 'ready') {
+    return 'Ready. The model is cached for future lessons.';
+  }
+
+  if (voiceState.value.status === 'error') {
+    return 'The model could not load. Check the connection and try again.';
+  }
+
+  return 'Free neural voice. The first test downloads its model once.';
 });
 const currentSuggestion = computed(() =>
   createCurrentActivitySuggestion(appStore.preferredWorkShift, appStore.activitySnapshots, new Date(), appStore.myShiftActivity),
@@ -222,12 +211,6 @@ onMounted(async () => {
 
   selectedShift.value = appStore.preferredWorkShift;
   await loadVersions();
-  await waitForSpeechVoices();
-  refreshVoices();
-
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.addEventListener('voiceschanged', refreshVoices);
-  }
 });
 
 async function finishMyShiftCallback() {
@@ -278,33 +261,15 @@ async function loadVersions() {
 }
 
 onUnmounted(() => {
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.removeEventListener('voiceschanged', refreshVoices);
-  }
+  unsubscribeVoiceStatus();
 });
-
-function refreshVoices() {
-  voiceOptions.value = getFemaleSpeechVoiceOptions();
-
-  if (!selectedVoiceURI.value || !getAvailableSpeechVoices().some((voice) => voice.voiceURI === selectedVoiceURI.value)) {
-    selectedVoiceURI.value = voiceOptions.value[0]?.value ?? null;
-  }
-
-  if (selectedVoiceURI.value) {
-    saveSpeechVoicePreference(selectedVoiceURI.value);
-  }
-}
-
-function saveVoice(value: string) {
-  saveSpeechVoicePreference(value);
-}
 
 function saveShift(value: WorkShift) {
   appStore.setPreferredWorkShift(value);
 }
 
 function testVoice() {
-  speakWithPreferredVoice('This is the voice for listening practice.');
+  void speakWithPreferredVoice('This is the voice for listening practice.');
 }
 
 function returnToDashboard() {

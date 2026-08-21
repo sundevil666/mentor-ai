@@ -17,6 +17,16 @@ export interface ShiftTimingRow {
   value: string;
 }
 
+export interface PriorityLesson {
+  trainingKey: TrainingKey;
+  skillLabel: string;
+  title: string;
+  reason: string;
+  phaseLabel: string;
+  scorePercent: number;
+  evidenceCount: number;
+}
+
 export const primaryTrainingModes: TrainingModeOption[] = [
   {
     key: 'listening',
@@ -175,7 +185,7 @@ export function chooseRecommendedTraining(suggestion: ActivitySuggestion, studen
   }
 
   if (suggestion.activityPace === 'passive' || suggestion.mode === 'review') {
-    return 'vocabulary';
+    return 'listening';
   }
 
   if (suggestion.activityPace === 'active' || suggestion.workShift === 'second' || suggestion.workShift === 'third') {
@@ -183,10 +193,42 @@ export function chooseRecommendedTraining(suggestion: ActivitySuggestion, studen
   }
 
   return [
-    { key: 'vocabulary' as const, value: studentModel.vocabulary.score.value },
     { key: 'listening' as const, value: studentModel.listening.score.value },
     { key: 'speaking' as const, value: studentModel.speaking.score.value },
   ].sort((left, right) => left.value - right.value)[0].key;
+}
+
+export function createPriorityLesson(studentModel: StudentModel): PriorityLesson {
+  const skills = [
+    { key: 'listening' as const, label: 'Listening', state: studentModel.listening },
+    { key: 'speaking' as const, label: 'Speaking', state: studentModel.speaking },
+    { key: 'vocabulary' as const, label: 'Vocabulary', state: studentModel.vocabulary },
+    { key: 'grammar' as const, label: 'Grammar', state: studentModel.grammar },
+  ];
+  const needsCalibration = skills.filter((skill) => skill.state.evidenceCount < 3);
+  const priorityPool = needsCalibration.length > 0 ? needsCalibration : skills;
+  const priority = [...priorityPool].sort((left, right) => {
+    const evidenceDifference = left.state.evidenceCount - right.state.evidenceCount;
+    return needsCalibration.length > 0
+      ? evidenceDifference || left.state.score.value - right.state.score.value
+      : left.state.score.value - right.state.score.value;
+  })[0];
+  const isCalibration = needsCalibration.length > 0;
+  const trainingKey: TrainingKey = priority.key === 'grammar' ? 'speaking' : priority.key;
+
+  return {
+    trainingKey,
+    skillLabel: priority.label,
+    title: isCalibration
+      ? `Let me check your ${priority.label.toLowerCase()}`
+      : `Strengthen your ${priority.label.toLowerCase()} first`,
+    reason: isCalibration
+      ? `I still need a little more evidence about this skill. This lesson helps me find the right level and choose better lessons for you next.`
+      : `${priority.label} is currently your weakest measured skill, so improving it will give you the most useful progress today.`,
+    phaseLabel: isCalibration ? 'Getting to know your weak spots' : 'Based on your learning history',
+    scorePercent: Math.round(priority.state.score.value * 100),
+    evidenceCount: priority.state.evidenceCount,
+  };
 }
 
 export function findTrainingMode(key: TrainingKey): TrainingModeOption {

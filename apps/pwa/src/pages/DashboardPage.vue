@@ -1,7 +1,7 @@
 <template>
   <q-page class="learning-page">
     <section class="learning-shell">
-      <div class="learning-status">
+      <div v-if="!appStore.session" class="learning-status">
         <q-badge
           class="network-status-badge"
           :color="syncColor"
@@ -42,29 +42,39 @@
             </q-btn>
           </div>
 
-          <p class="learning-start__eyebrow">Activity check</p>
-          <h1>{{ activityHeadline }}</h1>
-          <p>{{ currentSuggestion.reason }}</p>
+          <p class="learning-start__eyebrow">Your next lesson</p>
+          <h1>No searching. Start with this.</h1>
 
-          <div class="activity-signal">
-            <span>{{ activityMeta }}</span>
-            <strong>{{ paceLabel }}</strong>
-          </div>
-
-          <div class="recommended-action">
+          <article class="priority-lesson">
+            <div class="priority-lesson__topline">
+              <span><q-icon name="auto_awesome" /> {{ priorityLesson.phaseLabel }}</span>
+              <strong>{{ currentSuggestion.availableMinutes }} min</strong>
+            </div>
+            <div class="priority-lesson__body">
+              <div class="priority-lesson__icon">
+                <q-icon :name="recommendedTraining.icon" size="34px" />
+              </div>
+              <div>
+                <span class="priority-lesson__skill">Priority · {{ priorityLesson.skillLabel }}</span>
+                <h2>{{ priorityLesson.title }}</h2>
+                <p>{{ priorityLesson.reason }}</p>
+              </div>
+            </div>
+            <div class="priority-lesson__signals">
+              <span>{{ activityMeta }}</span>
+              <span>{{ paceLabel }}</span>
+              <span>{{ priorityLesson.evidenceCount }} answers observed</span>
+            </div>
             <q-btn
-              class="recommended-action__button"
+              class="priority-lesson__button"
               color="primary"
               unelevated
               no-caps
-              :icon="recommendedTraining.icon"
-              :label="recommendedTraining.label"
-              @click="startTraining(recommendedTraining.key)"
-            >
-              <q-tooltip>{{ recommendedTraining.reason }}</q-tooltip>
-            </q-btn>
-            <span>{{ recommendedTraining.reason }}</span>
-          </div>
+              icon-right="arrow_forward"
+              label="Do this lesson first"
+              @click="startTraining(priorityLesson.trainingKey)"
+            />
+          </article>
 
           <q-expansion-item
             class="lesson-library-expander"
@@ -184,7 +194,6 @@
               </div>
 
               <div class="lesson-actions">
-                <span>{{ currentExercise.successTip }}</span>
                 <q-btn
                   color="primary"
                   label="Continue"
@@ -392,14 +401,36 @@
                 >
                   <q-tooltip>Next sentence</q-tooltip>
                 </q-btn>
-                <q-btn color="primary" flat icon="skip_previous" round @click="jumpWord(-1)">
+                <q-btn
+                  class="listening-player__word-control"
+                  color="primary"
+                  flat
+                  icon="skip_previous"
+                  round
+                  @click="jumpWord(-1)"
+                >
                   <q-tooltip>Previous word</q-tooltip>
                 </q-btn>
-                <q-btn color="primary" flat icon="skip_next" round @click="jumpWord(1)">
+                <q-btn
+                  class="listening-player__word-control"
+                  color="primary"
+                  flat
+                  icon="skip_next"
+                  round
+                  @click="jumpWord(1)"
+                >
                   <q-tooltip>Next word</q-tooltip>
                 </q-btn>
                 <span>{{ listeningProgressLabel }}</span>
               </div>
+              <q-btn
+                class="listening-player__continue"
+                color="primary"
+                label="Continue"
+                no-caps
+                unelevated
+                @click="completeListeningExercise"
+              />
             </div>
           </transition>
         </section>
@@ -429,7 +460,7 @@
       </transition>
     </section>
 
-    <nav class="mobile-start-dock" aria-label="Start lesson">
+    <nav v-if="!appStore.session" class="mobile-start-dock" aria-label="Start lesson">
       <button
         v-for="item in quickStartItems"
         :key="item.key"
@@ -455,7 +486,7 @@ import type {
 import { getPreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
-  chooseRecommendedTraining,
+  createPriorityLesson,
   createCurrentActivitySuggestion,
   createLearningContext,
   findTrainingMode,
@@ -464,9 +495,11 @@ import {
   type TrainingKey,
 } from 'src/services/learning-context';
 import {
-  createPreferredSpeechUtterance,
+  isSpeechSynthesisAvailable,
+  pauseSpeech,
+  resumeSpeech,
   speakWithPreferredVoice,
-  waitForSpeechVoices,
+  stopSpeech,
 } from 'src/services/speech-synthesis';
 import {
   isSpeechRecognitionAvailable,
@@ -537,12 +570,7 @@ const isListeningPlayer = computed(() => {
     return false;
   }
 
-  return (
-    currentExercise.value.type === 'listening-text' ||
-    (appStore.session.context.mode === 'listening' &&
-      currentExercise.value.targetSkill === 'listening' &&
-      Boolean(currentExercise.value.audioText))
-  );
+  return currentExercise.value.type === 'listening-text';
 });
 const isDialogueTranslationExercise = computed(
   () => currentExercise.value?.type === 'dialogue-translation',
@@ -646,9 +674,6 @@ const syncColor = computed(() => {
 const currentSuggestion = computed(() =>
   createCurrentActivitySuggestion(appStore.preferredWorkShift, appStore.activitySnapshots, new Date(), appStore.myShiftActivity),
 );
-const activityHeadline = computed(() => {
-  return `Best now: ${recommendedTraining.value.shortLabel}`;
-});
 const paceLabel = computed(() => formatPaceLabel(currentSuggestion.value));
 const activityMeta = computed(() => formatActivityMeta(currentSuggestion.value));
 const remoteContinueOptions = computed(() =>
@@ -661,75 +686,20 @@ const remoteContinueOptions = computed(() =>
 const lessonSections: LessonSection[] = [
   {
     concept: 'learning',
-    label: 'Learning',
+    label: 'Real practice',
     icon: 'school',
     lessons: [
       {
-        templateKey: 'daily-guided',
-        title: 'Daily guided English',
-        focus: 'Grammar, listening, speaking, recall',
-      },
-      {
-        templateKey: 'work-speaking',
-        title: 'Speaking confidence at work',
-        focus: 'Low-pressure speech and question order',
-        preferredDevice: getPreferredLessonDevice('work-speaking'),
-      },
-      {
         templateKey: 'weekly-weak-spots-dialogue',
-        title: 'Weekly weak spots dialogue',
-        focus: 'Question order, prepositions, requests, natural chunks',
+        title: 'Work conversation',
+        focus: 'Five complete spoken phrases for a real workday',
         preferredDevice: getPreferredLessonDevice('weekly-weak-spots-dialogue'),
       },
       {
-        templateKey: 'morning-questions-listening',
-        title: 'Morning questions',
-        focus: 'Question words, time meaning, word order',
-        preferredDevice: getPreferredLessonDevice('morning-questions-listening'),
-      },
-    ],
-  },
-  {
-    concept: 'reading',
-    label: 'Reading',
-    icon: 'menu_book',
-    lessons: [
-      {
-        templateKey: 'message-reading',
-        title: 'Short work message',
-        focus: 'Comprehension, changed detail, useful words',
-      },
-      {
-        templateKey: 'routine-reading',
-        title: 'Evening routine',
-        focus: 'Sequence, time meaning, action words',
-      },
-      {
-        templateKey: 'cafe-reading',
-        title: 'Afternoon cafe',
-        focus: 'Main idea, place words, short reading',
-      },
-    ],
-  },
-  {
-    concept: 'vocabulary',
-    label: 'Vocabulary Growth',
-    icon: 'psychology',
-    lessons: [
-      {
-        templateKey: 'work-vocabulary',
-        title: 'Work words',
-        focus: 'Recognition, recall, sentence use',
-      },
-      {
-        templateKey: 'travel-vocabulary',
-        title: 'Travel words',
-        focus: 'Meaning, active recall, context',
-      },
-      {
-        templateKey: 'greetings-vocabulary',
-        title: 'Greetings',
-        focus: 'Recognition, polite recall, phrase use',
+        templateKey: 'commute-listening',
+        title: 'Commute listening',
+        focus: 'A complete ten-minute listening session',
+        preferredDevice: getPreferredLessonDevice('commute-listening'),
       },
     ],
   },
@@ -749,7 +719,7 @@ function deviceRecommendation(device: PreferredLessonDevice) {
       };
 }
 const recommendedTraining = computed(() => {
-  const key = chooseRecommendedTraining(currentSuggestion.value, appStore.studentModel);
+  const key = priorityLesson.value.trainingKey;
   const training = findTrainingMode(key);
 
   return {
@@ -758,6 +728,7 @@ const recommendedTraining = computed(() => {
     reason: `${training.reason} ${currentSuggestion.value.reason}`,
   };
 });
+const priorityLesson = computed(() => createPriorityLesson(appStore.studentModel));
 const quickStartItems = computed<QuickStartItem[]>(() => [
   {
     key: 'listening',
@@ -775,22 +746,6 @@ const quickStartItems = computed<QuickStartItem[]>(() => [
       void startTraining('speaking');
     },
   },
-  {
-    key: 'vocabulary',
-    label: 'Words',
-    icon: 'psychology',
-    start: () => {
-      void startTraining('vocabulary');
-    },
-  },
-  {
-    key: 'reading',
-    label: 'Read',
-    icon: 'menu_book',
-    start: () => {
-      void startConcept('reading');
-    },
-  },
 ]);
 onMounted(async () => {
   if (!appStore.isHydrated) {
@@ -800,8 +755,6 @@ onMounted(async () => {
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
   window.addEventListener('beforeunload', handlePageExit);
-  window.addEventListener('pagehide', handlePageExit);
-  document.addEventListener('visibilitychange', handleVisibilityChange);
 });
 
 onUnmounted(() => {
@@ -811,13 +764,12 @@ onUnmounted(() => {
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
   window.removeEventListener('beforeunload', handlePageExit);
-  window.removeEventListener('pagehide', handlePageExit);
-  document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 
 watch(
   () => currentExercise.value?.id,
   () => {
+    void nextTick(() => window.scrollTo({ top: 0, behavior: 'auto' }));
     answer.value = '';
     speechRecognitionError.value = '';
     stopSpeechRecognition();
@@ -919,6 +871,12 @@ async function submit() {
   await appStore.submitCurrentExercise(answer.value);
 }
 
+async function completeListeningExercise() {
+  answer.value = 'listened';
+  stopListeningAudio();
+  await submit();
+}
+
 async function recordDialogueAnswer() {
   if (!speechRecognitionAvailable.value || isRecognizingSpeech.value) {
     return;
@@ -943,20 +901,20 @@ async function recordDialogueAnswer() {
 async function playAudio() {
   const text = currentExercise.value?.audioText;
 
-  if (text && 'speechSynthesis' in window) {
-    speakWithPreferredVoice(text);
+  if (text && isSpeechSynthesisAvailable()) {
+    await speakWithPreferredVoice(text);
   }
 
   await appStore.replayAudio();
 }
 
 async function toggleListeningPlayback() {
-  if (!('speechSynthesis' in window)) {
+  if (!isSpeechSynthesisAvailable()) {
     return;
   }
 
   if (isListeningSpeaking.value && !isListeningPaused.value) {
-    window.speechSynthesis.pause();
+    await pauseSpeech();
     isListeningPaused.value = true;
     return;
   }
@@ -964,8 +922,7 @@ async function toggleListeningPlayback() {
   if (isListeningSpeaking.value && isListeningPaused.value) {
     isListeningPaused.value = false;
 
-    if (window.speechSynthesis.paused || window.speechSynthesis.speaking) {
-      window.speechSynthesis.resume();
+    if (await resumeSpeech()) {
       return;
     }
 
@@ -1027,11 +984,10 @@ function toggleListeningPlaylist() {
 async function startListeningAtWord(wordIndex: number) {
   const tokens = listeningTokens.value;
 
-  if (tokens.length === 0 || !('speechSynthesis' in window)) {
+  if (tokens.length === 0 || !isSpeechSynthesisAvailable()) {
     return;
   }
 
-  await waitForSpeechVoices();
   const safeWordIndex = clampIndex(wordIndex, 0, tokens.length - 1);
   const runId = activeSpeechRunId.value + 1;
 
@@ -1040,59 +996,56 @@ async function startListeningAtWord(wordIndex: number) {
   activeWordEndIndex.value = safeWordIndex;
   isListeningSpeaking.value = true;
   isListeningPaused.value = false;
-  window.speechSynthesis.cancel();
-  speakListeningPhrase(safeWordIndex, runId);
+  stopSpeech();
+  void speakListeningPhrase(safeWordIndex, runId);
   await appStore.replayAudio();
 }
 
-function speakListeningPhrase(wordIndex: number, runId: number) {
+async function speakListeningPhrase(wordIndex: number, runId: number) {
   const tokens = listeningTokens.value;
 
-  if (tokens.length === 0 || runId !== activeSpeechRunId.value || !('speechSynthesis' in window)) {
+  if (tokens.length === 0 || runId !== activeSpeechRunId.value || !isSpeechSynthesisAvailable()) {
     return;
   }
 
-  const phrase = createListeningPhrase(wordIndex, tokens);
-  const token = tokens[phrase.startIndex];
+  const token = tokens[wordIndex];
 
   if (!token) {
     finishListeningPlayback(runId);
     return;
   }
 
-  const utterance = createPreferredSpeechUtterance(phrase.text);
+  const playbackTokens = tokens.slice(wordIndex);
+  const playbackText = playbackTokens.map((item) => `${item.word}${item.trailing}`).join('');
+  activeWordIndex.value = wordIndex;
+  activeWordEndIndex.value = wordIndex;
+  await speakWithPreferredVoice(playbackText, {
+    mediaTitle: selectedListeningItem.value?.title ?? 'English listening practice',
+    onTimeUpdate: (currentTime, duration) => {
+      if (runId !== activeSpeechRunId.value || !Number.isFinite(duration) || duration <= 0) {
+        return;
+      }
 
-  activeWordIndex.value = phrase.startIndex;
-  activeWordEndIndex.value = phrase.endIndex;
-  utterance.onend = () => {
-    if (runId !== activeSpeechRunId.value) {
-      return;
-    }
-
-    const nextWordIndex = phrase.endIndex + 1;
-
-    if (nextWordIndex >= 0 && nextWordIndex < tokens.length && !isListeningPaused.value) {
-      window.setTimeout(() => speakListeningPhrase(nextWordIndex, runId), getPhrasePauseMs(phrase));
-      return;
-    }
-
-    if (isListeningPaused.value) {
-      activeWordIndex.value = nextWordIndex < tokens.length ? nextWordIndex : phrase.startIndex;
+      const progressIndex = Math.min(
+        playbackTokens.length - 1,
+        Math.floor((currentTime / duration) * playbackTokens.length),
+      );
+      activeWordIndex.value = wordIndex + progressIndex;
       activeWordEndIndex.value = activeWordIndex.value;
-      return;
-    }
+    },
+    onEnd: () => {
+      if (runId !== activeSpeechRunId.value) {
+        return;
+      }
 
-    finishListeningPlayback(runId, false);
-  };
-  utterance.onerror = () => {
-    if (runId !== activeSpeechRunId.value) {
-      return;
-    }
-
-    finishListeningPlayback(runId);
-  };
-
-  window.speechSynthesis.speak(utterance);
+      finishListeningPlayback(runId, false);
+    },
+    onError: () => {
+      if (runId === activeSpeechRunId.value) {
+        finishListeningPlayback(runId);
+      }
+    },
+  });
 }
 
 function finishListeningPlayback(runId: number, allowRepeat = true) {
@@ -1104,11 +1057,11 @@ function finishListeningPlayback(runId: number, allowRepeat = true) {
     allowRepeat &&
     isListeningRepeatEnabled.value &&
     listeningTokens.value.length > 0 &&
-    'speechSynthesis' in window
+    isSpeechSynthesisAvailable()
   ) {
     activeWordIndex.value = 0;
     activeWordEndIndex.value = 0;
-    window.setTimeout(() => speakListeningPhrase(0, runId), 220);
+    void speakListeningPhrase(0, runId);
     return;
   }
 
@@ -1123,9 +1076,7 @@ function stopListeningAudio(saveProgress = true) {
 
   activeSpeechRunId.value += 1;
 
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-  }
+  stopSpeech();
 
   isListeningSpeaking.value = false;
   isListeningPaused.value = false;
@@ -1277,12 +1228,6 @@ function handleOffline() {
   appStore.setNetworkStatus(false);
 }
 
-function handleVisibilityChange() {
-  if (document.visibilityState === 'hidden') {
-    stopListeningAudio();
-  }
-}
-
 function handlePageExit() {
   stopListeningAudio();
 }
@@ -1404,50 +1349,8 @@ function clampIndex(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function createListeningPhrase(
-  wordIndex: number,
-  tokens: ListeningToken[],
-): { startIndex: number; endIndex: number; text: string } {
-  const startIndex = clampIndex(wordIndex, 0, Math.max(tokens.length - 1, 0));
-  let endIndex = startIndex;
-
-  while (endIndex < tokens.length - 1 && !endsSentence(tokens[endIndex])) {
-    endIndex += 1;
-  }
-
-  const phraseText = tokens
-    .slice(startIndex, endIndex + 1)
-    .map((token) => `${token.word}${token.trailing}`)
-    .join('')
-    .trim();
-
-  return {
-    startIndex,
-    endIndex,
-    text: phraseText,
-  };
-}
-
 function endsSentence(token: ListeningToken): boolean {
   return /\n/.test(token.trailing) || /[.!?]["')\]]*$/.test(token.word);
-}
-
-function getPhrasePauseMs(phrase: { endIndex: number }): number {
-  const token = listeningTokens.value[phrase.endIndex];
-
-  if (!token) {
-    return 0;
-  }
-
-  if (/\n/.test(token.trailing)) {
-    return 320;
-  }
-
-  if (/[.!?]["')\]]*$/.test(token.word)) {
-    return 180;
-  }
-
-  return 120;
 }
 
 function findLastNumberIndex(values: number[], maxValue: number): number {

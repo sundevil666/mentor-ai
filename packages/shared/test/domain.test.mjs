@@ -254,13 +254,13 @@ describe('shared domain helpers', () => {
     assert.equal(listeningLesson.concept, 'learning');
     assert.equal(speakingLesson.concept, 'learning');
     assert.equal(listeningLesson.title, 'Commute listening routine');
-    assert.equal(speakingLesson.title, 'Speaking confidence at work');
+    assert.equal(speakingLesson.title, 'Weekly weak spots dialogue');
     assert.equal(
       listeningLesson.exercises.some((exercise) => exercise.type === 'listening-text'),
       true,
     );
     assert.equal(
-      speakingLesson.exercises.some((exercise) => exercise.type === 'repeat-speaking'),
+      speakingLesson.exercises.some((exercise) => exercise.type === 'dialogue-translation'),
       true,
     );
   });
