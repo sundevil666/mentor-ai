@@ -63,54 +63,6 @@
           </q-badge>
           <q-tooltip>{{ syncStatusTooltip }}</q-tooltip>
         </q-btn>
-        <q-btn
-          v-if="!appStore.authSession"
-          class="auth-button"
-          color="primary"
-          dense
-          flat
-          icon="login"
-          label="Google"
-          no-caps
-          @click="signInWithGoogle"
-        >
-          <q-tooltip>Sign in to sync only your learning data</q-tooltip>
-        </q-btn>
-        <q-btn
-          v-else-if="appStore.authSession"
-          class="auth-button"
-          dense
-          flat
-          icon="account_circle"
-          round
-        >
-          <q-tooltip>{{ appStore.authSession.user.email }}</q-tooltip>
-          <q-menu
-            anchor="bottom right"
-            self="top right"
-          >
-            <q-list dense>
-              <q-item>
-                <q-item-section>
-                  <q-item-label>{{ appStore.studentDisplayName }}</q-item-label>
-                  <q-item-label caption>
-                    {{ appStore.authSession.user.email }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-              <q-separator />
-              <q-item
-                clickable
-                @click="signOut"
-              >
-                <q-item-section avatar>
-                  <q-icon name="logout" />
-                </q-item-section>
-                <q-item-section>Sign out</q-item-section>
-              </q-item>
-            </q-list>
-          </q-menu>
-        </q-btn>
         <q-tabs
           class="main-nav-tabs"
           dense
@@ -252,6 +204,37 @@
                   <q-icon :name="installButtonIcon" />
                 </q-item-section>
                 <q-item-section>Install</q-item-section>
+              </q-item>
+              <q-item
+                v-if="!appStore.authSession"
+                clickable
+                @click="signInWithGoogle"
+              >
+                <q-item-section avatar>
+                  <q-icon name="login" />
+                </q-item-section>
+                <q-item-section>Sign in with Google</q-item-section>
+              </q-item>
+              <q-item v-else>
+                <q-item-section avatar>
+                  <q-icon name="account_circle" />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>{{ appStore.studentDisplayName }}</q-item-label>
+                  <q-item-label caption>
+                    {{ appStore.authSession.user.email }}
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+              <q-item
+                v-if="appStore.authSession"
+                clickable
+                @click="signOut"
+              >
+                <q-item-section avatar>
+                  <q-icon name="logout" />
+                </q-item-section>
+                <q-item-section>Sign out</q-item-section>
               </q-item>
               <q-separator />
               <q-item
