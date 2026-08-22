@@ -23,8 +23,6 @@
             </q-btn>
           </div>
 
-          <h1>Your next lesson</h1>
-
           <article class="priority-lesson">
             <div class="priority-lesson__topline">
               <span><q-icon name="auto_awesome" /> {{ priorityLesson.phaseLabel }}</span>
@@ -714,6 +712,14 @@ const recommendedTraining = computed(() => {
 });
 const priorityLesson = computed(() => createPriorityLesson(appStore.studentModel));
 const quickStartItems = computed<QuickStartItem[]>(() => [
+  {
+    key: 'home',
+    label: 'Home',
+    icon: 'home',
+    start: () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+  },
   {
     key: 'listening',
     label: 'Listen',

@@ -6,15 +6,6 @@
     >
       <q-toolbar>
         <q-btn
-          class="home-nav-button"
-          flat
-          icon="home"
-          round
-          @click="returnToLessonChoice"
-        >
-          <q-tooltip>Back to lesson choice</q-tooltip>
-        </q-btn>
-        <q-btn
           class="network-status-button"
           :aria-label="appStore.isOnline ? 'Online' : 'Offline'"
           :color="appStore.isOnline ? 'primary' : 'negative'"
@@ -304,7 +295,7 @@
 import type { ConceptLevel, StudentModel } from '@mentor-ai/shared';
 import { Dark, Notify } from 'quasar';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { onBeforeRouteUpdate, useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router';
+import { onBeforeRouteUpdate, type RouteLocationNormalizedLoaded } from 'vue-router';
 import { useAppStore } from 'src/stores/app-store';
 import { fetchAuthConfiguration, signInWithGoogleCredential } from 'src/services/auth';
 import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
@@ -329,8 +320,6 @@ declare global {
 }
 
 const appStore = useAppStore();
-const route = useRoute();
-const router = useRouter();
 const isDarkTheme = ref(false);
 const googleClientId = ref<string | null>(null);
 const routeTransitionName = ref('route-slide-forward');
@@ -482,14 +471,6 @@ async function installPwa() {
   deferredInstallPrompt.value = null;
   if (choice.outcome === 'dismissed') {
     Notify.create({ message: 'Installation cancelled', caption: 'You can install Mentor AI later.', timeout: 3500 });
-  }
-}
-
-async function returnToLessonChoice() {
-  await appStore.returnToLessonChoice();
-
-  if (route.name !== 'dashboard') {
-    await router.push({ name: 'dashboard' });
   }
 }
 

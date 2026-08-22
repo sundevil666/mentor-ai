@@ -105,15 +105,10 @@ body.body--dark .q-field--outlined .q-field__control::before {
 }
 
 .theme-toggle-button,
-.home-nav-button,
 .settings-nav-button,
 .update-log-button,
 .more-nav-button {
   color: var(--app-primary);
-}
-
-.home-nav-button {
-  margin-right: 4px;
 }
 
 .settings-nav-button {
@@ -1063,7 +1058,7 @@ body.body--dark .q-field--outlined .q-field__control::before {
   box-shadow: 0 18px 42px rgba(17, 24, 39, 0.16);
   display: grid;
   gap: 6px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   left: 50%;
   max-width: 520px;
   padding: 8px;
@@ -1489,7 +1484,7 @@ body.body--dark .q-field--outlined .q-field__control::before {
     padding: 8px 8px max(8px, env(safe-area-inset-bottom));
     transform: none;
     width: 100%;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .mobile-start-dock__button {
