@@ -125,67 +125,6 @@
           />
         </q-tabs>
         <q-btn
-          v-if="showInstallButton"
-          class="ios-install-button"
-          color="primary"
-          dense
-          flat
-          :icon="installButtonIcon"
-          label="Install"
-          no-caps
-          @click="installPwa"
-        >
-          <q-tooltip>Install Mentor AI on this device</q-tooltip>
-          <q-dialog v-model="showInstallHelp">
-            <q-card
-              class="ios-install-menu"
-            >
-              <div class="ios-install">
-                <div class="ios-install__icon">
-                  <img
-                    src="/icons/apple-icon-180x180.png"
-                    alt=""
-                  >
-                </div>
-                <div class="ios-install__copy">
-                  <strong>Install Mentor AI</strong>
-                  <span>{{ installHelpDescription }}</span>
-                </div>
-                <q-list dense>
-                  <q-item
-                    v-for="step in installHelpSteps"
-                    :key="step.text"
-                  >
-                    <q-item-section avatar>
-                      <q-icon :name="step.icon" />
-                    </q-item-section>
-                    <q-item-section>{{ step.text }}</q-item-section>
-                  </q-item>
-                </q-list>
-                <div
-                  v-if="installHelp === 'ios-safari'"
-                  class="ios-install__next-action"
-                >
-                  <q-icon
-                    name="ios_share"
-                    size="28px"
-                  />
-                  <span>
-                    Closing this guide does not install the app. Next, tap the Safari Share button.
-                  </span>
-                </div>
-                <q-btn
-                  v-close-popup
-                  color="primary"
-                  :icon="installHelp === 'ios-safari' ? 'ios_share' : undefined"
-                  :label="installHelpActionLabel"
-                  no-caps
-                />
-              </div>
-            </q-card>
-          </q-dialog>
-        </q-btn>
-        <q-btn
           class="update-log-button"
           flat
           icon="notifications"
@@ -304,6 +243,16 @@
                 </q-item-section>
                 <q-item-section>Settings</q-item-section>
               </q-item>
+              <q-item
+                v-if="showInstallButton"
+                clickable
+                @click="installPwa"
+              >
+                <q-item-section avatar>
+                  <q-icon :name="installButtonIcon" />
+                </q-item-section>
+                <q-item-section>Install</q-item-section>
+              </q-item>
               <q-separator />
               <q-item
                 clickable
@@ -319,6 +268,53 @@
         </q-btn>
       </q-toolbar>
     </q-header>
+
+    <q-dialog v-model="showInstallHelp">
+      <q-card class="ios-install-menu">
+        <div class="ios-install">
+          <div class="ios-install__icon">
+            <img
+              src="/icons/apple-icon-180x180.png"
+              alt=""
+            >
+          </div>
+          <div class="ios-install__copy">
+            <strong>Install Mentor AI</strong>
+            <span>{{ installHelpDescription }}</span>
+          </div>
+          <q-list dense>
+            <q-item
+              v-for="step in installHelpSteps"
+              :key="step.text"
+            >
+              <q-item-section avatar>
+                <q-icon :name="step.icon" />
+              </q-item-section>
+              <q-item-section>{{ step.text }}</q-item-section>
+            </q-item>
+          </q-list>
+          <div
+            v-if="installHelp === 'ios-safari'"
+            class="ios-install__next-action"
+          >
+            <q-icon
+              name="ios_share"
+              size="28px"
+            />
+            <span>
+              Closing this guide does not install the app. Next, tap the Safari Share button.
+            </span>
+          </div>
+          <q-btn
+            v-close-popup
+            color="primary"
+            :icon="installHelp === 'ios-safari' ? 'ios_share' : undefined"
+            :label="installHelpActionLabel"
+            no-caps
+          />
+        </div>
+      </q-card>
+    </q-dialog>
 
     <q-page-container class="app-page-container">
       <router-view v-slot="{ Component, route }">

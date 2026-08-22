@@ -106,7 +106,6 @@ body.body--dark .q-field--outlined .q-field__control::before {
 
 .theme-toggle-button,
 .home-nav-button,
-.ios-install-button,
 .settings-nav-button,
 .update-log-button,
 .more-nav-button {
@@ -124,10 +123,6 @@ body.body--dark .q-field--outlined .q-field__control::before {
 
 .settings-nav-button {
   margin-right: 4px;
-}
-
-.ios-install-button {
-  margin-right: 8px;
 }
 
 .ios-install-menu {
@@ -1246,24 +1241,20 @@ body.body--dark .q-field--outlined .q-field__control::before {
     display: none;
   }
 
-  .app-header .auth-button .q-btn__content > .block,
-  .app-header .ios-install-button .q-btn__content > .block {
+  .app-header .auth-button .q-btn__content > .block {
     display: none !important;
   }
 
-  .app-header .auth-button .q-icon,
-  .app-header .ios-install-button .q-icon {
+  .app-header .auth-button .q-icon {
     margin: 0;
   }
 
-  .app-header .auth-button,
-  .app-header .ios-install-button {
+  .app-header .auth-button {
     padding: 0;
     width: 44px;
   }
 
   .app-header .auth-button,
-  .app-header .ios-install-button,
   .app-header .update-log-button {
     margin-right: 0;
   }
