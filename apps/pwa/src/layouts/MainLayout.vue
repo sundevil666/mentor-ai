@@ -14,7 +14,6 @@
         >
           <q-tooltip>Back to lesson choice</q-tooltip>
         </q-btn>
-        <q-toolbar-title>Mentor AI</q-toolbar-title>
         <q-btn
           class="network-status-button"
           :aria-label="appStore.isOnline ? 'Online' : 'Offline'"
@@ -29,53 +28,6 @@
           {{ levelTrend.level }} · {{ levelTrend.daysLabel }}
           <q-tooltip>{{ levelTrend.tooltip }}</q-tooltip>
         </span>
-        <q-btn
-          class="app-update-button"
-          dense
-          flat
-          :color="appStore.availableAppUpdate ? 'amber-4' : undefined"
-          :disable="!appStore.availableAppUpdate || appStore.isAppUpdateInstalling"
-          :icon="appStore.isAppUpdateInstalling ? 'sync' : 'system_update_alt'"
-          round
-          @click="installAvailableUpdate"
-        >
-          <q-badge
-            v-if="appStore.availableAppUpdate && !appStore.isAppUpdateInstalling"
-            color="red-7"
-            floating
-            rounded
-          />
-          <q-tooltip>{{ appUpdateTooltip }}</q-tooltip>
-        </q-btn>
-        <q-btn
-          class="sync-status-button"
-          dense
-          flat
-          :icon="syncStatusIcon"
-          round
-        >
-          <q-badge
-            v-if="appStore.pendingSyncCount > 0"
-            color="deep-orange-7"
-            floating
-          >
-            {{ appStore.pendingSyncCount }}
-          </q-badge>
-          <q-tooltip>{{ syncStatusTooltip }}</q-tooltip>
-        </q-btn>
-        <q-tabs
-          class="main-nav-tabs"
-          dense
-          inline-label
-          shrink
-        >
-          <q-route-tab
-            icon="school"
-            label="Lessons"
-            no-caps
-            :to="{ name: 'dashboard' }"
-          />
-        </q-tabs>
         <q-btn
           class="update-log-button"
           flat
@@ -194,6 +146,39 @@
                   <q-icon name="settings" />
                 </q-item-section>
                 <q-item-section>Settings</q-item-section>
+              </q-item>
+              <q-item
+                clickable
+                :disable="!appStore.availableAppUpdate || appStore.isAppUpdateInstalling"
+                @click="installAvailableUpdate"
+              >
+                <q-item-section avatar>
+                  <q-icon
+                    :color="appStore.availableAppUpdate ? 'amber-7' : undefined"
+                    :name="appStore.isAppUpdateInstalling ? 'sync' : 'system_update_alt'"
+                  />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>Update app</q-item-label>
+                  <q-item-label caption>{{ appUpdateTooltip }}</q-item-label>
+                </q-item-section>
+              </q-item>
+              <q-item>
+                <q-item-section avatar>
+                  <q-icon :name="syncStatusIcon" />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>Synchronization</q-item-label>
+                  <q-item-label caption>{{ syncStatusTooltip }}</q-item-label>
+                </q-item-section>
+                <q-item-section
+                  v-if="appStore.pendingSyncCount > 0"
+                  side
+                >
+                  <q-badge color="deep-orange-7">
+                    {{ appStore.pendingSyncCount }}
+                  </q-badge>
+                </q-item-section>
               </q-item>
               <q-item
                 v-if="showInstallButton"

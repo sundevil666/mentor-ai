@@ -112,11 +112,6 @@ body.body--dark .q-field--outlined .q-field__control::before {
   color: var(--app-primary);
 }
 
-.main-nav-tabs {
-  color: var(--app-primary);
-  margin-right: 6px;
-}
-
 .home-nav-button {
   margin-right: 4px;
 }
@@ -1234,13 +1229,6 @@ body.body--dark .q-field--outlined .q-field__control::before {
     width: 44px;
   }
 
-  .app-header .q-toolbar__title,
-  .app-header .app-update-button,
-  .app-header .sync-status-button,
-  .app-header .main-nav-tabs {
-    display: none;
-  }
-
   .app-header .update-log-button {
     margin-right: 0;
   }
@@ -1606,7 +1594,6 @@ body.body--dark .q-field--outlined .q-field__control::before {
 }
 
 @media (max-width: 520px) {
-  .main-nav-tabs .q-tab__label,
   .settings-nav-button .q-btn__content span {
     display: none;
   }
