@@ -1,6 +1,9 @@
 const { readJsonBody } = require('./_shared');
 
-const voice = 'en-US-AvaMultilingualNeural';
+const voices = {
+  ava: 'en-US-AvaMultilingualNeural',
+  andrew: 'en-US-AndrewMultilingualNeural',
+};
 const maxTextLength = 4_000;
 
 module.exports = async (request, response) => {
@@ -14,6 +17,7 @@ module.exports = async (request, response) => {
   try {
     const body = await readJsonBody(request);
     const text = typeof body.text === 'string' ? body.text.trim() : '';
+    const voiceProfile = body.voice === 'andrew' ? 'andrew' : 'ava';
 
     if (!text || text.length > maxTextLength) {
       response.statusCode = 400;
@@ -22,7 +26,7 @@ module.exports = async (request, response) => {
     }
 
     const { EdgeTTS } = await import('edge-tts-universal');
-    const result = await new EdgeTTS(text, voice).synthesize();
+    const result = await new EdgeTTS(text, voices[voiceProfile]).synthesize();
     const audio = Buffer.from(await result.audio.arrayBuffer());
 
     response.statusCode = 200;

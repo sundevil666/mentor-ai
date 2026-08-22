@@ -62,6 +62,8 @@ export type ExerciseType =
   | 'dialogue-translation'
   | 'review';
 
+export type SpeechVoiceProfile = 'ava' | 'andrew';
+
 export type LearningEventType =
   | 'lesson-started'
   | 'lesson-finished'
@@ -270,6 +272,7 @@ export interface Exercise {
   expectedResponse?: string;
   options?: string[];
   audioText?: string;
+  audioVoice?: SpeechVoiceProfile;
   nativePrompt?: string;
   phraseFocus?: string;
 }
@@ -1530,6 +1533,7 @@ const learningLessonTemplates: LessonTemplate[] = [
         targetSkill: 'speaking',
         expectedResponse: 'what time do you start work today',
         audioText: 'What time do you start work today?',
+        audioVoice: 'ava',
         phraseFocus: 'question order',
       },
       {
@@ -1541,6 +1545,7 @@ const learningLessonTemplates: LessonTemplate[] = [
         targetSkill: 'speaking',
         expectedResponse: 'i start at seven but i need to leave home at six',
         audioText: 'I start at seven, but I need to leave home at six.',
+        audioVoice: 'andrew',
         phraseFocus: 'at + time',
       },
       {
@@ -1552,6 +1557,7 @@ const learningLessonTemplates: LessonTemplate[] = [
         targetSkill: 'speaking',
         expectedResponse: 'are you going by bus or by car',
         audioText: 'Are you going by bus or by car?',
+        audioVoice: 'ava',
         phraseFocus: 'by + transport',
       },
       {
@@ -1563,6 +1569,7 @@ const learningLessonTemplates: LessonTemplate[] = [
         targetSkill: 'speaking',
         expectedResponse: 'could you send me the address again please',
         audioText: 'Could you send me the address again, please?',
+        audioVoice: 'andrew',
         phraseFocus: 'polite request',
       },
       {
@@ -1574,6 +1581,7 @@ const learningLessonTemplates: LessonTemplate[] = [
         targetSkill: 'speaking',
         expectedResponse: 'i ran into pavel near the station this morning',
         audioText: 'I ran into Pavel near the station this morning.',
+        audioVoice: 'ava',
         phraseFocus: 'natural chunk',
       },
     ],

@@ -1,4 +1,6 @@
-const SPEECH_CACHE_NAME = 'mentor-ai-speech-ava-v1';
+const SPEECH_CACHE_NAME = 'mentor-ai-speech-dialogue-v1';
+
+export type SpeechVoiceProfile = 'ava' | 'andrew';
 
 export type SpeechModelStatus = 'idle' | 'loading' | 'generating' | 'playing' | 'ready' | 'error';
 
@@ -7,6 +9,7 @@ export interface SpeechPlaybackHandlers {
   onError?: (error: Error) => void;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   mediaTitle?: string;
+  voice?: SpeechVoiceProfile;
 }
 
 let activeAudio: HTMLAudioElement | null = null;
@@ -49,7 +52,8 @@ export async function speakWithPreferredVoice(
   stopActiveAudio();
 
   try {
-    const generated = await generateSpeech(trimmedText);
+    const voice = handlers.voice ?? 'ava';
+    const generated = await generateSpeech(trimmedText, voice);
 
     if (requestId !== activeRequestId) {
       return false;
@@ -121,20 +125,21 @@ export function stopSpeech() {
   stopActiveAudio();
 }
 
-function generateSpeech(text: string) {
-  const cached = generatedSpeechCache.get(text);
+function generateSpeech(text: string, voice: SpeechVoiceProfile = 'ava') {
+  const key = `${voice}:${text}`;
+  const cached = generatedSpeechCache.get(key);
   if (cached) return cached;
 
-  const generation = generateAndCacheSpeech(text).catch((error: unknown) => {
-    generatedSpeechCache.delete(text);
+  const generation = generateAndCacheSpeech(text, voice).catch((error: unknown) => {
+    generatedSpeechCache.delete(key);
     throw toError(error);
   });
-  generatedSpeechCache.set(text, generation);
+  generatedSpeechCache.set(key, generation);
   return generation;
 }
 
-async function generateAndCacheSpeech(text: string) {
-  const cacheRequest = await createSpeechCacheRequest(text);
+async function generateAndCacheSpeech(text: string, voice: SpeechVoiceProfile) {
+  const cacheRequest = await createSpeechCacheRequest(text, voice);
 
   if (cacheRequest && 'caches' in window) {
     const cachedResponse = await (await caches.open(SPEECH_CACHE_NAME)).match(cacheRequest);
@@ -148,7 +153,7 @@ async function generateAndCacheSpeech(text: string) {
   const response = await fetch('/api/speech', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, voice }),
   });
 
   if (!response.ok) {
@@ -169,11 +174,11 @@ async function generateAndCacheSpeech(text: string) {
   return audio;
 }
 
-async function createSpeechCacheRequest(text: string) {
+async function createSpeechCacheRequest(text: string, voice: SpeechVoiceProfile) {
   if (!('crypto' in window) || !crypto.subtle) return null;
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  return new Request(`${window.location.origin}/__speech-cache/ava/${hash}`);
+  return new Request(`${window.location.origin}/__speech-cache/${voice}/${hash}`);
 }
 
 function configureMediaSession(audio: HTMLAudioElement, title: string) {
