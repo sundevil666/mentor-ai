@@ -328,8 +328,8 @@
                   color="primary"
                   flat
                   icon="restart_alt"
-                  label="Start over"
-                  no-caps
+                  aria-label="Start over"
+                  round
                   @click="restartListening"
                 >
                   <q-tooltip>Start from the beginning</q-tooltip>

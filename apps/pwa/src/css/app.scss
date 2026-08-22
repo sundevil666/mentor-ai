@@ -783,10 +783,6 @@ body.body--dark .q-field--outlined .q-field__control::before {
   min-width: 56px;
 }
 
-.listening-player__restart-button {
-  min-width: max-content;
-}
-
 .listening-player__controls .q-btn {
   flex: 0 0 auto;
 }
@@ -1418,10 +1414,6 @@ body.body--dark .q-field--outlined .q-field__control::before {
     gap: 4px;
     grid-template-columns: repeat(4, minmax(44px, 1fr));
     padding: 8px;
-  }
-
-  .listening-player__restart-button {
-    grid-column: 1 / -1;
   }
 
   .listening-player__play-button {
