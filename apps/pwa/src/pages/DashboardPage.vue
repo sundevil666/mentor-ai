@@ -320,6 +320,14 @@
                   @scroll="handleListeningTextScroll"
                 >
                   <q-btn
+                    class="listening-player__continue-button"
+                    color="primary"
+                    label="Continue"
+                    no-caps
+                    unelevated
+                    @click="completeListeningExercise"
+                  />
+                  <q-btn
                     class="listening-player__start-over-button"
                     color="primary"
                     flat
@@ -470,14 +478,6 @@
                   <q-tooltip>Next word</q-tooltip>
                 </q-btn>
               </div>
-              <q-btn
-                class="listening-player__continue"
-                color="primary"
-                label="Continue"
-                no-caps
-                unelevated
-                @click="completeListeningExercise"
-              />
             </div>
           </transition>
         </section>
