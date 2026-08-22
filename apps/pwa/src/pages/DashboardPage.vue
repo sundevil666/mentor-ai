@@ -2,16 +2,16 @@
   <q-page class="learning-page">
     <section class="learning-shell">
       <div v-if="!appStore.session" class="learning-status">
-        <q-badge
-          class="network-status-badge"
-          :color="syncColor"
-          :outline="appStore.isOnline && appStore.pendingSyncCount === 0"
+        <q-btn
+          class="network-status-button"
+          :aria-label="appStore.isOnline ? 'Online' : 'Offline'"
+          :color="appStore.isOnline ? 'primary' : 'negative'"
+          flat
+          :icon="appStore.isOnline ? 'wifi' : 'wifi_off'"
+          round
         >
-          {{ syncLabel }}
-        </q-badge>
-        <q-badge class="network-status-badge" :color="appStore.isOnline ? 'teal-8' : 'negative'">
-          {{ appStore.isOnline ? 'Online' : 'Offline' }}
-        </q-badge>
+          <q-tooltip>{{ appStore.isOnline ? 'Online' : 'Offline' }}</q-tooltip>
+        </q-btn>
         <span>Model v{{ appStore.studentModel.version }}</span>
         <span class="level-trend">
           <q-icon :name="levelTrend.icon" size="18px" />
@@ -682,16 +682,6 @@ const optionList = computed(
 const inputLabel = computed(() =>
   currentExercise.value?.type === 'repeat-speaking' ? 'What did you say?' : 'Your answer',
 );
-const syncLabel = computed(() =>
-  appStore.pendingSyncCount > 0 ? `${appStore.pendingSyncCount} pending` : 'Offline ready',
-);
-const syncColor = computed(() => {
-  if (appStore.pendingSyncCount > 0) {
-    return appStore.isOnline ? 'amber-8' : 'deep-orange-7';
-  }
-
-  return appStore.isOnline ? 'teal-8' : 'grey-7';
-});
 const currentSuggestion = computed(() =>
   createCurrentActivitySuggestion(appStore.preferredWorkShift, appStore.activitySnapshots, new Date(), appStore.myShiftActivity),
 );

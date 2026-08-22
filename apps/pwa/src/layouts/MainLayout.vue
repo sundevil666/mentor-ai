@@ -258,13 +258,6 @@
             </div>
           </q-menu>
         </q-btn>
-        <q-badge
-          class="header-offline-badge"
-          color="teal-8"
-          outline
-        >
-          Offline first
-        </q-badge>
         <q-btn
           class="more-nav-button"
           flat

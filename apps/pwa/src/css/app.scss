@@ -126,10 +126,6 @@ body.body--dark .q-field--outlined .q-field__control::before {
   margin-right: 4px;
 }
 
-.header-offline-badge {
-  font-size: 0.8rem;
-}
-
 .ios-install-button {
   margin-right: 8px;
 }
@@ -424,11 +420,11 @@ body.body--dark .q-field--outlined .q-field__control::before {
   margin-bottom: 24px;
 }
 
-.network-status-badge {
-  font-weight: 700;
-  min-width: 76px;
-  padding: 5px 10px;
-  text-align: center;
+.network-status-button {
+  height: 44px;
+  min-height: 44px;
+  min-width: 44px;
+  width: 44px;
 }
 
 .level-trend {
@@ -1642,7 +1638,4 @@ body.body--dark .q-field--outlined .q-field__control::before {
     display: none;
   }
 
-  .header-offline-badge {
-    display: none !important;
-  }
 }
