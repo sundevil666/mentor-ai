@@ -1,6 +1,6 @@
 const { readJsonBody } = require('./_shared');
 
-const voice = 'en-US-JennyNeural';
+const voice = 'en-US-AvaMultilingualNeural';
 const maxTextLength = 4_000;
 
 module.exports = async (request, response) => {

@@ -445,6 +445,8 @@ Reduced neural voice startup latency by using WebGPU acceleration when the devic
 
 Replaced the browser-side Kokoro runtime after device testing showed unacceptable latency and unclear quantized speech. Speech is now synthesized server-side with the clear `en-US-JennyNeural` voice and returned as compact MP3. The client prefetches active listening text and stores generated audio in Cache Storage, giving every browser the identical voice without downloading or running a neural model on the phone. Removed Kokoro and its client-side inference dependencies.
 
+Changed the default server voice to the more natural `en-US-AvaMultilingualNeural` profile. Removed the hidden Web Speech fallback because it could silently replace the configured voice with a robotic device-specific system voice whenever the network request failed. The voice cache uses a new Ava-specific namespace so older Jenny or system-voice results cannot be reused.
+
 ## Practical feedback build and background listening
 
 Removed the short demo-style lesson choices from the learner-facing dashboard. The feedback build now exposes a complete work conversation drill and a ten-minute commute listening session. Generated speech is packaged as a normal media track instead of an `AudioContext` buffer, the PWA no longer stops it when the document becomes hidden, and Media Session metadata provides play and pause controls on supported lock screens.

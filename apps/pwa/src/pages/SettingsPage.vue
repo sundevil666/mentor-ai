@@ -100,7 +100,7 @@
           <span>Voice</span>
         </div>
         <div class="activity-signal">
-          <span>Jenny Neural · American English</span>
+          <span>Ava Multilingual Neural · American English</span>
           <strong>Same voice on every device</strong>
         </div>
 
