@@ -1,15 +1,6 @@
-const MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX';
-const VOICE_ID = 'af_heart' as const;
-
-type KokoroInstance = Awaited<ReturnType<typeof import('kokoro-js').KokoroTTS.from_pretrained>>;
+const SPEECH_CACHE_NAME = 'mentor-ai-speech-jenny-v1';
 
 export type SpeechModelStatus = 'idle' | 'loading' | 'generating' | 'playing' | 'ready' | 'error';
-
-type GeneratedSpeech = {
-  audio: Blob;
-};
-
-const SPEECH_CACHE_NAME = 'mentor-ai-speech-q8-v1';
 
 export interface SpeechPlaybackHandlers {
   onEnd?: () => void;
@@ -18,19 +9,16 @@ export interface SpeechPlaybackHandlers {
   mediaTitle?: string;
 }
 
-let modelPromise: Promise<KokoroInstance> | null = null;
-let modelUsesWebGpu = false;
-let forceWasmUntilReload = false;
 let activeAudio: HTMLAudioElement | null = null;
 let activeAudioUrl: string | null = null;
 let activeRequestId = 0;
 let modelStatus: SpeechModelStatus = 'idle';
 let modelProgress = 0;
 const statusListeners = new Set<() => void>();
-const generatedSpeechCache = new Map<string, Promise<GeneratedSpeech>>();
+const generatedSpeechCache = new Map<string, Promise<Blob>>();
 
 export function isSpeechSynthesisAvailable() {
-  return typeof window !== 'undefined' && 'Audio' in window && 'WebAssembly' in window;
+  return typeof window !== 'undefined' && 'Audio' in window && 'fetch' in window;
 }
 
 export function getSpeechModelStatus() {
@@ -40,61 +28,6 @@ export function getSpeechModelStatus() {
 export function subscribeToSpeechModelStatus(listener: () => void) {
   statusListeners.add(listener);
   return () => statusListeners.delete(listener);
-}
-
-export async function prepareSpeechModel() {
-  if (!isSpeechSynthesisAvailable()) {
-    throw new Error('Neural speech is not supported by this browser.');
-  }
-
-  if (!modelPromise) {
-    setModelStatus('loading', 0);
-    const useWebGpu = 'gpu' in navigator && !forceWasmUntilReload;
-    modelPromise = import('kokoro-js')
-      .then(async ({ KokoroTTS }) => {
-        const progressCallback: Parameters<typeof KokoroTTS.from_pretrained>[1] = {
-          progress_callback: (progress) => {
-            if (progress.status === 'progress' && typeof progress.progress === 'number') {
-              setModelStatus('loading', Math.round(progress.progress));
-            }
-          },
-        };
-
-        if (useWebGpu) {
-          try {
-            const model = await KokoroTTS.from_pretrained(MODEL_ID, {
-              ...progressCallback,
-              dtype: 'q8',
-              device: 'webgpu',
-            });
-            modelUsesWebGpu = true;
-            return model;
-          } catch {
-            forceWasmUntilReload = true;
-            setModelStatus('loading', 0);
-          }
-        }
-
-        const model = await KokoroTTS.from_pretrained(MODEL_ID, {
-          ...progressCallback,
-          dtype: 'q8',
-          device: 'wasm',
-        });
-        modelUsesWebGpu = false;
-        return model;
-      })
-      .then((model) => {
-        setModelStatus('ready', 100);
-        return model;
-      })
-      .catch((error: unknown) => {
-        modelPromise = null;
-        setModelStatus('error', 0);
-        throw toError(error);
-      });
-  }
-
-  return modelPromise;
 }
 
 export async function speakWithPreferredVoice(
@@ -118,23 +51,17 @@ export async function speakWithPreferredVoice(
       return false;
     }
 
-    const audioUrl = URL.createObjectURL(generated.audio);
+    const audioUrl = URL.createObjectURL(generated);
     const audio = new Audio(audioUrl);
     audio.preload = 'auto';
     audio.setAttribute('playsinline', '');
     audio.onended = () => {
-      if (activeAudio !== audio) {
-        return;
-      }
-
+      if (activeAudio !== audio) return;
       clearActiveAudio();
       handlers.onEnd?.();
     };
     audio.onerror = () => {
-      if (activeAudio !== audio) {
-        return;
-      }
-
+      if (activeAudio !== audio) return;
       clearActiveAudio();
       handlers.onError?.(new Error('Could not play generated speech.'));
     };
@@ -151,6 +78,7 @@ export async function speakWithPreferredVoice(
   } catch (error) {
     if (requestId === activeRequestId) {
       stopActiveAudio();
+      setModelStatus('error', 0);
       handlers.onError?.(toError(error));
     }
     return false;
@@ -160,14 +88,13 @@ export async function speakWithPreferredVoice(
 export async function preloadSpeech(text: string) {
   const trimmedText = text.trim();
 
-  if (!trimmedText || !isSpeechSynthesisAvailable()) {
-    return false;
-  }
+  if (!trimmedText || !isSpeechSynthesisAvailable()) return false;
 
   try {
     await generateSpeech(trimmedText);
     return true;
   } catch {
+    setModelStatus('error', 0);
     return false;
   }
 }
@@ -177,10 +104,7 @@ export async function pauseSpeech() {
 }
 
 export async function resumeSpeech() {
-  if (!activeAudio) {
-    return false;
-  }
-
+  if (!activeAudio) return false;
   await activeAudio.play();
   return true;
 }
@@ -190,49 +114,63 @@ export function stopSpeech() {
   stopActiveAudio();
 }
 
-function createWaveBlob(samples: Float32Array, sampleRate: number) {
-  const bytesPerSample = 2;
-  const peak = samples.reduce((maximum, sample) => Math.max(maximum, Math.abs(sample)), 0);
-  const gain = peak > 0.95 ? 0.95 / peak : 1;
-  const buffer = new ArrayBuffer(44 + samples.length * bytesPerSample);
-  const view = new DataView(buffer);
-  writeAscii(view, 0, 'RIFF');
-  view.setUint32(4, 36 + samples.length * bytesPerSample, true);
-  writeAscii(view, 8, 'WAVE');
-  writeAscii(view, 12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * bytesPerSample, true);
-  view.setUint16(32, bytesPerSample, true);
-  view.setUint16(34, 16, true);
-  writeAscii(view, 36, 'data');
-  view.setUint32(40, samples.length * bytesPerSample, true);
+function generateSpeech(text: string) {
+  const cached = generatedSpeechCache.get(text);
+  if (cached) return cached;
 
-  samples.forEach((sample, index) => {
-    const normalized = Math.max(-1, Math.min(1, sample * gain));
-    view.setInt16(
-      44 + index * bytesPerSample,
-      normalized < 0 ? normalized * 0x8000 : normalized * 0x7fff,
-      true,
-    );
+  const generation = generateAndCacheSpeech(text).catch((error: unknown) => {
+    generatedSpeechCache.delete(text);
+    throw toError(error);
   });
-
-  return new Blob([buffer], { type: 'audio/wav' });
+  generatedSpeechCache.set(text, generation);
+  return generation;
 }
 
-function writeAscii(view: DataView, offset: number, value: string) {
-  Array.from(value).forEach((character, index) => {
-    view.setUint8(offset + index, character.charCodeAt(0));
+async function generateAndCacheSpeech(text: string) {
+  const cacheRequest = await createSpeechCacheRequest(text);
+
+  if (cacheRequest && 'caches' in window) {
+    const cachedResponse = await (await caches.open(SPEECH_CACHE_NAME)).match(cacheRequest);
+    if (cachedResponse) {
+      setModelStatus('ready', 100);
+      return cachedResponse.blob();
+    }
+  }
+
+  setModelStatus('generating', 0);
+  const response = await fetch('/api/speech', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
   });
+
+  if (!response.ok) {
+    throw new Error('The online voice is temporarily unavailable.');
+  }
+
+  const audio = await response.blob();
+  if (!audio.size) throw new Error('The speech service returned empty audio.');
+
+  if (cacheRequest && 'caches' in window) {
+    await (await caches.open(SPEECH_CACHE_NAME)).put(
+      cacheRequest,
+      new Response(audio, { headers: { 'Content-Type': 'audio/mpeg' } }),
+    );
+  }
+
+  setModelStatus('ready', 100);
+  return audio;
+}
+
+async function createSpeechCacheRequest(text: string) {
+  if (!('crypto' in window) || !crypto.subtle) return null;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return new Request(`${window.location.origin}/__speech-cache/jenny/${hash}`);
 }
 
 function configureMediaSession(audio: HTMLAudioElement, title: string) {
-  if (!('mediaSession' in navigator)) {
-    return;
-  }
-
+  if (!('mediaSession' in navigator)) return;
   navigator.mediaSession.metadata = new MediaMetadata({
     title,
     artist: 'Mentor AI',
@@ -244,10 +182,7 @@ function configureMediaSession(audio: HTMLAudioElement, title: string) {
 }
 
 function updateMediaPosition(audio: HTMLAudioElement) {
-  if (!('mediaSession' in navigator) || !Number.isFinite(audio.duration) || audio.duration <= 0) {
-    return;
-  }
-
+  if (!('mediaSession' in navigator) || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
   navigator.mediaSession.setPositionState({
     duration: audio.duration,
     playbackRate: audio.playbackRate,
@@ -264,97 +199,16 @@ function stopActiveAudio() {
     activeAudio.removeAttribute('src');
     activeAudio.load();
   }
-
   clearActiveAudio();
 }
 
 function clearActiveAudio() {
   activeAudio = null;
-
   if (activeAudioUrl) {
     URL.revokeObjectURL(activeAudioUrl);
     activeAudioUrl = null;
   }
-
-  if (modelStatus === 'playing') {
-    setModelStatus('ready', 100);
-  }
-}
-
-function generateSpeech(text: string) {
-  const cached = generatedSpeechCache.get(text);
-
-  if (cached) {
-    return cached;
-  }
-
-  const generation = generateAndCacheSpeech(text)
-    .catch((error: unknown) => {
-      generatedSpeechCache.delete(text);
-      setModelStatus('error', 0);
-      throw toError(error);
-    });
-
-  generatedSpeechCache.set(text, generation);
-  return generation;
-}
-
-async function generateAndCacheSpeech(text: string): Promise<GeneratedSpeech> {
-  const cacheRequest = await createSpeechCacheRequest(text);
-
-  if (cacheRequest && 'caches' in window) {
-    const cachedResponse = await (await caches.open(SPEECH_CACHE_NAME)).match(cacheRequest);
-
-    if (cachedResponse) {
-      setModelStatus('ready', 100);
-      return { audio: await cachedResponse.blob() };
-    }
-  }
-
-  return prepareSpeechModel()
-    .then(async (model) => {
-      setModelStatus('generating', 100);
-      const generated = await generateWithBackendFallback(model, text);
-      const audio = createWaveBlob(new Float32Array(generated.audio), generated.sampling_rate);
-
-      if (cacheRequest && 'caches' in window) {
-        await (await caches.open(SPEECH_CACHE_NAME)).put(
-          cacheRequest,
-          new Response(audio, { headers: { 'Content-Type': 'audio/wav' } }),
-        );
-      }
-
-      setModelStatus('ready', 100);
-      return { audio };
-    });
-}
-
-async function generateWithBackendFallback(model: KokoroInstance, text: string) {
-  try {
-    return await model.generate(text, { voice: VOICE_ID, speed: 1 });
-  } catch (error) {
-    if (!modelUsesWebGpu) {
-      throw error;
-    }
-
-    forceWasmUntilReload = true;
-    modelUsesWebGpu = false;
-    modelPromise = null;
-    setModelStatus('loading', 0);
-    const fallbackModel = await prepareSpeechModel();
-    setModelStatus('generating', 100);
-    return fallbackModel.generate(text, { voice: VOICE_ID, speed: 1 });
-  }
-}
-
-async function createSpeechCacheRequest(text: string) {
-  if (!('crypto' in window) || !crypto.subtle) {
-    return null;
-  }
-
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  return new Request(`${window.location.origin}/__speech-cache/${hash}`);
+  if (modelStatus === 'playing') setModelStatus('ready', 100);
 }
 
 function setModelStatus(status: SpeechModelStatus, progress: number) {

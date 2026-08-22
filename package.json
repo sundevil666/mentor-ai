@@ -38,5 +38,8 @@
   "engines": {
     "node": "22.x",
     "npm": ">=10.0.0"
+  },
+  "dependencies": {
+    "edge-tts-universal": "^1.4.0"
   }
 }

@@ -443,6 +443,8 @@ Replaced operating-system Web Speech synthesis with Kokoro 82M running locally t
 
 Reduced neural voice startup latency by using WebGPU acceleration when the device supports it, pre-generating the active listening text in the background, and reusing generated audio during the current application session. The same quality-preserving q8 model is used by the WebGPU and compatible WASM paths, and WAV output is peak-normalized to prevent clipping. Voice settings distinguish model download, audio generation, ready, and active playback states.
 
+Replaced the browser-side Kokoro runtime after device testing showed unacceptable latency and unclear quantized speech. Speech is now synthesized server-side with the clear `en-US-JennyNeural` voice and returned as compact MP3. The client prefetches active listening text and stores generated audio in Cache Storage, giving every browser the identical voice without downloading or running a neural model on the phone. Removed Kokoro and its client-side inference dependencies.
+
 ## Practical feedback build and background listening
 
-Removed the short demo-style lesson choices from the learner-facing dashboard. The feedback build now exposes a complete work conversation drill and a ten-minute commute listening session. Generated Kokoro speech is packaged as a normal media track instead of an `AudioContext` buffer, the PWA no longer stops it when the document becomes hidden, and Media Session metadata provides play and pause controls on supported lock screens.
+Removed the short demo-style lesson choices from the learner-facing dashboard. The feedback build now exposes a complete work conversation drill and a ten-minute commute listening session. Generated speech is packaged as a normal media track instead of an `AudioContext` buffer, the PWA no longer stops it when the document becomes hidden, and Media Session metadata provides play and pause controls on supported lock screens.

@@ -100,7 +100,7 @@
           <span>Voice</span>
         </div>
         <div class="activity-signal">
-          <span>Kokoro Heart · American English</span>
+          <span>Jenny Neural · American English</span>
           <strong>Same voice on every device</strong>
         </div>
 
@@ -182,7 +182,7 @@ const voiceStatus = computed(() => {
   }
 
   if (voiceState.value.status === 'loading') {
-    return `Downloading the voice model… ${voiceState.value.progress}%`;
+    return 'Connecting to the voice service…';
   }
 
   if (voiceState.value.status === 'generating') {
@@ -201,7 +201,7 @@ const voiceStatus = computed(() => {
     return 'The model could not load. Check the connection and try again.';
   }
 
-  return 'Free neural voice. The first test downloads its model once.';
+  return 'Fast neural voice. Generated audio is cached on this device.';
 });
 const currentSuggestion = computed(() =>
   createCurrentActivitySuggestion(appStore.preferredWorkShift, appStore.activitySnapshots, new Date(), appStore.myShiftActivity),
