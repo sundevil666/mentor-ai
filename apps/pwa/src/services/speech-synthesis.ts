@@ -1,6 +1,11 @@
-const SPEECH_CACHE_NAME = 'mentor-ai-speech-dialogue-v1';
+const SPEECH_CACHE_NAME = 'mentor-ai-speech-dialogue-v2';
 
-export type SpeechVoiceProfile = 'ava' | 'andrew';
+export type SpeechVoiceProfile = 'mia' | 'tom';
+
+export interface SpeechSegment {
+  text: string;
+  voice: SpeechVoiceProfile;
+}
 
 export type SpeechModelStatus = 'idle' | 'loading' | 'generating' | 'playing' | 'ready' | 'error';
 
@@ -52,7 +57,7 @@ export async function speakWithPreferredVoice(
   stopActiveAudio();
 
   try {
-    const voice = handlers.voice ?? 'ava';
+    const voice = handlers.voice ?? 'mia';
     const generated = await generateSpeech(trimmedText, voice);
 
     if (requestId !== activeRequestId) {
@@ -125,12 +130,13 @@ export function stopSpeech() {
   stopActiveAudio();
 }
 
-function generateSpeech(text: string, voice: SpeechVoiceProfile = 'ava') {
-  const key = `${voice}:${text}`;
+function generateSpeech(text: string, voice: SpeechVoiceProfile = 'mia') {
+  const segments = parseSpeechSegments(text, voice);
+  const key = JSON.stringify(segments);
   const cached = generatedSpeechCache.get(key);
   if (cached) return cached;
 
-  const generation = generateAndCacheSpeech(text, voice).catch((error: unknown) => {
+  const generation = generateAndCacheSpeech(segments).catch((error: unknown) => {
     generatedSpeechCache.delete(key);
     throw toError(error);
   });
@@ -138,8 +144,8 @@ function generateSpeech(text: string, voice: SpeechVoiceProfile = 'ava') {
   return generation;
 }
 
-async function generateAndCacheSpeech(text: string, voice: SpeechVoiceProfile) {
-  const cacheRequest = await createSpeechCacheRequest(text, voice);
+async function generateAndCacheSpeech(segments: SpeechSegment[]) {
+  const cacheRequest = await createSpeechCacheRequest(segments);
 
   if (cacheRequest && 'caches' in window) {
     const cachedResponse = await (await caches.open(SPEECH_CACHE_NAME)).match(cacheRequest);
@@ -153,7 +159,7 @@ async function generateAndCacheSpeech(text: string, voice: SpeechVoiceProfile) {
   const response = await fetch('/api/speech', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voice }),
+    body: JSON.stringify({ segments }),
   });
 
   if (!response.ok) {
@@ -174,11 +180,32 @@ async function generateAndCacheSpeech(text: string, voice: SpeechVoiceProfile) {
   return audio;
 }
 
-async function createSpeechCacheRequest(text: string, voice: SpeechVoiceProfile) {
+async function createSpeechCacheRequest(segments: SpeechSegment[]) {
   if (!('crypto' in window) || !crypto.subtle) return null;
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  const cacheValue = JSON.stringify(segments);
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(cacheValue));
   const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  return new Request(`${window.location.origin}/__speech-cache/${voice}/${hash}`);
+  return new Request(`${window.location.origin}/__speech-cache/${hash}`);
+}
+
+export function parseSpeechSegments(
+  text: string,
+  defaultVoice: SpeechVoiceProfile = 'mia',
+): SpeechSegment[] {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length < 2) return [{ text, voice: defaultVoice }];
+
+  const segments: SpeechSegment[] = [];
+  for (const line of lines) {
+    const match = /^(Mia|Tom):\s*(.+)$/i.exec(line);
+    if (!match) return [{ text, voice: defaultVoice }];
+    segments.push({
+      text: match[2]!,
+      voice: match[1]!.toLowerCase() === 'tom' ? 'tom' : 'mia',
+    });
+  }
+
+  return segments;
 }
 
 function configureMediaSession(audio: HTMLAudioElement, title: string) {

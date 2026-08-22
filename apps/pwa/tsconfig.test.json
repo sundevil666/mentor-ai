@@ -13,6 +13,7 @@
     "src/services/api-client.ts",
     "src/services/auth.ts",
     "src/services/indexed-db.ts",
+    "src/services/speech-synthesis.ts",
     "src/services/storage-retention.ts",
     "test/*.test.ts"
   ]

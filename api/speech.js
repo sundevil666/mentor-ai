@@ -1,8 +1,8 @@
 const { readJsonBody } = require('./_shared');
 
 const voices = {
-  ava: 'en-US-AvaMultilingualNeural',
-  andrew: 'en-US-AndrewMultilingualNeural',
+  mia: 'en-US-AvaMultilingualNeural',
+  tom: 'en-US-AndrewMultilingualNeural',
 };
 const maxTextLength = 4_000;
 
@@ -16,18 +16,28 @@ module.exports = async (request, response) => {
 
   try {
     const body = await readJsonBody(request);
-    const text = typeof body.text === 'string' ? body.text.trim() : '';
-    const voiceProfile = body.voice === 'andrew' ? 'andrew' : 'ava';
+    const segments = Array.isArray(body.segments)
+      ? body.segments.map((segment) => ({
+          text: typeof segment?.text === 'string' ? segment.text.trim() : '',
+          voice: segment?.voice === 'tom' ? 'tom' : 'mia',
+        }))
+      : [];
+    const textLength = segments.reduce((length, segment) => length + segment.text.length, 0);
 
-    if (!text || text.length > maxTextLength) {
+    if (!segments.length || segments.some((segment) => !segment.text) || textLength > maxTextLength) {
       response.statusCode = 400;
       response.end('Text must contain between 1 and 4000 characters.');
       return;
     }
 
     const { EdgeTTS } = await import('edge-tts-universal');
-    const result = await new EdgeTTS(text, voices[voiceProfile]).synthesize();
-    const audio = Buffer.from(await result.audio.arrayBuffer());
+    const audioParts = await Promise.all(
+      segments.map(async (segment) => {
+        const result = await new EdgeTTS(segment.text, voices[segment.voice]).synthesize();
+        return Buffer.from(await result.audio.arrayBuffer());
+      }),
+    );
+    const audio = Buffer.concat(audioParts);
 
     response.statusCode = 200;
     response.setHeader('Content-Type', 'audio/mpeg');

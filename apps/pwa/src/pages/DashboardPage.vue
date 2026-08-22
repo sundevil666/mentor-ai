@@ -933,7 +933,7 @@ async function playAudio() {
   const text = currentExercise.value?.audioText;
 
   if (text && isSpeechSynthesisAvailable()) {
-    await speakWithPreferredVoice(text, { voice: currentExercise.value?.audioVoice ?? 'ava' });
+    await speakWithPreferredVoice(text, { voice: currentExercise.value?.audioVoice ?? 'mia' });
   }
 
   await appStore.replayAudio();

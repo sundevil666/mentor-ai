@@ -62,7 +62,7 @@ export type ExerciseType =
   | 'dialogue-translation'
   | 'review';
 
-export type SpeechVoiceProfile = 'ava' | 'andrew';
+export type SpeechVoiceProfile = 'mia' | 'tom';
 
 export type LearningEventType =
   | 'lesson-started'
@@ -1533,7 +1533,7 @@ const learningLessonTemplates: LessonTemplate[] = [
         targetSkill: 'speaking',
         expectedResponse: 'what time do you start work today',
         audioText: 'What time do you start work today?',
-        audioVoice: 'ava',
+        audioVoice: 'mia',
         phraseFocus: 'question order',
       },
       {
@@ -1545,7 +1545,7 @@ const learningLessonTemplates: LessonTemplate[] = [
         targetSkill: 'speaking',
         expectedResponse: 'i start at seven but i need to leave home at six',
         audioText: 'I start at seven, but I need to leave home at six.',
-        audioVoice: 'andrew',
+        audioVoice: 'tom',
         phraseFocus: 'at + time',
       },
       {
@@ -1557,7 +1557,7 @@ const learningLessonTemplates: LessonTemplate[] = [
         targetSkill: 'speaking',
         expectedResponse: 'are you going by bus or by car',
         audioText: 'Are you going by bus or by car?',
-        audioVoice: 'ava',
+        audioVoice: 'mia',
         phraseFocus: 'by + transport',
       },
       {
@@ -1569,7 +1569,7 @@ const learningLessonTemplates: LessonTemplate[] = [
         targetSkill: 'speaking',
         expectedResponse: 'could you send me the address again please',
         audioText: 'Could you send me the address again, please?',
-        audioVoice: 'andrew',
+        audioVoice: 'tom',
         phraseFocus: 'polite request',
       },
       {
@@ -1581,7 +1581,7 @@ const learningLessonTemplates: LessonTemplate[] = [
         targetSkill: 'speaking',
         expectedResponse: 'i ran into pavel near the station this morning',
         audioText: 'I ran into Pavel near the station this morning.',
-        audioVoice: 'ava',
+        audioVoice: 'mia',
         phraseFocus: 'natural chunk',
       },
     ],
