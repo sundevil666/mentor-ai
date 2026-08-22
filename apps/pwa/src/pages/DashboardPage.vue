@@ -23,8 +23,7 @@
             </q-btn>
           </div>
 
-          <p class="learning-start__eyebrow">Your next lesson</p>
-          <h1>No searching. Start with this.</h1>
+          <h1>Your next lesson</h1>
 
           <article class="priority-lesson">
             <div class="priority-lesson__topline">
