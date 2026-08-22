@@ -298,15 +298,39 @@
                   ]"
                   @scroll="handleListeningTextScroll"
                 >
+                  <q-btn
+                    class="listening-player__translate-button"
+                    :color="isListeningTranslationVisible ? 'secondary' : 'primary'"
+                    flat
+                    icon="translate"
+                    :label="isListeningTranslationVisible ? 'EN' : 'RU'"
+                    no-caps
+                    @click="toggleListeningTranslation"
+                  >
+                    <q-tooltip>{{
+                      isListeningTranslationVisible ? 'Show English' : 'Перевести на русский'
+                    }}</q-tooltip>
+                  </q-btn>
                   <p class="listening-player__sentence listening-player__sentence--previous">
-                    {{ previousListeningSentenceItem?.text ?? '' }}
+                    {{
+                      isListeningTranslationVisible
+                        ? translateListeningSentence(previousListeningSentenceItem?.text ?? '')
+                        : (previousListeningSentenceItem?.text ?? '')
+                    }}
                   </p>
                   <p class="listening-player__sentence listening-player__sentence--current">
+                    <span
+                      v-if="isListeningTranslationVisible"
+                      class="listening-player__translated-current"
+                    >
+                      {{ translateListeningSentence(activeListeningSentenceItem?.text ?? '') }}
+                    </span>
                     <span
                       v-for="token in listeningTokens.slice(
                         activeListeningSentenceItem?.startWordIndex ?? 0,
                         (activeListeningSentenceItem?.endWordIndex ?? -1) + 1,
                       )"
+                      v-else
                       :key="token.index"
                       :data-token-index="token.index"
                       :class="[
@@ -320,17 +344,13 @@
                     >{{ token.word }}{{ token.trailing }}</span>
                   </p>
                   <p class="listening-player__sentence listening-player__sentence--next">
-                    {{ nextListeningSentenceItem?.text ?? '' }}
+                    {{
+                      isListeningTranslationVisible
+                        ? translateListeningSentence(nextListeningSentenceItem?.text ?? '')
+                        : (nextListeningSentenceItem?.text ?? '')
+                    }}
                   </p>
                 </div>
-              </div>
-
-              <div
-                v-if="isListeningTranslationVisible"
-                class="listening-player__translation"
-                aria-live="polite"
-              >
-                <span>{{ activeListeningSentenceTranslation }}</span>
               </div>
 
               <div class="listening-player__controls">
@@ -386,18 +406,6 @@
                 >
                   <q-tooltip>{{
                     isListeningRepeatEnabled ? 'Repeat is on' : 'Repeat selected text'
-                  }}</q-tooltip>
-                </q-btn>
-                <q-btn
-                  :color="isListeningTranslationVisible ? 'secondary' : 'primary'"
-                  :flat="!isListeningTranslationVisible"
-                  :unelevated="isListeningTranslationVisible"
-                  icon="translate"
-                  round
-                  @click="toggleListeningTranslation"
-                >
-                  <q-tooltip>{{
-                    isListeningTranslationVisible ? 'Hide translation' : 'Translate sentence'
                   }}</q-tooltip>
                 </q-btn>
                 <q-btn
@@ -696,12 +704,6 @@ const previousListeningSentenceItem = computed(
 );
 const nextListeningSentenceItem = computed(
   () => listeningSentences.value[activeListeningSentenceIndex.value + 1] ?? null,
-);
-const activeListeningSentence = computed(() =>
-  getListeningSentenceAtWord(activeWordIndex.value, listeningTokens.value),
-);
-const activeListeningSentenceTranslation = computed(() =>
-  translateListeningSentence(activeListeningSentence.value),
 );
 const listeningTitle = computed(() =>
   currentExercise.value?.type === 'listening-text'
@@ -1063,7 +1065,6 @@ async function selectListeningSentence(sentence: ListeningSentenceItem) {
 
   activeWordIndex.value = sentence.startWordIndex;
   activeWordEndIndex.value = sentence.startWordIndex;
-  isListeningTranslationVisible.value = false;
   await scrollActiveListeningPhraseIntoView();
 }
 
@@ -1073,7 +1074,6 @@ function toggleListeningRepeat() {
 
 function toggleListeningTranslation() {
   isListeningTranslationVisible.value = !isListeningTranslationVisible.value;
-  void scrollActiveListeningPhraseIntoView();
 }
 
 function toggleListeningPlaylist() {
@@ -1390,31 +1390,6 @@ function getSentenceStartWordIndexes(tokens: ListeningToken[]): number[] {
   return Array.from(new Set(starts));
 }
 
-function getListeningSentenceAtWord(wordIndex: number, tokens: ListeningToken[]): string {
-  if (tokens.length === 0) {
-    return '';
-  }
-
-  const safeWordIndex = clampIndex(wordIndex, 0, tokens.length - 1);
-  let startIndex = safeWordIndex;
-  let endIndex = safeWordIndex;
-
-  while (startIndex > 0 && !endsSentence(tokens[startIndex - 1])) {
-    startIndex -= 1;
-  }
-
-  while (endIndex < tokens.length - 1 && !endsSentence(tokens[endIndex])) {
-    endIndex += 1;
-  }
-
-  return tokens
-    .slice(startIndex, endIndex + 1)
-    .map((token) => `${token.word}${token.trailing}`)
-    .join('')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 function translateListeningSentence(sentence: string): string {
   const normalizedSentence = normalizeListeningSentence(sentence);
   const translation = listeningSentenceTranslations[normalizedSentence];
@@ -1430,10 +1405,6 @@ function clampIndex(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function endsSentence(token: ListeningToken): boolean {
-  return /\n/.test(token.trailing) || /[.!?]["')\]]*$/.test(token.word);
-}
-
 function findLastNumberIndex(values: number[], maxValue: number): number {
   for (let index = values.length - 1; index >= 0; index -= 1) {
     if ((values[index] ?? 0) <= maxValue) {
@@ -1445,6 +1416,21 @@ function findLastNumberIndex(values: number[], maxValue: number): number {
 }
 
 const listeningSentenceTranslations: Record<string, string> = {
+  [normalizeListeningSentence('Mia: What time do you start work today?')]:
+    'Мия: Во сколько ты сегодня начинаешь работу?',
+  [normalizeListeningSentence('Tom: I start at seven, but I need to leave home at six.')]:
+    'Том: Я начинаю в семь, но мне нужно выйти из дома в шесть.',
+  [normalizeListeningSentence('Mia: Are you going by bus or by car?')]:
+    'Мия: Ты едешь на автобусе или на машине?',
+  [normalizeListeningSentence('Tom: By bus.')]: 'Том: На автобусе.',
+  [normalizeListeningSentence('Could you send me the address again, please?')]:
+    'Можешь отправить мне адрес ещё раз, пожалуйста?',
+  [normalizeListeningSentence('Mia: Sure.')]: 'Мия: Конечно.',
+  [normalizeListeningSentence('I also ran into Pavel near the station this morning.')]:
+    'Я ещё случайно встретила Павла возле станции сегодня утром.',
+  [normalizeListeningSentence('Tom: Nice.')]: 'Том: Отлично.',
+  [normalizeListeningSentence('I want to ask him about the new schedule later.')]:
+    'Я хочу позже спросить его о новом расписании.',
   [normalizeListeningSentence(
     'This morning I am going to work, and I want to use my travel time for English.',
   )]: 'Сегодня утром я еду на работу и хочу использовать время в дороге для английского.',

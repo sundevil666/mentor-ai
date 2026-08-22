@@ -749,11 +749,19 @@ body.body--dark .q-field--outlined .q-field__control::before {
   gap: 18px;
   min-height: 0;
   overflow: hidden;
-  padding: 24px 30px;
+  padding: 58px 30px 24px;
+  position: relative;
 }
 
 .listening-player__text--translation-visible {
-  padding-bottom: 32px;
+  padding-bottom: 24px;
+}
+
+.listening-player__translate-button {
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  z-index: 1;
 }
 
 .lesson-stage .listening-player__sentence {
@@ -791,16 +799,11 @@ body.body--dark .q-field--outlined .q-field__control::before {
   color: #10201d;
 }
 
-.listening-player__translation {
-  background: #10201d;
-  border: 1px solid rgba(16, 32, 29, 0.18);
-  border-radius: var(--app-radius-md);
-  color: #f8fffc;
-  font-size: 1.05rem;
-  font-weight: 700;
-  line-height: 1.45;
-  padding: 14px 16px;
-  text-align: center;
+.listening-player__translated-current {
+  background: #f2c94c;
+  border-radius: 6px;
+  color: #10201d;
+  padding: 2px 5px;
 }
 
 .listening-player__controls {
@@ -1414,7 +1417,7 @@ body.body--dark .q-field--outlined .q-field__control::before {
     height: auto;
     max-height: none;
     overflow: hidden;
-    padding: 18px;
+    padding: 54px 18px 18px;
   }
 
   .listening-player__text--translation-visible {
@@ -1423,11 +1426,6 @@ body.body--dark .q-field--outlined .q-field__control::before {
 
   .lesson-stage .listening-player__sentence--current {
     font-size: clamp(1.8rem, 7vw, 2.2rem);
-  }
-
-  .listening-player__translation {
-    font-size: 0.98rem;
-    padding: 12px 14px;
   }
 
   .listening-player__body {
