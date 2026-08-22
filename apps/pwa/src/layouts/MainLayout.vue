@@ -6,7 +6,6 @@
     >
       <q-toolbar>
         <q-btn
-          v-if="appStore.session || route.name !== 'dashboard'"
           class="home-nav-button"
           flat
           icon="home"
@@ -27,7 +26,6 @@
           <q-tooltip>{{ appStore.isOnline ? 'Online' : 'Offline' }}</q-tooltip>
         </q-btn>
         <span class="level-trend header-level-trend">
-          <q-icon :name="levelTrend.icon" size="18px" />
           {{ levelTrend.level }} · {{ levelTrend.daysLabel }}
           <q-tooltip>{{ levelTrend.tooltip }}</q-tooltip>
         </span>
@@ -605,7 +603,6 @@ function readSavedTheme() {
 
 function createLevelTrend(studentModel: StudentModel) {
   const learningState = studentModel.conceptLevels.learning;
-  const decision = studentModel.teacherDecision.levelDecision;
   const practicedAt = learningState.lastPracticedAt ?? studentModel.teacherDecision.createdAt;
   const daysInProcess = Math.max(
     0,
@@ -614,12 +611,6 @@ function createLevelTrend(studentModel: StudentModel) {
 
   return {
     level: conceptLevelToCefr(learningState.level),
-    icon:
-      decision === 'increase'
-        ? 'arrow_upward'
-        : decision === 'decrease'
-          ? 'arrow_downward'
-          : 'arrow_forward',
     daysLabel: `${daysInProcess}d`,
     tooltip: `${studentModel.teacherDecision.reason} Days in this level process: ${daysInProcess}.`,
   };
