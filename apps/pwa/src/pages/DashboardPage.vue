@@ -305,6 +305,7 @@
               <q-option-group
                 v-if="currentExercise.options"
                 v-model="answer"
+                class="exercise-options"
                 :options="optionList"
                 color="primary"
               />

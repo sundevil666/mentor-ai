@@ -540,6 +540,30 @@ body .q-menu {
   width: 100%;
 }
 
+.exercise-standard h1,
+.dialogue-drill h1 {
+  font-size: 3rem;
+  line-height: 1.12;
+}
+
+.exercise-options {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+.exercise-options .q-radio {
+  border-radius: var(--app-radius-sm);
+  font-size: 1.2rem;
+  line-height: 1.45;
+  min-height: 54px;
+  padding: 8px 12px;
+}
+
+.exercise-options .q-radio__inner {
+  font-size: 2.75rem;
+}
+
 .dialogue-drill {
   align-content: start;
   align-items: start;
@@ -1451,6 +1475,21 @@ body .q-menu {
   .lesson-stage h1,
   .lesson-complete h1 {
     font-size: 1.85rem;
+  }
+
+  .exercise-standard h1,
+  .dialogue-drill h1 {
+    font-size: 2.1rem;
+  }
+
+  .exercise-options {
+    gap: 8px;
+  }
+
+  .exercise-options .q-radio {
+    font-size: 1.1rem;
+    min-height: 52px;
+    padding: 7px 8px;
   }
 
   .lesson-stage {
