@@ -28,6 +28,7 @@ type StoredAuthSession = {
 };
 
 const learningSyncTag = 'mentor-ai-learning-sync';
+const offlineVideoCacheName = 'mentor-ai-offline-videos-v1';
 
 self.skipWaiting();
 clientsClaim();
@@ -67,6 +68,19 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'mentor-ai:sync-learning') {
     event.waitUntil(syncPendingLearningEvents());
   }
+});
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.destination !== 'video' || event.request.method !== 'GET') {
+    return;
+  }
+
+  event.respondWith(
+    caches.open(offlineVideoCacheName).then(async (cache) => {
+      const cached = await cache.match(event.request.url, { ignoreVary: true });
+      return cached ?? fetch(event.request);
+    }),
+  );
 });
 
 async function syncPendingLearningEvents() {

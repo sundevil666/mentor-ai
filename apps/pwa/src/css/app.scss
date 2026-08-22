@@ -1276,7 +1276,7 @@ body .q-menu {
   box-shadow: 0 18px 42px rgba(17, 24, 39, 0.16);
   display: grid;
   gap: 6px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   left: 50%;
   max-width: 520px;
   padding: 8px;
@@ -1305,6 +1305,7 @@ body .q-menu {
     border-color 160ms ease,
     color 160ms ease,
     transform 160ms ease;
+  text-decoration: none;
 }
 
 .mobile-start-dock__button:hover,
@@ -1330,6 +1331,158 @@ body .q-menu {
   min-width: 0;
   overflow-wrap: anywhere;
   text-align: center;
+}
+
+.videos-page {
+  min-height: calc(100vh - 50px);
+  padding: 28px 20px 118px;
+}
+
+.videos-shell {
+  display: grid;
+  gap: 22px;
+  margin: 0 auto;
+  max-width: 920px;
+}
+
+.videos-header p {
+  color: var(--app-accent);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+}
+
+.videos-header h1 {
+  color: var(--app-text-strong);
+  font-size: clamp(2rem, 6vw, 3rem);
+  line-height: 1;
+  margin: 0 0 10px;
+}
+
+.videos-header span,
+.video-storage-note,
+.video-card__heading span,
+.video-card__body p {
+  color: var(--app-muted-strong);
+}
+
+.video-library {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+}
+
+.video-card {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  box-shadow: 0 14px 34px rgba(17, 24, 39, 0.08);
+  overflow: hidden;
+}
+
+.video-card__player {
+  aspect-ratio: 16 / 9;
+  background: #0b1514;
+  display: block;
+  object-fit: contain;
+  width: 100%;
+}
+
+.video-card__body {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.video-card__heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.video-card__heading h2 {
+  color: var(--app-text-strong);
+  font-size: 1.25rem;
+  line-height: 1.25;
+  margin: 0 0 4px;
+}
+
+.video-card__heading span {
+  font-size: 0.78rem;
+}
+
+.video-card__body p {
+  line-height: 1.55;
+  margin: 0;
+}
+
+.video-card__meta {
+  display: flex;
+  gap: 16px;
+}
+
+.video-card__meta span {
+  align-items: center;
+  color: var(--app-text);
+  display: flex;
+  font-size: 0.88rem;
+  font-weight: 700;
+  gap: 5px;
+}
+
+.video-card__body > .q-btn {
+  min-height: 48px;
+}
+
+.video-storage-note {
+  font-size: 0.84rem;
+  margin: 0;
+  text-align: center;
+}
+
+.video-bottom-dock {
+  background: color-mix(in srgb, var(--app-surface) 96%, transparent);
+  border: 1px solid var(--app-border-strong);
+  border-radius: 18px;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  box-shadow: 0 18px 42px rgba(17, 24, 39, 0.16);
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  left: 50%;
+  max-width: 360px;
+  padding: 8px;
+  position: fixed;
+  transform: translateX(-50%);
+  width: min(360px, calc(100vw - 24px));
+  z-index: 5;
+}
+
+.video-bottom-dock a {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--app-muted-strong);
+  display: grid;
+  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 3px;
+  justify-items: center;
+  min-height: 58px;
+  padding: 7px;
+  text-decoration: none;
+}
+
+.video-bottom-dock a:hover,
+.video-bottom-dock a:focus-visible,
+.video-bottom-dock .video-bottom-dock__active {
+  background: var(--app-surface-active);
+  border-color: var(--app-primary);
+  color: var(--app-primary);
+  outline: none;
 }
 
 .activity-signal {
@@ -1728,12 +1881,25 @@ body .q-menu {
     padding: 8px 8px max(8px, env(safe-area-inset-bottom));
     transform: none;
     width: 100%;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .mobile-start-dock__button {
     border-radius: 10px;
     min-height: 60px;
+  }
+
+  .videos-page {
+    padding: 22px 14px 104px;
+  }
+
+  .video-bottom-dock {
+    border-radius: 16px 16px 0 0;
+    border-width: 1px 0 0;
+    bottom: 0;
+    max-width: none;
+    padding: 8px 8px max(8px, env(safe-area-inset-bottom));
+    width: 100%;
   }
 
   .learning-overview,

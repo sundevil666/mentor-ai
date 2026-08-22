@@ -584,6 +584,13 @@
         <q-icon :name="item.icon" size="24px" />
         <span>{{ item.label }}</span>
       </button>
+      <router-link
+        class="mobile-start-dock__button"
+        :to="{ name: 'videos' }"
+      >
+        <q-icon name="video_library" size="24px" />
+        <span>Video</span>
+      </router-link>
     </nav>
   </q-page>
 </template>

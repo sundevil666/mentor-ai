@@ -4,6 +4,7 @@ import DashboardPage from 'pages/DashboardPage.vue';
 import ErrorNotFound from 'pages/ErrorNotFound.vue';
 import SettingsPage from 'pages/SettingsPage.vue';
 import StatisticsPage from 'pages/StatisticsPage.vue';
+import VideosPage from 'pages/VideosPage.vue';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -17,16 +18,22 @@ const routes: RouteRecordRaw[] = [
         meta: { routeOrder: 0 },
       },
       {
+        path: 'videos',
+        name: 'videos',
+        component: VideosPage,
+        meta: { routeOrder: 1 },
+      },
+      {
         path: 'statistics',
         name: 'statistics',
         component: StatisticsPage,
-        meta: { routeOrder: 1 },
+        meta: { routeOrder: 2 },
       },
       {
         path: 'settings',
         name: 'settings',
         component: SettingsPage,
-        meta: { routeOrder: 2 },
+        meta: { routeOrder: 3 },
       },
     ],
   },
