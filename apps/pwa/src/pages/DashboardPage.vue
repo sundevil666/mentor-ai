@@ -23,6 +23,7 @@
             </q-btn>
           </div>
 
+          <template v-if="selectedLessonLibrary === 'home'">
           <article class="priority-lesson">
             <div class="priority-lesson__topline">
               <span><q-icon name="auto_awesome" /> {{ priorityLesson.phaseLabel }}</span>
@@ -98,6 +99,51 @@
               </section>
             </div>
           </q-expansion-item>
+          </template>
+
+          <section v-else class="training-library">
+            <div class="training-library__heading">
+              <div>
+                <p class="learning-start__eyebrow">{{ activeTrainingLibrary.label }}</p>
+                <h1>{{ activeTrainingLibrary.title }}</h1>
+                <p>{{ activeTrainingLibrary.description }}</p>
+              </div>
+              <q-icon :name="activeTrainingLibrary.icon" size="42px" color="primary" />
+            </div>
+
+            <div class="training-library__list">
+              <article
+                v-for="lesson in activeTrainingLibrary.lessons"
+                :key="lesson.templateKey"
+                class="training-library-card"
+              >
+                <button type="button" class="training-library-card__body" @click="startLibraryLesson(lesson)">
+                  <span class="training-library-card__title">{{ lesson.title }}</span>
+                  <strong>{{ lesson.focus }}</strong>
+                  <span>{{ lesson.minutes }} min</span>
+                </button>
+                <div class="training-library-card__offline">
+                  <q-icon
+                    :name="libraryDownloadIcon(lesson.templateKey)"
+                    :color="libraryDownloadStatus[lesson.templateKey] === 'ready' ? 'positive' : 'grey-7'"
+                    size="20px"
+                  />
+                  <span>{{ libraryDownloadLabel(lesson.templateKey) }}</span>
+                  <q-btn
+                    color="primary"
+                    :icon="libraryDownloadStatus[lesson.templateKey] === 'ready' ? 'check' : 'download'"
+                    :label="libraryDownloadStatus[lesson.templateKey] === 'ready' ? 'Downloaded' : 'Download'"
+                    :loading="libraryDownloadStatus[lesson.templateKey] === 'downloading'"
+                    :disable="libraryDownloadStatus[lesson.templateKey] === 'ready'"
+                    dense
+                    flat
+                    no-caps
+                    @click="downloadLibraryLesson(lesson)"
+                  />
+                </div>
+              </article>
+            </div>
+          </section>
         </section>
 
         <section
@@ -537,6 +583,7 @@ import {
   type TrainingKey,
 } from 'src/services/learning-context';
 import {
+  isSpeechBatchCached,
   isSpeechSynthesisAvailable,
   pauseSpeech,
   preloadSpeechBatch,
@@ -593,6 +640,8 @@ type QuickStartItem = {
   icon: string;
   start: () => void;
 };
+type TrainingLibraryKey = 'home' | 'listening' | 'speaking';
+type TrainingLibraryLesson = LessonChoice & { mode: 'listening' | 'speaking'; minutes: number };
 
 const appStore = useAppStore();
 const answer = ref('');
@@ -605,6 +654,8 @@ const isListeningRepeatEnabled = ref(false);
 const isListeningTranslationVisible = ref(false);
 const isListeningPlaylistVisible = ref(false);
 const isLessonLibraryVisible = ref(false);
+const selectedLessonLibrary = ref<TrainingLibraryKey>('home');
+const libraryDownloadStatus = ref<Record<string, 'idle' | 'checking' | 'downloading' | 'ready' | 'error'>>({});
 const offlineAudioStatus = ref<'idle' | 'downloading' | 'ready' | 'error'>('idle');
 const offlineAudioProgress = ref(0);
 const isRecognizingSpeech = ref(false);
@@ -793,6 +844,39 @@ const lessonSections: LessonSection[] = [
     ],
   },
 ];
+const trainingLibraries: Record<'listening' | 'speaking', {
+  label: string;
+  title: string;
+  description: string;
+  icon: string;
+  lessons: TrainingLibraryLesson[];
+}> = {
+  listening: {
+    label: 'Listen',
+    title: 'Listening lessons',
+    description: 'Choose a lesson to begin, or download its audio before you go offline.',
+    icon: 'headphones',
+    lessons: [
+      { templateKey: 'morning-questions-listening', title: 'Morning questions', focus: 'Hear and understand everyday questions', mode: 'listening', minutes: 6 },
+      { templateKey: 'shop-listening', title: 'Small shop request', focus: 'Listen for the key words in a real request', mode: 'listening', minutes: 6 },
+      { templateKey: 'commute-listening', title: 'Commute listening', focus: 'A complete listening session for the journey', mode: 'listening', minutes: 10 },
+    ],
+  },
+  speaking: {
+    label: 'Speak',
+    title: 'Speaking lessons',
+    description: 'Choose a speaking practice, or download its voice examples for offline use.',
+    icon: 'record_voice_over',
+    lessons: [
+      { templateKey: 'daily-speaking', title: 'Daily routine', focus: 'Build confident sentences about your day', mode: 'speaking', minutes: 6 },
+      { templateKey: 'polite-speaking', title: 'Polite requests', focus: 'Practise useful phrases for real conversations', mode: 'speaking', minutes: 6 },
+      { templateKey: 'work-speaking', title: 'Speaking at work', focus: 'Answer aloud in common work situations', mode: 'speaking', minutes: 6 },
+    ],
+  },
+};
+const activeTrainingLibrary = computed(() =>
+  selectedLessonLibrary.value === 'speaking' ? trainingLibraries.speaking : trainingLibraries.listening,
+);
 
 function deviceRecommendation(device: PreferredLessonDevice) {
   return device === 'mac'
@@ -819,6 +903,7 @@ const recommendedTraining = computed(() => {
 });
 const priorityLesson = computed(() => createPriorityLesson(appStore.studentModel));
 const activeQuickStartKey = computed<QuickStartItem['key']>(() => {
+  if (!appStore.session) return selectedLessonLibrary.value;
   const mode = appStore.session?.context.mode;
 
   if (mode === 'speaking') {
@@ -837,6 +922,7 @@ const quickStartItems = computed<QuickStartItem[]>(() => [
     label: 'Home',
     icon: 'home',
     start: () => {
+      selectedLessonLibrary.value = 'home';
       void returnToLessonChoice().then(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
     },
   },
@@ -845,7 +931,7 @@ const quickStartItems = computed<QuickStartItem[]>(() => [
     label: 'Listen',
     icon: 'headphones',
     start: () => {
-      void startTraining('listening');
+      void openTrainingLibrary('listening');
     },
   },
   {
@@ -853,10 +939,91 @@ const quickStartItems = computed<QuickStartItem[]>(() => [
     label: 'Speak',
     icon: 'record_voice_over',
     start: () => {
-      void startTraining('speaking');
+      void openTrainingLibrary('speaking');
     },
   },
 ]);
+
+async function openTrainingLibrary(library: 'listening' | 'speaking') {
+  if (appStore.session) await returnToLessonChoice();
+  selectedLessonLibrary.value = library;
+  await refreshLibraryDownloadStatuses(trainingLibraries[library].lessons);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function startLibraryLesson(lesson: TrainingLibraryLesson) {
+  answer.value = '';
+  setForwardTransition();
+  await appStore.startLesson(createLearningContext(currentSuggestion.value, {
+    mode: lesson.mode,
+    selectedConcept: 'learning',
+    manualConceptChoice: true,
+    lessonTemplateKey: lesson.templateKey,
+  }));
+}
+
+async function downloadLibraryLesson(lesson: TrainingLibraryLesson) {
+  libraryDownloadStatus.value[lesson.templateKey] = 'downloading';
+  try {
+    const generatedLesson = await appStore.loadLesson(createLearningContext(currentSuggestion.value, {
+      mode: lesson.mode,
+      selectedConcept: 'learning',
+      manualConceptChoice: true,
+      lessonTemplateKey: lesson.templateKey,
+    }), new Date().toISOString());
+    const texts = getLessonOfflineSpeechTexts(generatedLesson.exercises);
+    const result = await preloadSpeechBatch(texts);
+    libraryDownloadStatus.value[lesson.templateKey] = result.failed === 0 ? 'ready' : 'error';
+  } catch {
+    libraryDownloadStatus.value[lesson.templateKey] = 'error';
+  }
+}
+
+async function refreshLibraryDownloadStatuses(lessons: TrainingLibraryLesson[]) {
+  await Promise.all(lessons.map(async (lesson) => {
+    libraryDownloadStatus.value[lesson.templateKey] = 'checking';
+    try {
+      const generatedLesson = await appStore.loadLesson(createLearningContext(currentSuggestion.value, {
+        mode: lesson.mode,
+        selectedConcept: 'learning',
+        manualConceptChoice: true,
+        lessonTemplateKey: lesson.templateKey,
+      }), new Date().toISOString());
+      const ready = await isSpeechBatchCached(getLessonOfflineSpeechTexts(generatedLesson.exercises));
+      libraryDownloadStatus.value[lesson.templateKey] = ready ? 'ready' : 'idle';
+    } catch {
+      libraryDownloadStatus.value[lesson.templateKey] = 'idle';
+    }
+  }));
+}
+
+function getLessonOfflineSpeechTexts(exercises: Array<{ audioText?: string }>) {
+  return exercises.flatMap((exercise) => {
+    const text = exercise.audioText?.trim();
+    if (!text) return [];
+    const tokens = tokenizeListeningText(text);
+    const starts = getSentenceStartWordIndexes(tokens);
+    return starts.map((start, index) => tokens.slice(start, (starts[index + 1] ?? tokens.length))
+      .map((token) => `${token.word}${token.trailing}`).join('').replace(/\s+/g, ' ').trim());
+  });
+}
+
+function libraryDownloadLabel(templateKey: string) {
+  const status = libraryDownloadStatus.value[templateKey];
+  if (status === 'ready') return 'Available offline';
+  if (status === 'checking') return 'Checking offline availability…';
+  if (status === 'downloading') return 'Downloading for offline use…';
+  if (status === 'error') return 'Download incomplete — try again';
+  return 'Internet required';
+}
+
+function libraryDownloadIcon(templateKey: string) {
+  const status = libraryDownloadStatus.value[templateKey];
+  if (status === 'ready') return 'offline_pin';
+  if (status === 'downloading' || status === 'checking') return 'downloading';
+  if (status === 'error') return 'cloud_off';
+  return 'cloud_queue';
+}
 onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();

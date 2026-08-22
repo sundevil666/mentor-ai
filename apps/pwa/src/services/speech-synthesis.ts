@@ -147,6 +147,24 @@ export async function preloadSpeechBatch(
   return { completed, failed, total } as const;
 }
 
+export async function isSpeechBatchCached(texts: string[]) {
+  const uniqueTexts = Array.from(new Set(texts.map((text) => text.trim()).filter(Boolean)));
+
+  if (uniqueTexts.length === 0 || typeof window === 'undefined' || !('caches' in window)) {
+    return false;
+  }
+
+  const cache = await caches.open(SPEECH_CACHE_NAME);
+  const matches = await Promise.all(
+    uniqueTexts.map(async (text) => {
+      const request = await createSpeechCacheRequest(parseSpeechSegments(text));
+      return request ? Boolean(await cache.match(request)) : false;
+    }),
+  );
+
+  return matches.every(Boolean);
+}
+
 export async function pauseSpeech() {
   activeAudio?.pause();
 }
