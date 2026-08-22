@@ -55,6 +55,7 @@
           </article>
 
           <q-expansion-item
+            v-model="isLessonLibraryVisible"
             class="lesson-library-expander"
             dense-toggle
             icon="tune"
@@ -588,7 +589,8 @@ const isListeningStarting = ref(false);
 const isListeningPaused = ref(false);
 const isListeningRepeatEnabled = ref(false);
 const isListeningTranslationVisible = ref(false);
-const isListeningPlaylistVisible = ref(true);
+const isListeningPlaylistVisible = ref(false);
+const isLessonLibraryVisible = ref(false);
 const isRecognizingSpeech = ref(false);
 const speechRecognitionError = ref('');
 const selectedListeningItemId = ref<string | null>(null);
@@ -846,6 +848,7 @@ onUnmounted(() => {
 watch(
   () => currentExercise.value?.id,
   () => {
+    isListeningPlaylistVisible.value = false;
     void nextTick(() => window.scrollTo({ top: 0, behavior: 'auto' }));
     answer.value = '';
     speechRecognitionError.value = '';
@@ -901,12 +904,14 @@ watch([activeWordIndex, activeWordEndIndex], () => {
 
 async function startWithMode(mode: LearningMode) {
   answer.value = '';
+  isLessonLibraryVisible.value = false;
   setForwardTransition();
   await appStore.startLesson(createLearningContext(currentSuggestion.value, { mode }));
 }
 
 async function startConcept(concept: LearningConcept) {
   answer.value = '';
+  isLessonLibraryVisible.value = false;
   setForwardTransition();
   await appStore.startLesson(
     createLearningContext(currentSuggestion.value, {
@@ -918,6 +923,7 @@ async function startConcept(concept: LearningConcept) {
 
 async function startLessonChoice(concept: LearningConcept, lessonTemplateKey: string) {
   answer.value = '';
+  isLessonLibraryVisible.value = false;
   setForwardTransition();
   await appStore.startLesson(
     createLearningContext(currentSuggestion.value, {
@@ -945,6 +951,7 @@ async function continueFromDevice(handoffId: string) {
   }
 
   answer.value = '';
+  isLessonLibraryVisible.value = false;
   setForwardTransition();
   await appStore.continueSessionHandoff(handoff);
 }
@@ -1326,6 +1333,8 @@ async function scrollActiveListeningPhraseIntoView() {
 
 async function returnToLessonChoice() {
   answer.value = '';
+  isListeningPlaylistVisible.value = false;
+  isLessonLibraryVisible.value = false;
   stopListeningAudio();
   setBackTransition();
   await appStore.returnToLessonChoice();
