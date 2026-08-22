@@ -36,7 +36,7 @@
       <section class="learning-panels">
         <div class="learning-panel">
           <div class="panel-heading">
-            <span>Student Model</span>
+            <span>Student model</span>
           </div>
           <div class="skill-list">
             <div
