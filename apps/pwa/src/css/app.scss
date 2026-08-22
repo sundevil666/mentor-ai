@@ -770,9 +770,9 @@ body.body--dark .q-field--outlined .q-field__control::before {
 
 .lesson-stage .listening-player__sentence--current {
   color: var(--app-text-strong);
-  font-size: clamp(1.9rem, 3.4vw, 2.75rem);
+  font-size: clamp(2.15rem, 4vw, 3.15rem);
   font-weight: 750;
-  line-height: 1.22;
+  line-height: 1.1;
 }
 
 .lesson-stage .listening-player__sentence--current.listening-player__sentence--compact {
@@ -1443,8 +1443,8 @@ body.body--dark .q-field--outlined .q-field__control::before {
   }
 
   .lesson-stage .listening-player__sentence--current {
-    font-size: clamp(2.15rem, min(9vw, 5.2dvh), 2.65rem);
-    line-height: 1.2;
+    font-size: clamp(2.45rem, min(10.5vw, 6dvh), 3.1rem);
+    line-height: 1.08;
   }
 
   .lesson-stage .listening-player__sentence--current.listening-player__sentence--compact {
