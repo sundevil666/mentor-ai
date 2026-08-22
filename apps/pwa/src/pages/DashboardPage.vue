@@ -271,19 +271,20 @@
               >
                 <aside class="listening-player__playlist">
                   <button
-                    v-for="item in listeningPlaylist"
-                    :key="item.id"
+                    v-for="sentence in listeningSentences"
+                    :key="sentence.id"
                     :class="[
                       'listening-player__playlist-item',
                       {
                         'listening-player__playlist-item--active':
-                          item.id === selectedListeningItem?.id,
+                          sentence.id === activeListeningSentenceItem?.id,
                       },
                     ]"
                     type="button"
-                    @click="selectListeningItem(item.id)"
+                    @click="selectListeningSentence(sentence)"
                   >
-                    <span>{{ item.title }}</span>
+                    <strong>{{ sentence.number }}</strong>
+                    <span>{{ sentence.text }}</span>
                   </button>
                 </aside>
 
@@ -297,20 +298,30 @@
                   ]"
                   @scroll="handleListeningTextScroll"
                 >
-                  <span
-                    v-for="token in listeningTokens"
-                    :key="token.index"
-                    :data-token-index="token.index"
-                    :class="[
-                      'listening-player__token',
-                      {
-                        'listening-player__token--active':
-                          token.index >= activeWordIndex && token.index <= activeWordEndIndex,
-                        'listening-player__token--past': token.index < activeWordIndex,
-                      },
-                    ]"
-                    >{{ token.word }}{{ token.trailing }}</span
-                  >
+                  <p class="listening-player__sentence listening-player__sentence--previous">
+                    {{ previousListeningSentenceItem?.text ?? '' }}
+                  </p>
+                  <p class="listening-player__sentence listening-player__sentence--current">
+                    <span
+                      v-for="token in listeningTokens.slice(
+                        activeListeningSentenceItem?.startWordIndex ?? 0,
+                        (activeListeningSentenceItem?.endWordIndex ?? -1) + 1,
+                      )"
+                      :key="token.index"
+                      :data-token-index="token.index"
+                      :class="[
+                        'listening-player__token',
+                        {
+                          'listening-player__token--active':
+                            token.index >= activeWordIndex && token.index <= activeWordEndIndex,
+                          'listening-player__token--past': token.index < activeWordIndex,
+                        },
+                      ]"
+                    >{{ token.word }}{{ token.trailing }}</span>
+                  </p>
+                  <p class="listening-player__sentence listening-player__sentence--next">
+                    {{ nextListeningSentenceItem?.text ?? '' }}
+                  </p>
                 </div>
               </div>
 
@@ -529,6 +540,14 @@ type ListeningPlaylistItem = {
   title: string;
   text: string;
 };
+type ListeningSentenceItem = {
+  id: string;
+  itemId: string;
+  number: number;
+  text: string;
+  startWordIndex: number;
+  endWordIndex: number;
+};
 type QuickStartItem = {
   key: string;
   label: string;
@@ -545,7 +564,7 @@ const isListeningStarting = ref(false);
 const isListeningPaused = ref(false);
 const isListeningRepeatEnabled = ref(false);
 const isListeningTranslationVisible = ref(false);
-const isListeningPlaylistVisible = ref(false);
+const isListeningPlaylistVisible = ref(true);
 const isRecognizingSpeech = ref(false);
 const speechRecognitionError = ref('');
 const selectedListeningItemId = ref<string | null>(null);
@@ -619,6 +638,34 @@ const listeningText = computed(
     '',
 );
 const listeningTokens = computed(() => tokenizeListeningText(listeningText.value));
+const listeningSentences = computed<ListeningSentenceItem[]>(() => {
+  const item = selectedListeningItem.value;
+  const tokens = listeningTokens.value;
+
+  if (!item) {
+    return [];
+  }
+
+  const starts = getSentenceStartWordIndexes(tokens);
+
+  return starts.map((startWordIndex, sentenceIndex) => {
+    const endWordIndex = (starts[sentenceIndex + 1] ?? tokens.length) - 1;
+
+    return {
+      id: `${item.id}:${startWordIndex}`,
+      itemId: item.id,
+      number: sentenceIndex + 1,
+      text: tokens
+        .slice(startWordIndex, endWordIndex + 1)
+        .map((token) => `${token.word}${token.trailing}`)
+        .join('')
+        .replace(/\s+/g, ' ')
+        .trim(),
+      startWordIndex,
+      endWordIndex,
+    };
+  });
+});
 const listeningProgressKey = computed(() => {
   const session = appStore.session;
   const item = selectedListeningItem.value;
@@ -630,6 +677,26 @@ const listeningProgressKey = computed(() => {
   return `${session.lesson.id}:${item.id}`;
 });
 const sentenceStartWordIndexes = computed(() => getSentenceStartWordIndexes(listeningTokens.value));
+const activeListeningSentenceIndex = computed(() => {
+  const itemId = selectedListeningItem.value?.id;
+  const exactIndex = listeningSentences.value.findIndex(
+    (sentence) =>
+      sentence.itemId === itemId &&
+      activeWordIndex.value >= sentence.startWordIndex &&
+      activeWordIndex.value <= sentence.endWordIndex,
+  );
+
+  return exactIndex >= 0 ? exactIndex : 0;
+});
+const activeListeningSentenceItem = computed(
+  () => listeningSentences.value[activeListeningSentenceIndex.value] ?? null,
+);
+const previousListeningSentenceItem = computed(
+  () => listeningSentences.value[activeListeningSentenceIndex.value - 1] ?? null,
+);
+const nextListeningSentenceItem = computed(
+  () => listeningSentences.value[activeListeningSentenceIndex.value + 1] ?? null,
+);
 const activeListeningSentence = computed(() =>
   getListeningSentenceAtWord(activeWordIndex.value, listeningTokens.value),
 );
@@ -986,13 +1053,18 @@ async function jumpSentence(direction: -1 | 1) {
   await startListeningAtWord(sentenceStarts[nextSentenceIndex] ?? 0);
 }
 
-function selectListeningItem(itemId: string) {
-  if (itemId === selectedListeningItemId.value) {
-    return;
+async function selectListeningSentence(sentence: ListeningSentenceItem) {
+  stopListeningAudio();
+
+  if (sentence.itemId !== selectedListeningItemId.value) {
+    selectedListeningItemId.value = sentence.itemId;
+    await nextTick();
   }
 
-  selectedListeningItemId.value = itemId;
-  restoreListeningPlayback();
+  activeWordIndex.value = sentence.startWordIndex;
+  activeWordEndIndex.value = sentence.startWordIndex;
+  isListeningTranslationVisible.value = false;
+  await scrollActiveListeningPhraseIntoView();
 }
 
 function toggleListeningRepeat() {

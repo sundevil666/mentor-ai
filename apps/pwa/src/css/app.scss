@@ -686,17 +686,33 @@ body.body--dark .q-field--outlined .q-field__control::before {
 }
 
 .listening-player__playlist-item {
+  align-items: start;
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--app-radius-sm);
   color: var(--app-text);
   cursor: pointer;
-  display: block;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 30px minmax(0, 1fr);
   min-width: 0;
   padding: 10px;
   text-align: left;
   transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
   width: 100%;
+}
+
+.listening-player__playlist-item strong {
+  align-items: center;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  display: flex;
+  font-size: 0.78rem;
+  height: 28px;
+  justify-content: center;
+  line-height: 1;
+  width: 28px;
 }
 
 .listening-player__playlist-item:hover {
@@ -710,30 +726,54 @@ body.body--dark .q-field--outlined .q-field__control::before {
   color: #10201d;
 }
 
+.listening-player__playlist-item--active strong {
+  background: #2f9e83;
+  border-color: #2f9e83;
+  color: #fff;
+}
+
 .listening-player__playlist-item span {
   display: block;
-  font-size: 0.92rem;
-  font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 0.88rem;
+  font-weight: 650;
+  line-height: 1.35;
 }
 
 .listening-player__text {
+  align-content: center;
   background: var(--app-surface);
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-lg);
   color: var(--app-text-strong);
-  font-size: 1.9rem;
-  line-height: 1.82;
-  max-height: min(48vh, 520px);
-  overflow: auto;
-  padding: min(20vh, 160px) 26px min(34vh, 260px);
-  white-space: pre-line;
+  display: grid;
+  gap: 24px;
+  min-height: min(48vh, 520px);
+  overflow: hidden;
+  padding: 32px 34px;
 }
 
 .listening-player__text--translation-visible {
-  padding-bottom: min(42vh, 340px);
+  padding-bottom: 32px;
+}
+
+.listening-player__sentence {
+  line-height: 1.55;
+  margin: 0;
+  min-height: 1.55em;
+  transition: color 160ms ease, opacity 160ms ease;
+}
+
+.listening-player__sentence--previous,
+.listening-player__sentence--next {
+  color: var(--app-muted-strong);
+  font-size: 1.05rem;
+  opacity: 0.68;
+}
+
+.listening-player__sentence--current {
+  color: var(--app-text-strong);
+  font-size: clamp(1.65rem, 3vw, 2.35rem);
+  font-weight: 750;
 }
 
 .listening-player__token {
