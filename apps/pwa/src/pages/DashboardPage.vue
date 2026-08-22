@@ -113,7 +113,26 @@
               label="Back to choice"
               @click="returnToLessonChoice"
             />
-            <span>{{ appStore.lessonProgress }}% complete</span>
+            <div class="lesson-nav__status">
+              <span>{{ appStore.lessonProgress }}% complete</span>
+              <q-btn
+                color="primary"
+                dense
+                flat
+                icon="info_outline"
+                round
+                aria-label="Lesson details"
+              >
+                <q-tooltip>Lesson details</q-tooltip>
+                <q-menu anchor="bottom right" self="top right">
+                  <div class="lesson-info-popover">
+                    <span>{{ appStore.session.lesson.title }}</span>
+                    <strong>{{ selectedListeningItem?.title ?? currentExercise.prompt }}</strong>
+                    <p>{{ currentExercise.microLesson }}</p>
+                  </div>
+                </q-menu>
+              </q-btn>
+            </div>
           </div>
 
           <transition :name="exerciseTransitionName">
@@ -235,21 +254,6 @@
 
             <div v-else :key="currentExercise.id" class="listening-player">
               <div class="listening-player__header">
-                <div>
-                  <p class="lesson-stage__eyebrow">
-                    {{ appStore.session.lesson.title }}
-                    <q-icon
-                      v-if="appStore.session.lesson.preferredDevice"
-                      :name="deviceRecommendation(appStore.session.lesson.preferredDevice).icon"
-                      size="18px"
-                      class="lesson-device-icon"
-                    >
-                      <q-tooltip>{{ deviceRecommendation(appStore.session.lesson.preferredDevice).tooltip }}</q-tooltip>
-                    </q-icon>
-                  </p>
-                  <h1>{{ selectedListeningItem?.title ?? listeningTitle }}</h1>
-                  <p>{{ currentExercise.microLesson }}</p>
-                </div>
                 <q-btn
                   color="primary"
                   flat
@@ -437,7 +441,6 @@
                 >
                   <q-tooltip>Next word</q-tooltip>
                 </q-btn>
-                <span>{{ listeningProgressLabel }}</span>
               </div>
               <q-btn
                 class="listening-player__continue"
@@ -705,18 +708,6 @@ const previousListeningSentenceItem = computed(
 const nextListeningSentenceItem = computed(
   () => listeningSentences.value[activeListeningSentenceIndex.value + 1] ?? null,
 );
-const listeningTitle = computed(() =>
-  currentExercise.value?.type === 'listening-text'
-    ? 'Listen and read'
-    : (currentExercise.value?.prompt ?? 'Listen'),
-);
-const listeningProgressLabel = computed(() => {
-  if (listeningTokens.value.length === 0) {
-    return 'Ready to listen';
-  }
-
-  return `Word ${Math.min(activeWordIndex.value + 1, listeningTokens.value.length)} / ${listeningTokens.value.length}`;
-});
 const optionList = computed(
   () => currentExercise.value?.options?.map((option) => ({ label: option, value: option })) ?? [],
 );

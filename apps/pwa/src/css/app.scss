@@ -646,7 +646,7 @@ body.body--dark .q-field--outlined .q-field__control::before {
   align-items: start;
   display: flex;
   gap: 14px;
-  justify-content: space-between;
+  justify-content: flex-end;
 }
 
 .listening-player__header > div {
@@ -850,6 +850,39 @@ body.body--dark .q-field--outlined .q-field__control::before {
   justify-content: space-between;
   min-height: 48px;
   padding-bottom: 8px;
+}
+
+.lesson-nav__status {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+}
+
+.lesson-info-popover {
+  display: grid;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 18px;
+}
+
+.lesson-info-popover > span {
+  color: var(--app-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lesson-info-popover strong {
+  color: var(--app-text-strong);
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
+.lesson-info-popover p {
+  color: var(--app-muted-strong);
+  line-height: 1.5;
+  margin: 0;
 }
 
 .lesson-actions {
