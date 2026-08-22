@@ -104,6 +104,25 @@ body.body--dark .q-field--outlined .q-field__control::before {
   padding-top: env(safe-area-inset-top);
 }
 
+.app-header .app-update-button,
+.app-header .sync-status-button,
+.app-header .update-log-button {
+  order: 1;
+}
+
+.app-header .network-status-button {
+  margin-left: auto;
+  order: 2;
+}
+
+.app-header .header-level-trend {
+  order: 3;
+}
+
+.app-header .more-nav-button {
+  order: 4;
+}
+
 .theme-toggle-button,
 .settings-nav-button,
 .update-log-button,
@@ -1096,6 +1115,13 @@ body.body--dark .q-field--outlined .q-field__control::before {
   color: var(--app-primary);
   outline: none;
   transform: translateY(-1px);
+}
+
+.mobile-start-dock__button--active {
+  background: var(--app-surface-active);
+  border-color: var(--app-primary);
+  color: var(--app-primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-primary) 35%, transparent);
 }
 
 .mobile-start-dock__button span {

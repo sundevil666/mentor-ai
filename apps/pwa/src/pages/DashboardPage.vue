@@ -457,11 +457,12 @@
       </transition>
     </section>
 
-    <nav v-if="!appStore.session" class="mobile-start-dock" aria-label="Start lesson">
+    <nav class="mobile-start-dock" aria-label="Primary navigation">
       <button
         v-for="item in quickStartItems"
         :key="item.key"
         class="mobile-start-dock__button"
+        :class="{ 'mobile-start-dock__button--active': activeQuickStartKey === item.key }"
         type="button"
         @click="item.start"
       >
@@ -711,13 +712,26 @@ const recommendedTraining = computed(() => {
   };
 });
 const priorityLesson = computed(() => createPriorityLesson(appStore.studentModel));
+const activeQuickStartKey = computed<QuickStartItem['key']>(() => {
+  const mode = appStore.session?.context.mode;
+
+  if (mode === 'speaking') {
+    return 'speaking';
+  }
+
+  if (mode === 'listening' || mode === 'bus' || mode === 'walking') {
+    return 'listening';
+  }
+
+  return 'home';
+});
 const quickStartItems = computed<QuickStartItem[]>(() => [
   {
     key: 'home',
     label: 'Home',
     icon: 'home',
     start: () => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      void returnToLessonChoice().then(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
     },
   },
   {
