@@ -11,6 +11,9 @@ body {
   --app-muted-strong: #3f5751;
   --app-accent: #14645c;
   --app-primary: #0f766e;
+  --app-radius-sm: 12px;
+  --app-radius-md: 16px;
+  --app-radius-lg: 22px;
   --q-primary: var(--app-primary);
   background: var(--app-bg);
   color: var(--app-text);
@@ -18,13 +21,13 @@ body {
 }
 
 body.body--dark {
-  --app-bg: #121816;
-  --app-surface: #1b2421;
-  --app-surface-soft: #23342f;
-  --app-surface-active: #203f39;
-  --app-border: #324640;
-  --app-border-strong: #456059;
-  --app-text: #edf6f3;
+  --app-bg: #0e1412;
+  --app-surface: #19231f;
+  --app-surface-soft: #22332e;
+  --app-surface-active: #1d3b35;
+  --app-border: #3b504a;
+  --app-border-strong: #527069;
+  --app-text: #f0f8f5;
   --app-text-strong: #ffffff;
   --app-muted: #b5c9c3;
   --app-muted-strong: #d1dfdb;
@@ -35,9 +38,59 @@ body.body--dark {
   color: var(--app-text);
 }
 
+/* Keep Quasar controls readable when its default dark palette is bypassed by
+   our app surfaces. This includes menus, fields, captions, and disabled text. */
+body.body--dark .q-card,
+body.body--dark .q-menu,
+body.body--dark .q-list,
+body.body--dark .q-item,
+body.body--dark .q-field,
+body.body--dark .q-field__native,
+body.body--dark .q-field__input,
+body.body--dark .q-field__label,
+body.body--dark .q-item__label,
+body.body--dark .q-item__label--caption {
+  color: var(--app-text);
+}
+
+body.body--dark .q-item__label--caption,
+body.body--dark .q-field--disabled,
+body.body--dark .q-field--readonly {
+  opacity: 1;
+  color: var(--app-muted);
+}
+
+body.body--dark .q-field--outlined .q-field__control::before {
+  border-color: var(--app-border-strong);
+}
+
+.q-btn {
+  border-radius: var(--app-radius-sm);
+  flex-shrink: 0;
+  min-height: 44px;
+}
+
+.q-btn.q-btn--round {
+  border-radius: 50%;
+  height: 44px;
+  min-height: 44px;
+  min-width: 44px;
+  width: 44px;
+}
+
+.q-card,
+.q-menu {
+  border-radius: var(--app-radius-md);
+  overflow: hidden;
+}
+
 .app-header {
   background: var(--app-surface);
   color: var(--app-text);
+}
+
+.app-header .q-toolbar {
+  padding-top: env(safe-area-inset-top);
 }
 
 .theme-toggle-button,
@@ -86,7 +139,7 @@ body.body--dark {
   align-items: center;
   background: var(--app-surface-soft);
   border: 1px solid var(--app-border-strong);
-  border-radius: 8px;
+  border-radius: var(--app-radius-sm);
   display: flex;
   height: 56px;
   justify-content: center;
@@ -118,7 +171,7 @@ body.body--dark {
   align-items: center;
   background: var(--app-surface-soft);
   border: 1px solid var(--app-border-strong);
-  border-radius: 10px;
+  border-radius: var(--app-radius-sm);
   color: var(--app-text-strong);
   display: flex;
   font-size: 0.95rem;
@@ -236,7 +289,7 @@ body.body--dark {
   align-items: flex-start;
   display: flex;
   min-height: calc(100vh - 51px);
-  padding: 24px 24px 112px;
+  padding: 24px max(24px, env(safe-area-inset-right)) calc(112px + env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
 }
 
 .settings-page,
@@ -244,7 +297,7 @@ body.body--dark {
   align-items: flex-start;
   display: flex;
   min-height: calc(100vh - 51px);
-  padding: 24px;
+  padding: 24px max(24px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
 }
 
 .learning-shell {
@@ -297,7 +350,7 @@ body.body--dark {
 .settings-section {
   background: var(--app-surface);
   border: 1px solid var(--app-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius-md);
   display: grid;
   gap: 16px;
   padding: 16px;
@@ -375,7 +428,7 @@ body.body--dark {
   align-items: center;
   background: var(--app-surface);
   border: 1px solid var(--app-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius-sm);
   color: var(--app-text);
   display: inline-flex;
   font-weight: 700;
@@ -394,7 +447,7 @@ body.body--dark {
 .metric-tile {
   background: var(--app-surface);
   border: 1px solid var(--app-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius-md);
   display: grid;
   gap: 4px;
   min-height: 78px;
@@ -492,7 +545,7 @@ body.body--dark {
 .dialogue-drill__native {
   background: var(--app-surface);
   border: 1px solid var(--app-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius-md);
   display: grid;
   gap: 8px;
   padding: 16px;
@@ -519,7 +572,7 @@ body.body--dark {
   align-items: center;
   background: var(--app-surface-soft);
   border: 1px solid var(--app-border-strong);
-  border-radius: 8px;
+  border-radius: var(--app-radius-md);
   color: var(--app-muted-strong);
   display: flex;
   gap: 12px;
@@ -580,7 +633,7 @@ body.body--dark {
   align-items: center;
   background: var(--app-surface-soft);
   border: 1px solid var(--app-border-strong);
-  border-radius: 8px;
+  border-radius: var(--app-radius-md);
   color: var(--app-text);
   display: flex;
   gap: 12px;
@@ -627,7 +680,7 @@ body.body--dark {
 .listening-player__playlist {
   background: var(--app-surface-soft);
   border: 1px solid var(--app-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius-md);
   display: grid;
   gap: 8px;
   max-height: min(38vh, 420px);
@@ -638,7 +691,7 @@ body.body--dark {
 .listening-player__playlist-item {
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--app-radius-sm);
   color: var(--app-text);
   cursor: pointer;
   display: block;
@@ -672,7 +725,7 @@ body.body--dark {
 .listening-player__text {
   background: var(--app-surface);
   border: 1px solid var(--app-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius-lg);
   color: var(--app-text-strong);
   font-size: 1.9rem;
   line-height: 1.82;
@@ -704,7 +757,7 @@ body.body--dark {
 .listening-player__translation {
   background: #10201d;
   border: 1px solid rgba(16, 32, 29, 0.18);
-  border-radius: 8px;
+  border-radius: var(--app-radius-md);
   color: #f8fffc;
   font-size: 1.05rem;
   font-weight: 700;
@@ -717,7 +770,7 @@ body.body--dark {
   align-items: center;
   background: var(--app-surface-soft);
   border: 1px solid var(--app-border-strong);
-  border-radius: 8px;
+  border-radius: var(--app-radius-md);
   color: var(--app-muted-strong);
   display: flex;
   gap: 14px;
@@ -805,7 +858,7 @@ body.body--dark {
 .lesson-library-expander {
   background: var(--app-surface);
   border: 1px solid var(--app-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius-md);
   color: var(--app-text);
   width: 100%;
 }
@@ -845,7 +898,7 @@ body.body--dark {
   appearance: none;
   background: var(--app-surface);
   border: 1px solid var(--app-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius-md);
   color: var(--app-text);
   cursor: pointer;
   display: grid;
@@ -904,7 +957,7 @@ body.body--dark {
 }
 
 .recommended-action__button {
-  border-radius: 8px;
+  border-radius: var(--app-radius-md);
   font-size: 1.125rem;
   min-height: 76px;
   padding: 0 34px;
@@ -1078,7 +1131,7 @@ body.body--dark {
 .activity-signal {
   background: var(--app-surface);
   border: 1px solid var(--app-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius-md);
   display: grid;
   gap: 4px;
   padding: 10px 12px;
@@ -1107,7 +1160,7 @@ body.body--dark {
 .shift-timing-item {
   background: var(--app-surface);
   border: 1px solid var(--app-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius-md);
   display: grid;
   gap: 4px;
   min-height: 64px;
@@ -1137,7 +1190,7 @@ body.body--dark {
 .learning-panel {
   background: var(--app-surface);
   border: 1px solid var(--app-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius-md);
   display: grid;
   gap: 16px;
   padding: 16px;
@@ -1176,8 +1229,22 @@ body.body--dark {
 
 @media (max-width: 640px) {
   .app-header .q-toolbar {
-    min-height: 48px;
-    padding: 0 6px;
+    gap: 2px;
+    min-height: calc(54px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+  }
+
+  .app-header .q-btn {
+    height: 44px;
+    min-height: 44px;
+    min-width: 44px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .app-header .q-btn.q-btn--round {
+    padding: 0;
+    width: 44px;
   }
 
   .app-header .q-toolbar__title,
@@ -1205,7 +1272,7 @@ body.body--dark {
 
   .learning-page {
     align-items: flex-start;
-    padding: 12px 14px 96px;
+    padding: 14px max(16px, env(safe-area-inset-right)) calc(104px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   }
 
   .priority-lesson {
@@ -1226,7 +1293,18 @@ body.body--dark {
 
   .settings-page,
   .statistics-page {
-    padding: 20px;
+    padding: 18px max(16px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+
+  .settings-shell,
+  .statistics-shell {
+    gap: 18px;
+  }
+
+  .settings-section,
+  .learning-panel,
+  .metric-tile {
+    border-radius: var(--app-radius-md);
   }
 
   .learning-start h1,
@@ -1264,7 +1342,10 @@ body.body--dark {
   }
 
   .lesson-nav .q-btn {
+    flex: 0 1 auto;
     min-height: 40px;
+    min-width: 0;
+    white-space: nowrap;
   }
 
   .listening-player {
@@ -1383,6 +1464,11 @@ body.body--dark {
     min-height: 48px;
   }
 
+  .handoff-actions .q-btn,
+  .lesson-complete > .q-btn {
+    width: 100%;
+  }
+
   .lesson-library__grid,
   .handoff-actions,
   .shift-timing-grid {
@@ -1455,6 +1541,40 @@ body.body--dark {
 
   .voice-actions > .q-btn {
     align-self: stretch;
+    height: 52px;
+    width: 100%;
+  }
+}
+
+/* iPhone 13 Pro and similarly sized phones (390 × 844 CSS px). */
+@media (min-width: 375px) and (max-width: 430px) {
+  .learning-shell,
+  .settings-shell,
+  .statistics-shell {
+    max-width: 398px;
+  }
+
+  .learning-start,
+  .lesson-stage,
+  .lesson-complete {
+    gap: 18px;
+  }
+
+  .priority-lesson {
+    border-radius: var(--app-radius-lg);
+    padding: 18px;
+  }
+
+  .priority-lesson__button,
+  .recommended-action__button,
+  .listening-player__continue {
+    height: 56px;
+    min-height: 56px;
+  }
+
+  .lesson-card {
+    min-height: 104px;
+    padding: 16px;
   }
 }
 
