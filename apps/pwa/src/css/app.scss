@@ -65,9 +65,20 @@ body.body--dark .q-field--outlined .q-field__control::before {
 }
 
 .q-btn {
+  border: 1px solid var(--app-border-strong);
   border-radius: var(--app-radius-sm);
+  box-sizing: border-box;
   flex-shrink: 0;
   min-height: 44px;
+}
+
+.q-btn.bg-primary {
+  border-color: color-mix(in srgb, var(--app-primary) 72%, var(--app-text-strong));
+}
+
+.q-btn.disabled,
+.q-btn[disabled] {
+  border-color: var(--app-border-strong) !important;
 }
 
 .q-btn.q-btn--round {
@@ -838,6 +849,11 @@ body.body--dark .q-field--outlined .q-field__control::before {
   height: 48px;
 }
 
+.statistics-header > .q-btn.q-btn--round {
+  min-width: 48px;
+  width: 48px;
+}
+
 .lesson-library {
   display: grid;
   gap: 16px;
@@ -1249,6 +1265,12 @@ body.body--dark .q-field--outlined .q-field__control::before {
   }
 
   .app-header .auth-button,
+  .app-header .ios-install-button {
+    padding: 0;
+    width: 44px;
+  }
+
+  .app-header .auth-button,
   .app-header .ios-install-button,
   .app-header .update-log-button {
     margin-right: 0;
@@ -1441,7 +1463,13 @@ body.body--dark .q-field--outlined .q-field__control::before {
   }
 
   .listening-player__continue {
-    min-height: 50px;
+    align-items: center;
+    height: 52px;
+    justify-content: center;
+    justify-self: end;
+    min-height: 52px;
+    min-width: 136px;
+    width: auto;
   }
 
   .handoff-actions .q-btn,
@@ -1556,14 +1584,6 @@ body.body--dark .q-field--outlined .q-field__control::before {
   .recommended-action__button {
     height: 56px;
     min-height: 56px;
-  }
-
-  .listening-player__continue {
-    align-items: center;
-    justify-content: center;
-    justify-self: end;
-    min-width: 136px;
-    width: auto;
   }
 
   .lesson-card {

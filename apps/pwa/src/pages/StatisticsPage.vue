@@ -10,8 +10,7 @@
           color="primary"
           outline
           icon="restart_alt"
-          label="Reset"
-          no-caps
+          round
           @click="reset"
         >
           <q-tooltip>Reset local learning</q-tooltip>
