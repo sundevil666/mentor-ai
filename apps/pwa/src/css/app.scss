@@ -966,6 +966,25 @@ body .q-menu {
   gap: 4px;
 }
 
+.lesson-time-progress {
+  display: grid;
+  gap: 7px;
+  padding: 10px 2px 4px;
+}
+
+.lesson-time-progress__labels {
+  color: var(--app-muted);
+  display: flex;
+  font-size: 0.78rem;
+  font-weight: 700;
+  justify-content: space-between;
+  letter-spacing: 0.01em;
+}
+
+.lesson-time-progress__labels span:last-child {
+  text-align: right;
+}
+
 .lesson-info-popover {
   display: grid;
   gap: 8px;

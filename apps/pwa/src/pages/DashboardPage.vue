@@ -212,6 +212,24 @@
             </div>
           </div>
 
+          <div
+            class="lesson-time-progress"
+            role="group"
+            :aria-label="`Lesson progress. ${lessonTotalTimeLabel}. ${lessonRemainingTimeLabel}.`"
+          >
+            <div class="lesson-time-progress__labels">
+              <span>{{ lessonTotalTimeLabel }}</span>
+              <span>{{ lessonRemainingTimeLabel }}</span>
+            </div>
+            <q-linear-progress
+              :value="appStore.lessonProgress / 100"
+              color="primary"
+              track-color="grey-4"
+              rounded
+              size="8px"
+            />
+          </div>
+
           <transition :name="exerciseTransitionName">
             <div
               v-if="isDialogueTranslationExercise"
@@ -673,6 +691,16 @@ let programmaticListeningScrollUntil = 0;
 let offlineAudioDownloadRunId = 0;
 
 const currentExercise = computed(() => appStore.currentExercise);
+const lessonEstimatedMinutes = computed(() =>
+  Math.max(1, Math.round(appStore.session?.lesson.estimatedMinutes ?? 1)),
+);
+const lessonRemainingMinutes = computed(() =>
+  Math.max(0, Math.ceil(lessonEstimatedMinutes.value * (1 - appStore.lessonProgress / 100))),
+);
+const lessonTotalTimeLabel = computed(() => `About ${lessonEstimatedMinutes.value} min total`);
+const lessonRemainingTimeLabel = computed(() =>
+  lessonRemainingMinutes.value === 0 ? 'Less than 1 min left' : `About ${lessonRemainingMinutes.value} min left`,
+);
 const isListeningPlayer = computed(() => {
   if (!appStore.session || !currentExercise.value) {
     return false;
