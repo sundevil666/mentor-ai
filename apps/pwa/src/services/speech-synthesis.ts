@@ -112,6 +112,41 @@ export async function preloadSpeech(text: string) {
   }
 }
 
+export async function preloadSpeechBatch(
+  texts: string[],
+  onProgress?: (completed: number, total: number) => void,
+) {
+  const uniqueTexts = Array.from(new Set(texts.map((text) => text.trim()).filter(Boolean)));
+  const total = uniqueTexts.length;
+
+  if (total === 0 || !isSpeechSynthesisAvailable()) {
+    return { completed: 0, failed: total, total } as const;
+  }
+
+  let nextIndex = 0;
+  let completed = 0;
+  let failed = 0;
+  const workerCount = Math.min(3, total);
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < total) {
+        const text = uniqueTexts[nextIndex];
+        nextIndex += 1;
+
+        if (!text || !(await preloadSpeech(text))) {
+          failed += 1;
+        }
+
+        completed += 1;
+        onProgress?.(completed, total);
+      }
+    }),
+  );
+
+  return { completed, failed, total } as const;
+}
+
 export async function pauseSpeech() {
   activeAudio?.pause();
 }
@@ -193,7 +228,18 @@ export function parseSpeechSegments(
   defaultVoice: SpeechVoiceProfile = 'mia',
 ): SpeechSegment[] {
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  if (lines.length < 2) return [{ text, voice: defaultVoice }];
+  if (lines.length === 1) {
+    const singleLineMatch = /^(Mia|Tom):\s*(.+)$/i.exec(lines[0] ?? '');
+
+    if (singleLineMatch) {
+      return [{
+        text: singleLineMatch[2]!,
+        voice: singleLineMatch[1]!.toLowerCase() === 'tom' ? 'tom' : 'mia',
+      }];
+    }
+
+    return [{ text, voice: defaultVoice }];
+  }
 
   const segments: SpeechSegment[] = [];
   for (const line of lines) {

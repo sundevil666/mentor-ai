@@ -123,6 +123,20 @@
                 color="primary"
                 dense
                 flat
+                :icon="offlineAudioIcon"
+                :label="offlineAudioStatus === 'downloading' ? `${offlineAudioProgress}%` : undefined"
+                no-caps
+                :disable="offlineAudioStatus === 'downloading'"
+                aria-label="Offline audio"
+                @click="prepareListeningOfflineAudio(true)"
+              >
+                <q-tooltip>{{ offlineAudioTooltip }}</q-tooltip>
+              </q-btn>
+              <q-btn
+                v-if="isListeningPlayer"
+                color="primary"
+                dense
+                flat
                 :icon="isListeningPlaylistVisible ? 'playlist_remove' : 'playlist_play'"
                 round
                 :aria-label="isListeningPlaylistVisible ? 'Hide text list' : 'Show text list'"
@@ -525,7 +539,7 @@ import {
 import {
   isSpeechSynthesisAvailable,
   pauseSpeech,
-  preloadSpeech,
+  preloadSpeechBatch,
   resumeSpeech,
   speakWithPreferredVoice,
   stopSpeech,
@@ -591,6 +605,8 @@ const isListeningRepeatEnabled = ref(false);
 const isListeningTranslationVisible = ref(false);
 const isListeningPlaylistVisible = ref(false);
 const isLessonLibraryVisible = ref(false);
+const offlineAudioStatus = ref<'idle' | 'downloading' | 'ready' | 'error'>('idle');
+const offlineAudioProgress = ref(0);
 const isRecognizingSpeech = ref(false);
 const speechRecognitionError = ref('');
 const selectedListeningItemId = ref<string | null>(null);
@@ -602,6 +618,7 @@ const isListeningAutoScrollPaused = ref(false);
 let listeningAutoScrollPauseTimer: number | undefined;
 let isProgrammaticListeningScroll = false;
 let programmaticListeningScrollUntil = 0;
+let offlineAudioDownloadRunId = 0;
 
 const currentExercise = computed(() => appStore.currentExercise);
 const isListeningPlayer = computed(() => {
@@ -701,6 +718,20 @@ const listeningProgressKey = computed(() => {
   }
 
   return `${session.lesson.id}:${item.id}`;
+});
+const offlineAudioIcon = computed(() => {
+  if (offlineAudioStatus.value === 'ready') return 'offline_pin';
+  if (offlineAudioStatus.value === 'error') return 'cloud_download';
+  if (offlineAudioStatus.value === 'downloading') return 'downloading';
+  return 'download_for_offline';
+});
+const offlineAudioTooltip = computed(() => {
+  if (offlineAudioStatus.value === 'ready') return 'This lesson is ready offline';
+  if (offlineAudioStatus.value === 'error') return 'Offline audio is incomplete. Tap to retry.';
+  if (offlineAudioStatus.value === 'downloading') {
+    return `Preparing offline audio: ${offlineAudioProgress.value}%`;
+  }
+  return 'Download this lesson for offline listening';
 });
 const sentenceStartWordIndexes = computed(() => getSentenceStartWordIndexes(listeningTokens.value));
 const activeListeningSentenceIndex = computed(() => {
@@ -870,9 +901,13 @@ watch(isListeningPlayer, (isActiveListeningPlayer) => {
     selectedListeningItemId.value =
       currentExercise.value?.id ?? listeningPlaylist.value[0]?.id ?? null;
     restoreListeningPlayback();
+    void nextTick(() => prepareListeningOfflineAudio());
     return;
   }
 
+  offlineAudioDownloadRunId += 1;
+  offlineAudioStatus.value = 'idle';
+  offlineAudioProgress.value = 0;
   resetListeningPlayback();
 });
 
@@ -890,11 +925,9 @@ watch(listeningPlaylist, (playlist) => {
 watch(
   listeningText,
   () => {
-    const firstSentence = listeningSentences.value[0]?.text;
-
-    if (firstSentence) {
-      void preloadSpeech(firstSentence);
-    }
+    offlineAudioStatus.value = 'idle';
+    offlineAudioProgress.value = 0;
+    void prepareListeningOfflineAudio();
   },
   { immediate: true },
 );
@@ -1082,6 +1115,42 @@ async function selectListeningSentence(sentence: ListeningSentenceItem) {
   activeWordIndex.value = sentence.startWordIndex;
   activeWordEndIndex.value = sentence.startWordIndex;
   await scrollActiveListeningPhraseIntoView();
+}
+
+async function prepareListeningOfflineAudio(force = false) {
+  if (!isListeningPlayer.value || offlineAudioStatus.value === 'downloading') {
+    return;
+  }
+
+  if (!force && offlineAudioStatus.value === 'ready') {
+    return;
+  }
+
+  const texts = listeningSentences.value.map((sentence) => sentence.text);
+
+  if (texts.length === 0) {
+    return;
+  }
+
+  const runId = offlineAudioDownloadRunId + 1;
+  offlineAudioDownloadRunId = runId;
+  offlineAudioStatus.value = 'downloading';
+  offlineAudioProgress.value = 0;
+
+  const result = await preloadSpeechBatch(texts, (completed, total) => {
+    if (runId !== offlineAudioDownloadRunId) {
+      return;
+    }
+
+    offlineAudioProgress.value = Math.round((completed / total) * 100);
+  });
+
+  if (runId !== offlineAudioDownloadRunId) {
+    return;
+  }
+
+  offlineAudioProgress.value = 100;
+  offlineAudioStatus.value = result.failed === 0 ? 'ready' : 'error';
 }
 
 function toggleListeningRepeat() {
@@ -1346,6 +1415,9 @@ async function returnToLessonChoice() {
   answer.value = '';
   isListeningPlaylistVisible.value = false;
   isLessonLibraryVisible.value = false;
+  offlineAudioDownloadRunId += 1;
+  offlineAudioStatus.value = 'idle';
+  offlineAudioProgress.value = 0;
   stopListeningAudio();
   setBackTransition();
   await appStore.returnToLessonChoice();

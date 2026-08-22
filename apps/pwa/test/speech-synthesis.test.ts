@@ -16,4 +16,10 @@ describe('speech synthesis voices', () => {
       { text: 'Hello, Mia.', voice: 'tom' },
     ]);
   });
+
+  it('keeps the speaker voice when dialogue is cached one sentence at a time', () => {
+    assert.deepEqual(parseSpeechSegments('Tom: I start work at seven.'), [
+      { text: 'I start work at seven.', voice: 'tom' },
+    ]);
+  });
 });
