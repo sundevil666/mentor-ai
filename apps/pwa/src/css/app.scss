@@ -642,23 +642,6 @@ body.body--dark .q-field--outlined .q-field__control::before {
   gap: 18px;
 }
 
-.listening-player__header {
-  align-items: start;
-  display: flex;
-  gap: 14px;
-  justify-content: flex-end;
-}
-
-.listening-player__header > div {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-}
-
-.listening-player__header .q-btn {
-  flex: 0 0 auto;
-}
-
 .listening-player__body {
   align-items: start;
   display: grid;
@@ -1406,20 +1389,6 @@ body.body--dark .q-field--outlined .q-field__control::before {
 
   .listening-player {
     gap: 10px;
-  }
-
-  .listening-player__header,
-  .listening-player__header > div {
-    gap: 6px;
-  }
-
-  .listening-player__header p {
-    font-size: 0.94rem;
-    line-height: 1.4;
-  }
-
-  .listening-player__header .lesson-stage__eyebrow {
-    font-size: 0.78rem;
   }
 
   .lesson-actions {

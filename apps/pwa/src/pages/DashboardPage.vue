@@ -107,14 +107,30 @@
           <div class="lesson-nav">
             <q-btn
               color="primary"
-              outline
+              flat
               icon="arrow_back"
-              no-caps
-              label="Back to choice"
+              round
+              aria-label="Back to choice"
               @click="returnToLessonChoice"
-            />
+            >
+              <q-tooltip>Back to choice</q-tooltip>
+            </q-btn>
             <div class="lesson-nav__status">
               <span>{{ appStore.lessonProgress }}% complete</span>
+              <q-btn
+                v-if="isListeningPlayer"
+                color="primary"
+                dense
+                flat
+                :icon="isListeningPlaylistVisible ? 'playlist_remove' : 'playlist_play'"
+                round
+                :aria-label="isListeningPlaylistVisible ? 'Hide text list' : 'Show text list'"
+                @click="toggleListeningPlaylist"
+              >
+                <q-tooltip>{{
+                  isListeningPlaylistVisible ? 'Hide text list' : 'Show text list'
+                }}</q-tooltip>
+              </q-btn>
               <q-btn
                 color="primary"
                 dense
@@ -253,20 +269,6 @@
             </div>
 
             <div v-else :key="currentExercise.id" class="listening-player">
-              <div class="listening-player__header">
-                <q-btn
-                  color="primary"
-                  flat
-                  :icon="isListeningPlaylistVisible ? 'playlist_remove' : 'playlist_play'"
-                  round
-                  @click="toggleListeningPlaylist"
-                >
-                  <q-tooltip>{{
-                    isListeningPlaylistVisible ? 'Hide text list' : 'Show text list'
-                  }}</q-tooltip>
-                </q-btn>
-              </div>
-
               <div
                 :class="[
                   'listening-player__body',
