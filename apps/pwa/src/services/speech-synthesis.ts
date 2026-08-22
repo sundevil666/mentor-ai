@@ -6,9 +6,10 @@ type KokoroInstance = Awaited<ReturnType<typeof import('kokoro-js').KokoroTTS.fr
 export type SpeechModelStatus = 'idle' | 'loading' | 'generating' | 'playing' | 'ready' | 'error';
 
 type GeneratedSpeech = {
-  samples: Float32Array;
-  samplingRate: number;
+  audio: Blob;
 };
+
+const SPEECH_CACHE_NAME = 'mentor-ai-speech-q8-v1';
 
 export interface SpeechPlaybackHandlers {
   onEnd?: () => void;
@@ -18,6 +19,8 @@ export interface SpeechPlaybackHandlers {
 }
 
 let modelPromise: Promise<KokoroInstance> | null = null;
+let modelUsesWebGpu = false;
+let forceWasmUntilReload = false;
 let activeAudio: HTMLAudioElement | null = null;
 let activeAudioUrl: string | null = null;
 let activeRequestId = 0;
@@ -46,7 +49,7 @@ export async function prepareSpeechModel() {
 
   if (!modelPromise) {
     setModelStatus('loading', 0);
-    const useWebGpu = 'gpu' in navigator && navigator.maxTouchPoints === 0;
+    const useWebGpu = 'gpu' in navigator && !forceWasmUntilReload;
     modelPromise = import('kokoro-js')
       .then(async ({ KokoroTTS }) => {
         const progressCallback: Parameters<typeof KokoroTTS.from_pretrained>[1] = {
@@ -59,21 +62,26 @@ export async function prepareSpeechModel() {
 
         if (useWebGpu) {
           try {
-            return await KokoroTTS.from_pretrained(MODEL_ID, {
+            const model = await KokoroTTS.from_pretrained(MODEL_ID, {
               ...progressCallback,
-              dtype: 'q4f16',
+              dtype: 'q8',
               device: 'webgpu',
             });
+            modelUsesWebGpu = true;
+            return model;
           } catch {
+            forceWasmUntilReload = true;
             setModelStatus('loading', 0);
           }
         }
 
-        return KokoroTTS.from_pretrained(MODEL_ID, {
+        const model = await KokoroTTS.from_pretrained(MODEL_ID, {
           ...progressCallback,
           dtype: 'q8',
           device: 'wasm',
         });
+        modelUsesWebGpu = false;
+        return model;
       })
       .then((model) => {
         setModelStatus('ready', 100);
@@ -110,9 +118,7 @@ export async function speakWithPreferredVoice(
       return false;
     }
 
-    const audioUrl = URL.createObjectURL(
-      createWaveBlob(generated.samples, generated.samplingRate),
-    );
+    const audioUrl = URL.createObjectURL(generated.audio);
     const audio = new Audio(audioUrl);
     audio.preload = 'auto';
     audio.setAttribute('playsinline', '');
@@ -186,6 +192,8 @@ export function stopSpeech() {
 
 function createWaveBlob(samples: Float32Array, sampleRate: number) {
   const bytesPerSample = 2;
+  const peak = samples.reduce((maximum, sample) => Math.max(maximum, Math.abs(sample)), 0);
+  const gain = peak > 0.95 ? 0.95 / peak : 1;
   const buffer = new ArrayBuffer(44 + samples.length * bytesPerSample);
   const view = new DataView(buffer);
   writeAscii(view, 0, 'RIFF');
@@ -203,7 +211,7 @@ function createWaveBlob(samples: Float32Array, sampleRate: number) {
   view.setUint32(40, samples.length * bytesPerSample, true);
 
   samples.forEach((sample, index) => {
-    const normalized = Math.max(-1, Math.min(1, sample));
+    const normalized = Math.max(-1, Math.min(1, sample * gain));
     view.setInt16(
       44 + index * bytesPerSample,
       normalized < 0 ? normalized * 0x8000 : normalized * 0x7fff,
@@ -280,16 +288,7 @@ function generateSpeech(text: string) {
     return cached;
   }
 
-  const generation = prepareSpeechModel()
-    .then(async (model) => {
-      setModelStatus('generating', 100);
-      const generated = await model.generate(text, { voice: VOICE_ID, speed: 1 });
-      setModelStatus('ready', 100);
-      return {
-        samples: new Float32Array(generated.audio),
-        samplingRate: generated.sampling_rate,
-      };
-    })
+  const generation = generateAndCacheSpeech(text)
     .catch((error: unknown) => {
       generatedSpeechCache.delete(text);
       setModelStatus('error', 0);
@@ -298,6 +297,64 @@ function generateSpeech(text: string) {
 
   generatedSpeechCache.set(text, generation);
   return generation;
+}
+
+async function generateAndCacheSpeech(text: string): Promise<GeneratedSpeech> {
+  const cacheRequest = await createSpeechCacheRequest(text);
+
+  if (cacheRequest && 'caches' in window) {
+    const cachedResponse = await (await caches.open(SPEECH_CACHE_NAME)).match(cacheRequest);
+
+    if (cachedResponse) {
+      setModelStatus('ready', 100);
+      return { audio: await cachedResponse.blob() };
+    }
+  }
+
+  return prepareSpeechModel()
+    .then(async (model) => {
+      setModelStatus('generating', 100);
+      const generated = await generateWithBackendFallback(model, text);
+      const audio = createWaveBlob(new Float32Array(generated.audio), generated.sampling_rate);
+
+      if (cacheRequest && 'caches' in window) {
+        await (await caches.open(SPEECH_CACHE_NAME)).put(
+          cacheRequest,
+          new Response(audio, { headers: { 'Content-Type': 'audio/wav' } }),
+        );
+      }
+
+      setModelStatus('ready', 100);
+      return { audio };
+    });
+}
+
+async function generateWithBackendFallback(model: KokoroInstance, text: string) {
+  try {
+    return await model.generate(text, { voice: VOICE_ID, speed: 1 });
+  } catch (error) {
+    if (!modelUsesWebGpu) {
+      throw error;
+    }
+
+    forceWasmUntilReload = true;
+    modelUsesWebGpu = false;
+    modelPromise = null;
+    setModelStatus('loading', 0);
+    const fallbackModel = await prepareSpeechModel();
+    setModelStatus('generating', 100);
+    return fallbackModel.generate(text, { voice: VOICE_ID, speed: 1 });
+  }
+}
+
+async function createSpeechCacheRequest(text: string) {
+  if (!('crypto' in window) || !crypto.subtle) {
+    return null;
+  }
+
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return new Request(`${window.location.origin}/__speech-cache/${hash}`);
 }
 
 function setModelStatus(status: SpeechModelStatus, progress: number) {

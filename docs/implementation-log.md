@@ -441,7 +441,7 @@ Use Learning Events and Exercise Results together during backend analytics so au
 
 Replaced operating-system Web Speech synthesis with Kokoro 82M running locally through WebAssembly. Listening now uses the same `af_heart` American English voice on desktop and mobile instead of exposing a device-dependent voice picker. The quantized model is downloaded on first use, cached by the browser, and the TTS runtime is lazy-loaded so it does not delay the normal application startup. Existing listening pause, resume, repeat, sentence navigation, and progress behavior now controls generated neural audio.
 
-Reduced neural voice startup latency by using WebGPU acceleration on desktop, pre-generating the active listening text in the background, and reusing generated audio during the current application session. Mobile keeps the compatible WASM path while starting synthesis before the play action. Voice settings now distinguish model download, audio generation, ready, and active playback states.
+Reduced neural voice startup latency by using WebGPU acceleration when the device supports it, pre-generating the active listening text in the background, and reusing generated audio during the current application session. The same quality-preserving q8 model is used by the WebGPU and compatible WASM paths, and WAV output is peak-normalized to prevent clipping. Voice settings distinguish model download, audio generation, ready, and active playback states.
 
 ## Practical feedback build and background listening
 
