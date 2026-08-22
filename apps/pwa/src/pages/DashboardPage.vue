@@ -346,6 +346,17 @@
 
               <div class="listening-player__controls">
                 <q-btn
+                  class="listening-player__restart-button"
+                  color="primary"
+                  flat
+                  icon="restart_alt"
+                  label="Start over"
+                  no-caps
+                  @click="restartListening"
+                >
+                  <q-tooltip>Start from the beginning</q-tooltip>
+                </q-btn>
+                <q-btn
                   color="primary"
                   flat
                   icon="keyboard_double_arrow_left"
@@ -947,6 +958,10 @@ async function toggleListeningPlayback() {
 async function jumpWord(direction: -1 | 1) {
   const maxIndex = Math.max(listeningTokens.value.length - 1, 0);
   await startListeningAtWord(clampIndex(activeWordIndex.value + direction, 0, maxIndex));
+}
+
+async function restartListening() {
+  await startListeningAtWord(0);
 }
 
 async function jumpSentence(direction: -1 | 1) {

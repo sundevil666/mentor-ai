@@ -733,6 +733,10 @@ body.body--dark {
   min-width: 56px;
 }
 
+.listening-player__restart-button {
+  min-width: max-content;
+}
+
 .listening-player__controls .q-btn {
   flex: 0 0 auto;
 }
@@ -1344,8 +1348,12 @@ body.body--dark {
     display: grid;
     bottom: 0;
     gap: 4px;
-    grid-template-columns: repeat(5, minmax(44px, 1fr));
+    grid-template-columns: repeat(4, minmax(44px, 1fr));
     padding: 8px;
+  }
+
+  .listening-player__restart-button {
+    grid-column: 1 / -1;
   }
 
   .listening-player__play-button {
@@ -1356,10 +1364,6 @@ body.body--dark {
   .listening-player__controls .q-btn {
     min-height: 44px;
     min-width: 44px;
-  }
-
-  .listening-player__controls .listening-player__word-control {
-    display: none;
   }
 
   .listening-player__controls > span {
