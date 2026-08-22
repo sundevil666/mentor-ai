@@ -370,13 +370,21 @@
                   class="listening-player__play-button"
                   unelevated
                   :icon="
-                    isListeningPaused ? 'play_arrow' : isListeningSpeaking ? 'pause' : 'play_arrow'
+                    isListeningPaused
+                      ? 'play_arrow'
+                      : isListeningStarting || isListeningSpeaking
+                        ? 'pause'
+                        : 'play_arrow'
                   "
                   round
                   @click="toggleListeningPlayback"
                 >
                   <q-tooltip>{{
-                    isListeningPaused ? 'Resume' : isListeningSpeaking ? 'Pause' : 'Play'
+                    isListeningPaused
+                      ? 'Resume'
+                      : isListeningStarting || isListeningSpeaking
+                        ? 'Pause'
+                        : 'Play'
                   }}</q-tooltip>
                 </q-btn>
                 <q-btn
@@ -560,6 +568,7 @@ const answer = ref('');
 const activeWordIndex = ref(0);
 const activeWordEndIndex = ref(0);
 const isListeningSpeaking = ref(false);
+const isListeningStarting = ref(false);
 const isListeningPaused = ref(false);
 const isListeningRepeatEnabled = ref(false);
 const isListeningTranslationVisible = ref(false);
@@ -935,6 +944,15 @@ async function toggleListeningPlayback() {
     return;
   }
 
+  if (isListeningStarting.value) {
+    activeSpeechRunId.value += 1;
+    stopSpeech();
+    isListeningStarting.value = false;
+    isListeningSpeaking.value = true;
+    isListeningPaused.value = true;
+    return;
+  }
+
   if (isListeningSpeaking.value && !isListeningPaused.value) {
     await pauseSpeech();
     isListeningPaused.value = true;
@@ -1021,6 +1039,8 @@ async function startListeningAtWord(wordIndex: number) {
   activeWordIndex.value = safeWordIndex;
   activeWordEndIndex.value = safeWordIndex;
   isListeningPaused.value = false;
+  isListeningStarting.value = true;
+  isListeningSpeaking.value = false;
   stopSpeech();
   void speakListeningPhrase(safeWordIndex, runId);
   await appStore.replayAudio();
@@ -1077,6 +1097,7 @@ async function speakListeningPhrase(wordIndex: number, runId: number) {
   }
 
   if (started) {
+    isListeningStarting.value = false;
     isListeningSpeaking.value = true;
     return;
   }
@@ -1102,6 +1123,7 @@ function finishListeningPlayback(runId: number, allowRepeat = true) {
   }
 
   isListeningSpeaking.value = false;
+  isListeningStarting.value = false;
   isListeningPaused.value = false;
 }
 
@@ -1115,6 +1137,7 @@ function stopListeningAudio(saveProgress = true) {
   stopSpeech();
 
   isListeningSpeaking.value = false;
+  isListeningStarting.value = false;
   isListeningPaused.value = false;
 }
 
