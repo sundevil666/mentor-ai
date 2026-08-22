@@ -747,6 +747,13 @@ body.body--dark .q-field--outlined .q-field__control::before {
   z-index: 1;
 }
 
+.listening-player__start-over-button {
+  position: absolute;
+  right: 112px;
+  top: 10px;
+  z-index: 1;
+}
+
 .lesson-stage .listening-player__sentence {
   line-height: 1.55;
   margin: 0;

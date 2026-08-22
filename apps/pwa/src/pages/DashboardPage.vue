@@ -305,6 +305,17 @@
                   @scroll="handleListeningTextScroll"
                 >
                   <q-btn
+                    class="listening-player__start-over-button"
+                    color="primary"
+                    flat
+                    icon="restart_alt"
+                    label="Start"
+                    no-caps
+                    @click="resetListeningToBeginning"
+                  >
+                    <q-tooltip>Go to the beginning</q-tooltip>
+                  </q-btn>
+                  <q-btn
                     class="listening-player__translate-button"
                     :color="isListeningTranslationVisible ? 'secondary' : 'primary'"
                     flat
@@ -360,17 +371,6 @@
               </div>
 
               <div class="listening-player__controls">
-                <q-btn
-                  class="listening-player__restart-button"
-                  color="primary"
-                  flat
-                  icon="restart_alt"
-                  aria-label="Start over"
-                  round
-                  @click="restartListening"
-                >
-                  <q-tooltip>Start from the beginning</q-tooltip>
-                </q-btn>
                 <q-btn
                   color="primary"
                   flat
@@ -1023,8 +1023,11 @@ async function jumpWord(direction: -1 | 1) {
   await startListeningAtWord(clampIndex(activeWordIndex.value + direction, 0, maxIndex));
 }
 
-async function restartListening() {
-  await startListeningAtWord(0);
+async function resetListeningToBeginning() {
+  stopListeningAudio();
+  activeWordIndex.value = 0;
+  activeWordEndIndex.value = 0;
+  await scrollActiveListeningPhraseIntoView();
 }
 
 async function jumpSentence(direction: -1 | 1) {
