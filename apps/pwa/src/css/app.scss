@@ -410,21 +410,17 @@ body.body--dark .q-field--outlined .q-field__control::before {
   justify-content: space-between;
 }
 
-.learning-status {
-  align-items: center;
-  color: var(--app-muted);
-  display: flex;
-  font-size: 0.95rem;
-  gap: 12px;
-  justify-content: flex-end;
-  margin-bottom: 24px;
-}
-
 .network-status-button {
   height: 44px;
   min-height: 44px;
   min-width: 44px;
   width: 44px;
+}
+
+.header-level-trend {
+  flex: 0 0 auto;
+  margin: 0 6px;
+  white-space: nowrap;
 }
 
 .level-trend {
@@ -1486,11 +1482,11 @@ body.body--dark .q-field--outlined .q-field__control::before {
     grid-template-columns: 1fr;
   }
 
-  .learning-status {
-    justify-content: flex-start;
-    margin-bottom: 18px;
-    overflow-x: auto;
-    white-space: nowrap;
+  .header-level-trend {
+    font-size: 0.82rem;
+    margin: 0 2px;
+    min-height: 36px;
+    padding: 3px 7px;
   }
 
   .dialogue-drill__recorder {

@@ -17,6 +17,21 @@
         </q-btn>
         <q-toolbar-title>Mentor AI</q-toolbar-title>
         <q-btn
+          class="network-status-button"
+          :aria-label="appStore.isOnline ? 'Online' : 'Offline'"
+          :color="appStore.isOnline ? 'primary' : 'negative'"
+          flat
+          :icon="appStore.isOnline ? 'wifi' : 'wifi_off'"
+          round
+        >
+          <q-tooltip>{{ appStore.isOnline ? 'Online' : 'Offline' }}</q-tooltip>
+        </q-btn>
+        <span class="level-trend header-level-trend">
+          <q-icon :name="levelTrend.icon" size="18px" />
+          {{ levelTrend.level }} · {{ levelTrend.daysLabel }}
+          <q-tooltip>{{ levelTrend.tooltip }}</q-tooltip>
+        </span>
+        <q-btn
           class="app-update-button"
           dense
           flat
@@ -323,6 +338,7 @@
 </template>
 
 <script setup lang="ts">
+import type { ConceptLevel, StudentModel } from '@mentor-ai/shared';
 import { Dark, Notify } from 'quasar';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { onBeforeRouteUpdate, useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router';
@@ -355,6 +371,7 @@ const router = useRouter();
 const isDarkTheme = ref(false);
 const googleClientId = ref<string | null>(null);
 const routeTransitionName = ref('route-slide-forward');
+const levelTrend = computed(() => createLevelTrend(appStore.studentModel));
 const deferredInstallPrompt = ref<BeforeInstallPromptEvent | null>(null);
 const isPwaInstalled = ref(false);
 const showInstallHelp = ref(false);
@@ -584,6 +601,39 @@ function readSavedTheme() {
   }
 
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function createLevelTrend(studentModel: StudentModel) {
+  const learningState = studentModel.conceptLevels.learning;
+  const decision = studentModel.teacherDecision.levelDecision;
+  const practicedAt = learningState.lastPracticedAt ?? studentModel.teacherDecision.createdAt;
+  const daysInProcess = Math.max(
+    0,
+    Math.floor((Date.now() - Date.parse(practicedAt)) / 86_400_000),
+  );
+
+  return {
+    level: conceptLevelToCefr(learningState.level),
+    icon:
+      decision === 'increase'
+        ? 'arrow_upward'
+        : decision === 'decrease'
+          ? 'arrow_downward'
+          : 'arrow_forward',
+    daysLabel: `${daysInProcess}d`,
+    tooltip: `${studentModel.teacherDecision.reason} Days in this level process: ${daysInProcess}.`,
+  };
+}
+
+function conceptLevelToCefr(level: ConceptLevel): string {
+  switch (level) {
+    case 'foundation':
+      return 'A1';
+    case 'developing':
+      return 'A2';
+    case 'confident':
+      return 'B1';
+  }
 }
 
 </script>

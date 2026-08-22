@@ -1,25 +1,6 @@
 <template>
   <q-page class="learning-page">
     <section class="learning-shell">
-      <div v-if="!appStore.session" class="learning-status">
-        <q-btn
-          class="network-status-button"
-          :aria-label="appStore.isOnline ? 'Online' : 'Offline'"
-          :color="appStore.isOnline ? 'primary' : 'negative'"
-          flat
-          :icon="appStore.isOnline ? 'wifi' : 'wifi_off'"
-          round
-        >
-          <q-tooltip>{{ appStore.isOnline ? 'Online' : 'Offline' }}</q-tooltip>
-        </q-btn>
-        <span>Model v{{ appStore.studentModel.version }}</span>
-        <span class="level-trend">
-          <q-icon :name="levelTrend.icon" size="18px" />
-          {{ levelTrend.level }} · {{ levelTrend.daysLabel }}
-          <q-tooltip>{{ levelTrend.tooltip }}</q-tooltip>
-        </span>
-      </div>
-
       <transition :name="learningTransitionName">
         <section v-if="!appStore.isHydrated" key="hydrating" class="learning-start">
           <p class="learning-start__eyebrow">Loading</p>
@@ -495,13 +476,7 @@
 </template>
 
 <script setup lang="ts">
-import type {
-  ConceptLevel,
-  LearningConcept,
-  LearningMode,
-  PreferredLessonDevice,
-  StudentModel,
-} from '@mentor-ai/shared';
+import type { LearningConcept, LearningMode, PreferredLessonDevice } from '@mentor-ai/shared';
 import { getPreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
@@ -608,7 +583,6 @@ const speechSupportMessage = computed(() => {
 
   return 'Desktop Chrome/Edge can record and turn your answer into text.';
 });
-const levelTrend = computed(() => createLevelTrend(appStore.studentModel));
 const listeningPlaylist = computed<ListeningPlaylistItem[]>(() => {
   const lesson = appStore.session?.lesson;
 
@@ -1355,39 +1329,6 @@ function translateListeningSentence(sentence: string): string {
   const translation = listeningSentenceTranslations[normalizedSentence];
 
   return translation ?? sentence;
-}
-
-function createLevelTrend(studentModel: StudentModel) {
-  const learningState = studentModel.conceptLevels.learning;
-  const decision = studentModel.teacherDecision.levelDecision;
-  const practicedAt = learningState.lastPracticedAt ?? studentModel.teacherDecision.createdAt;
-  const daysInProcess = Math.max(
-    0,
-    Math.floor((Date.now() - Date.parse(practicedAt)) / 86_400_000),
-  );
-
-  return {
-    level: conceptLevelToCefr(learningState.level),
-    icon:
-      decision === 'increase'
-        ? 'arrow_upward'
-        : decision === 'decrease'
-          ? 'arrow_downward'
-          : 'arrow_forward',
-    daysLabel: `${daysInProcess}d`,
-    tooltip: `${studentModel.teacherDecision.reason} Days in this level process: ${daysInProcess}.`,
-  };
-}
-
-function conceptLevelToCefr(level: ConceptLevel): string {
-  switch (level) {
-    case 'foundation':
-      return 'A1';
-    case 'developing':
-      return 'A2';
-    case 'confident':
-      return 'B1';
-  }
 }
 
 function normalizeListeningSentence(sentence: string): string {
