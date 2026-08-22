@@ -497,6 +497,7 @@ import {
 import {
   isSpeechSynthesisAvailable,
   pauseSpeech,
+  preloadSpeech,
   resumeSpeech,
   speakWithPreferredVoice,
   stopSpeech,
@@ -806,6 +807,16 @@ watch(listeningPlaylist, (playlist) => {
     selectedListeningItemId.value = currentExercise.value?.id ?? playlist[0]?.id ?? null;
   }
 });
+
+watch(
+  listeningText,
+  () => {
+    if (listeningText.value) {
+      void preloadSpeech(listeningText.value);
+    }
+  },
+  { immediate: true },
+);
 
 watch([activeWordIndex, activeWordEndIndex], () => {
   saveListeningPlaybackProgress();

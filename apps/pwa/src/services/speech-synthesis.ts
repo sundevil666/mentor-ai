@@ -3,7 +3,12 @@ const VOICE_ID = 'af_heart' as const;
 
 type KokoroInstance = Awaited<ReturnType<typeof import('kokoro-js').KokoroTTS.from_pretrained>>;
 
-export type SpeechModelStatus = 'idle' | 'loading' | 'ready' | 'error';
+export type SpeechModelStatus = 'idle' | 'loading' | 'generating' | 'playing' | 'ready' | 'error';
+
+type GeneratedSpeech = {
+  samples: Float32Array;
+  samplingRate: number;
+};
 
 export interface SpeechPlaybackHandlers {
   onEnd?: () => void;
@@ -19,6 +24,7 @@ let activeRequestId = 0;
 let modelStatus: SpeechModelStatus = 'idle';
 let modelProgress = 0;
 const statusListeners = new Set<() => void>();
+const generatedSpeechCache = new Map<string, Promise<GeneratedSpeech>>();
 
 export function isSpeechSynthesisAvailable() {
   return typeof window !== 'undefined' && 'Audio' in window && 'WebAssembly' in window;
@@ -40,18 +46,35 @@ export async function prepareSpeechModel() {
 
   if (!modelPromise) {
     setModelStatus('loading', 0);
+    const useWebGpu = 'gpu' in navigator && navigator.maxTouchPoints === 0;
     modelPromise = import('kokoro-js')
-      .then(({ KokoroTTS }) =>
-        KokoroTTS.from_pretrained(MODEL_ID, {
-          dtype: 'q8',
-          device: 'wasm',
+      .then(async ({ KokoroTTS }) => {
+        const progressCallback: Parameters<typeof KokoroTTS.from_pretrained>[1] = {
           progress_callback: (progress) => {
             if (progress.status === 'progress' && typeof progress.progress === 'number') {
               setModelStatus('loading', Math.round(progress.progress));
             }
           },
-        }),
-      )
+        };
+
+        if (useWebGpu) {
+          try {
+            return await KokoroTTS.from_pretrained(MODEL_ID, {
+              ...progressCallback,
+              dtype: 'q4f16',
+              device: 'webgpu',
+            });
+          } catch {
+            setModelStatus('loading', 0);
+          }
+        }
+
+        return KokoroTTS.from_pretrained(MODEL_ID, {
+          ...progressCallback,
+          dtype: 'q8',
+          device: 'wasm',
+        });
+      })
       .then((model) => {
         setModelStatus('ready', 100);
         return model;
@@ -81,15 +104,14 @@ export async function speakWithPreferredVoice(
   stopActiveAudio();
 
   try {
-    const model = await prepareSpeechModel();
-    const generated = await model.generate(trimmedText, { voice: VOICE_ID, speed: 1 });
+    const generated = await generateSpeech(trimmedText);
 
     if (requestId !== activeRequestId) {
       return false;
     }
 
     const audioUrl = URL.createObjectURL(
-      createWaveBlob(new Float32Array(generated.audio), generated.sampling_rate),
+      createWaveBlob(generated.samples, generated.samplingRate),
     );
     const audio = new Audio(audioUrl);
     audio.preload = 'auto';
@@ -118,12 +140,28 @@ export async function speakWithPreferredVoice(
     activeAudioUrl = audioUrl;
     configureMediaSession(audio, handlers.mediaTitle ?? 'Mentor AI listening');
     await audio.play();
+    setModelStatus('playing', 100);
     return true;
   } catch (error) {
     if (requestId === activeRequestId) {
       stopActiveAudio();
       handlers.onError?.(toError(error));
     }
+    return false;
+  }
+}
+
+export async function preloadSpeech(text: string) {
+  const trimmedText = text.trim();
+
+  if (!trimmedText || !isSpeechSynthesisAvailable()) {
+    return false;
+  }
+
+  try {
+    await generateSpeech(trimmedText);
+    return true;
+  } catch {
     return false;
   }
 }
@@ -229,6 +267,37 @@ function clearActiveAudio() {
     URL.revokeObjectURL(activeAudioUrl);
     activeAudioUrl = null;
   }
+
+  if (modelStatus === 'playing') {
+    setModelStatus('ready', 100);
+  }
+}
+
+function generateSpeech(text: string) {
+  const cached = generatedSpeechCache.get(text);
+
+  if (cached) {
+    return cached;
+  }
+
+  const generation = prepareSpeechModel()
+    .then(async (model) => {
+      setModelStatus('generating', 100);
+      const generated = await model.generate(text, { voice: VOICE_ID, speed: 1 });
+      setModelStatus('ready', 100);
+      return {
+        samples: new Float32Array(generated.audio),
+        samplingRate: generated.sampling_rate,
+      };
+    })
+    .catch((error: unknown) => {
+      generatedSpeechCache.delete(text);
+      setModelStatus('error', 0);
+      throw toError(error);
+    });
+
+  generatedSpeechCache.set(text, generation);
+  return generation;
 }
 
 function setModelStatus(status: SpeechModelStatus, progress: number) {

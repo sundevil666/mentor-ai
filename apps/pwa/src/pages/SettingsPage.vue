@@ -111,8 +111,8 @@
             label="Test"
             no-caps
             unelevated
-            :disable="!speechAvailable || voiceState.status === 'loading'"
-            :loading="voiceState.status === 'loading'"
+            :disable="!speechAvailable || voiceBusy"
+            :loading="voiceBusy"
             @click="testVoice"
           />
           <span>{{ voiceStatus }}</span>
@@ -129,6 +129,7 @@ import { useRouter } from 'vue-router';
 import {
   getSpeechModelStatus,
   isSpeechSynthesisAvailable,
+  preloadSpeech,
   speakWithPreferredVoice,
   subscribeToSpeechModelStatus,
 } from 'src/services/speech-synthesis';
@@ -164,6 +165,7 @@ const voiceState = ref(getSpeechModelStatus());
 const unsubscribeVoiceStatus = subscribeToSpeechModelStatus(() => {
   voiceState.value = getSpeechModelStatus();
 });
+const voiceTestText = 'This is the voice for listening practice.';
 const shiftOptions: Array<{ label: string; value: WorkShift }> = [
   { label: 'Unknown', value: 'unknown' },
   { label: 'First shift', value: 'first' },
@@ -171,6 +173,9 @@ const shiftOptions: Array<{ label: string; value: WorkShift }> = [
   { label: 'Third shift', value: 'third' },
   { label: 'Day off', value: 'off' },
 ];
+const voiceBusy = computed(() =>
+  ['loading', 'generating'].includes(voiceState.value.status),
+);
 const voiceStatus = computed(() => {
   if (!speechAvailable) {
     return 'Neural speech is not available in this browser.';
@@ -178,6 +183,14 @@ const voiceStatus = computed(() => {
 
   if (voiceState.value.status === 'loading') {
     return `Downloading the voice model… ${voiceState.value.progress}%`;
+  }
+
+  if (voiceState.value.status === 'generating') {
+    return 'Preparing audio…';
+  }
+
+  if (voiceState.value.status === 'playing') {
+    return 'Playing now.';
   }
 
   if (voiceState.value.status === 'ready') {
@@ -211,6 +224,7 @@ onMounted(async () => {
 
   selectedShift.value = appStore.preferredWorkShift;
   await loadVersions();
+  void preloadSpeech(voiceTestText);
 });
 
 async function finishMyShiftCallback() {
@@ -269,7 +283,7 @@ function saveShift(value: WorkShift) {
 }
 
 function testVoice() {
-  void speakWithPreferredVoice('This is the voice for listening practice.');
+  void speakWithPreferredVoice(voiceTestText);
 }
 
 function returnToDashboard() {
