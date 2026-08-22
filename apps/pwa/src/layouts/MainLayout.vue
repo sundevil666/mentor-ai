@@ -6,7 +6,7 @@
     >
       <q-toolbar>
         <q-btn
-          v-if="appStore.session"
+          v-if="appStore.session || route.name !== 'dashboard'"
           class="home-nav-button"
           flat
           icon="home"
@@ -332,7 +332,7 @@
 <script setup lang="ts">
 import { Dark, Notify } from 'quasar';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { onBeforeRouteUpdate, type RouteLocationNormalizedLoaded } from 'vue-router';
+import { onBeforeRouteUpdate, useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router';
 import { useAppStore } from 'src/stores/app-store';
 import { fetchAuthConfiguration, signInWithGoogleCredential } from 'src/services/auth';
 import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
@@ -357,6 +357,8 @@ declare global {
 }
 
 const appStore = useAppStore();
+const route = useRoute();
+const router = useRouter();
 const isDarkTheme = ref(false);
 const googleClientId = ref<string | null>(null);
 const routeTransitionName = ref('route-slide-forward');
@@ -510,8 +512,12 @@ async function installPwa() {
   }
 }
 
-function returnToLessonChoice() {
-  void appStore.returnToLessonChoice();
+async function returnToLessonChoice() {
+  await appStore.returnToLessonChoice();
+
+  if (route.name !== 'dashboard') {
+    await router.push({ name: 'dashboard' });
+  }
 }
 
 function toggleTheme() {
