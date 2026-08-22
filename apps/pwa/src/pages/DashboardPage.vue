@@ -890,8 +890,10 @@ watch(listeningPlaylist, (playlist) => {
 watch(
   listeningText,
   () => {
-    if (listeningText.value) {
-      void preloadSpeech(listeningText.value);
+    const firstSentence = listeningSentences.value[0]?.text;
+
+    if (firstSentence) {
+      void preloadSpeech(firstSentence);
     }
   },
   { immediate: true },
@@ -1129,7 +1131,9 @@ async function speakListeningPhrase(wordIndex: number, runId: number) {
     return;
   }
 
-  const playbackTokens = tokens.slice(wordIndex);
+  const nextSentenceStart = sentenceStartWordIndexes.value.find((start) => start > wordIndex);
+  const sentenceEndWordIndex = nextSentenceStart ?? tokens.length;
+  const playbackTokens = tokens.slice(wordIndex, sentenceEndWordIndex);
   const playbackText = playbackTokens.map((item) => `${item.word}${item.trailing}`).join('');
   activeWordIndex.value = wordIndex;
   activeWordEndIndex.value = wordIndex;
@@ -1149,6 +1153,13 @@ async function speakListeningPhrase(wordIndex: number, runId: number) {
     },
     onEnd: () => {
       if (runId !== activeSpeechRunId.value) {
+        return;
+      }
+
+      const nextWordIndex = wordIndex + playbackTokens.length;
+
+      if (nextWordIndex < tokens.length) {
+        void speakListeningPhrase(nextWordIndex, runId);
         return;
       }
 
