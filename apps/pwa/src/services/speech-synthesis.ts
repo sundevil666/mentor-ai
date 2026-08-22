@@ -11,6 +11,7 @@ export interface SpeechPlaybackHandlers {
 
 let activeAudio: HTMLAudioElement | null = null;
 let activeAudioUrl: string | null = null;
+let activeUtterance: SpeechSynthesisUtterance | null = null;
 let activeRequestId = 0;
 let modelStatus: SpeechModelStatus = 'idle';
 let modelProgress = 0;
@@ -18,7 +19,10 @@ const statusListeners = new Set<() => void>();
 const generatedSpeechCache = new Map<string, Promise<Blob>>();
 
 export function isSpeechSynthesisAvailable() {
-  return typeof window !== 'undefined' && 'Audio' in window && 'fetch' in window;
+  return (
+    typeof window !== 'undefined' &&
+    (('Audio' in window && 'fetch' in window) || 'speechSynthesis' in window)
+  );
 }
 
 export function getSpeechModelStatus() {
@@ -78,6 +82,10 @@ export async function speakWithPreferredVoice(
   } catch (error) {
     if (requestId === activeRequestId) {
       stopActiveAudio();
+      if (startBrowserSpeech(trimmedText, handlers, requestId)) {
+        return true;
+      }
+
       setModelStatus('error', 0);
       handlers.onError?.(toError(error));
     }
@@ -101,17 +109,72 @@ export async function preloadSpeech(text: string) {
 
 export async function pauseSpeech() {
   activeAudio?.pause();
+  if (activeUtterance) window.speechSynthesis.pause();
 }
 
 export async function resumeSpeech() {
-  if (!activeAudio) return false;
-  await activeAudio.play();
-  return true;
+  if (activeAudio) {
+    await activeAudio.play();
+    return true;
+  }
+
+  if (activeUtterance) {
+    window.speechSynthesis.resume();
+    return true;
+  }
+
+  return false;
 }
 
 export function stopSpeech() {
   activeRequestId += 1;
   stopActiveAudio();
+  stopBrowserSpeech();
+}
+
+function startBrowserSpeech(
+  text: string,
+  handlers: SpeechPlaybackHandlers,
+  requestId: number,
+) {
+  if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return false;
+
+  stopBrowserSpeech();
+  const utterance = new SpeechSynthesisUtterance(text);
+  const englishVoice = window.speechSynthesis
+    .getVoices()
+    .find((voice) => voice.lang.toLowerCase().startsWith('en'));
+
+  utterance.lang = 'en-US';
+  if (englishVoice) utterance.voice = englishVoice;
+  utterance.onboundary = (event) => {
+    handlers.onTimeUpdate?.(Math.min(event.charIndex, text.length), text.length);
+  };
+  utterance.onend = () => {
+    if (requestId !== activeRequestId || activeUtterance !== utterance) return;
+    activeUtterance = null;
+    setModelStatus('ready', 100);
+    handlers.onEnd?.();
+  };
+  utterance.onerror = () => {
+    if (requestId !== activeRequestId || activeUtterance !== utterance) return;
+    activeUtterance = null;
+    setModelStatus('error', 0);
+    handlers.onError?.(new Error('Could not play speech in this browser.'));
+  };
+  activeUtterance = utterance;
+  window.speechSynthesis.speak(utterance);
+  setModelStatus('playing', 100);
+  return true;
+}
+
+function stopBrowserSpeech() {
+  if (!activeUtterance || !('speechSynthesis' in window)) return;
+  activeUtterance.onboundary = null;
+  activeUtterance.onend = null;
+  activeUtterance.onerror = null;
+  activeUtterance = null;
+  window.speechSynthesis.cancel();
 }
 
 function generateSpeech(text: string) {

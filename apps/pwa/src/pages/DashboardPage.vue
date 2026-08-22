@@ -1020,7 +1020,6 @@ async function startListeningAtWord(wordIndex: number) {
   activeSpeechRunId.value = runId;
   activeWordIndex.value = safeWordIndex;
   activeWordEndIndex.value = safeWordIndex;
-  isListeningSpeaking.value = true;
   isListeningPaused.value = false;
   stopSpeech();
   void speakListeningPhrase(safeWordIndex, runId);
@@ -1045,7 +1044,7 @@ async function speakListeningPhrase(wordIndex: number, runId: number) {
   const playbackText = playbackTokens.map((item) => `${item.word}${item.trailing}`).join('');
   activeWordIndex.value = wordIndex;
   activeWordEndIndex.value = wordIndex;
-  await speakWithPreferredVoice(playbackText, {
+  const started = await speakWithPreferredVoice(playbackText, {
     mediaTitle: selectedListeningItem.value?.title ?? 'English listening practice',
     onTimeUpdate: (currentTime, duration) => {
       if (runId !== activeSpeechRunId.value || !Number.isFinite(duration) || duration <= 0) {
@@ -1072,6 +1071,17 @@ async function speakListeningPhrase(wordIndex: number, runId: number) {
       }
     },
   });
+
+  if (runId !== activeSpeechRunId.value) {
+    return;
+  }
+
+  if (started) {
+    isListeningSpeaking.value = true;
+    return;
+  }
+
+  finishListeningPlayback(runId);
 }
 
 function finishListeningPlayback(runId: number, allowRepeat = true) {
