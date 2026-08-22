@@ -64,6 +64,12 @@ body.body--dark .q-field--outlined .q-field__control::before {
   border-color: var(--app-border-strong);
 }
 
+body .q-menu {
+  max-height: calc(100dvh - 32px);
+  overscroll-behavior: contain;
+  overflow-y: auto;
+}
+
 .q-btn {
   border: 1px solid var(--app-border-strong);
   border-radius: var(--app-radius-sm);
@@ -1526,6 +1532,31 @@ body.body--dark .q-field--outlined .q-field__control::before {
   .handoff-actions,
   .shift-timing-grid {
     grid-template-columns: 1fr;
+  }
+
+  .lesson-library-expander {
+    bottom: calc(85px + env(safe-area-inset-bottom));
+    left: 50%;
+    max-height: calc(100dvh - 118px - env(safe-area-inset-bottom));
+    overflow: hidden;
+    position: fixed;
+    transform: translateX(-50%);
+    width: min(calc(100vw - 32px), 398px);
+    z-index: 30;
+  }
+
+  .lesson-library-expander .q-expansion-item__container {
+    display: flex;
+    flex-direction: column-reverse;
+    max-height: inherit;
+  }
+
+  .lesson-library-expander .q-expansion-item__content {
+    border-bottom: 1px solid var(--app-border);
+    border-top: 0;
+    max-height: calc(100dvh - 186px - env(safe-area-inset-bottom));
+    overscroll-behavior: contain;
+    overflow-y: auto;
   }
 
   .header-level-trend {
