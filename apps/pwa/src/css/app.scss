@@ -772,6 +772,15 @@ body.body--dark .q-field--outlined .q-field__control::before {
   color: var(--app-text-strong);
   font-size: clamp(1.9rem, 3.4vw, 2.75rem);
   font-weight: 750;
+  line-height: 1.22;
+}
+
+.lesson-stage .listening-player__sentence--current.listening-player__sentence--compact {
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+}
+
+.lesson-stage .listening-player__sentence--current.listening-player__sentence--dense {
+  font-size: clamp(1.55rem, 2.6vw, 2.05rem);
 }
 
 .listening-player__token {
@@ -1434,7 +1443,16 @@ body.body--dark .q-field--outlined .q-field__control::before {
   }
 
   .lesson-stage .listening-player__sentence--current {
-    font-size: clamp(1.8rem, 7vw, 2.2rem);
+    font-size: clamp(2.15rem, min(9vw, 5.2dvh), 2.65rem);
+    line-height: 1.2;
+  }
+
+  .lesson-stage .listening-player__sentence--current.listening-player__sentence--compact {
+    font-size: clamp(1.9rem, min(7.7vw, 4.5dvh), 2.3rem);
+  }
+
+  .lesson-stage .listening-player__sentence--current.listening-player__sentence--dense {
+    font-size: clamp(1.7rem, min(6.8vw, 4dvh), 2rem);
   }
 
   .listening-player__body {

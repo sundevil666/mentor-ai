@@ -335,7 +335,18 @@
                         : (previousListeningSentenceItem?.text ?? '')
                     }}
                   </p>
-                  <p class="listening-player__sentence listening-player__sentence--current">
+                  <p
+                    :class="[
+                      'listening-player__sentence',
+                      'listening-player__sentence--current',
+                      {
+                        'listening-player__sentence--compact':
+                          (activeListeningSentenceItem?.text.length ?? 0) > 72,
+                        'listening-player__sentence--dense':
+                          (activeListeningSentenceItem?.text.length ?? 0) > 110,
+                      },
+                    ]"
+                  >
                     <span
                       v-if="isListeningTranslationVisible"
                       class="listening-player__translated-current"
