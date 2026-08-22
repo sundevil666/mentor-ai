@@ -1456,7 +1456,7 @@ body.body--dark .q-field--outlined .q-field__control::before {
     display: grid;
     bottom: 0;
     gap: 4px;
-    grid-template-columns: repeat(4, minmax(44px, 1fr));
+    grid-template-columns: repeat(6, minmax(40px, 1fr));
     padding: 8px;
   }
 
@@ -1468,12 +1468,6 @@ body.body--dark .q-field--outlined .q-field__control::before {
   .listening-player__controls .q-btn {
     min-height: 44px;
     min-width: 44px;
-  }
-
-  .listening-player__controls > span {
-    grid-column: 1 / -1;
-    margin-left: 0;
-    text-align: center;
   }
 
   .listening-player__continue {
