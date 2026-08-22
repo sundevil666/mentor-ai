@@ -1471,11 +1471,17 @@ body.body--dark .q-field--outlined .q-field__control::before {
   }
 
   .listening-player__controls {
+    bottom: calc(85px + env(safe-area-inset-bottom));
     display: grid;
-    bottom: 0;
     gap: 4px;
     grid-template-columns: repeat(6, minmax(40px, 1fr));
+    left: 50%;
     padding: 8px;
+    position: fixed;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(calc(100vw - 32px), 398px);
+    z-index: 20;
   }
 
   .listening-player__play-button {
