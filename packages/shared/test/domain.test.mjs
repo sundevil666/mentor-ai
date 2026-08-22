@@ -350,7 +350,7 @@ describe('shared domain helpers', () => {
       listening: [
         ['commute-listening', 'Commute listening routine'],
         ['morning-questions-listening', 'Listening: morning questions'],
-        ['shop-listening', 'Listening: small shop request'],
+        ['shop-listening', 'Listening: at a small shop'],
       ],
       speaking: [
         ['work-speaking', 'Speaking confidence at work'],

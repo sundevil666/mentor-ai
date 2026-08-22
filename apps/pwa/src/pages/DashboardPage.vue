@@ -857,9 +857,8 @@ const trainingLibraries: Record<'listening' | 'speaking', {
     description: 'Choose a lesson to begin, or download its audio before you go offline.',
     icon: 'headphones',
     lessons: [
-      { templateKey: 'morning-questions-listening', title: 'Morning questions', focus: 'Hear and understand everyday questions', mode: 'listening', minutes: 6 },
-      { templateKey: 'shop-listening', title: 'Small shop request', focus: 'Listen for the key words in a real request', mode: 'listening', minutes: 6 },
       { templateKey: 'commute-listening', title: 'Commute listening', focus: 'A complete listening session for the journey', mode: 'listening', minutes: 10 },
+      { templateKey: 'shop-listening', title: 'At a small shop', focus: 'Follow a short dialogue and understand a real request', mode: 'listening', minutes: 7 },
     ],
   },
   speaking: {
@@ -868,9 +867,8 @@ const trainingLibraries: Record<'listening' | 'speaking', {
     description: 'Choose a speaking practice, or download its voice examples for offline use.',
     icon: 'record_voice_over',
     lessons: [
-      { templateKey: 'daily-speaking', title: 'Daily routine', focus: 'Build confident sentences about your day', mode: 'speaking', minutes: 6 },
-      { templateKey: 'polite-speaking', title: 'Polite requests', focus: 'Practise useful phrases for real conversations', mode: 'speaking', minutes: 6 },
-      { templateKey: 'work-speaking', title: 'Speaking at work', focus: 'Answer aloud in common work situations', mode: 'speaking', minutes: 6 },
+      { templateKey: 'weekly-weak-spots-dialogue', title: 'Work conversation', focus: 'Say five complete phrases for a real workday', mode: 'speaking', minutes: 9 },
+      { templateKey: 'polite-speaking', title: 'Polite requests', focus: 'Keep a conversation going when you need help', mode: 'speaking', minutes: 7 },
     ],
   },
 };
