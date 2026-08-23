@@ -375,7 +375,7 @@ For sites such as Liteka, the adapter must respect copyright, robots rules, rate
 
 ### Video catalog rule
 
-Every video added to the Mentor AI catalog must have a ready-made English subtitle track that can be downloaded as WebVTT or converted losslessly from an existing SRT track. Burned-in captions and AI-generated transcripts do not satisfy this requirement. The reviewed subtitle file must be stored with the PWA so subtitles remain available offline alongside a cached video.
+Every video added to the Mentor AI catalog must have a ready-made English subtitle track that can be downloaded as WebVTT or converted losslessly from an existing SRT track. Burned-in captions and AI-generated transcripts do not satisfy this requirement. The reviewed subtitle file must be stored with the PWA so subtitles remain available offline alongside a cached video. The selected video URL must also use a mobile-compatible rendition: prefer MPEG-4/H.264 with broadly supported audio, or a reviewed VP9 fallback when MPEG-4 is unavailable. Do not publish an AV1/Opus WebM original as the only source, even when it works in desktop browsers.
 
 ## Useful Commands
 

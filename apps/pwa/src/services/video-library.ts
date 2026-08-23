@@ -20,9 +20,9 @@ export const videoLibrary: LibraryVideo[] = [
     captionUrl: '/subtitles/english-networking-dinner.en.vtt',
     level: 'A2–B1',
     sourceLabel: 'U.S. Marine Corps · Public domain via Wikimedia Commons',
-    sourceUrl: 'https://upload.wikimedia.org/wikipedia/commons/8/87/English_Networking_Dinner_%281018406%29.webm',
+    sourceUrl: 'https://upload.wikimedia.org/wikipedia/commons/transcoded/8/87/English_Networking_Dinner_%281018406%29.webm/English_Networking_Dinner_%281018406%29.webm.360p.mpeg4.mov',
     durationSeconds: 30,
-    sizeBytes: 14_691_312,
+    sizeBytes: 4_274_153,
   },
   {
     id: 'leaders-links',
@@ -31,9 +31,9 @@ export const videoLibrary: LibraryVideo[] = [
     captionUrl: '/subtitles/leaders-links.en.vtt',
     level: 'B1–B2',
     sourceLabel: 'U.S. Army · Public domain via Wikimedia Commons',
-    sourceUrl: 'https://upload.wikimedia.org/wikipedia/commons/d/d8/Leaders_Links_-_DrillSergeantFitness_%28990648%29.webm',
+    sourceUrl: 'https://upload.wikimedia.org/wikipedia/commons/transcoded/d/d8/Leaders_Links_-_DrillSergeantFitness_%28990648%29.webm/Leaders_Links_-_DrillSergeantFitness_%28990648%29.webm.480p.vp9.webm',
     durationSeconds: 60,
-    sizeBytes: 25_506_557,
+    sizeBytes: 7_776_489,
   },
   {
     id: 'pacific-spotlight',
@@ -42,9 +42,9 @@ export const videoLibrary: LibraryVideo[] = [
     captionUrl: '/subtitles/pacific-spotlight.en.vtt',
     level: 'A2–B1',
     sourceLabel: 'U.S. Air Force · Public domain via Wikimedia Commons',
-    sourceUrl: 'https://upload.wikimedia.org/wikipedia/commons/9/95/Pacific_Spotlight_-_SrA_Malik_Hardy-No_Graphics_%281004531%29.webm',
+    sourceUrl: 'https://upload.wikimedia.org/wikipedia/commons/transcoded/9/95/Pacific_Spotlight_-_SrA_Malik_Hardy-No_Graphics_%281004531%29.webm/Pacific_Spotlight_-_SrA_Malik_Hardy-No_Graphics_%281004531%29.webm.480p.vp9.webm',
     durationSeconds: 30,
-    sizeBytes: 7_577_847,
+    sizeBytes: 3_194_948,
   },
   {
     id: 'opsec-spot',
@@ -53,9 +53,9 @@ export const videoLibrary: LibraryVideo[] = [
     captionUrl: '/subtitles/opsec-spot.en.vtt',
     level: 'B1',
     sourceLabel: 'U.S. Air Force · Public domain via Wikimedia Commons',
-    sourceUrl: 'https://upload.wikimedia.org/wikipedia/commons/b/b2/OPSEC_Spot_%28720p%29_%28998832%29.webm',
+    sourceUrl: 'https://upload.wikimedia.org/wikipedia/commons/transcoded/b/b2/OPSEC_Spot_%28720p%29_%28998832%29.webm/OPSEC_Spot_%28720p%29_%28998832%29.webm.480p.vp9.webm',
     durationSeconds: 30,
-    sizeBytes: 6_207_133,
+    sizeBytes: 3_160_183,
   },
 ];
 
