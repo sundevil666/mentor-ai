@@ -91,7 +91,7 @@ export async function fetchCurrentLesson(context: LearningContext): Promise<Gene
 }
 
 export async function fetchOfflineLessons(since: string): Promise<GeneratedLesson[]> {
-  const response = await fetch(`${apiBaseUrl}/api/lessons/offline?since=${encodeURIComponent(since)}&t=${Date.now()}`, {
+  const response = await fetch(`${apiBaseUrl}/api/lessons?offline=1&since=${encodeURIComponent(since)}&t=${Date.now()}`, {
     cache: 'no-store',
     headers: authHeaders(),
   });
