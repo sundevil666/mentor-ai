@@ -961,8 +961,12 @@ async function refreshLibraryDownloadStatuses(lessons: TrainingLibraryLesson[]) 
         manualConceptChoice: true,
         lessonTemplateKey: lesson.templateKey,
       }), new Date().toISOString());
-      const ready = await isSpeechBatchCached(getLessonOfflineSpeechTexts(generatedLesson.exercises));
+      const texts = getLessonOfflineSpeechTexts(generatedLesson.exercises);
+      const ready = await isSpeechBatchCached(texts);
       libraryDownloadStatus.value[lesson.templateKey] = ready ? 'ready' : 'idle';
+      if (ready) {
+        registerOfflineSpeechLesson({ id: lesson.templateKey, category: lesson.mode, title: lesson.title, speechTexts: texts });
+      }
     } catch {
       libraryDownloadStatus.value[lesson.templateKey] = 'idle';
     }

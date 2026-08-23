@@ -49,9 +49,11 @@
 import { Notify } from 'quasar';
 import { computed, onMounted, ref } from 'vue';
 import { formatDisplayDate } from 'src/services/date-format';
-import { cleanupExpiredOfflineLessons, clearOfflineCategory, offlineCategories, readOfflineLessons, readOfflineRetention, refreshOfflineSizes, removeOfflineLesson, saveOfflineRetention, type OfflineCategory, type OfflineLesson, type RetentionDays } from 'src/services/offline-library';
+import { cleanupExpiredOfflineLessons, clearOfflineCategory, migrateLegacySpeechDownloads, offlineCategories, readOfflineLessons, readOfflineRetention, refreshOfflineSizes, removeOfflineLesson, saveOfflineRetention, type OfflineCategory, type OfflineLesson, type RetentionDays } from 'src/services/offline-library';
+import { useAppStore } from 'src/stores/app-store';
 
 const activeTab = ref<OfflineCategory | 'statistics'>('listening');
+const appStore = useAppStore();
 const lessons = ref<OfflineLesson[]>([]);
 const retention = ref(readOfflineRetention());
 const retentionOptions = [{ label: '1 week', value: 7 }, { label: '2 weeks', value: 14 }, { label: '1 month', value: 30 }, { label: '3 months', value: 90 }];
@@ -63,7 +65,7 @@ const donutStyle = computed(() => {
   const stops = offlineCategories.map((category, index) => { const start = cursor; cursor += categoryPercent(category.id); return `${chartColors[index]} ${start}% ${cursor}%`; });
   return { background: `conic-gradient(${stops.join(', ')})` };
 });
-onMounted(async () => { const expired = await cleanupExpiredOfflineLessons(); lessons.value = await refreshOfflineSizes(); if (expired.length) Notify.create({ type: 'info', message: `Removed ${expired.length} unused offline lesson${expired.length === 1 ? '' : 's'}.` }); });
+onMounted(async () => { if (!appStore.isHydrated) await appStore.hydrate(); await migrateLegacySpeechDownloads(appStore.loadLesson.bind(appStore)); const expired = await cleanupExpiredOfflineLessons(); lessons.value = await refreshOfflineSizes(); if (expired.length) Notify.create({ type: 'info', message: `Removed ${expired.length} unused offline lesson${expired.length === 1 ? '' : 's'}.` }); });
 function categoryLessons(category: OfflineCategory) { return lessons.value.filter((lesson) => lesson.category === category); }
 function categoryBytes(category: OfflineCategory) { return categoryLessons(category).reduce((sum, lesson) => sum + lesson.estimatedBytes, 0); }
 function categoryPercent(category: OfflineCategory) { return totalBytes.value ? Math.round(categoryBytes(category) / totalBytes.value * 100) : 0; }
