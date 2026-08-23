@@ -91,7 +91,7 @@
           :loop="activeRepeat"
           playsinline
           preload="metadata"
-          @loadedmetadata="restoreVideoPosition(selectedVideo)"
+          @loadedmetadata="handleVideoMetadataLoaded(selectedVideo)"
           @pause="handleVideoPause"
           @play="handleVideoPlay"
           @seeked="synchronizeAudioToVideo"
@@ -103,6 +103,21 @@
             srclang="en"
           >
         </video>
+        <div
+          class="video-progress"
+          aria-label="Video progress"
+        >
+          <span>{{ formatVideoDuration(videoCurrentTime) }}</span>
+          <q-slider
+            :model-value="videoCurrentTime"
+            :min="0"
+            :max="videoDuration || selectedVideo.durationSeconds"
+            :step="0.1"
+            color="primary"
+            @update:model-value="seekVideoProgress"
+          />
+          <span>{{ formatVideoDuration(videoDuration || selectedVideo.durationSeconds) }}</span>
+        </div>
         <audio
           ref="backgroundAudioElement"
           :src="selectedVideo.sourceUrl"
@@ -278,6 +293,8 @@ const activeVideoElement = ref<HTMLVideoElement | null>(null);
 const backgroundAudioElement = ref<HTMLAudioElement | null>(null);
 const activeRepeat = ref(true);
 const activePlaybackRate = ref<VideoPlaybackRate>(1);
+const videoCurrentTime = ref(0);
+const videoDuration = ref(0);
 const subtitleCues = ref<VideoSubtitleCue[]>([]);
 const activeSubtitleCueId = ref<string | null>(null);
 const subtitleStatus = ref<'loading' | 'ready' | 'error'>('loading');
@@ -334,6 +351,8 @@ async function toggleVideo(videoId: string) {
   const playbackPreference = readVideoPlaybackPreference(videoId);
   activeRepeat.value = playbackPreference.repeat;
   activePlaybackRate.value = playbackPreference.playbackRate;
+  videoCurrentTime.value = 0;
+  videoDuration.value = 0;
   selectedVideoId.value = videoId;
   await nextTick();
 
@@ -360,6 +379,8 @@ function closeVideo() {
   clearVideoMediaSession();
   subtitleCues.value = [];
   activeSubtitleCueId.value = null;
+  videoCurrentTime.value = 0;
+  videoDuration.value = 0;
 }
 
 async function loadVideoSubtitles(video: LibraryVideo) {
@@ -384,6 +405,17 @@ function seekToSubtitle(position: number) {
   const audio = backgroundAudioElement.value;
   if (player) player.currentTime = position;
   if (audio) audio.currentTime = position;
+  videoCurrentTime.value = position;
+  updateActiveSubtitle(position);
+}
+
+function seekVideoProgress(position: number | null) {
+  if (position === null || !Number.isFinite(position)) return;
+  const player = activeVideoElement.value;
+  const audio = backgroundAudioElement.value;
+  if (player) player.currentTime = position;
+  if (audio) audio.currentTime = position;
+  videoCurrentTime.value = position;
   updateActiveSubtitle(position);
 }
 
@@ -449,6 +481,8 @@ function synchronizeVideoToAudio() {
   const player = activeVideoElement.value;
   const audio = backgroundAudioElement.value;
   if (!player || !audio) return;
+  videoCurrentTime.value = audio.currentTime;
+  if (Number.isFinite(audio.duration)) videoDuration.value = audio.duration;
   updateActiveSubtitle(audio.currentTime);
   if (document.hidden) return;
   if (Math.abs(player.currentTime - audio.currentTime) > 0.45) player.currentTime = audio.currentTime;
@@ -456,15 +490,17 @@ function synchronizeVideoToAudio() {
   persistActiveVideoProgress(audio);
 }
 
-async function restoreVideoPosition(video: LibraryVideo) {
+async function handleVideoMetadataLoaded(video: LibraryVideo) {
   const player = activeVideoElement.value;
   const audio = backgroundAudioElement.value;
   if (!player || !audio) return;
+  videoDuration.value = Number.isFinite(player.duration) ? player.duration : video.durationSeconds;
   const progress = await loadContentProgress('video', video.id);
   if (!progress || progress.completed) return;
   const position = Math.min(progress.furthestPosition, Math.max(0, player.duration - 0.25));
   player.currentTime = position;
   audio.currentTime = position;
+  videoCurrentTime.value = position;
   updateActiveSubtitle(position);
 }
 
@@ -510,6 +546,7 @@ function handleBackgroundAudioEnded() {
   if (backgroundAudioElement.value) persistActiveVideoProgress(backgroundAudioElement.value, true);
   activeVideoElement.value?.pause();
   if (activeVideoElement.value) activeVideoElement.value.currentTime = 0;
+  videoCurrentTime.value = 0;
 }
 
 function stopActiveVideo() {

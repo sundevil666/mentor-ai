@@ -1435,6 +1435,27 @@ body .q-menu {
   max-height: 43%;
 }
 
+.video-progress {
+  align-items: center;
+  background: var(--app-surface-active);
+  display: grid;
+  flex: 0 0 auto;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 5px 18px 1px;
+}
+
+.video-progress span {
+  color: var(--app-muted-strong);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.video-progress .q-slider {
+  min-width: 0;
+}
+
 .video-subtitles {
   background: var(--app-surface-active);
   border: 1px solid var(--app-border);
