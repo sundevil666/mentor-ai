@@ -571,27 +571,6 @@
         </section>
       </transition>
     </section>
-
-    <nav class="mobile-start-dock" aria-label="Primary navigation">
-      <button
-        v-for="item in quickStartItems"
-        :key="item.key"
-        class="mobile-start-dock__button"
-        :class="{ 'mobile-start-dock__button--active': activeQuickStartKey === item.key }"
-        type="button"
-        @click="item.start"
-      >
-        <q-icon :name="item.icon" size="24px" />
-        <span>{{ item.label }}</span>
-      </button>
-      <router-link
-        class="mobile-start-dock__button"
-        :to="{ name: 'videos' }"
-      >
-        <q-icon name="video_library" size="24px" />
-        <span>Video</span>
-      </router-link>
-    </nav>
   </q-page>
 </template>
 
@@ -660,12 +639,6 @@ type ListeningSentenceItem = {
   text: string;
   startWordIndex: number;
   endWordIndex: number;
-};
-type QuickStartItem = {
-  key: string;
-  label: string;
-  icon: string;
-  start: () => void;
 };
 type TrainingLibraryKey = 'home' | 'listening' | 'speaking';
 type TrainingLibraryLesson = LessonChoice & { mode: 'listening' | 'speaking'; minutes: number };
@@ -938,48 +911,6 @@ const recommendedTraining = computed(() => {
   };
 });
 const priorityLesson = computed(() => createPriorityLesson(appStore.studentModel));
-const activeQuickStartKey = computed<QuickStartItem['key']>(() => {
-  if (!appStore.session) return selectedLessonLibrary.value;
-  const mode = appStore.session?.context.mode;
-
-  if (mode === 'speaking') {
-    return 'speaking';
-  }
-
-  if (mode === 'listening' || mode === 'bus' || mode === 'walking') {
-    return 'listening';
-  }
-
-  return 'home';
-});
-const quickStartItems = computed<QuickStartItem[]>(() => [
-  {
-    key: 'home',
-    label: 'Home',
-    icon: 'home',
-    start: () => {
-      selectedLessonLibrary.value = 'home';
-      void returnToLessonChoice().then(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
-    },
-  },
-  {
-    key: 'listening',
-    label: 'Listen',
-    icon: 'headphones',
-    start: () => {
-      void openTrainingLibrary('listening');
-    },
-  },
-  {
-    key: 'speaking',
-    label: 'Speak',
-    icon: 'record_voice_over',
-    start: () => {
-      void openTrainingLibrary('speaking');
-    },
-  },
-]);
-
 async function openTrainingLibrary(library: 'listening' | 'speaking') {
   if (appStore.session) await returnToLessonChoice();
   selectedLessonLibrary.value = library;
@@ -1082,6 +1013,22 @@ onUnmounted(() => {
   window.removeEventListener('offline', handleOffline);
   window.removeEventListener('beforeunload', handlePageExit);
 });
+
+watch(
+  () => route.query.training,
+  (training) => {
+    if (training === 'listening' || training === 'speaking') {
+      void openTrainingLibrary(training);
+      return;
+    }
+
+    selectedLessonLibrary.value = 'home';
+    if (appStore.session) {
+      void returnToLessonChoice();
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  },
+);
 
 watch(
   () => currentExercise.value?.id,

@@ -212,6 +212,19 @@
       </router-view>
     </q-page-container>
 
+    <nav class="mobile-start-dock" aria-label="Primary navigation">
+      <router-link
+        v-for="item in primaryNavigationItems"
+        :key="item.label"
+        class="mobile-start-dock__button"
+        :class="{ 'mobile-start-dock__button--active': item.isActive() }"
+        :to="item.to"
+      >
+        <q-icon :name="item.icon" size="24px" />
+        <span>{{ item.label }}</span>
+      </router-link>
+    </nav>
+
     <q-dialog v-model="showGoogleSignIn">
       <q-card class="google-sign-in-dialog">
         <q-card-section>
@@ -235,7 +248,12 @@
 import type { ConceptLevel, StudentModel } from '@mentor-ai/shared';
 import { Dark, Notify } from 'quasar';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import { onBeforeRouteUpdate, type RouteLocationNormalizedLoaded } from 'vue-router';
+import {
+  onBeforeRouteUpdate,
+  useRoute,
+  type RouteLocationNormalizedLoaded,
+  type RouteLocationRaw,
+} from 'vue-router';
 import { useAppStore } from 'src/stores/app-store';
 import { fetchAuthConfiguration, signInWithGoogleCredential } from 'src/services/auth';
 import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
@@ -266,6 +284,7 @@ declare global {
 }
 
 const appStore = useAppStore();
+const route = useRoute();
 const isDarkTheme = ref(false);
 const googleClientId = ref<string | null>(null);
 const googleSignInButton = ref<HTMLElement | null>(null);
@@ -350,6 +369,37 @@ const syncStatusTooltip = computed(() => {
 
   return 'Learning progress is synchronized.';
 });
+const primaryNavigationItems: Array<{
+  label: string;
+  icon: string;
+  to: RouteLocationRaw;
+  isActive: () => boolean;
+}> = [
+  {
+    label: 'Home',
+    icon: 'home',
+    to: { name: 'dashboard' },
+    isActive: () => route.name === 'dashboard' && route.query.training === undefined,
+  },
+  {
+    label: 'Listen',
+    icon: 'headphones',
+    to: { name: 'dashboard', query: { training: 'listening' } },
+    isActive: () => route.name === 'dashboard' && route.query.training === 'listening',
+  },
+  {
+    label: 'Speak',
+    icon: 'record_voice_over',
+    to: { name: 'dashboard', query: { training: 'speaking' } },
+    isActive: () => route.name === 'dashboard' && route.query.training === 'speaking',
+  },
+  {
+    label: 'Video',
+    icon: 'video_library',
+    to: { name: 'videos' },
+    isActive: () => route.name === 'videos',
+  },
+];
 
 onMounted(async () => {
   isPwaInstalled.value = isStandalonePwa();

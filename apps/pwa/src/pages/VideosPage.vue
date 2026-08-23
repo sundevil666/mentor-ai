@@ -89,52 +89,6 @@
         {{ offlineStorageSummary }} Offline copies stay only on this device and can be removed at any time.
       </p>
     </section>
-
-    <nav
-      class="mobile-start-dock"
-      aria-label="Primary navigation"
-    >
-      <router-link
-        class="mobile-start-dock__button"
-        :to="{ name: 'dashboard' }"
-      >
-        <q-icon
-          name="home"
-          size="24px"
-        />
-        <span>Home</span>
-      </router-link>
-      <router-link
-        class="mobile-start-dock__button"
-        :to="{ name: 'dashboard', query: { training: 'listening' } }"
-      >
-        <q-icon
-          name="headphones"
-          size="24px"
-        />
-        <span>Listen</span>
-      </router-link>
-      <router-link
-        class="mobile-start-dock__button"
-        :to="{ name: 'dashboard', query: { training: 'speaking' } }"
-      >
-        <q-icon
-          name="record_voice_over"
-          size="24px"
-        />
-        <span>Speak</span>
-      </router-link>
-      <router-link
-        class="mobile-start-dock__button mobile-start-dock__button--active"
-        :to="{ name: 'videos' }"
-      >
-        <q-icon
-          name="video_library"
-          size="24px"
-        />
-        <span>Video</span>
-      </router-link>
-    </nav>
   </q-page>
 </template>
 

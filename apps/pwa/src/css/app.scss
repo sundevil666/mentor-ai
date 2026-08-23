@@ -315,7 +315,7 @@ body .q-menu {
   align-items: flex-start;
   display: flex;
   min-height: calc(100vh - 51px);
-  padding: 24px max(24px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom))
+  padding: 24px max(24px, env(safe-area-inset-right)) calc(112px + env(safe-area-inset-bottom))
     max(24px, env(safe-area-inset-left));
 }
 
@@ -1612,7 +1612,7 @@ body .q-menu {
 
   .settings-page,
   .statistics-page {
-    padding: 18px max(16px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom))
+    padding: 18px max(16px, env(safe-area-inset-right)) calc(104px + env(safe-area-inset-bottom))
       max(16px, env(safe-area-inset-left));
   }
 
