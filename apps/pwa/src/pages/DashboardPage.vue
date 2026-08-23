@@ -157,10 +157,10 @@
               flat
               icon="arrow_back"
               round
-              aria-label="Back to choice"
-              @click="returnToLessonChoice"
+              :aria-label="lessonBackLabel"
+              @click="returnToLessonChoice()"
             >
-              <q-tooltip>Back to choice</q-tooltip>
+              <q-tooltip>{{ lessonBackLabel }}</q-tooltip>
             </q-btn>
             <div class="lesson-nav__status">
               <span>{{ appStore.lessonProgress }}% complete</span>
@@ -564,9 +564,9 @@
             color="primary"
             outline
             icon="arrow_back"
-            label="Back to choice"
+            :label="lessonBackLabel"
             no-caps
-            @click="returnToLessonChoice"
+            @click="returnToLessonChoice()"
           />
         </section>
       </transition>
@@ -642,6 +642,7 @@ type ListeningSentenceItem = {
   endWordIndex: number;
 };
 type TrainingLibraryKey = 'home' | 'listening' | 'speaking';
+type LessonReturnDestination = TrainingLibraryKey | 'specific-lessons';
 type TrainingLibraryLesson = LessonChoice & { mode: 'listening' | 'speaking'; minutes: number };
 
 const appStore = useAppStore();
@@ -657,6 +658,7 @@ const isListeningTranslationVisible = ref(false);
 const isListeningPlaylistVisible = ref(false);
 const isLessonLibraryVisible = ref(false);
 const selectedLessonLibrary = ref<TrainingLibraryKey>('home');
+const lessonReturnDestination = ref<LessonReturnDestination>('home');
 const libraryDownloadStatus = ref<Record<string, 'idle' | 'checking' | 'downloading' | 'ready' | 'error'>>({});
 const offlineAudioStatus = ref<'idle' | 'downloading' | 'ready' | 'error'>('idle');
 const offlineAudioProgress = ref(0);
@@ -887,6 +889,12 @@ const trainingLibraries: Record<'listening' | 'speaking', {
 const activeTrainingLibrary = computed(() =>
   selectedLessonLibrary.value === 'speaking' ? trainingLibraries.speaking : trainingLibraries.listening,
 );
+const lessonBackLabel = computed(() => {
+  if (lessonReturnDestination.value === 'listening') return 'Back to Listening lessons';
+  if (lessonReturnDestination.value === 'speaking') return 'Back to Speaking lessons';
+  if (lessonReturnDestination.value === 'specific-lessons') return 'Back to Specific lessons';
+  return 'Back to Home';
+});
 
 function deviceRecommendation(device: PreferredLessonDevice) {
   return device === 'mac'
@@ -921,6 +929,7 @@ async function openTrainingLibrary(library: 'listening' | 'speaking') {
 
 async function startLibraryLesson(lesson: TrainingLibraryLesson) {
   markOfflineLessonOpened(lesson.templateKey, lesson.mode);
+  lessonReturnDestination.value = selectedLessonLibrary.value;
   answer.value = '';
   setForwardTransition();
   await appStore.startLesson(createLearningContext(currentSuggestion.value, {
@@ -1033,7 +1042,7 @@ watch(
 
     selectedLessonLibrary.value = 'home';
     if (appStore.session) {
-      void returnToLessonChoice();
+      void returnToLessonChoice('home');
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   },
@@ -1101,6 +1110,7 @@ watch([activeWordIndex, activeWordEndIndex], () => {
 });
 
 async function startWithMode(mode: LearningMode) {
+  lessonReturnDestination.value = selectedLessonLibrary.value;
   answer.value = '';
   isLessonLibraryVisible.value = false;
   setForwardTransition();
@@ -1108,6 +1118,7 @@ async function startWithMode(mode: LearningMode) {
 }
 
 async function startConcept(concept: LearningConcept) {
+  lessonReturnDestination.value = selectedLessonLibrary.value;
   answer.value = '';
   isLessonLibraryVisible.value = false;
   setForwardTransition();
@@ -1120,6 +1131,7 @@ async function startConcept(concept: LearningConcept) {
 }
 
 async function startLessonChoice(concept: LearningConcept, lessonTemplateKey: string) {
+  lessonReturnDestination.value = 'specific-lessons';
   answer.value = '';
   isLessonLibraryVisible.value = false;
   setForwardTransition();
@@ -1574,7 +1586,8 @@ async function scrollActiveListeningPhraseIntoView() {
   }, 900);
 }
 
-async function returnToLessonChoice() {
+async function returnToLessonChoice(destination?: LessonReturnDestination) {
+  const returnDestination = destination ?? lessonReturnDestination.value;
   answer.value = '';
   isListeningPlaylistVisible.value = false;
   isLessonLibraryVisible.value = false;
@@ -1584,6 +1597,9 @@ async function returnToLessonChoice() {
   stopListeningAudio();
   setBackTransition();
   await appStore.returnToLessonChoice();
+  selectedLessonLibrary.value = returnDestination === 'specific-lessons' ? 'home' : returnDestination;
+  isLessonLibraryVisible.value = returnDestination === 'specific-lessons';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function setForwardTransition() {
