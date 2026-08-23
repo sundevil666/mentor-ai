@@ -20,7 +20,7 @@
           class="app-update-button"
           :aria-label="appUpdateTooltip"
           :color="appStore.availableAppUpdate ? 'amber-7' : undefined"
-          :disable="!appStore.isOnline || appStore.isAppUpdateInstalling"
+          :disable="appStore.isAppUpdateInstalling"
           flat
           :icon="appStore.isAppUpdateInstalling ? 'sync' : 'system_update_alt'"
           round
@@ -507,6 +507,10 @@ function markAllRead() {
 }
 
 function installAvailableUpdate() {
+  if (!navigator.onLine) {
+    Notify.create({ type: 'warning', icon: 'wifi_off', message: 'Internet is required to check for an app update' });
+    return;
+  }
   window.dispatchEvent(new CustomEvent(appStore.availableAppUpdate ? 'mentor-ai:install-update' : 'mentor-ai:check-update'));
 }
 

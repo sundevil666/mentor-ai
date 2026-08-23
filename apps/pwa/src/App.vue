@@ -31,6 +31,8 @@ onMounted(async () => {
   window.addEventListener('mentor-ai:check-update', handleManualUpdateCheck);
   document.addEventListener('visibilitychange', handleVisibilitySync);
   window.addEventListener('online', handleContentProgressSync);
+  window.addEventListener('online', handleOnline);
+  window.addEventListener('offline', handleOffline);
   navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
   stopUpdatePolling = startAppUpdatePolling(handleServerUpdateAvailable);
   startRemoteSyncPolling();
@@ -46,11 +48,16 @@ onUnmounted(() => {
   stopRemoteSyncPolling();
   stopUpdatePolling?.();
   window.removeEventListener('online', handleContentProgressSync);
+  window.removeEventListener('online', handleOnline);
+  window.removeEventListener('offline', handleOffline);
 });
 
 function handleContentProgressSync() {
   void syncAllContentProgress().catch(() => undefined);
 }
+
+function handleOnline() { appStore.setNetworkStatus(true); }
+function handleOffline() { appStore.setNetworkStatus(false); }
 
 function handleUpdateAvailable() {
   appStore.setAvailableAppUpdate('new version');
@@ -77,12 +84,19 @@ function handleInstallUpdateRequest() {
 }
 
 async function handleManualUpdateCheck() {
-  const result = await checkForAppUpdate();
-  if (result?.manifest && result.notification) {
-    handleServerUpdateAvailable(result);
-    Notify.create({ type: 'info', icon: 'system_update_alt', message: `Mentor AI ${result.manifest.version} is ready to install` });
+  if (!navigator.onLine) {
+    Notify.create({ type: 'warning', icon: 'wifi_off', message: 'Internet is required to update Mentor AI' });
     return;
   }
+  appStore.setAppUpdateInstalling(true);
+  const result = await checkForAppUpdate();
+  if (result?.manifest) {
+    handleServerUpdateAvailable(result);
+    appStore.setAppUpdateInstalling(false);
+    await installUpdate(result.manifest.version);
+    return;
+  }
+  appStore.setAppUpdateInstalling(false);
   Notify.create({ type: 'positive', icon: 'check_circle', message: 'Mentor AI is up to date' });
 }
 
