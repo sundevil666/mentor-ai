@@ -27,6 +27,7 @@
             muted
             playsinline
             preload="metadata"
+            @loadedmetadata="restoreVideoPosition(video)"
             @pause="handleVideoPause"
             @play="handleVideoPlay"
             @seeked="synchronizeAudioToVideo"
@@ -152,6 +153,7 @@ import {
 } from 'src/services/video-library';
 import { useAppStore } from 'src/stores/app-store';
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineVideo } from 'src/services/offline-library';
+import { loadContentProgress, saveContentProgress, syncAllContentProgress } from 'src/services/content-progress';
 
 const appStore = useAppStore();
 const cachedUrls = ref(new Set<string>());
@@ -160,6 +162,7 @@ const selectedVideoId = ref<string | null>(null);
 const activeVideoElement = ref<HTMLVideoElement | null>(null);
 const backgroundAudioElement = ref<HTMLAudioElement | null>(null);
 const isOnline = computed(() => appStore.isOnline);
+let lastProgressSaveAt = 0;
 const offlineStorageSummary = computed(() => {
   const cachedVideos = videoLibrary.filter((video) => cachedUrls.value.has(video.sourceUrl));
   const totalBytes = cachedVideos.reduce((total, video) => total + video.sizeBytes, 0);
@@ -170,6 +173,7 @@ const offlineStorageSummary = computed(() => {
 
 onMounted(() => {
   void refreshCacheStatus();
+  void syncAllContentProgress().catch(() => undefined);
   document.addEventListener('visibilitychange', handleVisibilityChange);
 });
 
@@ -235,6 +239,37 @@ function synchronizeVideoToAudio() {
   if (!player || !audio || document.hidden) return;
   if (Math.abs(player.currentTime - audio.currentTime) > 0.45) player.currentTime = audio.currentTime;
   updateVideoMediaPosition(audio);
+  persistActiveVideoProgress(audio);
+}
+
+async function restoreVideoPosition(video: LibraryVideo) {
+  const player = activeVideoElement.value;
+  const audio = backgroundAudioElement.value;
+  if (!player || !audio) return;
+  const progress = await loadContentProgress('video', video.id);
+  if (!progress || progress.completed) return;
+  const position = Math.min(progress.furthestPosition, Math.max(0, player.duration - 0.25));
+  player.currentTime = position;
+  audio.currentTime = position;
+}
+
+function persistActiveVideoProgress(audio: HTMLAudioElement, force = false) {
+  const video = videoLibrary.find((item) => item.id === selectedVideoId.value);
+  if (!video || !Number.isFinite(audio.currentTime)) return;
+  const timestamp = Date.now();
+  if (!force && timestamp - lastProgressSaveAt < 3000) return;
+  lastProgressSaveAt = timestamp;
+  const duration = Number.isFinite(audio.duration) ? audio.duration : video.durationSeconds;
+  void saveContentProgress({
+    studentId: appStore.studentId,
+    category: 'video',
+    contentId: video.id,
+    position: audio.currentTime,
+    furthestPosition: audio.currentTime,
+    duration,
+    completed: duration > 0 && audio.currentTime >= duration - 2,
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 function handleVisibilityChange() {
@@ -254,11 +289,13 @@ function handleVisibilityChange() {
 }
 
 function handleBackgroundAudioEnded() {
+  if (backgroundAudioElement.value) persistActiveVideoProgress(backgroundAudioElement.value, true);
   activeVideoElement.value?.pause();
   if (activeVideoElement.value) activeVideoElement.value.currentTime = 0;
 }
 
 function stopActiveVideo() {
+  if (backgroundAudioElement.value) persistActiveVideoProgress(backgroundAudioElement.value, true);
   activeVideoElement.value?.pause();
   backgroundAudioElement.value?.pause();
 }

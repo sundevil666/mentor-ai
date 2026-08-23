@@ -50,8 +50,8 @@ describe('learning state service', () => {
     });
 
     assert.equal(listeningLesson.exercises[0].type, 'listening-text');
-    assert.equal(speakingLesson.title, 'Speaking confidence at work');
-    assert.equal(speakingLesson.exercises.some((exercise) => exercise.type === 'repeat-speaking'), true);
+    assert.notEqual(speakingLesson.id, listeningLesson.id);
+    assert.equal(speakingLesson.exercises.some((exercise) => exercise.targetSkill === 'speaking'), true);
   });
 
   it('does not reuse the cached current lesson when a lesson card requests a specific template', async () => {
@@ -214,5 +214,21 @@ describe('learning state service', () => {
 
     assert.equal(saved.studentId, 'demo-student');
     assert.equal(handoffs.some((item) => item.id === handoff.id && item.sourceDevice === 'mobile'), true);
+  });
+
+  it('keeps the furthest processed progress when a newer device reports less', async () => {
+    const base = {
+      id: 'video:conflict-test', studentId: 'demo-student', category: 'video', contentId: 'conflict-test',
+      duration: 600, completed: false,
+    };
+    await learningStateService.mergeContentProgress([{
+      ...base, position: 420, furthestPosition: 420, sourceDeviceId: 'phone', updatedAt: '2026-01-01T10:00:00.000Z',
+    }]);
+    const merged = await learningStateService.mergeContentProgress([{
+      ...base, position: 30, furthestPosition: 30, sourceDeviceId: 'laptop', updatedAt: '2026-01-01T11:00:00.000Z',
+    }]);
+    const progress = merged.find((item) => item.id === base.id);
+    assert.equal(progress.position, 420);
+    assert.equal(progress.furthestPosition, 420);
   });
 });

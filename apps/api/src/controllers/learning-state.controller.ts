@@ -1,5 +1,5 @@
 import type { RequestHandler } from 'express';
-import type { ExerciseResult, LearningContext, LearningEvent, LearningSessionHandoff, SpeechResult } from '@mentor-ai/shared';
+import type { ContentProgress, ExerciseResult, LearningContext, LearningEvent, LearningSessionHandoff, SpeechResult } from '@mentor-ai/shared';
 import { learningStateService } from '../services/learning-state.service.js';
 import { sendData } from './http-response.js';
 
@@ -15,6 +15,12 @@ export const listSessionHandoffs: RequestHandler = sendData((req) => learningSta
 
 export const upsertSessionHandoff: RequestHandler = sendData((req) =>
   learningStateService.upsertSessionHandoff(req.body as LearningSessionHandoff, req.authUser),
+);
+
+export const listContentProgress: RequestHandler = sendData((req) => learningStateService.listContentProgress(req.authUser));
+
+export const mergeContentProgress: RequestHandler = sendData((req) =>
+  learningStateService.mergeContentProgress(Array.isArray(req.body?.progress) ? req.body.progress as ContentProgress[] : [], req.authUser),
 );
 
 export const synchronizeLearningEvents: RequestHandler = async (req, res, next) => {

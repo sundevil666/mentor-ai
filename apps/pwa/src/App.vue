@@ -16,6 +16,7 @@ import {
   type AppUpdateCheckResult,
 } from 'src/services/app-update';
 import { useAppStore } from 'src/stores/app-store';
+import { syncAllContentProgress } from 'src/services/content-progress';
 
 const appStore = useAppStore();
 const router = useRouter();
@@ -27,6 +28,7 @@ onMounted(async () => {
   window.addEventListener('mentor-ai:update-available', handleUpdateAvailable);
   window.addEventListener('mentor-ai:install-update', handleInstallUpdateRequest);
   document.addEventListener('visibilitychange', handleVisibilitySync);
+  window.addEventListener('online', handleContentProgressSync);
   navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
   stopUpdatePolling = startAppUpdatePolling(handleServerUpdateAvailable);
   startRemoteSyncPolling();
@@ -40,7 +42,12 @@ onUnmounted(() => {
   navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
   stopRemoteSyncPolling();
   stopUpdatePolling?.();
+  window.removeEventListener('online', handleContentProgressSync);
 });
+
+function handleContentProgressSync() {
+  void syncAllContentProgress().catch(() => undefined);
+}
 
 function handleUpdateAvailable() {
   appStore.setAvailableAppUpdate('new version');

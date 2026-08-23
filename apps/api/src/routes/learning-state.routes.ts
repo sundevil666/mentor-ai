@@ -5,6 +5,8 @@ import {
   getRecommendations,
   getStudentState,
   listSessionHandoffs,
+  listContentProgress,
+  mergeContentProgress,
   synchronizeLearningEvents,
   upsertSessionHandoff,
 } from '../controllers/learning-state.controller.js';
@@ -20,5 +22,7 @@ learningStateRouter.post('/lessons/current', getCurrentLesson);
 learningStateRouter.get('/recommendations', getRecommendations);
 learningStateRouter.get('/session-handoffs', listSessionHandoffs);
 learningStateRouter.put('/session-handoffs', upsertSessionHandoff);
+learningStateRouter.get('/content-progress', listContentProgress);
+learningStateRouter.post('/content-progress-synchronize', mergeContentProgress);
 learningStateRouter.get('/configuration', getConfiguration);
 learningStateRouter.post('/synchronization', synchronizeLearningEvents);

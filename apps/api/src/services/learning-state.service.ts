@@ -5,6 +5,7 @@ import {
   type ExerciseResult,
   type GeneratedLesson,
   type LearningSessionHandoff,
+  type ContentProgress,
   type LearningContext,
   type LearningEvent,
   type SpeechResult,
@@ -67,6 +68,27 @@ export const learningStateService = {
     return state.sessionHandoffs.filter((handoff) => handoff.studentId === state.student.id);
   },
 
+  async listContentProgress(user?: AuthenticatedUser) {
+    const state = await learningStateRepository.read(user);
+    return state.contentProgress.filter((progress) => progress.studentId === state.student.id);
+  },
+
+  async mergeContentProgress(incoming: ContentProgress[], user?: AuthenticatedUser) {
+    const state = await learningStateRepository.read(user);
+    const merged = new Map(state.contentProgress.map((progress) => [progress.id, progress]));
+
+    for (const candidate of incoming) {
+      if (candidate.studentId !== state.student.id || !candidate.contentId || !Number.isFinite(candidate.position)) continue;
+      const safe = sanitizeContentProgress(candidate);
+      const current = merged.get(safe.id);
+      merged.set(safe.id, current ? mergeProgress(current, safe) : safe);
+    }
+
+    const contentProgress = [...merged.values()];
+    await learningStateRepository.write({ ...state, contentProgress }, user);
+    return contentProgress;
+  },
+
   async upsertSessionHandoff(handoff: LearningSessionHandoff, user?: AuthenticatedUser) {
     const state = await learningStateRepository.read(user);
 
@@ -75,9 +97,13 @@ export const learningStateService = {
     }
 
     const safeHandoff = sanitizeSessionHandoff(handoff);
+    const previous = state.sessionHandoffs.find((item) => item.id === safeHandoff.id);
+    const resolvedHandoff = previous && previous.lesson.id === safeHandoff.lesson.id
+      ? mergeSessionHandoff(previous, safeHandoff)
+      : safeHandoff;
     const sessionHandoffs = [
-      ...state.sessionHandoffs.filter((item) => item.id !== safeHandoff.id),
-      safeHandoff,
+      ...state.sessionHandoffs.filter((item) => item.id !== resolvedHandoff.id),
+      resolvedHandoff,
     ].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 
     await learningStateRepository.write({
@@ -85,7 +111,7 @@ export const learningStateService = {
       sessionHandoffs,
     }, user);
 
-    return safeHandoff;
+    return resolvedHandoff;
   },
 
   async synchronize(
@@ -520,4 +546,42 @@ function promoteTeacherMemory(
 
 function now(): string {
   return new Date().toISOString();
+}
+
+function sanitizeContentProgress(progress: ContentProgress): ContentProgress {
+  const duration = progress.duration && Number.isFinite(progress.duration) ? Math.max(0, progress.duration) : undefined;
+  const position = Math.max(0, duration ? Math.min(progress.position, duration) : progress.position);
+  return {
+    ...progress,
+    id: `${progress.category}:${progress.contentId}`,
+    position,
+    furthestPosition: Math.max(position, progress.furthestPosition || 0),
+    duration,
+    completed: Boolean(progress.completed),
+  };
+}
+
+export function mergeProgress(current: ContentProgress, incoming: ContentProgress): ContentProgress {
+  const furthestPosition = Math.max(current.furthestPosition, incoming.furthestPosition);
+  const winner = incoming.furthestPosition > current.furthestPosition
+    ? incoming
+    : incoming.furthestPosition < current.furthestPosition
+      ? current
+      : incoming.updatedAt >= current.updatedAt ? incoming : current;
+  return {
+    ...winner,
+    position: furthestPosition,
+    furthestPosition,
+    duration: Math.max(current.duration ?? 0, incoming.duration ?? 0) || undefined,
+    completed: current.completed || incoming.completed,
+    updatedAt: current.updatedAt >= incoming.updatedAt ? current.updatedAt : incoming.updatedAt,
+  };
+}
+
+function mergeSessionHandoff(current: LearningSessionHandoff, incoming: LearningSessionHandoff): LearningSessionHandoff {
+  if (incoming.currentExerciseIndex > current.currentExerciseIndex) return incoming;
+  if (incoming.currentExerciseIndex < current.currentExerciseIndex) return current;
+  if (incoming.results.length > current.results.length) return incoming;
+  if (incoming.results.length < current.results.length) return current;
+  return incoming.updatedAt >= current.updatedAt ? incoming : current;
 }

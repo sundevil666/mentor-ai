@@ -5,6 +5,7 @@ import {
   demoStudent,
   initialStudentModel,
   type GeneratedLesson,
+  type ContentProgress,
   type ExerciseResult,
   type LearningSessionHandoff,
   type LearningEvent,
@@ -36,6 +37,7 @@ interface LearningStateRecord {
   teacherMemory: TeacherMemory[];
   acknowledgements: SynchronizationAcknowledgement[];
   sessionHandoffs: LearningSessionHandoff[];
+  contentProgress: ContentProgress[];
 }
 
 const demoState: LearningStateRecord = {
@@ -51,6 +53,7 @@ const demoState: LearningStateRecord = {
   teacherMemory: [],
   acknowledgements: [],
   sessionHandoffs: [],
+  contentProgress: [],
 };
 
 export const learningStateRepository = {
@@ -116,6 +119,7 @@ function normalizeState(state: Partial<LearningStateRecord>, user?: Authenticate
     teacherMemory: state.teacherMemory ?? [],
     acknowledgements: state.acknowledgements ?? [],
     sessionHandoffs: state.sessionHandoffs ?? [],
+    contentProgress: state.contentProgress ?? [],
   };
 }
 

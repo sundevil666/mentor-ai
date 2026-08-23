@@ -441,6 +441,23 @@ export interface LearningSessionHandoff {
   updatedAt: string;
 }
 
+export type ContentProgressCategory = 'lesson' | 'video' | 'audio' | 'reading' | 'vocabulary';
+
+/** Durable, device-independent resume state. `furthestPosition` is monotonic and
+ * prevents a newer device that only opened content from erasing real progress. */
+export interface ContentProgress {
+  id: string;
+  studentId: string;
+  category: ContentProgressCategory;
+  contentId: string;
+  position: number;
+  furthestPosition: number;
+  duration?: number;
+  completed: boolean;
+  sourceDeviceId: string;
+  updatedAt: string;
+}
+
 export interface StatisticsSnapshot {
   id: string;
   studentId: string;

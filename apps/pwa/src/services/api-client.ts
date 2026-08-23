@@ -1,5 +1,6 @@
 import type {
   ApiResponse,
+  ContentProgress,
   ExerciseResult,
   GeneratedLesson,
   LearningContext,
@@ -118,6 +119,16 @@ export async function upsertSessionHandoff(handoff: LearningSessionHandoff): Pro
 
   const body = (await response.json()) as ApiResponse<LearningSessionHandoff>;
   return body.data;
+}
+
+export async function synchronizeContentProgress(progress: ContentProgress[]): Promise<ContentProgress[]> {
+  const response = await fetch(`${apiBaseUrl}/api/content-progress-synchronize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ progress }),
+  });
+  if (!response.ok) throw new Error('Content progress synchronization failed.');
+  return ((await response.json()) as ApiResponse<ContentProgress[]>).data;
 }
 
 export async function synchronizeLearningEvidence(

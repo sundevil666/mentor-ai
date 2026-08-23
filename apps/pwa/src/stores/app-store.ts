@@ -52,6 +52,7 @@ import {
 } from 'src/services/storage-retention';
 import { readPreferredWorkShift, savePreferredWorkShift } from 'src/services/user-preferences';
 import { formatDisplayDate } from 'src/services/date-format';
+import { saveContentProgress } from 'src/services/content-progress';
 import {
   fetchMyShiftActivity,
   isMyShiftConnected,
@@ -230,8 +231,13 @@ export const useAppStore = defineStore('app', {
 
       if (isOnline) {
         void this.refreshMyShiftActivity();
-        void this.refreshRemoteLearningState();
+        void this.publishLocalProgressAfterReconnect();
       }
+    },
+
+    async publishLocalProgressAfterReconnect() {
+      await this.publishSessionHandoff();
+      await this.refreshRemoteLearningState();
     },
 
     async startLesson(context?: LearningContext) {
@@ -610,6 +616,16 @@ export const useAppStore = defineStore('app', {
       const session = toStorageRecord(this.session);
       await db.put('learning-sessions', session, sessionStoreKey);
       await db.put('lessons', session.lesson);
+      await saveContentProgress({
+        studentId: this.studentId,
+        category: 'lesson',
+        contentId: session.lesson.id,
+        position: session.currentExerciseIndex,
+        furthestPosition: session.currentExerciseIndex,
+        duration: session.lesson.exercises.length,
+        completed: Boolean(session.completedAt),
+        updatedAt: session.completedAt ?? now(),
+      });
     },
 
     async persistStudentModel() {
