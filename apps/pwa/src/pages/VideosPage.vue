@@ -38,14 +38,8 @@
           />
           <div class="video-card__body">
             <div class="video-card__heading">
-              <q-icon
-                class="video-card__icon"
-                name="smart_display"
-                size="34px"
-              />
               <div>
                 <h2>{{ video.title }}</h2>
-                <span>{{ video.sourceLabel }}</span>
               </div>
               <q-badge
                 v-if="cachedUrls.has(video.sourceUrl)"

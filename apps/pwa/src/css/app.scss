@@ -1378,7 +1378,6 @@ body .q-menu {
 
 .videos-header span,
 .video-storage-note,
-.video-card__heading span,
 .video-card__body p {
   color: var(--app-muted-strong);
 }
@@ -1512,20 +1511,11 @@ body .q-menu {
   min-width: 0;
 }
 
-.video-card__icon {
-  color: var(--app-accent);
-  flex: 0 0 auto;
-}
-
 .video-card__heading h2 {
   color: var(--app-text-strong);
   font-size: 1.25rem;
   line-height: 1.25;
   margin: 0 0 4px;
-}
-
-.video-card__heading span {
-  font-size: 0.78rem;
 }
 
 .video-card__body p {
