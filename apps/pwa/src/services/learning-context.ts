@@ -66,7 +66,7 @@ export function createCurrentActivitySuggestion(
   const nextWindow = day.recommendedLearningWindows
     .filter((window) => new Date(window.endsAt) > date)
     .sort((left, right) => right.priority - left.priority)[0];
-  const workShift = day.dayType === 'day_off' ? 'off' : inferRemoteShift(day.shift?.startsAt) ?? fallback.workShift;
+  const workShift = getSynchronizedWorkShift(myShiftActivity, date) ?? fallback.workShift;
 
   if (current?.type === 'commute') {
     return {
@@ -142,9 +142,22 @@ export function createCurrentActivitySuggestion(
   return { ...fallback, workShift, reason: `My Shift schedule is connected. ${fallback.reason}` };
 }
 
-function inferRemoteShift(startsAt?: string): WorkShift | null {
+export function getSynchronizedWorkShift(activity: MyShiftActivity | null, date = new Date()): WorkShift | null {
+  const day = findCurrentMyShiftDay(activity, date);
+  if (!day) return null;
+  if (day.dayType === 'day_off' || day.timeline.some((item) => item.type === 'day_off')) return 'off';
+  return inferRemoteShift(day.shift?.startsAt, activity?.user.timezone);
+}
+
+function inferRemoteShift(startsAt?: string, timeZone?: string): WorkShift | null {
   if (!startsAt) return null;
-  const hour = new Date(startsAt).getHours();
+  const hourPart = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(startsAt)).find((part) => part.type === 'hour')?.value;
+  const hour = Number(hourPart);
+  if (!Number.isFinite(hour)) return null;
   if (hour >= 4 && hour < 10) return 'first';
   if (hour >= 10 && hour < 18) return 'second';
   return 'third';

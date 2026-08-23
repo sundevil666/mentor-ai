@@ -60,12 +60,15 @@
           <span>{{ myShiftStatus }}</span>
         </div>
         <q-select
-          v-model="selectedShift"
+          :model-value="displayedShift"
           :options="shiftOptions"
           emit-value
           map-options
-          label="Current shift"
+          :label="myShiftConnected ? 'Shift synchronized from My Shift' : 'Current shift (manual)'"
           outlined
+          :disable="myShiftConnected"
+          :hint="myShiftConnected ? 'Managed by My Shift while synchronization is connected.' : 'Used only when My Shift synchronization is off.'"
+          persistent-hint
           @update:model-value="saveShift"
         />
       </section>
@@ -138,6 +141,7 @@ import {
   createShiftTimingRows,
   formatActivityMeta,
   formatPaceLabel,
+  getSynchronizedWorkShift,
 } from 'src/services/learning-context';
 import { clearLastRoutePreference } from 'src/services/user-preferences';
 import { useAppStore } from 'src/stores/app-store';
@@ -206,6 +210,10 @@ const voiceStatus = computed(() => {
 const currentSuggestion = computed(() =>
   createCurrentActivitySuggestion(appStore.preferredWorkShift, appStore.activitySnapshots, new Date(), appStore.myShiftActivity),
 );
+const synchronizedShift = computed(() => getSynchronizedWorkShift(appStore.myShiftActivity));
+const displayedShift = computed(() => myShiftConnected.value
+  ? synchronizedShift.value ?? 'unknown'
+  : selectedShift.value);
 const myShiftStatus = computed(() => {
   if (myShiftMessage.value) return myShiftMessage.value;
   if (!myShiftConfigured) return 'Client ID must be configured before connecting.';
@@ -214,7 +222,7 @@ const myShiftStatus = computed(() => {
   const synchronized = appStore.myShiftLastSyncAt
     ? ` Last synchronized ${formatDisplayDate(appStore.myShiftLastSyncAt)}.`
     : '';
-  return `Connected. Your schedule guides lesson timing.${synchronized}`;
+  return `Connected. Synced shift: ${shiftLabel(synchronizedShift.value)}.${synchronized}`;
 });
 const activityMeta = computed(() => formatActivityMeta(currentSuggestion.value));
 const paceLabel = computed(() => formatPaceLabel(currentSuggestion.value));
@@ -258,7 +266,8 @@ async function handleMyShiftAction() {
       return;
     }
     await appStore.refreshMyShiftActivity();
-    myShiftMessage.value = appStore.myShiftSyncError ?? 'Schedule synchronized.';
+    myShiftMessage.value = appStore.myShiftSyncError
+      ?? `Schedule synchronized. Current shift: ${shiftLabel(synchronizedShift.value)}.`;
   } catch (error) {
     myShiftMessage.value = error instanceof Error ? error.message : 'My Shift request failed.';
   } finally {
@@ -283,7 +292,12 @@ onUnmounted(() => {
 });
 
 function saveShift(value: WorkShift) {
+  if (myShiftConnected.value) return;
   appStore.setPreferredWorkShift(value);
+}
+
+function shiftLabel(shift: WorkShift | null) {
+  return shiftOptions.find((option) => option.value === shift)?.label ?? 'Unknown';
 }
 
 function testVoice() {

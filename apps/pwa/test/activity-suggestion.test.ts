@@ -6,6 +6,7 @@ import { inferActivitySuggestion } from '../src/services/activity-suggestion.js'
 import {
   createCurrentActivitySuggestion,
   createPriorityLesson,
+  getSynchronizedWorkShift,
 } from '../src/services/learning-context.js';
 import { isMyShiftSyncDue, type MyShiftActivity } from '../src/services/my-shift.js';
 
@@ -111,6 +112,14 @@ describe('PWA activity suggestion', () => {
     assert.equal(suggestion.mode, 'home');
     assert.equal(suggestion.activityPace, 'active');
     assert.match(suggestion.reason, /focused video/);
+  });
+
+  it('shows the synchronized shift using the My Shift timezone', () => {
+    const activity = createWorkdayActivity('2026-06-29T20:00:00.000Z', '2026-06-30T04:00:00.000Z');
+    activity.user.timezone = 'Europe/Bratislava';
+
+    assert.equal(getSynchronizedWorkShift(activity, new Date('2026-06-29T21:00:00.000Z')), 'third');
+    assert.equal(createCurrentActivitySuggestion('second', [], new Date('2026-06-29T21:00:00.000Z'), activity).workShift, 'third');
   });
 });
 
