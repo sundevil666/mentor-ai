@@ -41,6 +41,12 @@
               <div>
                 <h2>{{ video.title }}</h2>
               </div>
+            </div>
+            <p>{{ video.description }}</p>
+            <div class="video-card__meta">
+              <span><q-icon name="school" /> {{ video.level }}</span>
+              <span><q-icon name="schedule" /> {{ formatVideoDuration(video.durationSeconds) }}</span>
+              <span><q-icon name="storage" /> {{ formatVideoSize(video.sizeBytes) }}</span>
               <q-btn
                 v-if="cachedUrls.has(video.sourceUrl)"
                 aria-label="Delete offline video"
@@ -68,12 +74,6 @@
               >
                 <q-tooltip>Save video for offline viewing</q-tooltip>
               </q-btn>
-            </div>
-            <p>{{ video.description }}</p>
-            <div class="video-card__meta">
-              <span><q-icon name="school" /> {{ video.level }}</span>
-              <span><q-icon name="schedule" /> {{ formatVideoDuration(video.durationSeconds) }}</span>
-              <span><q-icon name="storage" /> {{ formatVideoSize(video.sizeBytes) }}</span>
             </div>
           </div>
         </article>

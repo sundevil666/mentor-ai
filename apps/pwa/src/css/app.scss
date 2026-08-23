@@ -1573,6 +1573,7 @@ body .q-menu {
   background: color-mix(in srgb, var(--app-surface) 88%, transparent);
   border: 1px solid var(--app-border-strong);
   flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .video-card__heading h2 {
