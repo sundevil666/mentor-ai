@@ -599,6 +599,7 @@
 import type { LearningConcept, LearningMode, PreferredLessonDevice } from '@mentor-ai/shared';
 import { getPreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import {
   createPriorityLesson,
   createCurrentActivitySuggestion,
@@ -670,6 +671,7 @@ type TrainingLibraryKey = 'home' | 'listening' | 'speaking';
 type TrainingLibraryLesson = LessonChoice & { mode: 'listening' | 'speaking'; minutes: number };
 
 const appStore = useAppStore();
+const route = useRoute();
 const answer = ref('');
 const activeWordIndex = ref(0);
 const activeWordEndIndex = ref(0);
@@ -1061,6 +1063,10 @@ function libraryDownloadIcon(templateKey: string) {
 onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();
+  }
+
+  if (route.query.training === 'listening' || route.query.training === 'speaking') {
+    await openTrainingLibrary(route.query.training);
   }
 
   window.addEventListener('online', handleOnline);

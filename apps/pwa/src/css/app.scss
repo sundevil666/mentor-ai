@@ -1371,7 +1371,6 @@ body .q-menu {
 .video-library {
   display: grid;
   gap: 18px;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
 }
 
 .video-card {
@@ -1400,7 +1399,16 @@ body .q-menu {
   align-items: flex-start;
   display: flex;
   gap: 12px;
-  justify-content: space-between;
+}
+
+.video-card__heading > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.video-card__icon {
+  color: var(--app-accent);
+  flex: 0 0 auto;
 }
 
 .video-card__heading h2 {
@@ -1433,56 +1441,20 @@ body .q-menu {
   gap: 5px;
 }
 
-.video-card__body > .q-btn {
-  min-height: 48px;
+.video-card__actions {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.video-card__actions > .q-btn {
+  min-height: 46px;
 }
 
 .video-storage-note {
   font-size: 0.84rem;
   margin: 0;
   text-align: center;
-}
-
-.video-bottom-dock {
-  background: color-mix(in srgb, var(--app-surface) 96%, transparent);
-  border: 1px solid var(--app-border-strong);
-  border-radius: 18px;
-  bottom: max(14px, env(safe-area-inset-bottom));
-  box-shadow: 0 18px 42px rgba(17, 24, 39, 0.16);
-  display: grid;
-  gap: 6px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  left: 50%;
-  max-width: 360px;
-  padding: 8px;
-  position: fixed;
-  transform: translateX(-50%);
-  width: min(360px, calc(100vw - 24px));
-  z-index: 5;
-}
-
-.video-bottom-dock a {
-  align-items: center;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  color: var(--app-muted-strong);
-  display: grid;
-  font-size: 0.78rem;
-  font-weight: 800;
-  gap: 3px;
-  justify-items: center;
-  min-height: 58px;
-  padding: 7px;
-  text-decoration: none;
-}
-
-.video-bottom-dock a:hover,
-.video-bottom-dock a:focus-visible,
-.video-bottom-dock .video-bottom-dock__active {
-  background: var(--app-surface-active);
-  border-color: var(--app-primary);
-  color: var(--app-primary);
-  outline: none;
 }
 
 .activity-signal {
@@ -1893,13 +1865,9 @@ body .q-menu {
     padding: 22px 14px 104px;
   }
 
-  .video-bottom-dock {
-    border-radius: 16px 16px 0 0;
-    border-width: 1px 0 0;
-    bottom: 0;
-    max-width: none;
-    padding: 8px 8px max(8px, env(safe-area-inset-bottom));
-    width: 100%;
+  .video-card__meta {
+    flex-wrap: wrap;
+    gap: 8px 14px;
   }
 
   .learning-overview,
