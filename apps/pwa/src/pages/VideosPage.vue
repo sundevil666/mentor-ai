@@ -16,7 +16,18 @@
           v-for="video in videoLibrary"
           :key="video.id"
           class="video-card"
+          :class="{ 'video-card--open': selectedVideoId === video.id }"
+          role="link"
+          tabindex="0"
+          @click="handleVideoCardClick($event, video.id)"
+          @keydown.enter="handleVideoCardKeydown($event, video.id)"
+          @keydown.space.prevent="handleVideoCardKeydown($event, video.id)"
         >
+          <q-icon
+            v-if="selectedVideoId !== video.id"
+            class="video-card__play-backdrop"
+            name="play_circle"
+          />
           <video
             v-if="selectedVideoId === video.id"
             ref="activeVideoElement"
@@ -93,14 +104,6 @@
               <span><q-icon name="storage" /> {{ formatVideoSize(video.sizeBytes) }}</span>
             </div>
             <div class="video-card__actions">
-              <q-btn
-                color="primary"
-                :icon="selectedVideoId === video.id ? 'close' : 'play_arrow'"
-                :label="selectedVideoId === video.id ? 'Close' : 'Watch'"
-                no-caps
-                outline
-                @click="toggleVideo(video.id)"
-              />
               <q-btn
                 v-if="cachedUrls.has(video.sourceUrl)"
                 color="negative"
@@ -222,6 +225,18 @@ onUnmounted(() => {
 
 async function refreshCacheStatus() {
   cachedUrls.value = await getCachedVideoUrls();
+}
+
+function handleVideoCardClick(event: MouseEvent, videoId: string) {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (target.closest('button, video, audio, .video-playback-settings')) return;
+  void toggleVideo(videoId);
+}
+
+function handleVideoCardKeydown(event: KeyboardEvent, videoId: string) {
+  if (event.target !== event.currentTarget) return;
+  void toggleVideo(videoId);
 }
 
 async function toggleVideo(videoId: string) {
