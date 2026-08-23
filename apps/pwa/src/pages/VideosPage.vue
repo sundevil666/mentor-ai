@@ -2,13 +2,23 @@
   <q-page class="videos-page">
     <section class="videos-shell">
       <header class="videos-header">
+        <q-btn
+          v-if="selectedVideo"
+          aria-label="Back to video list"
+          color="primary"
+          flat
+          icon="arrow_back"
+          round
+          @click="closeVideo"
+        />
         <div>
           <p>Real English</p>
-          <h1>Videos</h1>
+          <h1>{{ selectedVideo?.title ?? 'Videos' }}</h1>
         </div>
       </header>
 
       <section
+        v-if="!selectedVideo"
         class="video-library"
         aria-label="Video library"
       >
@@ -16,7 +26,6 @@
           v-for="video in videoLibrary"
           :key="video.id"
           class="video-card"
-          :class="{ 'video-card--open': selectedVideoId === video.id }"
           role="link"
           tabindex="0"
           @click="handleVideoCardClick($event, video.id)"
@@ -24,62 +33,9 @@
           @keydown.space.prevent="handleVideoCardKeydown($event, video.id)"
         >
           <q-icon
-            v-if="selectedVideoId !== video.id"
             class="video-card__play-backdrop"
             name="play_circle"
           />
-          <video
-            v-if="selectedVideoId === video.id"
-            ref="activeVideoElement"
-            class="video-card__player"
-            :src="video.sourceUrl"
-            controls
-            :loop="activeRepeat"
-            playsinline
-            preload="metadata"
-            @loadedmetadata="restoreVideoPosition(video)"
-            @pause="handleVideoPause"
-            @play="handleVideoPlay"
-            @seeked="synchronizeAudioToVideo"
-          />
-          <audio
-            v-if="selectedVideoId === video.id"
-            ref="backgroundAudioElement"
-            :src="video.sourceUrl"
-            :loop="activeRepeat"
-            preload="metadata"
-            @ended="handleBackgroundAudioEnded"
-            @timeupdate="synchronizeVideoToAudio"
-          />
-          <div
-            v-if="selectedVideoId === video.id"
-            class="video-playback-settings"
-          >
-            <q-toggle
-              :model-value="activeRepeat"
-              color="primary"
-              icon="repeat"
-              label="Repeat video"
-              left-label
-              @update:model-value="setVideoRepeat"
-            />
-            <div
-              class="video-speed-controls"
-              aria-label="Playback speed"
-            >
-              <span>Speed</span>
-              <q-btn
-                v-for="rate in videoPlaybackRates"
-                :key="rate"
-                :color="activePlaybackRate === rate ? 'primary' : undefined"
-                :label="`${rate}×`"
-                :outline="activePlaybackRate !== rate"
-                no-caps
-                unelevated
-                @click="setVideoPlaybackRate(rate)"
-              />
-            </div>
-          </div>
           <div class="video-card__body">
             <div class="video-card__heading">
               <q-icon
@@ -103,34 +59,96 @@
               <span><q-icon name="schedule" /> {{ formatVideoDuration(video.durationSeconds) }}</span>
               <span><q-icon name="storage" /> {{ formatVideoSize(video.sizeBytes) }}</span>
             </div>
-            <div class="video-card__actions">
-              <q-btn
-                v-if="cachedUrls.has(video.sourceUrl)"
-                color="negative"
-                icon="delete_outline"
-                label="Delete from cache"
-                no-caps
-                outline
-                :loading="busyVideoId === video.id"
-                @click="removeVideo(video)"
-              />
-              <q-btn
-                v-else
-                color="primary"
-                icon="download_for_offline"
-                label="Save offline"
-                no-caps
-                unelevated
-                :disable="!isOnline"
-                :loading="busyVideoId === video.id"
-                @click="saveVideo(video)"
-              />
-            </div>
           </div>
         </article>
       </section>
 
-      <p class="video-storage-note">
+      <section
+        v-else
+        class="video-detail"
+      >
+        <video
+          ref="activeVideoElement"
+          class="video-card__player"
+          :src="selectedVideo.sourceUrl"
+          controls
+          :loop="activeRepeat"
+          playsinline
+          preload="metadata"
+          @loadedmetadata="restoreVideoPosition(selectedVideo)"
+          @pause="handleVideoPause"
+          @play="handleVideoPlay"
+          @seeked="synchronizeAudioToVideo"
+        />
+        <audio
+          ref="backgroundAudioElement"
+          :src="selectedVideo.sourceUrl"
+          :loop="activeRepeat"
+          preload="metadata"
+          @ended="handleBackgroundAudioEnded"
+          @timeupdate="synchronizeVideoToAudio"
+        />
+        <div class="video-playback-settings">
+          <q-toggle
+            :model-value="activeRepeat"
+            color="primary"
+            icon="repeat"
+            label="Repeat video"
+            left-label
+            @update:model-value="setVideoRepeat"
+          />
+          <div
+            class="video-speed-controls"
+            aria-label="Playback speed"
+          >
+            <span>Speed</span>
+            <q-btn
+              v-for="rate in videoPlaybackRates"
+              :key="rate"
+              :color="activePlaybackRate === rate ? 'primary' : undefined"
+              :label="`${rate}×`"
+              :outline="activePlaybackRate !== rate"
+              no-caps
+              unelevated
+              @click="setVideoPlaybackRate(rate)"
+            />
+          </div>
+        </div>
+        <div class="video-detail__body">
+          <p>{{ selectedVideo.description }}</p>
+          <div class="video-card__meta">
+            <span><q-icon name="school" /> {{ selectedVideo.level }}</span>
+            <span><q-icon name="schedule" /> {{ formatVideoDuration(selectedVideo.durationSeconds) }}</span>
+            <span><q-icon name="storage" /> {{ formatVideoSize(selectedVideo.sizeBytes) }}</span>
+          </div>
+          <q-btn
+            v-if="cachedUrls.has(selectedVideo.sourceUrl)"
+            color="negative"
+            icon="delete_outline"
+            label="Delete from cache"
+            no-caps
+            outline
+            :loading="busyVideoId === selectedVideo.id"
+            @click="removeVideo(selectedVideo)"
+          />
+          <q-btn
+            v-else
+            color="primary"
+            icon="download_for_offline"
+            label="Save offline"
+            no-caps
+            unelevated
+            :disable="!isOnline"
+            :loading="busyVideoId === selectedVideo.id"
+            @click="saveVideo(selectedVideo)"
+          />
+        </div>
+      </section>
+
+      <p
+        v-if="!selectedVideo"
+        class="video-storage-note"
+      >
         {{ offlineStorageSummary }} Offline copies stay only on this device and can be removed at any time.
       </p>
     </section>
@@ -202,6 +220,7 @@ const backgroundAudioElement = ref<HTMLAudioElement | null>(null);
 const activeRepeat = ref(true);
 const activePlaybackRate = ref<VideoPlaybackRate>(1);
 const isOnline = computed(() => appStore.isOnline);
+const selectedVideo = computed(() => videoLibrary.find((video) => video.id === selectedVideoId.value) ?? null);
 let lastProgressSaveAt = 0;
 const offlineStorageSummary = computed(() => {
   const cachedVideos = videoLibrary.filter((video) => cachedUrls.value.has(video.sourceUrl));
@@ -269,6 +288,12 @@ async function toggleVideo(videoId: string) {
   } catch {
     Notify.create({ type: 'negative', message: 'Tap play to start this video.' });
   }
+}
+
+function closeVideo() {
+  stopActiveVideo();
+  selectedVideoId.value = null;
+  clearVideoMediaSession();
 }
 
 function setVideoRepeat(repeat: boolean) {

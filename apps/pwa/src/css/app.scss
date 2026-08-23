@@ -1363,6 +1363,12 @@ body .q-menu {
   text-transform: uppercase;
 }
 
+.videos-header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
 .videos-header h1 {
   color: var(--app-text-strong);
   font-size: clamp(2rem, 6vw, 3rem);
@@ -1404,8 +1410,28 @@ body .q-menu {
   transform: translateY(-2px);
 }
 
-.video-card--open {
-  cursor: default;
+.video-detail {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  box-shadow: 0 14px 34px rgba(17, 24, 39, 0.08);
+  overflow: hidden;
+}
+
+.video-detail__body {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.video-detail__body > p {
+  color: var(--app-muted-strong);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.video-detail__body > .q-btn {
+  min-height: 48px;
 }
 
 .video-card__play-backdrop {
