@@ -10,6 +10,10 @@ module.exports = async (request, response) => {
 
     const { learningStateService } = await import('../apps/api/src/services/learning-state.service.js');
     const body = await readJsonBody(request);
+    if (Array.isArray(body?.progress)) {
+      sendJson(response, 200, await learningStateService.mergeContentProgress(body.progress, user));
+      return;
+    }
     const events = Array.isArray(body?.events) ? body.events : [];
     const exerciseResults = Array.isArray(body?.exerciseResults) ? body.exerciseResults : [];
     const speechResults = Array.isArray(body?.speechResults) ? body.speechResults : [];

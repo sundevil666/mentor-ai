@@ -122,7 +122,7 @@ export async function upsertSessionHandoff(handoff: LearningSessionHandoff): Pro
 }
 
 export async function synchronizeContentProgress(progress: ContentProgress[]): Promise<ContentProgress[]> {
-  const response = await fetch(`${apiBaseUrl}/api/content-progress-synchronize`, {
+  const response = await fetch(`${apiBaseUrl}/api/synchronization`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ progress }),
