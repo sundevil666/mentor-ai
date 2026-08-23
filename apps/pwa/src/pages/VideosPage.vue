@@ -5,7 +5,6 @@
         <div>
           <p>Real English</p>
           <h1>Videos</h1>
-          <span>Watch online or save a video on this device for offline listening.</span>
         </div>
       </header>
 
