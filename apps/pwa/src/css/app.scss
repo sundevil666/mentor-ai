@@ -1456,6 +1456,16 @@ body .q-menu {
   max-height: 43%;
 }
 
+.video-detail--subtitles-hidden > .video-card__player {
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 0;
+}
+
+.video-detail--subtitles-hidden .video-detail__body {
+  flex: 0 0 auto;
+}
+
 .video-progress {
   align-items: center;
   background: var(--app-surface-active);

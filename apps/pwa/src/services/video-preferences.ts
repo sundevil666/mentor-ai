@@ -4,10 +4,11 @@ export type VideoPlaybackRate = (typeof videoPlaybackRates)[number];
 export type VideoPlaybackPreference = {
   repeat: boolean;
   playbackRate: VideoPlaybackRate;
+  subtitlesVisible: boolean;
 };
 
 const storageKey = 'mentor_ai_video_playback_preferences';
-const defaultPreference: VideoPlaybackPreference = { repeat: true, playbackRate: 1 };
+const defaultPreference: VideoPlaybackPreference = { repeat: true, playbackRate: 1, subtitlesVisible: true };
 
 export function readVideoPlaybackPreference(videoId: string): VideoPlaybackPreference {
   if (typeof localStorage === 'undefined') return { ...defaultPreference };
@@ -44,5 +45,6 @@ function validatePreference(value: unknown): VideoPlaybackPreference {
   return {
     repeat: typeof candidate.repeat === 'boolean' ? candidate.repeat : true,
     playbackRate,
+    subtitlesVisible: typeof candidate.subtitlesVisible === 'boolean' ? candidate.subtitlesVisible : true,
   };
 }

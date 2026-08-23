@@ -88,6 +88,7 @@
       <section
         v-else
         class="video-detail"
+        :class="{ 'video-detail--subtitles-hidden': !activeSubtitlesVisible }"
       >
         <video
           ref="activeVideoElement"
@@ -140,6 +141,16 @@
             icon="repeat"
             @update:model-value="setVideoRepeat"
           />
+          <q-btn
+            :aria-label="activeSubtitlesVisible ? 'Hide subtitles' : 'Show subtitles'"
+            :color="activeSubtitlesVisible ? 'primary' : undefined"
+            flat
+            :icon="activeSubtitlesVisible ? 'subtitles' : 'subtitles_off'"
+            round
+            @click="setSubtitlesVisible(!activeSubtitlesVisible)"
+          >
+            <q-tooltip>{{ activeSubtitlesVisible ? 'Hide subtitles' : 'Show subtitles' }}</q-tooltip>
+          </q-btn>
           <div
             class="video-speed-controls"
             aria-label="Playback speed"
@@ -190,6 +201,7 @@
             </q-btn>
           </div>
           <div
+            v-if="activeSubtitlesVisible"
             ref="subtitleScroller"
             class="video-subtitles"
             aria-label="English subtitles"
@@ -299,6 +311,7 @@ const activeVideoElement = ref<HTMLVideoElement | null>(null);
 const backgroundAudioElement = ref<HTMLAudioElement | null>(null);
 const activeRepeat = ref(true);
 const activePlaybackRate = ref<VideoPlaybackRate>(1);
+const activeSubtitlesVisible = ref(true);
 const videoCurrentTime = ref(0);
 const videoDuration = ref(0);
 const subtitleCues = ref<VideoSubtitleCue[]>([]);
@@ -357,6 +370,7 @@ async function toggleVideo(videoId: string) {
   const playbackPreference = readVideoPlaybackPreference(videoId);
   activeRepeat.value = playbackPreference.repeat;
   activePlaybackRate.value = playbackPreference.playbackRate;
+  activeSubtitlesVisible.value = playbackPreference.subtitlesVisible;
   videoCurrentTime.value = 0;
   videoDuration.value = 0;
   selectedVideoId.value = videoId;
@@ -449,6 +463,15 @@ function setVideoPlaybackRate(playbackRate: VideoPlaybackRate) {
   saveActiveVideoPlaybackPreference();
 }
 
+function setSubtitlesVisible(visible: boolean) {
+  activeSubtitlesVisible.value = visible;
+  saveActiveVideoPlaybackPreference();
+  if (visible) {
+    activeSubtitleCueId.value = null;
+    void nextTick(() => updateActiveSubtitle(backgroundAudioElement.value?.currentTime ?? 0));
+  }
+}
+
 function applyPlaybackRate(playbackRate: VideoPlaybackRate) {
   if (activeVideoElement.value) activeVideoElement.value.playbackRate = playbackRate;
   if (backgroundAudioElement.value) backgroundAudioElement.value.playbackRate = playbackRate;
@@ -459,6 +482,7 @@ function saveActiveVideoPlaybackPreference() {
   saveVideoPlaybackPreference(selectedVideoId.value, {
     repeat: activeRepeat.value,
     playbackRate: activePlaybackRate.value,
+    subtitlesVisible: activeSubtitlesVisible.value,
   });
 }
 
