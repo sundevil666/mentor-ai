@@ -1,9 +1,6 @@
 <template>
   <q-layout view="hHh lpR fFf">
-    <q-header
-      bordered
-      class="app-header"
-    >
+    <q-header bordered class="app-header">
       <q-toolbar>
         <q-btn
           class="network-status-button"
@@ -44,34 +41,17 @@
           :icon="syncStatusIcon"
           round
         >
-          <q-badge
-            v-if="appStore.pendingSyncCount > 0"
-            color="deep-orange-7"
-            floating
-          >
+          <q-badge v-if="appStore.pendingSyncCount > 0" color="deep-orange-7" floating>
             {{ appStore.pendingSyncCount }}
           </q-badge>
           <q-tooltip>{{ syncStatusTooltip }}</q-tooltip>
         </q-btn>
-        <q-btn
-          class="update-log-button"
-          flat
-          icon="notifications"
-          round
-        >
-          <q-badge
-            v-if="appStore.unreadUpdateNotificationCount > 0"
-            color="red-7"
-            floating
-          >
+        <q-btn class="update-log-button" flat icon="notifications" round>
+          <q-badge v-if="appStore.unreadUpdateNotificationCount > 0" color="red-7" floating>
             {{ appStore.unreadUpdateNotificationCount }}
           </q-badge>
           <q-tooltip>Update notifications</q-tooltip>
-          <q-menu
-            anchor="bottom right"
-            self="top right"
-            class="update-log-menu"
-          >
+          <q-menu anchor="bottom right" self="top right" class="update-log-menu">
             <div class="update-log">
               <div class="update-log__header">
                 <div>
@@ -90,10 +70,7 @@
                 </q-btn>
               </div>
 
-              <q-list
-                v-if="appStore.updateNotifications.length > 0"
-                separator
-              >
+              <q-list v-if="appStore.updateNotifications.length > 0" separator>
                 <q-item
                   v-for="notification in appStore.updateNotifications"
                   :key="notification.id"
@@ -130,63 +107,33 @@
                 </q-item>
               </q-list>
 
-              <div
-                v-else
-                class="update-log__empty"
-              >
-                No updates yet.
-              </div>
+              <div v-else class="update-log__empty">No updates yet.</div>
             </div>
           </q-menu>
         </q-btn>
-        <q-btn
-          class="more-nav-button"
-          flat
-          icon="more_vert"
-          round
-        >
+        <q-btn class="more-nav-button" flat icon="more_vert" round>
           <q-tooltip>More</q-tooltip>
-          <q-menu
-            anchor="bottom right"
-            self="top right"
-          >
-            <q-list
-              class="more-nav-menu"
-              dense
-            >
-              <q-item
-                clickable
-                :to="{ name: 'statistics' }"
-              >
+          <q-menu anchor="bottom right" self="top right">
+            <q-list class="more-nav-menu" dense>
+              <q-item clickable :to="{ name: 'statistics' }">
                 <q-item-section avatar>
                   <q-icon name="query_stats" />
                 </q-item-section>
                 <q-item-section>Statistics</q-item-section>
               </q-item>
-              <q-item
-                clickable
-                :to="{ name: 'settings' }"
-              >
+              <q-item clickable :to="{ name: 'settings' }">
                 <q-item-section avatar>
                   <q-icon name="settings" />
                 </q-item-section>
                 <q-item-section>Settings</q-item-section>
               </q-item>
-              <q-item
-                v-if="showInstallButton"
-                clickable
-                @click="installPwa"
-              >
+              <q-item v-if="showInstallButton" clickable @click="installPwa">
                 <q-item-section avatar>
                   <q-icon :name="installButtonIcon" />
                 </q-item-section>
                 <q-item-section>Install</q-item-section>
               </q-item>
-              <q-item
-                v-if="!appStore.authSession"
-                clickable
-                @click="signInWithGoogle"
-              >
+              <q-item v-if="!appStore.authSession" clickable @click="signInWithGoogle">
                 <q-item-section avatar>
                   <q-icon name="login" />
                 </q-item-section>
@@ -203,21 +150,14 @@
                   </q-item-label>
                 </q-item-section>
               </q-item>
-              <q-item
-                v-if="appStore.authSession"
-                clickable
-                @click="signOut"
-              >
+              <q-item v-if="appStore.authSession" clickable @click="signOut">
                 <q-item-section avatar>
                   <q-icon name="logout" />
                 </q-item-section>
                 <q-item-section>Sign out</q-item-section>
               </q-item>
               <q-separator />
-              <q-item
-                clickable
-                @click="toggleTheme"
-              >
+              <q-item clickable @click="toggleTheme">
                 <q-item-section avatar>
                   <q-icon :name="isDarkTheme ? 'light_mode' : 'dark_mode'" />
                 </q-item-section>
@@ -233,34 +173,22 @@
       <q-card class="ios-install-menu">
         <div class="ios-install">
           <div class="ios-install__icon">
-            <img
-              src="/icons/apple-icon-180x180.png"
-              alt=""
-            >
+            <img src="/icons/apple-icon-180x180.png" alt="" />
           </div>
           <div class="ios-install__copy">
             <strong>Install Mentor AI</strong>
             <span>{{ installHelpDescription }}</span>
           </div>
           <q-list dense>
-            <q-item
-              v-for="step in installHelpSteps"
-              :key="step.text"
-            >
+            <q-item v-for="step in installHelpSteps" :key="step.text">
               <q-item-section avatar>
                 <q-icon :name="step.icon" />
               </q-item-section>
               <q-item-section>{{ step.text }}</q-item-section>
             </q-item>
           </q-list>
-          <div
-            v-if="installHelp === 'ios-safari'"
-            class="ios-install__next-action"
-          >
-            <q-icon
-              name="ios_share"
-              size="28px"
-            />
+          <div v-if="installHelp === 'ios-safari'" class="ios-install__next-action">
+            <q-icon name="ios_share" size="28px" />
             <span>
               Closing this guide does not install the app. Next, tap the Safari Share button.
             </span>
@@ -278,23 +206,35 @@
 
     <q-page-container class="app-page-container">
       <router-view v-slot="{ Component, route }">
-        <transition
-          :name="routeTransitionName"
-        >
-          <component
-            :is="Component"
-            :key="route.name ?? route.fullPath"
-          />
+        <transition :name="routeTransitionName">
+          <component :is="Component" :key="route.name ?? route.fullPath" />
         </transition>
       </router-view>
     </q-page-container>
+
+    <q-dialog v-model="showGoogleSignIn">
+      <q-card class="google-sign-in-dialog">
+        <q-card-section>
+          <div class="text-h6">Sign in to Mentor AI</div>
+          <div class="text-body2 text-grey-7 q-mt-sm">
+            Continue with your Google account to synchronize your learning progress.
+          </div>
+        </q-card-section>
+        <q-card-section class="google-sign-in-dialog__button">
+          <div ref="googleSignInButton" />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn v-close-popup flat label="Cancel" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-layout>
 </template>
 
 <script setup lang="ts">
 import type { ConceptLevel, StudentModel } from '@mentor-ai/shared';
 import { Dark, Notify } from 'quasar';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { onBeforeRouteUpdate, type RouteLocationNormalizedLoaded } from 'vue-router';
 import { useAppStore } from 'src/stores/app-store';
 import { fetchAuthConfiguration, signInWithGoogleCredential } from 'src/services/auth';
@@ -311,8 +251,14 @@ declare global {
     google?: {
       accounts?: {
         id?: {
-          initialize(options: { client_id: string; callback(response: { credential?: string }): void }): void;
-          prompt(): void;
+          initialize(options: {
+            client_id: string;
+            callback(response: { credential?: string }): void;
+          }): void;
+          renderButton(
+            parent: HTMLElement,
+            options: { theme: string; size: string; width: number },
+          ): void;
         };
       };
     };
@@ -322,13 +268,17 @@ declare global {
 const appStore = useAppStore();
 const isDarkTheme = ref(false);
 const googleClientId = ref<string | null>(null);
+const googleSignInButton = ref<HTMLElement | null>(null);
+const showGoogleSignIn = ref(false);
 const routeTransitionName = ref('route-slide-forward');
 const levelTrend = computed(() => createLevelTrend(appStore.studentModel));
 const deferredInstallPrompt = ref<BeforeInstallPromptEvent | null>(null);
 const isPwaInstalled = ref(false);
 const showInstallHelp = ref(false);
 const showInstallButton = computed(() => !isPwaInstalled.value);
-const installButtonIcon = computed(() => deferredInstallPrompt.value ? 'install_mobile' : 'add_to_home_screen');
+const installButtonIcon = computed(() =>
+  deferredInstallPrompt.value ? 'install_mobile' : 'add_to_home_screen',
+);
 const installHelp = computed(() => getInstallHelp());
 const installHelpDescription = computed(() => {
   if (installHelp.value === 'ios-safari') {
@@ -420,9 +370,8 @@ onBeforeUnmount(() => {
 });
 
 onBeforeRouteUpdate((to, from) => {
-  routeTransitionName.value = getRouteOrder(to) < getRouteOrder(from)
-    ? 'route-slide-back'
-    : 'route-slide-forward';
+  routeTransitionName.value =
+    getRouteOrder(to) < getRouteOrder(from) ? 'route-slide-back' : 'route-slide-forward';
 });
 
 function formatDate(value: string) {
@@ -470,7 +419,11 @@ async function installPwa() {
   const choice = await prompt.userChoice;
   deferredInstallPrompt.value = null;
   if (choice.outcome === 'dismissed') {
-    Notify.create({ message: 'Installation cancelled', caption: 'You can install Mentor AI later.', timeout: 3500 });
+    Notify.create({
+      message: 'Installation cancelled',
+      caption: 'You can install Mentor AI later.',
+      timeout: 3500,
+    });
   }
 }
 
@@ -501,16 +454,56 @@ async function signInWithGoogle() {
     return;
   }
 
-  await loadGoogleIdentityScript();
-  window.google?.accounts?.id?.initialize({
-    client_id: googleClientId.value,
-    callback: (response) => {
-      if (response.credential) {
-        void signInWithGoogleCredential(response.credential).then((session) => appStore.signIn(session));
-      }
-    },
-  });
-  window.google?.accounts?.id?.prompt();
+  showGoogleSignIn.value = true;
+
+  try {
+    await loadGoogleIdentityScript();
+    await nextTick();
+
+    const googleIdentity = window.google?.accounts?.id;
+    const button = googleSignInButton.value;
+    if (!googleIdentity || !button) {
+      throw new Error('Google Sign-In is unavailable.');
+    }
+
+    googleIdentity.initialize({
+      client_id: googleClientId.value,
+      callback: (response) => {
+        if (!response.credential) return;
+
+        void completeGoogleSignIn(response.credential);
+      },
+    });
+    button.replaceChildren();
+    googleIdentity.renderButton(button, {
+      theme: isDarkTheme.value ? 'filled_black' : 'outline',
+      size: 'large',
+      width: 280,
+    });
+  } catch {
+    showGoogleSignIn.value = false;
+    Notify.create({
+      type: 'negative',
+      icon: 'error',
+      message: 'Could not open Google sign-in',
+      caption: 'Check your internet connection and try again.',
+    });
+  }
+}
+
+async function completeGoogleSignIn(credential: string) {
+  try {
+    const session = await signInWithGoogleCredential(credential);
+    await appStore.signIn(session);
+    showGoogleSignIn.value = false;
+  } catch {
+    Notify.create({
+      type: 'negative',
+      icon: 'error',
+      message: 'Google sign-in failed',
+      caption: 'Make sure this Google account is allowed and try again.',
+    });
+  }
 }
 
 function signOut() {
@@ -572,5 +565,4 @@ function conceptLevelToCefr(level: ConceptLevel): string {
       return 'B1';
   }
 }
-
 </script>

@@ -306,7 +306,8 @@ body .q-menu {
   align-items: flex-start;
   display: flex;
   min-height: calc(100vh - 51px);
-  padding: 24px max(24px, env(safe-area-inset-right)) calc(112px + env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  padding: 24px max(24px, env(safe-area-inset-right)) calc(112px + env(safe-area-inset-bottom))
+    max(24px, env(safe-area-inset-left));
 }
 
 .settings-page,
@@ -314,7 +315,8 @@ body .q-menu {
   align-items: flex-start;
   display: flex;
   min-height: calc(100vh - 51px);
-  padding: 24px max(24px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  padding: 24px max(24px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom))
+    max(24px, env(safe-area-inset-left));
 }
 
 .learning-shell {
@@ -788,7 +790,10 @@ body .q-menu {
   min-width: 0;
   padding: 10px;
   text-align: left;
-  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
   width: 100%;
 }
 
@@ -872,7 +877,9 @@ body .q-menu {
   line-height: 1.55;
   margin: 0;
   min-height: 1.55em;
-  transition: color 160ms ease, opacity 160ms ease;
+  transition:
+    color 160ms ease,
+    opacity 160ms ease;
 }
 
 .lesson-stage .listening-player__sentence--previous,
@@ -900,7 +907,9 @@ body .q-menu {
 .listening-player__token {
   border-radius: 5px;
   padding: 1px 2px;
-  transition: background-color 160ms ease, color 160ms ease;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
 }
 
 .listening-player__token--past {
@@ -1558,7 +1567,8 @@ body .q-menu {
   .app-header .q-toolbar {
     gap: 2px;
     min-height: calc(54px + env(safe-area-inset-top));
-    padding: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+    padding: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) 0
+      max(8px, env(safe-area-inset-left));
   }
 
   .app-header .q-btn {
@@ -1580,7 +1590,8 @@ body .q-menu {
 
   .learning-page {
     align-items: flex-start;
-    padding: 14px max(16px, env(safe-area-inset-right)) calc(104px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    padding: 14px max(16px, env(safe-area-inset-right)) calc(104px + env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
   }
 
   .priority-lesson {
@@ -1601,7 +1612,8 @@ body .q-menu {
 
   .settings-page,
   .statistics-page {
-    padding: 18px max(16px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    padding: 18px max(16px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
   }
 
   .settings-shell,
@@ -1970,5 +1982,13 @@ body .q-menu {
   .settings-nav-button .q-btn__content span {
     display: none;
   }
+}
+.google-sign-in-dialog {
+  width: min(360px, calc(100vw - 32px));
+}
 
+.google-sign-in-dialog__button {
+  display: flex;
+  justify-content: center;
+  min-height: 60px;
 }
