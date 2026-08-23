@@ -18,7 +18,10 @@ export async function cacheMyShiftActivity(
   activity: MyShiftActivity,
   synchronizedAt = new Date().toISOString(),
 ): Promise<MyShiftActivityCache> {
-  const cached: MyShiftActivityCache = { id: activityCacheKey, activity, synchronizedAt };
+  // IndexedDB cannot clone Vue/Pinia Proxy objects. Serializing also guarantees
+  // that only the Activity API JSON contract is persisted in the offline cache.
+  const snapshot = JSON.parse(JSON.stringify(activity)) as MyShiftActivity;
+  const cached: MyShiftActivityCache = { id: activityCacheKey, activity: snapshot, synchronizedAt };
   const db = await mentorDb;
   await db.put('my-shift-cache', cached);
   return cached;

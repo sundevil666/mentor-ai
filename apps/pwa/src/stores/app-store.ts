@@ -385,8 +385,9 @@ export const useAppStore = defineStore('app', {
       const to = toLocalDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7));
 
       try {
-        this.myShiftActivity = await fetchMyShiftActivity(from, to);
-        const cached = await cacheMyShiftActivity(this.myShiftActivity);
+        const activity = await fetchMyShiftActivity(from, to);
+        const cached = await cacheMyShiftActivity(activity);
+        this.myShiftActivity = activity;
         this.myShiftLastSyncAt = cached.synchronizedAt;
         this.myShiftSyncError = null;
       } catch (error) {
