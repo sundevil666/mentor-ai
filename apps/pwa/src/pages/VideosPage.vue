@@ -136,38 +136,6 @@
           </div>
         </div>
         <div class="video-detail__body">
-          <div
-            ref="subtitleScroller"
-            class="video-subtitles"
-            aria-label="English subtitles"
-            aria-live="polite"
-          >
-            <p
-              v-if="subtitleStatus === 'loading'"
-              class="video-subtitles__status"
-            >
-              Loading English subtitles…
-            </p>
-            <p
-              v-else-if="subtitleStatus === 'error'"
-              class="video-subtitles__status"
-            >
-              English subtitles are temporarily unavailable.
-            </p>
-            <template v-else>
-              <button
-                v-for="cue in subtitleCues"
-                :key="cue.id"
-                class="video-subtitles__cue"
-                :class="{ 'video-subtitles__cue--active': activeSubtitleCueId === cue.id }"
-                :data-cue-id="cue.id"
-                type="button"
-                @click="seekToSubtitle(cue.start)"
-              >
-                {{ cue.text }}
-              </button>
-            </template>
-          </div>
           <div class="video-card__meta video-detail__meta">
             <span><q-icon name="school" /> {{ selectedVideo.level }}</span>
             <span><q-icon name="schedule" /> {{ formatVideoDuration(selectedVideo.durationSeconds) }}</span>
@@ -199,6 +167,38 @@
             >
               <q-tooltip>Save video for offline viewing</q-tooltip>
             </q-btn>
+          </div>
+          <div
+            ref="subtitleScroller"
+            class="video-subtitles"
+            aria-label="English subtitles"
+            aria-live="polite"
+          >
+            <p
+              v-if="subtitleStatus === 'loading'"
+              class="video-subtitles__status"
+            >
+              Loading English subtitles…
+            </p>
+            <p
+              v-else-if="subtitleStatus === 'error'"
+              class="video-subtitles__status"
+            >
+              English subtitles are temporarily unavailable.
+            </p>
+            <template v-else>
+              <button
+                v-for="cue in subtitleCues"
+                :key="cue.id"
+                class="video-subtitles__cue"
+                :class="{ 'video-subtitles__cue--active': activeSubtitleCueId === cue.id }"
+                :data-cue-id="cue.id"
+                type="button"
+                @click="seekToSubtitle(cue.start)"
+              >
+                {{ cue.text }}
+              </button>
+            </template>
           </div>
         </div>
       </section>
