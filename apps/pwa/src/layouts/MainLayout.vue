@@ -99,7 +99,7 @@
                   <q-item-section>
                     <q-item-label>{{ notification.title }}</q-item-label>
                     <q-item-label caption>
-                      Version {{ notification.version }} · {{ formatDate(notification.createdAt) }}
+                      {{ notification.kind === 'lessons' ? 'Offline lessons' : `Version ${notification.version}` }} · {{ formatDate(notification.createdAt) }}
                     </q-item-label>
                     <q-item-label caption>
                       {{ notification.message }}
@@ -470,6 +470,7 @@ onBeforeUnmount(() => {
 async function checkOfflineLessons(showResult: boolean) {
   try {
     const result = await updateOfflineLessons();
+    if (result.downloaded > 0) await appStore.recordLessonUpdateNotification(result.downloaded, result.eventId);
     if (!showResult) return;
     Notify.create({
       type: 'positive',

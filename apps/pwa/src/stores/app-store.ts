@@ -85,7 +85,10 @@ export interface UpdateNotification {
   createdAt: string;
   viewedAt: string | null;
   readAt: string | null;
+  kind?: 'app' | 'lessons';
 }
+
+const maxUpdateNotifications = 5;
 
 type QueuedLearningEvent = LearningEvent & {
   status: string;
@@ -258,7 +261,11 @@ export const useAppStore = defineStore('app', {
       this.pendingSyncEvents = queuedEvents.filter((event) => event.status === 'pending').length;
       this.updateNotifications = (updateNotifications as UpdateNotification[]).sort((left, right) =>
         right.createdAt.localeCompare(left.createdAt),
-      );
+      ).slice(0, maxUpdateNotifications);
+      const retainedNotificationIds = new Set(this.updateNotifications.map((notification) => notification.id));
+      for (const notification of updateNotifications as UpdateNotification[]) {
+        if (!retainedNotificationIds.has(notification.id)) await db.delete('update-notifications', notification.id);
+      }
       this.myShiftActivity = myShiftCache?.activity ?? null;
       this.myShiftLastSyncAt = myShiftCache?.synchronizedAt ?? null;
       this.isOnline = navigator.onLine;
@@ -578,12 +585,40 @@ export const useAppStore = defineStore('app', {
         createdAt,
         viewedAt: null,
         readAt: null,
+        kind: 'app',
       };
 
-      await db.put('update-notifications', notification);
-      this.updateNotifications = [notification, ...this.updateNotifications];
+      await this.saveUpdateNotification(notification);
 
       return notification;
+    },
+
+    async recordLessonUpdateNotification(downloaded: number, eventId: string) {
+      const createdAt = now();
+      const id = `lessons-${eventId}`;
+      const existing = this.updateNotifications.find((notification) => notification.id === id);
+      if (existing) return existing;
+      const notification: UpdateNotification = {
+        id,
+        version: 'offline',
+        title: 'Lessons updated',
+        message: `${downloaded} current lesson${downloaded === 1 ? '' : 's'} downloaded and available offline.`,
+        createdAt,
+        viewedAt: null,
+        readAt: null,
+        kind: 'lessons',
+      };
+      await this.saveUpdateNotification(notification);
+      return notification;
+    },
+
+    async saveUpdateNotification(notification: UpdateNotification) {
+      const db = await mentorDb;
+      await db.put('update-notifications', notification);
+      const next = [notification, ...this.updateNotifications.filter((item) => item.id !== notification.id)]
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+      this.updateNotifications = next.slice(0, maxUpdateNotifications);
+      for (const removed of next.slice(maxUpdateNotifications)) await db.delete('update-notifications', removed.id);
     },
 
     async prepareForAppUpdate() {
@@ -612,8 +647,8 @@ export const useAppStore = defineStore('app', {
       };
       const db = await mentorDb;
 
-      await db.delete('update-notifications', updated.id);
-      this.updateNotifications = this.updateNotifications.filter((item) => item.id !== id);
+      await db.put('update-notifications', updated);
+      this.updateNotifications = this.updateNotifications.map((item) => item.id === id ? updated : item);
     },
 
     async markAllUpdateNotificationsRead() {
@@ -625,11 +660,13 @@ export const useAppStore = defineStore('app', {
 
       const db = await mentorDb;
 
-      for (const notification of unread) {
-        await db.delete('update-notifications', notification.id);
-      }
-
-      this.updateNotifications = this.updateNotifications.filter((notification) => notification.readAt !== null);
+      const readAt = now();
+      this.updateNotifications = this.updateNotifications.map((notification) => notification.readAt ? notification : {
+        ...notification,
+        viewedAt: notification.viewedAt ?? readAt,
+        readAt,
+      });
+      for (const notification of this.updateNotifications) await db.put('update-notifications', notification);
     },
 
     async finishLesson(completedAt: string) {

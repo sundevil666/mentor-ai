@@ -20,7 +20,7 @@ export interface OfflineLessonUpdateState {
 
 const listeners = new Set<(state: OfflineLessonUpdateState) => void>();
 let state: OfflineLessonUpdateState = { status: 'idle', completed: 0, total: 0, lastCheckedAt: null };
-let activeUpdate: Promise<{ downloaded: number; current: boolean }> | null = null;
+let activeUpdate: Promise<{ downloaded: number; current: boolean; eventId: string }> | null = null;
 
 export function getOfflineLessonUpdateState() { return state; }
 export function subscribeOfflineLessonUpdates(listener: (state: OfflineLessonUpdateState) => void) {
@@ -29,13 +29,14 @@ export function subscribeOfflineLessonUpdates(listener: (state: OfflineLessonUpd
   return () => listeners.delete(listener);
 }
 
-export function updateOfflineLessons(): Promise<{ downloaded: number; current: boolean }> {
+export function updateOfflineLessons(): Promise<{ downloaded: number; current: boolean; eventId: string }> {
   if (activeUpdate) return activeUpdate;
   activeUpdate = performUpdate().finally(() => { activeUpdate = null; });
   return activeUpdate;
 }
 
 async function performUpdate() {
+  const eventId = new Date().toISOString();
   setState({ status: 'checking', completed: 0, total: 0 });
   try {
     const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
@@ -50,7 +51,7 @@ async function performUpdate() {
     if (pending.length === 0) {
       await cleanupExpiredOfflineLessons();
       setState({ status: 'ready', completed: lessons.length, total: lessons.length, lastCheckedAt: new Date().toISOString() });
-      return { downloaded: 0, current: true };
+      return { downloaded: 0, current: true, eventId };
     }
 
     setState({ status: 'downloading', completed: 0, total: pending.length });
@@ -66,7 +67,7 @@ async function performUpdate() {
     await refreshOfflineSizes();
     await cleanupExpiredOfflineLessons();
     setState({ status: 'ready', completed: lessons.length, total: lessons.length, lastCheckedAt: new Date().toISOString() });
-    return { downloaded: completed, current: false };
+    return { downloaded: completed, current: false, eventId };
   } catch (error) {
     setState({ status: 'error', lastCheckedAt: new Date().toISOString() });
     throw error;
