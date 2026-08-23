@@ -107,17 +107,15 @@
         <div class="video-playback-settings">
           <q-toggle
             :model-value="activeRepeat"
+            aria-label="Repeat video"
             color="primary"
             icon="repeat"
-            label="Repeat video"
-            left-label
             @update:model-value="setVideoRepeat"
           />
           <div
             class="video-speed-controls"
             aria-label="Playback speed"
           >
-            <span>Speed</span>
             <q-btn
               v-for="rate in videoPlaybackRates"
               :key="rate"

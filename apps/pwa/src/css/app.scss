@@ -1474,16 +1474,11 @@ body .q-menu {
 
 .video-speed-controls {
   align-items: center;
-  display: flex;
+  display: grid;
+  flex: 1;
   gap: 7px;
-}
-
-.video-speed-controls > span {
-  color: var(--app-muted-strong);
-  font-size: 0.78rem;
-  font-weight: 800;
-  margin-right: 3px;
-  text-transform: uppercase;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-width: 340px;
 }
 
 .video-speed-controls .q-btn {
@@ -1975,18 +1970,13 @@ body .q-menu {
   }
 
   .video-playback-settings {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 10px;
+    gap: 8px;
+    padding: 10px 12px;
   }
 
   .video-speed-controls {
-    display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .video-speed-controls > span {
-    grid-column: 1 / -1;
+    max-width: none;
   }
 
   .video-speed-controls .q-btn {
