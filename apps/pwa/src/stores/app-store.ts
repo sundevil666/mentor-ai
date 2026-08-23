@@ -60,6 +60,7 @@ import {
   type MyShiftActivity,
 } from 'src/services/my-shift';
 import { cacheMyShiftActivity, readCachedMyShiftActivity } from 'src/services/my-shift-cache';
+import { findOfflineLesson } from 'src/services/offline-library';
 
 interface LearningSessionState {
   id: string;
@@ -349,6 +350,12 @@ export const useAppStore = defineStore('app', {
           logDiagnostic('lesson.api_fallback', { reason: getErrorMessage(error) }, 'warn');
           // Keep offline-first practice usable when the API is temporarily unavailable.
         }
+      }
+
+      const offlineLesson = await findOfflineLesson(context);
+      if (offlineLesson) {
+        logDiagnostic('lesson.loaded', { lessonId: offlineLesson.id, source: 'offline-library' });
+        return offlineLesson;
       }
 
       const plan = createLessonPlan(this.studentModel, context, createdAt);

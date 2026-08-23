@@ -10,6 +10,7 @@ import {
   activatePendingServiceWorkerUpdate,
   consumePendingAppUpdate,
   createAppUpdateReloadUrl,
+  checkForAppUpdate,
   rememberPendingAppUpdate,
   startAppUpdatePolling,
   showSystemUpdateNotification,
@@ -27,6 +28,7 @@ let remoteSyncPollingTimer: number | undefined;
 onMounted(async () => {
   window.addEventListener('mentor-ai:update-available', handleUpdateAvailable);
   window.addEventListener('mentor-ai:install-update', handleInstallUpdateRequest);
+  window.addEventListener('mentor-ai:check-update', handleManualUpdateCheck);
   document.addEventListener('visibilitychange', handleVisibilitySync);
   window.addEventListener('online', handleContentProgressSync);
   navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
@@ -38,6 +40,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('mentor-ai:update-available', handleUpdateAvailable);
   window.removeEventListener('mentor-ai:install-update', handleInstallUpdateRequest);
+  window.removeEventListener('mentor-ai:check-update', handleManualUpdateCheck);
   document.removeEventListener('visibilitychange', handleVisibilitySync);
   navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
   stopRemoteSyncPolling();
@@ -71,6 +74,16 @@ function handleInstallUpdateRequest() {
   if (update) {
     void installUpdate(update.version);
   }
+}
+
+async function handleManualUpdateCheck() {
+  const result = await checkForAppUpdate();
+  if (result?.manifest && result.notification) {
+    handleServerUpdateAvailable(result);
+    Notify.create({ type: 'info', icon: 'system_update_alt', message: `Mentor AI ${result.manifest.version} is ready to install` });
+    return;
+  }
+  Notify.create({ type: 'positive', icon: 'check_circle', message: 'Mentor AI is up to date' });
 }
 
 async function installUpdate(version: string) {

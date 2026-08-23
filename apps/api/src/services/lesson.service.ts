@@ -12,4 +12,8 @@ export const lessonService = {
     const validLessons = lessons.filter((lesson) => lesson?.id && Array.isArray(lesson.exercises));
     return privateLessonRepository.upsertMany(validLessons);
   },
+
+  async listOfflineLessons(since: Date) {
+    return privateLessonRepository.findAddedSince(since);
+  },
 };

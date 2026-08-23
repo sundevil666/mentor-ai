@@ -20,7 +20,7 @@
           class="app-update-button"
           :aria-label="appUpdateTooltip"
           :color="appStore.availableAppUpdate ? 'amber-7' : undefined"
-          :disable="!appStore.availableAppUpdate || appStore.isAppUpdateInstalling"
+          :disable="!appStore.isOnline || appStore.isAppUpdateInstalling"
           flat
           :icon="appStore.isAppUpdateInstalling ? 'sync' : 'system_update_alt'"
           round
@@ -33,6 +33,19 @@
             rounded
           />
           <q-tooltip>{{ appUpdateTooltip }}</q-tooltip>
+        </q-btn>
+        <q-btn
+          class="lesson-update-button"
+          :aria-label="lessonUpdateTooltip"
+          :color="offlineLessonState.status === 'error' ? 'negative' : offlineLessonState.status === 'ready' ? 'positive' : undefined"
+          :disable="!appStore.isOnline || offlineLessonState.status === 'checking' || offlineLessonState.status === 'downloading'"
+          flat
+          :icon="lessonUpdateIcon"
+          :loading="offlineLessonState.status === 'checking' || offlineLessonState.status === 'downloading'"
+          round
+          @click="checkOfflineLessons(true)"
+        >
+          <q-tooltip>{{ lessonUpdateTooltip }}</q-tooltip>
         </q-btn>
         <q-btn
           class="sync-status-button"
@@ -264,6 +277,12 @@ import { readThemePreference, saveThemePreference } from 'src/services/user-pref
 import { formatDisplayDate } from 'src/services/date-format';
 import { cleanupExpiredOfflineLessons } from 'src/services/offline-library';
 import {
+  getOfflineLessonUpdateState,
+  subscribeOfflineLessonUpdates,
+  updateOfflineLessons,
+  type OfflineLessonUpdateState,
+} from 'src/services/offline-lesson-updates';
+import {
   getInstallHelp,
   isStandalonePwa,
   type BeforeInstallPromptEvent,
@@ -299,6 +318,9 @@ const levelTrend = computed(() => createLevelTrend(appStore.studentModel));
 const deferredInstallPrompt = ref<BeforeInstallPromptEvent | null>(null);
 const isPwaInstalled = ref(false);
 const showInstallHelp = ref(false);
+const offlineLessonState = ref<OfflineLessonUpdateState>(getOfflineLessonUpdateState());
+let unsubscribeOfflineLessonUpdates: (() => void) | undefined;
+let offlineLessonUpdateTimer: number | undefined;
 const showInstallButton = computed(() => !isPwaInstalled.value);
 const installButtonIcon = computed(() =>
   deferredInstallPrompt.value ? 'install_mobile' : 'add_to_home_screen',
@@ -351,6 +373,17 @@ const appUpdateTooltip = computed(() => {
   }
 
   return 'Mentor AI is up to date.';
+});
+const lessonUpdateIcon = computed(() => offlineLessonState.value.status === 'error'
+  ? 'cloud_off'
+  : offlineLessonState.value.status === 'ready' ? 'offline_pin' : 'download_for_offline');
+const lessonUpdateTooltip = computed(() => {
+  const current = offlineLessonState.value;
+  if (current.status === 'checking') return 'Checking the server for current lessons…';
+  if (current.status === 'downloading') return `Saving current lessons offline: ${current.completed}/${current.total}.`;
+  if (current.status === 'error') return 'Lesson update failed. Tap to try again.';
+  if (!appStore.isOnline) return 'Offline. Saved lessons remain available.';
+  return 'Current lessons are available offline. Tap to check the server now.';
 });
 const syncStatusIcon = computed(() => {
   if (appStore.pendingSyncCount > 0) {
@@ -408,9 +441,13 @@ const primaryNavigationItems: Array<{
 
 onMounted(async () => {
   await cleanupExpiredOfflineLessons();
+  unsubscribeOfflineLessonUpdates = subscribeOfflineLessonUpdates((nextState) => { offlineLessonState.value = nextState; });
   isPwaInstalled.value = isStandalonePwa();
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   window.addEventListener('appinstalled', handleAppInstalled);
+  window.addEventListener('online', handleOfflineLessonReconnect);
+  document.addEventListener('visibilitychange', handleOfflineLessonVisibility);
+  offlineLessonUpdateTimer = window.setInterval(() => { if (navigator.onLine) void checkOfflineLessons(false); }, 60 * 60 * 1000);
   isDarkTheme.value = readSavedTheme();
   Dark.set(isDarkTheme.value);
   await loadAuthConfiguration();
@@ -418,12 +455,32 @@ onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();
   }
+  if (appStore.isOnline) void checkOfflineLessons(false);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   window.removeEventListener('appinstalled', handleAppInstalled);
+  window.removeEventListener('online', handleOfflineLessonReconnect);
+  document.removeEventListener('visibilitychange', handleOfflineLessonVisibility);
+  if (offlineLessonUpdateTimer) window.clearInterval(offlineLessonUpdateTimer);
+  unsubscribeOfflineLessonUpdates?.();
 });
+
+async function checkOfflineLessons(showResult: boolean) {
+  try {
+    const result = await updateOfflineLessons();
+    if (!showResult) return;
+    Notify.create({
+      type: 'positive',
+      icon: 'offline_pin',
+      message: result.current ? 'Everything is downloaded and available offline' : `${result.downloaded} current lesson${result.downloaded === 1 ? '' : 's'} downloaded`,
+    });
+  } catch {
+    if (!showResult) return;
+    Notify.create({ type: 'negative', icon: 'cloud_off', message: 'Could not update offline lessons', caption: 'Check the connection and try again.' });
+  }
+}
 
 onBeforeRouteUpdate((to, from) => {
   routeTransitionName.value =
@@ -449,7 +506,12 @@ function markAllRead() {
 }
 
 function installAvailableUpdate() {
-  window.dispatchEvent(new CustomEvent('mentor-ai:install-update'));
+  window.dispatchEvent(new CustomEvent(appStore.availableAppUpdate ? 'mentor-ai:install-update' : 'mentor-ai:check-update'));
+}
+
+function handleOfflineLessonReconnect() { void checkOfflineLessons(false); }
+function handleOfflineLessonVisibility() {
+  if (document.visibilityState === 'visible' && navigator.onLine) void checkOfflineLessons(false);
 }
 
 function handleBeforeInstallPrompt(event: Event) {

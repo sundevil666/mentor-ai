@@ -14,6 +14,7 @@
     "src/services/auth.ts",
     "src/services/indexed-db.ts",
     "src/services/offline-library.ts",
+    "src/services/offline-lesson-updates.ts",
     "src/services/speech-synthesis.ts",
     "src/services/storage-retention.ts",
     "src/services/video-library.ts",

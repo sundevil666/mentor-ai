@@ -27,3 +27,13 @@ export const importPrivateLessons: RequestHandler = async (req, res, next) => {
     next(error);
   }
 };
+
+export const listOfflineLessons: RequestHandler = async (req, res, next) => {
+  try {
+    const requestedSince = typeof req.query.since === 'string' ? Date.parse(req.query.since) : Number.NaN;
+    const defaultSince = Date.now() - 30 * 86_400_000;
+    res.json({ data: await lessonService.listOfflineLessons(new Date(Number.isFinite(requestedSince) ? requestedSince : defaultSince)) });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -6,6 +6,30 @@ import { getPostgresPool } from './postgres-client.js';
 const lessonDirectory = resolvePersonalStoragePath('lessons');
 
 export const privateLessonRepository = {
+  async findAddedSince(since: Date): Promise<GeneratedLesson[]> {
+    const pool = getPostgresPool();
+
+    if (pool) {
+      await ensurePrivateLessonsTable();
+      const result = await pool.query<{ lesson: GeneratedLesson; added_at: Date | string }>(
+        `
+          SELECT lesson, created_at AS added_at
+          FROM private_lessons
+          WHERE is_active = true AND created_at >= $1
+          ORDER BY created_at DESC
+        `,
+        [since.toISOString()],
+      );
+
+      return result.rows.map((row) => ({
+        ...row.lesson,
+        createdAt: new Date(row.added_at).toISOString(),
+      })).filter(isGeneratedLesson);
+    }
+
+    return (await this.findAll()).filter((lesson) => Date.parse(lesson.createdAt) >= since.getTime());
+  },
+
   async getLibraryMetadata(): Promise<{ version: string; updatedAt: string | null; lessonCount: number }> {
     const databaseMetadata = await findDatabaseLibraryMetadata();
 

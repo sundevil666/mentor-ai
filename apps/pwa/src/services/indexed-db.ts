@@ -1,6 +1,6 @@
 import { openDB } from 'idb';
 
-export const mentorDb = openDB('mentor-ai', 11, {
+export const mentorDb = openDB('mentor-ai', 12, {
   upgrade(db, oldVersion) {
     if (!db.objectStoreNames.contains('lessons')) {
       db.createObjectStore('lessons', { keyPath: 'id' });

@@ -90,6 +90,15 @@ export async function fetchCurrentLesson(context: LearningContext): Promise<Gene
   return body.data;
 }
 
+export async function fetchOfflineLessons(since: string): Promise<GeneratedLesson[]> {
+  const response = await fetch(`${apiBaseUrl}/api/lessons/offline?since=${encodeURIComponent(since)}&t=${Date.now()}`, {
+    cache: 'no-store',
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error('Offline lesson update request failed.');
+  return ((await response.json()) as ApiResponse<GeneratedLesson[]>).data;
+}
+
 export async function fetchSessionHandoffs(): Promise<LearningSessionHandoff[]> {
   const response = await fetch(`${apiBaseUrl}/api/session-handoffs`, {
     headers: authHeaders(),
