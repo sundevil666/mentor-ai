@@ -66,7 +66,9 @@ export function createCurrentActivitySuggestion(
   const nextWindow = day.recommendedLearningWindows
     .filter((window) => new Date(window.endsAt) > date)
     .sort((left, right) => right.priority - left.priority)[0];
-  const workShift = getSynchronizedWorkShift(myShiftActivity, date) ?? fallback.workShift;
+  const workShift = day.dayType === 'day_off'
+    ? 'off'
+    : inferRemoteShift(day.shift?.startsAt, myShiftActivity?.user.timezone, day.shift?.id) ?? fallback.workShift;
 
   if (current?.type === 'commute') {
     return {
@@ -143,13 +145,27 @@ export function createCurrentActivitySuggestion(
 }
 
 export function getSynchronizedWorkShift(activity: MyShiftActivity | null, date = new Date()): WorkShift | null {
-  const day = findCurrentMyShiftDay(activity, date);
-  if (!day) return null;
-  if (day.dayType === 'day_off' || day.timeline.some((item) => item.type === 'day_off')) return 'off';
-  return inferRemoteShift(day.shift?.startsAt, activity?.user.timezone);
+  if (!activity) return null;
+  const dateKey = formatDateInTimeZone(date, activity.user.timezone);
+  const week = weekRange(dateKey);
+  const scheduledDays = activity.days.filter((day) =>
+    day.date >= week.from && day.date <= week.to && day.shift,
+  );
+  const shifts = scheduledDays
+    .map((day) => inferRemoteShift(day.shift?.startsAt, activity.user.timezone, day.shift?.id))
+    .filter((shift): shift is WorkShift => shift !== null);
+  if (shifts.length === 0) return null;
+  const counts = shifts.reduce<Record<WorkShift, number>>(
+    (result, shift) => ({ ...result, [shift]: result[shift] + 1 }),
+    { first: 0, second: 0, third: 0, off: 0, unknown: 0 },
+  );
+  return shifts.sort((left, right) => counts[right] - counts[left])[0] ?? null;
 }
 
-function inferRemoteShift(startsAt?: string, timeZone?: string): WorkShift | null {
+function inferRemoteShift(startsAt?: string, timeZone?: string, shiftId?: string): WorkShift | null {
+  if (/shift[-_ ]?1$/i.test(shiftId ?? '')) return 'first';
+  if (/shift[-_ ]?2$/i.test(shiftId ?? '')) return 'second';
+  if (/shift[-_ ]?3$/i.test(shiftId ?? '')) return 'third';
   if (!startsAt) return null;
   const hourPart = new Intl.DateTimeFormat('en-GB', {
     timeZone,
@@ -161,6 +177,25 @@ function inferRemoteShift(startsAt?: string, timeZone?: string): WorkShift | nul
   if (hour >= 4 && hour < 10) return 'first';
   if (hour >= 10 && hour < 18) return 'second';
   return 'third';
+}
+
+function formatDateInTimeZone(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+function weekRange(dateKey: string): { from: string; to: string } {
+  const date = new Date(`${dateKey}T12:00:00.000Z`);
+  const day = date.getUTCDay();
+  const monday = new Date(date);
+  monday.setUTCDate(date.getUTCDate() - (day === 0 ? 6 : day - 1));
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  return { from: monday.toISOString().slice(0, 10), to: sunday.toISOString().slice(0, 10) };
 }
 
 function durationMinutes(from: Date, endsAt: string, maximum: number): number {

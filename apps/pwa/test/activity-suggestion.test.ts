@@ -121,6 +121,29 @@ describe('PWA activity suggestion', () => {
     assert.equal(getSynchronizedWorkShift(activity, new Date('2026-06-29T21:00:00.000Z')), 'third');
     assert.equal(createCurrentActivitySuggestion('second', [], new Date('2026-06-29T21:00:00.000Z'), activity).workShift, 'third');
   });
+
+  it('keeps the synchronized weekly shift visible on a day off', () => {
+    const activity = createMyShiftActivity('day_off', 'day_off', '2026-07-05T00:00:00.000Z', '2026-07-06T00:00:00.000Z');
+    activity.range = { from: '2026-06-29', to: '2026-07-05' };
+    const workDates = ['2026-06-29', '2026-06-30', '2026-07-01', '2026-07-02', '2026-07-03'];
+    activity.days.unshift(...workDates.map((workDate) => ({
+      date: workDate,
+      dayType: 'workday',
+      shift: {
+        id: 'shift-3',
+        name: 'Night shift',
+        startsAt: `${workDate}T20:00:00.000Z`,
+        endsAt: new Date(`${workDate}T20:00:00.000Z`).toISOString(),
+        isNightShift: true,
+        status: 'scheduled',
+      },
+      timeline: [],
+      recommendedLearningWindows: [],
+    })));
+
+    assert.equal(getSynchronizedWorkShift(activity, new Date('2026-07-05T12:00:00.000Z')), 'third');
+    assert.equal(createCurrentActivitySuggestion('second', [], new Date('2026-07-05T12:00:00.000Z'), activity).workShift, 'off');
+  });
 });
 
 function createWorkdayActivity(startsAt: string, endsAt: string): MyShiftActivity {
