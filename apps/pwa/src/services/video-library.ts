@@ -2,6 +2,7 @@ export type LibraryVideo = {
   id: string;
   title: string;
   description: string;
+  captionUrl: string;
   level: string;
   sourceLabel: string;
   sourceUrl: string;
@@ -13,44 +14,48 @@ export const offlineVideoCacheName = 'mentor-ai-offline-videos-v1';
 
 export const videoLibrary: LibraryVideo[] = [
   {
-    id: 'sintel-trailer',
-    title: 'Sintel — English trailer',
-    description: 'A short animated story with natural English dialogue. Good for listening to emotion and intonation.',
+    id: 'english-networking-dinner',
+    title: 'English Networking Dinner',
+    description: 'Clear news-style narration about conversations and community connections in Okinawa.',
+    captionUrl: '/subtitles/english-networking-dinner.en.vtt',
     level: 'A2–B1',
-    sourceLabel: 'W3C media archive · Blender Foundation',
-    sourceUrl: 'https://media.w3.org/2010/05/sintel/trailer.mp4',
-    durationSeconds: 52,
-    sizeBytes: 4_372_373,
+    sourceLabel: 'U.S. Marine Corps · Public domain via Wikimedia Commons',
+    sourceUrl: 'https://upload.wikimedia.org/wikipedia/commons/8/87/English_Networking_Dinner_%281018406%29.webm',
+    durationSeconds: 30,
+    sizeBytes: 14_691_312,
   },
   {
-    id: 'weekly-conversation-eldraen',
-    title: 'A phone call with Eldraen',
-    description: 'A short real-life American phone conversation. Listen for greetings, short answers and everyday rhythm.',
-    level: 'A2–B1',
-    sourceLabel: 'White House · Public domain via Wikimedia Commons',
-    sourceUrl: 'https://upload.wikimedia.org/wikipedia/commons/c/c0/A_Weekly_Conversation_-_On_The_Line_With_Eldraen.webm',
-    durationSeconds: 142,
-    sizeBytes: 16_017_033,
-  },
-  {
-    id: 'weekly-conversation-jocelyn',
-    title: 'A phone call with Jocelyn',
-    description: 'Natural American speech in a friendly conversation. Practise catching the topic without translating every word.',
-    level: 'B1',
-    sourceLabel: 'White House · Public domain via Wikimedia Commons',
-    sourceUrl: 'https://upload.wikimedia.org/wikipedia/commons/b/be/A_Weekly_Conversation-_On_the_Line_with_Jocelyn.webm',
-    durationSeconds: 153,
-    sizeBytes: 25_354_920,
-  },
-  {
-    id: 'weekly-conversation-erica',
-    title: 'A phone call with Erica',
-    description: 'A longer unscripted exchange for practising names, key details and natural conversational pauses.',
+    id: 'leaders-links',
+    title: 'What Do You Want to Be Remembered For?',
+    description: 'Natural reflective speech about reputation, leadership and the impression we leave on others.',
+    captionUrl: '/subtitles/leaders-links.en.vtt',
     level: 'B1–B2',
-    sourceLabel: 'White House · Public domain via Wikimedia Commons',
-    sourceUrl: 'https://upload.wikimedia.org/wikipedia/commons/d/d9/A_Weekly_Conversation-_On_the_Line_with_Erica.webm',
-    durationSeconds: 171,
-    sizeBytes: 35_527_616,
+    sourceLabel: 'U.S. Army · Public domain via Wikimedia Commons',
+    sourceUrl: 'https://upload.wikimedia.org/wikipedia/commons/d/d8/Leaders_Links_-_DrillSergeantFitness_%28990648%29.webm',
+    durationSeconds: 60,
+    sizeBytes: 25_506_557,
+  },
+  {
+    id: 'pacific-spotlight',
+    title: 'A Pharmacy Technician at Work',
+    description: 'A short self-introduction using practical workplace vocabulary and conversational American English.',
+    captionUrl: '/subtitles/pacific-spotlight.en.vtt',
+    level: 'A2–B1',
+    sourceLabel: 'U.S. Air Force · Public domain via Wikimedia Commons',
+    sourceUrl: 'https://upload.wikimedia.org/wikipedia/commons/9/95/Pacific_Spotlight_-_SrA_Malik_Hardy-No_Graphics_%281004531%29.webm',
+    durationSeconds: 30,
+    sizeBytes: 7_577_847,
+  },
+  {
+    id: 'opsec-spot',
+    title: 'Think Before You Share',
+    description: 'Clear instructional English about information, social media and everyday responsibility.',
+    captionUrl: '/subtitles/opsec-spot.en.vtt',
+    level: 'B1',
+    sourceLabel: 'U.S. Air Force · Public domain via Wikimedia Commons',
+    sourceUrl: 'https://upload.wikimedia.org/wikipedia/commons/b/b2/OPSEC_Spot_%28720p%29_%28998832%29.webm',
+    durationSeconds: 30,
+    sizeBytes: 6_207_133,
   },
 ];
 

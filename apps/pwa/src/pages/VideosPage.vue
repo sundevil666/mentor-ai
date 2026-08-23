@@ -95,7 +95,14 @@
           @pause="handleVideoPause"
           @play="handleVideoPlay"
           @seeked="synchronizeAudioToVideo"
-        />
+        >
+          <track
+            kind="captions"
+            label="English"
+            :src="selectedVideo.captionUrl"
+            srclang="en"
+          >
+        </video>
         <audio
           ref="backgroundAudioElement"
           :src="selectedVideo.sourceUrl"
@@ -129,7 +136,38 @@
           </div>
         </div>
         <div class="video-detail__body">
-          <p>{{ selectedVideo.description }}</p>
+          <div
+            ref="subtitleScroller"
+            class="video-subtitles"
+            aria-label="English subtitles"
+            aria-live="polite"
+          >
+            <p
+              v-if="subtitleStatus === 'loading'"
+              class="video-subtitles__status"
+            >
+              Loading English subtitles…
+            </p>
+            <p
+              v-else-if="subtitleStatus === 'error'"
+              class="video-subtitles__status"
+            >
+              English subtitles are temporarily unavailable.
+            </p>
+            <template v-else>
+              <button
+                v-for="cue in subtitleCues"
+                :key="cue.id"
+                class="video-subtitles__cue"
+                :class="{ 'video-subtitles__cue--active': activeSubtitleCueId === cue.id }"
+                :data-cue-id="cue.id"
+                type="button"
+                @click="seekToSubtitle(cue.start)"
+              >
+                {{ cue.text }}
+              </button>
+            </template>
+          </div>
           <div class="video-card__meta video-detail__meta">
             <span><q-icon name="school" /> {{ selectedVideo.level }}</span>
             <span><q-icon name="schedule" /> {{ formatVideoDuration(selectedVideo.durationSeconds) }}</span>
@@ -230,6 +268,7 @@ import {
   videoPlaybackRates,
   type VideoPlaybackRate,
 } from 'src/services/video-preferences';
+import { parseWebVtt, type VideoSubtitleCue } from 'src/services/video-subtitles';
 
 const appStore = useAppStore();
 const cachedUrls = ref(new Set<string>());
@@ -239,6 +278,10 @@ const activeVideoElement = ref<HTMLVideoElement | null>(null);
 const backgroundAudioElement = ref<HTMLAudioElement | null>(null);
 const activeRepeat = ref(true);
 const activePlaybackRate = ref<VideoPlaybackRate>(1);
+const subtitleCues = ref<VideoSubtitleCue[]>([]);
+const activeSubtitleCueId = ref<string | null>(null);
+const subtitleStatus = ref<'loading' | 'ready' | 'error'>('loading');
+const subtitleScroller = ref<HTMLElement | null>(null);
 const isOnline = computed(() => appStore.isOnline);
 const selectedVideo = computed(() => videoLibrary.find((video) => video.id === selectedVideoId.value) ?? null);
 let lastProgressSaveAt = 0;
@@ -299,6 +342,7 @@ async function toggleVideo(videoId: string) {
   const audio = backgroundAudioElement.value;
   if (!video || !player || !audio) return;
 
+  void loadVideoSubtitles(video);
   applyPlaybackRate(playbackPreference.playbackRate);
   configureVideoMediaSession(video, audio);
   try {
@@ -314,6 +358,46 @@ function closeVideo() {
   stopActiveVideo();
   selectedVideoId.value = null;
   clearVideoMediaSession();
+  subtitleCues.value = [];
+  activeSubtitleCueId.value = null;
+}
+
+async function loadVideoSubtitles(video: LibraryVideo) {
+  subtitleStatus.value = 'loading';
+  subtitleCues.value = [];
+  activeSubtitleCueId.value = null;
+  try {
+    const response = await fetch(video.captionUrl);
+    if (!response.ok) throw new Error('Subtitle request failed.');
+    const cues = parseWebVtt(await response.text());
+    if (cues.length === 0) throw new Error('Subtitle track is empty.');
+    subtitleCues.value = cues;
+    subtitleStatus.value = 'ready';
+    updateActiveSubtitle(backgroundAudioElement.value?.currentTime ?? 0);
+  } catch {
+    subtitleStatus.value = 'error';
+  }
+}
+
+function seekToSubtitle(position: number) {
+  const player = activeVideoElement.value;
+  const audio = backgroundAudioElement.value;
+  if (player) player.currentTime = position;
+  if (audio) audio.currentTime = position;
+  updateActiveSubtitle(position);
+}
+
+function updateActiveSubtitle(position: number) {
+  const cue = subtitleCues.value.find((item) => position >= item.start && position < item.end) ?? null;
+  if (cue?.id === activeSubtitleCueId.value) return;
+  activeSubtitleCueId.value = cue?.id ?? null;
+  if (!cue) return;
+  void nextTick(() => {
+    const container = subtitleScroller.value;
+    const element = container?.querySelector<HTMLElement>(`[data-cue-id="${cue.id}"]`);
+    if (!container || !element) return;
+    container.scrollTo({ top: element.offsetTop - container.clientHeight / 2, behavior: 'smooth' });
+  });
 }
 
 function setVideoRepeat(repeat: boolean) {
@@ -364,7 +448,9 @@ function synchronizeAudioToVideo() {
 function synchronizeVideoToAudio() {
   const player = activeVideoElement.value;
   const audio = backgroundAudioElement.value;
-  if (!player || !audio || document.hidden) return;
+  if (!player || !audio) return;
+  updateActiveSubtitle(audio.currentTime);
+  if (document.hidden) return;
   if (Math.abs(player.currentTime - audio.currentTime) > 0.45) player.currentTime = audio.currentTime;
   updateVideoMediaPosition(audio);
   persistActiveVideoProgress(audio);
@@ -379,6 +465,7 @@ async function restoreVideoPosition(video: LibraryVideo) {
   const position = Math.min(progress.furthestPosition, Math.max(0, player.duration - 0.25));
   player.currentTime = position;
   audio.currentTime = position;
+  updateActiveSubtitle(position);
 }
 
 function persistActiveVideoProgress(audio: HTMLAudioElement, force = false) {

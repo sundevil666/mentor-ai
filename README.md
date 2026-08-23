@@ -373,6 +373,10 @@ The reading pipeline should be built as provider adapters, not as site-specific 
 
 For sites such as Liteka, the adapter must respect copyright, robots rules, rate limits, and user authorization. Mentor AI should only download and store books from public-domain sources, licensed providers, explicit exports, or user-owned materials. Once content is imported, the PWA can read it fully offline, record the student's speech, compare the transcript with the expected page text, extract mispronounced or unknown words, and schedule those words for separate practice and sentence-based review.
 
+### Video catalog rule
+
+Every video added to the Mentor AI catalog must have a ready-made English subtitle track that can be downloaded as WebVTT or converted losslessly from an existing SRT track. Burned-in captions and AI-generated transcripts do not satisfy this requirement. The reviewed subtitle file must be stored with the PWA so subtitles remain available offline alongside a cached video.
+
 ## Useful Commands
 
 ```bash
