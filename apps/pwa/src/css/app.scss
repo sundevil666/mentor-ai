@@ -1398,6 +1398,36 @@ body .q-menu {
   width: 100%;
 }
 
+.video-playback-settings {
+  align-items: center;
+  background: var(--app-surface-active);
+  border-bottom: 1px solid var(--app-border);
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 12px 18px;
+}
+
+.video-speed-controls {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+}
+
+.video-speed-controls > span {
+  color: var(--app-muted-strong);
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-right: 3px;
+  text-transform: uppercase;
+}
+
+.video-speed-controls .q-btn {
+  min-height: 36px;
+  min-width: 48px;
+  padding: 4px 10px;
+}
+
 .video-card__body {
   display: grid;
   gap: 14px;
@@ -1880,6 +1910,25 @@ body .q-menu {
   .video-card__meta {
     flex-wrap: wrap;
     gap: 8px 14px;
+  }
+
+  .video-playback-settings {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .video-speed-controls {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .video-speed-controls > span {
+    grid-column: 1 / -1;
+  }
+
+  .video-speed-controls .q-btn {
+    min-width: 0;
   }
 
   .learning-overview,

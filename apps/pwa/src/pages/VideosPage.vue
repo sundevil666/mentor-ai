@@ -24,6 +24,7 @@
             class="video-card__player"
             :src="video.sourceUrl"
             controls
+            :loop="activeRepeat"
             playsinline
             preload="metadata"
             @loadedmetadata="restoreVideoPosition(video)"
@@ -35,10 +36,40 @@
             v-if="selectedVideoId === video.id"
             ref="backgroundAudioElement"
             :src="video.sourceUrl"
+            :loop="activeRepeat"
             preload="metadata"
             @ended="handleBackgroundAudioEnded"
             @timeupdate="synchronizeVideoToAudio"
           />
+          <div
+            v-if="selectedVideoId === video.id"
+            class="video-playback-settings"
+          >
+            <q-toggle
+              :model-value="activeRepeat"
+              color="primary"
+              icon="repeat"
+              label="Repeat video"
+              left-label
+              @update:model-value="setVideoRepeat"
+            />
+            <div
+              class="video-speed-controls"
+              aria-label="Playback speed"
+            >
+              <span>Speed</span>
+              <q-btn
+                v-for="rate in videoPlaybackRates"
+                :key="rate"
+                :color="activePlaybackRate === rate ? 'primary' : undefined"
+                :label="`${rate}×`"
+                :outline="activePlaybackRate !== rate"
+                no-caps
+                unelevated
+                @click="setVideoPlaybackRate(rate)"
+              />
+            </div>
+          </div>
           <div class="video-card__body">
             <div class="video-card__heading">
               <q-icon
@@ -153,6 +184,12 @@ import {
 import { useAppStore } from 'src/stores/app-store';
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineVideo } from 'src/services/offline-library';
 import { loadContentProgress, saveContentProgress, syncAllContentProgress } from 'src/services/content-progress';
+import {
+  readVideoPlaybackPreference,
+  saveVideoPlaybackPreference,
+  videoPlaybackRates,
+  type VideoPlaybackRate,
+} from 'src/services/video-preferences';
 
 const appStore = useAppStore();
 const cachedUrls = ref(new Set<string>());
@@ -160,6 +197,8 @@ const busyVideoId = ref<string | null>(null);
 const selectedVideoId = ref<string | null>(null);
 const activeVideoElement = ref<HTMLVideoElement | null>(null);
 const backgroundAudioElement = ref<HTMLAudioElement | null>(null);
+const activeRepeat = ref(true);
+const activePlaybackRate = ref<VideoPlaybackRate>(1);
 const isOnline = computed(() => appStore.isOnline);
 let lastProgressSaveAt = 0;
 const offlineStorageSummary = computed(() => {
@@ -196,6 +235,9 @@ async function toggleVideo(videoId: string) {
 
   stopActiveVideo();
   markOfflineLessonOpened(videoId, 'videos');
+  const playbackPreference = readVideoPlaybackPreference(videoId);
+  activeRepeat.value = playbackPreference.repeat;
+  activePlaybackRate.value = playbackPreference.playbackRate;
   selectedVideoId.value = videoId;
   await nextTick();
 
@@ -204,6 +246,7 @@ async function toggleVideo(videoId: string) {
   const audio = backgroundAudioElement.value;
   if (!video || !player || !audio) return;
 
+  applyPlaybackRate(playbackPreference.playbackRate);
   configureVideoMediaSession(video, audio);
   try {
     audio.volume = 0;
@@ -212,6 +255,30 @@ async function toggleVideo(videoId: string) {
   } catch {
     Notify.create({ type: 'negative', message: 'Tap play to start this video.' });
   }
+}
+
+function setVideoRepeat(repeat: boolean) {
+  activeRepeat.value = repeat;
+  saveActiveVideoPlaybackPreference();
+}
+
+function setVideoPlaybackRate(playbackRate: VideoPlaybackRate) {
+  activePlaybackRate.value = playbackRate;
+  applyPlaybackRate(playbackRate);
+  saveActiveVideoPlaybackPreference();
+}
+
+function applyPlaybackRate(playbackRate: VideoPlaybackRate) {
+  if (activeVideoElement.value) activeVideoElement.value.playbackRate = playbackRate;
+  if (backgroundAudioElement.value) backgroundAudioElement.value.playbackRate = playbackRate;
+}
+
+function saveActiveVideoPlaybackPreference() {
+  if (!selectedVideoId.value) return;
+  saveVideoPlaybackPreference(selectedVideoId.value, {
+    repeat: activeRepeat.value,
+    playbackRate: activePlaybackRate.value,
+  });
 }
 
 function handleVideoPlay() {
