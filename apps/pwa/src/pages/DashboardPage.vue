@@ -607,6 +607,7 @@ import {
   saveListeningProgressPreference,
 } from 'src/services/user-preferences';
 import { useAppStore } from 'src/stores/app-store';
+import { markOfflineLessonOpened, registerOfflineSpeechLesson } from 'src/services/offline-library';
 
 type LessonChoice = {
   templateKey: string;
@@ -919,6 +920,7 @@ async function openTrainingLibrary(library: 'listening' | 'speaking') {
 }
 
 async function startLibraryLesson(lesson: TrainingLibraryLesson) {
+  markOfflineLessonOpened(lesson.templateKey, lesson.mode);
   answer.value = '';
   setForwardTransition();
   await appStore.startLesson(createLearningContext(currentSuggestion.value, {
@@ -941,6 +943,9 @@ async function downloadLibraryLesson(lesson: TrainingLibraryLesson) {
     const texts = getLessonOfflineSpeechTexts(generatedLesson.exercises);
     const result = await preloadSpeechBatch(texts);
     libraryDownloadStatus.value[lesson.templateKey] = result.failed === 0 ? 'ready' : 'error';
+    if (result.failed === 0) {
+      registerOfflineSpeechLesson({ id: lesson.templateKey, category: lesson.mode, title: lesson.title, speechTexts: texts });
+    }
   } catch {
     libraryDownloadStatus.value[lesson.templateKey] = 'error';
   }

@@ -5,6 +5,7 @@ import ErrorNotFound from 'pages/ErrorNotFound.vue';
 import SettingsPage from 'pages/SettingsPage.vue';
 import StatisticsPage from 'pages/StatisticsPage.vue';
 import VideosPage from 'pages/VideosPage.vue';
+import StoragePage from 'pages/StoragePage.vue';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -22,6 +23,9 @@ const routes: RouteRecordRaw[] = [
         name: 'videos',
         component: VideosPage,
         meta: { routeOrder: 1 },
+      },
+      {
+        path: 'storage', name: 'storage', component: StoragePage, meta: { routeOrder: 2 },
       },
       {
         path: 'statistics',

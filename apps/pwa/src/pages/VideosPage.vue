@@ -151,6 +151,7 @@ import {
   type LibraryVideo,
 } from 'src/services/video-library';
 import { useAppStore } from 'src/stores/app-store';
+import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineVideo } from 'src/services/offline-library';
 
 const appStore = useAppStore();
 const cachedUrls = ref(new Set<string>());
@@ -191,6 +192,7 @@ async function toggleVideo(videoId: string) {
   }
 
   stopActiveVideo();
+  markOfflineLessonOpened(videoId, 'videos');
   selectedVideoId.value = videoId;
   await nextTick();
 
@@ -304,6 +306,7 @@ async function saveVideo(video: LibraryVideo) {
   busyVideoId.value = video.id;
   try {
     await saveVideoOffline(video);
+    registerOfflineVideo(video);
     await refreshCacheStatus();
     Notify.create({ type: 'positive', message: `${video.title} is ready offline.` });
   } catch {
@@ -317,6 +320,7 @@ async function removeVideo(video: LibraryVideo) {
   busyVideoId.value = video.id;
   try {
     await deleteOfflineVideo(video);
+    forgetOfflineLesson(video.id, 'videos');
     await refreshCacheStatus();
     Notify.create({ message: 'Offline copy deleted.' });
   } finally {

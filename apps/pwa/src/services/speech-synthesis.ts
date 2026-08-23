@@ -1,4 +1,4 @@
-const SPEECH_CACHE_NAME = 'mentor-ai-speech-dialogue-v2';
+export const SPEECH_CACHE_NAME = 'mentor-ai-speech-dialogue-v2';
 
 export type SpeechVoiceProfile = 'mia' | 'tom';
 
@@ -163,6 +163,31 @@ export async function isSpeechBatchCached(texts: string[]) {
   );
 
   return matches.every(Boolean);
+}
+
+export async function getSpeechBatchSize(texts: string[]) {
+  if (typeof window === 'undefined' || !('caches' in window)) return 0;
+  const cache = await caches.open(SPEECH_CACHE_NAME);
+  let total = 0;
+  for (const text of uniqueSpeechTexts(texts)) {
+    const request = await createSpeechCacheRequest(parseSpeechSegments(text));
+    const response = request ? await cache.match(request) : undefined;
+    if (response) total += (await response.clone().blob()).size;
+  }
+  return total;
+}
+
+export async function deleteSpeechBatch(texts: string[]) {
+  if (typeof window === 'undefined' || !('caches' in window)) return;
+  const cache = await caches.open(SPEECH_CACHE_NAME);
+  await Promise.all(uniqueSpeechTexts(texts).map(async (text) => {
+    const request = await createSpeechCacheRequest(parseSpeechSegments(text));
+    if (request) await cache.delete(request);
+  }));
+}
+
+function uniqueSpeechTexts(texts: string[]) {
+  return Array.from(new Set(texts.map((text) => text.trim()).filter(Boolean)));
 }
 
 export async function pauseSpeech() {

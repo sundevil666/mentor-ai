@@ -115,6 +115,10 @@
           <q-tooltip>More</q-tooltip>
           <q-menu anchor="bottom right" self="top right">
             <q-list class="more-nav-menu" dense>
+              <q-item clickable :to="{ name: 'storage' }">
+                <q-item-section avatar><q-icon name="storage" /></q-item-section>
+                <q-item-section>Storage</q-item-section>
+              </q-item>
               <q-item clickable :to="{ name: 'statistics' }">
                 <q-item-section avatar>
                   <q-icon name="query_stats" />
@@ -258,6 +262,7 @@ import { useAppStore } from 'src/stores/app-store';
 import { fetchAuthConfiguration, signInWithGoogleCredential } from 'src/services/auth';
 import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
 import { formatDisplayDate } from 'src/services/date-format';
+import { cleanupExpiredOfflineLessons } from 'src/services/offline-library';
 import {
   getInstallHelp,
   isStandalonePwa,
@@ -402,6 +407,7 @@ const primaryNavigationItems: Array<{
 ];
 
 onMounted(async () => {
+  await cleanupExpiredOfflineLessons();
   isPwaInstalled.value = isStandalonePwa();
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   window.addEventListener('appinstalled', handleAppInstalled);
