@@ -1,14 +1,15 @@
-import type { GeneratedLesson } from '@mentor-ai/shared';
+import type { GeneratedLesson, LearningContext } from '@mentor-ai/shared';
 import { fetchOfflineLessons } from './api-client.js';
 import {
   cleanupExpiredOfflineLessons,
   getOfflineLessonContentVersion,
   readOfflineLessons,
+  registerOfflineSpeechLesson,
   removeOfflineLesson,
   refreshOfflineSizes,
   registerOfflineGeneratedLesson,
 } from './offline-library.js';
-import { preloadSpeechBatch } from './speech-synthesis.js';
+import { isSpeechBatchCached, preloadSpeechBatch } from './speech-synthesis.js';
 
 export type OfflineLessonUpdateStatus = 'idle' | 'checking' | 'downloading' | 'ready' | 'error';
 export interface OfflineLessonUpdateState {
@@ -21,6 +22,12 @@ export interface OfflineLessonUpdateState {
 const listeners = new Set<(state: OfflineLessonUpdateState) => void>();
 let state: OfflineLessonUpdateState = { status: 'idle', completed: 0, total: 0, lastCheckedAt: null };
 let activeUpdate: Promise<{ downloaded: number; current: boolean; eventId: string }> | null = null;
+const builtInOfflineLessons = [
+  { id: 'commute-listening', category: 'listening', title: 'Commute listening' },
+  { id: 'shop-listening', category: 'listening', title: 'At a small shop' },
+  { id: 'weekly-weak-spots-dialogue', category: 'speaking', title: 'Work conversation' },
+  { id: 'polite-speaking', category: 'speaking', title: 'Polite requests' },
+] as const;
 
 export function getOfflineLessonUpdateState() { return state; }
 export function subscribeOfflineLessonUpdates(listener: (state: OfflineLessonUpdateState) => void) {
@@ -29,18 +36,21 @@ export function subscribeOfflineLessonUpdates(listener: (state: OfflineLessonUpd
   return () => listeners.delete(listener);
 }
 
-export function updateOfflineLessons(): Promise<{ downloaded: number; current: boolean; eventId: string }> {
+export function updateOfflineLessons(
+  loadLesson: (context: LearningContext, createdAt: string) => Promise<GeneratedLesson>,
+): Promise<{ downloaded: number; current: boolean; eventId: string }> {
   if (activeUpdate) return activeUpdate;
-  activeUpdate = performUpdate().finally(() => { activeUpdate = null; });
+  activeUpdate = performUpdate(loadLesson).finally(() => { activeUpdate = null; });
   return activeUpdate;
 }
 
-async function performUpdate() {
+async function performUpdate(loadLesson: (context: LearningContext, createdAt: string) => Promise<GeneratedLesson>) {
   const eventId = new Date().toISOString();
   setState({ status: 'checking', completed: 0, total: 0 });
   try {
     const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
     const lessons = await fetchOfflineLessons(since);
+    const builtInDownloaded = await updateBuiltInLessons(loadLesson);
     const savedLessons = readOfflineLessons().filter((item) => item.category === 'lessons');
     const activeIds = new Set(lessons.map((lesson) => lesson.id));
     const removed = savedLessons.filter((item) => item.sourceCreatedAt && item.sourceCreatedAt >= since && !activeIds.has(item.id));
@@ -51,7 +61,7 @@ async function performUpdate() {
     if (pending.length === 0) {
       await cleanupExpiredOfflineLessons();
       setState({ status: 'ready', completed: lessons.length, total: lessons.length, lastCheckedAt: new Date().toISOString() });
-      return { downloaded: 0, current: true, eventId };
+      return { downloaded: builtInDownloaded, current: builtInDownloaded === 0, eventId };
     }
 
     setState({ status: 'downloading', completed: 0, total: pending.length });
@@ -67,11 +77,38 @@ async function performUpdate() {
     await refreshOfflineSizes();
     await cleanupExpiredOfflineLessons();
     setState({ status: 'ready', completed: lessons.length, total: lessons.length, lastCheckedAt: new Date().toISOString() });
-    return { downloaded: completed, current: false, eventId };
+    return { downloaded: completed + builtInDownloaded, current: false, eventId };
   } catch (error) {
     setState({ status: 'error', lastCheckedAt: new Date().toISOString() });
     throw error;
   }
+}
+
+async function updateBuiltInLessons(
+  loadLesson: (context: LearningContext, createdAt: string) => Promise<GeneratedLesson>,
+) {
+  let downloaded = 0;
+  for (const item of builtInOfflineLessons) {
+    const lesson = await loadLesson({
+      mode: item.category,
+      selectedConcept: 'learning',
+      manualConceptChoice: true,
+      lessonTemplateKey: item.id,
+      isOffline: false,
+      speechAvailable: true,
+      availableMinutes: 10,
+    }, new Date().toISOString());
+    const texts = getSpeechTexts(lesson);
+    if (texts.length === 0 || await isSpeechBatchCached(texts)) {
+      if (texts.length > 0) registerOfflineSpeechLesson({ ...item, speechTexts: texts });
+      continue;
+    }
+    const result = await preloadSpeechBatch(texts);
+    if (result.failed > 0) throw new Error(`Could not download ${item.title}.`);
+    registerOfflineSpeechLesson({ ...item, speechTexts: texts });
+    downloaded += 1;
+  }
+  return downloaded;
 }
 
 function setState(update: Partial<OfflineLessonUpdateState>) {

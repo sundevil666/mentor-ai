@@ -469,7 +469,7 @@ onBeforeUnmount(() => {
 
 async function checkOfflineLessons(showResult: boolean) {
   try {
-    const result = await updateOfflineLessons();
+    const result = await updateOfflineLessons(appStore.loadLesson.bind(appStore));
     if (result.downloaded > 0) await appStore.recordLessonUpdateNotification(result.downloaded, result.eventId);
     if (!showResult) return;
     Notify.create({
