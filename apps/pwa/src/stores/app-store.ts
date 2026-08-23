@@ -120,6 +120,52 @@ interface AppState {
 }
 
 const sessionStoreKey = 'active-session';
+const sessionCheckpointKey = 'mentor-ai:active-session-checkpoint';
+
+function readSessionCheckpoint(): LearningSessionState | null {
+  if (typeof localStorage === 'undefined') return null;
+
+  try {
+    const candidate = JSON.parse(localStorage.getItem(sessionCheckpointKey) ?? 'null') as Partial<LearningSessionState> | null;
+    if (
+      !candidate
+      || typeof candidate.id !== 'string'
+      || !candidate.lesson
+      || !Array.isArray(candidate.lesson.exercises)
+      || typeof candidate.currentExerciseIndex !== 'number'
+      || candidate.currentExerciseIndex < 0
+      || candidate.currentExerciseIndex >= candidate.lesson.exercises.length
+      || !candidate.context
+      || !Array.isArray(candidate.events)
+      || !Array.isArray(candidate.results)
+      || !Array.isArray(candidate.speechResults)
+    ) {
+      return null;
+    }
+
+    return candidate as LearningSessionState;
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionCheckpoint(session: LearningSessionState) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(sessionCheckpointKey, JSON.stringify(session));
+  } catch {
+    // IndexedDB remains the primary session store when synchronous storage is unavailable.
+  }
+}
+
+function clearSessionCheckpoint() {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.removeItem(sessionCheckpointKey);
+  } catch {
+    // Ignore unavailable synchronous storage.
+  }
+}
 
 export const useAppStore = defineStore('app', {
   state: (): AppState => ({
@@ -186,6 +232,7 @@ export const useAppStore = defineStore('app', {
       const db = await mentorDb;
       const savedModel = await db.get('student-models', initialStudentModel.id);
       const savedSession = await db.get('learning-sessions', sessionStoreKey);
+      const checkpointSession = readSessionCheckpoint();
       const statistics = await db.getAll('statistics');
       const activitySnapshots = await db.getAll('activity-snapshots');
       const queuedEvents = await db.getAll('sync-queue');
@@ -193,7 +240,10 @@ export const useAppStore = defineStore('app', {
       const myShiftCache = await readCachedMyShiftActivity();
 
       this.studentModel = (savedModel as StudentModel | undefined) ?? initialStudentModel;
-      this.session = (savedSession as LearningSessionState | undefined) ?? null;
+      this.session = checkpointSession ?? (savedSession as LearningSessionState | undefined) ?? null;
+      if (checkpointSession) {
+        await db.put('learning-sessions', toStorageRecord(checkpointSession), sessionStoreKey);
+      }
       this.latestRecommendation = this.session?.recommendation ?? createRecommendationFromModel(this.studentModel, now());
       this.statisticsSnapshots = (statistics as StatisticsSnapshot[]).sort((left, right) =>
         left.createdAt.localeCompare(right.createdAt),
@@ -458,16 +508,16 @@ export const useAppStore = defineStore('app', {
         return;
       }
 
-      const db = await mentorDb;
       this.session = null;
+      clearSessionCheckpoint();
+      const db = await mentorDb;
       await db.delete('learning-sessions', sessionStoreKey);
     },
 
     async resetLocalLearning() {
-      const db = await mentorDb;
-
       this.studentModel = initialStudentModel;
       this.session = null;
+      clearSessionCheckpoint();
       this.latestRecommendation = createRecommendationFromModel(initialStudentModel, now());
       this.pendingSyncEvents = 0;
       this.statisticsSnapshots = [];
@@ -478,6 +528,7 @@ export const useAppStore = defineStore('app', {
       this.isSyncRefreshing = false;
       savePreferredWorkShift('unknown');
 
+      const db = await mentorDb;
       await db.put('student-models', this.studentModel);
       await db.delete('learning-sessions', sessionStoreKey);
       await db.clear('statistics');
@@ -622,8 +673,9 @@ export const useAppStore = defineStore('app', {
         return;
       }
 
-      const db = await mentorDb;
       const session = toStorageRecord(this.session);
+      writeSessionCheckpoint(session);
+      const db = await mentorDb;
       await db.put('learning-sessions', session, sessionStoreKey);
       await db.put('lessons', session.lesson);
       await saveContentProgress({

@@ -1014,13 +1014,14 @@ onMounted(async () => {
     await appStore.hydrate();
   }
 
-  if (route.query.training === 'listening' || route.query.training === 'speaking') {
+  if (!appStore.session && (route.query.training === 'listening' || route.query.training === 'speaking')) {
     await openTrainingLibrary(route.query.training);
   }
 
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
   window.addEventListener('beforeunload', handlePageExit);
+  window.addEventListener('pagehide', handlePageExit);
 });
 
 onUnmounted(() => {
@@ -1030,6 +1031,7 @@ onUnmounted(() => {
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
   window.removeEventListener('beforeunload', handlePageExit);
+  window.removeEventListener('pagehide', handlePageExit);
 });
 
 watch(
@@ -1621,6 +1623,7 @@ function handleOffline() {
 }
 
 function handlePageExit() {
+  void appStore.persistSession();
   stopListeningAudio();
 }
 
