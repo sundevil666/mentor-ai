@@ -27,6 +27,12 @@ export interface PriorityLesson {
   evidenceCount: number;
 }
 
+export interface SynchronizedShiftDisplay {
+  shift: WorkShift;
+  date: string;
+  isNext: boolean;
+}
+
 export const primaryTrainingModes: TrainingModeOption[] = [
   {
     key: 'listening',
@@ -145,21 +151,28 @@ export function createCurrentActivitySuggestion(
 }
 
 export function getSynchronizedWorkShift(activity: MyShiftActivity | null, date = new Date()): WorkShift | null {
+  return getSynchronizedShiftDisplay(activity, date)?.shift ?? null;
+}
+
+export function getSynchronizedShiftDisplay(
+  activity: MyShiftActivity | null,
+  date = new Date(),
+): SynchronizedShiftDisplay | null {
   if (!activity) return null;
   const dateKey = formatDateInTimeZone(date, activity.user.timezone);
-  const week = weekRange(dateKey);
-  const scheduledDays = activity.days.filter((day) =>
-    day.date >= week.from && day.date <= week.to && day.shift,
+  const today = activity.days.find((day) => day.date === dateKey);
+  const scheduledDay = today?.shift
+    ? today
+    : activity.days
+      .filter((day) => day.date > dateKey && day.shift)
+      .sort((left, right) => left.date.localeCompare(right.date))[0];
+  if (!scheduledDay?.shift) return null;
+  const shift = inferRemoteShift(
+    scheduledDay.shift.startsAt,
+    activity.user.timezone,
+    scheduledDay.shift.id,
   );
-  const shifts = scheduledDays
-    .map((day) => inferRemoteShift(day.shift?.startsAt, activity.user.timezone, day.shift?.id))
-    .filter((shift): shift is WorkShift => shift !== null);
-  if (shifts.length === 0) return null;
-  const counts = shifts.reduce<Record<WorkShift, number>>(
-    (result, shift) => ({ ...result, [shift]: result[shift] + 1 }),
-    { first: 0, second: 0, third: 0, off: 0, unknown: 0 },
-  );
-  return shifts.sort((left, right) => counts[right] - counts[left])[0] ?? null;
+  return shift ? { shift, date: scheduledDay.date, isNext: scheduledDay.date !== dateKey } : null;
 }
 
 function inferRemoteShift(startsAt?: string, timeZone?: string, shiftId?: string): WorkShift | null {
@@ -186,16 +199,6 @@ function formatDateInTimeZone(date: Date, timeZone: string): string {
     month: '2-digit',
     day: '2-digit',
   }).format(date);
-}
-
-function weekRange(dateKey: string): { from: string; to: string } {
-  const date = new Date(`${dateKey}T12:00:00.000Z`);
-  const day = date.getUTCDay();
-  const monday = new Date(date);
-  monday.setUTCDate(date.getUTCDate() - (day === 0 ? 6 : day - 1));
-  const sunday = new Date(monday);
-  sunday.setUTCDate(monday.getUTCDate() + 6);
-  return { from: monday.toISOString().slice(0, 10), to: sunday.toISOString().slice(0, 10) };
 }
 
 function durationMinutes(from: Date, endsAt: string, maximum: number): number {

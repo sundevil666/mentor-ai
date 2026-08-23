@@ -59,15 +59,23 @@
           />
           <span>{{ myShiftStatus }}</span>
         </div>
+        <div v-if="myShiftConnected" class="activity-signal">
+          <span>{{ synchronizedShiftDisplay?.isNext ? 'Next shift' : 'Current shift' }}</span>
+          <strong>{{ shiftLabel(synchronizedShiftDisplay?.shift ?? null) }}</strong>
+          <small v-if="synchronizedShiftDisplay?.isNext">
+            {{ formatDisplayDate(synchronizedShiftDisplay.date) }} · synchronized from My Shift
+          </small>
+          <small v-else>Synchronized from My Shift · read-only</small>
+        </div>
         <q-select
-          :model-value="displayedShift"
+          v-else
+          v-model="selectedShift"
           :options="shiftOptions"
           emit-value
           map-options
-          :label="myShiftConnected ? 'Shift synchronized from My Shift' : 'Current shift (manual)'"
+          label="Current shift (manual)"
           outlined
-          :disable="myShiftConnected"
-          :hint="myShiftConnected ? 'Managed by My Shift while synchronization is connected.' : 'Used only when My Shift synchronization is off.'"
+          hint="Used only when My Shift synchronization is off."
           persistent-hint
           @update:model-value="saveShift"
         />
@@ -141,7 +149,7 @@ import {
   createShiftTimingRows,
   formatActivityMeta,
   formatPaceLabel,
-  getSynchronizedWorkShift,
+  getSynchronizedShiftDisplay,
 } from 'src/services/learning-context';
 import { clearLastRoutePreference } from 'src/services/user-preferences';
 import { useAppStore } from 'src/stores/app-store';
@@ -210,10 +218,7 @@ const voiceStatus = computed(() => {
 const currentSuggestion = computed(() =>
   createCurrentActivitySuggestion(appStore.preferredWorkShift, appStore.activitySnapshots, new Date(), appStore.myShiftActivity),
 );
-const synchronizedShift = computed(() => getSynchronizedWorkShift(appStore.myShiftActivity));
-const displayedShift = computed(() => myShiftConnected.value
-  ? synchronizedShift.value ?? 'unknown'
-  : selectedShift.value);
+const synchronizedShiftDisplay = computed(() => getSynchronizedShiftDisplay(appStore.myShiftActivity));
 const myShiftStatus = computed(() => {
   if (myShiftMessage.value) return myShiftMessage.value;
   if (!myShiftConfigured) return 'Client ID must be configured before connecting.';
@@ -222,7 +227,7 @@ const myShiftStatus = computed(() => {
   const synchronized = appStore.myShiftLastSyncAt
     ? ` Last synchronized ${formatDisplayDate(appStore.myShiftLastSyncAt)}.`
     : '';
-  return `Connected. Synced shift: ${shiftLabel(synchronizedShift.value)}.${synchronized}`;
+  return `Connected. Schedule context is synchronized.${synchronized}`;
 });
 const activityMeta = computed(() => formatActivityMeta(currentSuggestion.value));
 const paceLabel = computed(() => formatPaceLabel(currentSuggestion.value));
@@ -267,7 +272,7 @@ async function handleMyShiftAction() {
     }
     await appStore.refreshMyShiftActivity();
     myShiftMessage.value = appStore.myShiftSyncError
-      ?? `Schedule synchronized. Current shift: ${shiftLabel(synchronizedShift.value)}.`;
+      ?? `Schedule synchronized. ${synchronizedShiftDisplay.value?.isNext ? 'Next' : 'Current'} shift: ${shiftLabel(synchronizedShiftDisplay.value?.shift ?? null)}.`;
   } catch (error) {
     myShiftMessage.value = error instanceof Error ? error.message : 'My Shift request failed.';
   } finally {

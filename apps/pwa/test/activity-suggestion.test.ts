@@ -6,6 +6,7 @@ import { inferActivitySuggestion } from '../src/services/activity-suggestion.js'
 import {
   createCurrentActivitySuggestion,
   createPriorityLesson,
+  getSynchronizedShiftDisplay,
   getSynchronizedWorkShift,
 } from '../src/services/learning-context.js';
 import { isMyShiftSyncDue, type MyShiftActivity } from '../src/services/my-shift.js';
@@ -122,7 +123,7 @@ describe('PWA activity suggestion', () => {
     assert.equal(createCurrentActivitySuggestion('second', [], new Date('2026-06-29T21:00:00.000Z'), activity).workShift, 'third');
   });
 
-  it('keeps the synchronized weekly shift visible on a day off', () => {
+  it('shows the next scheduled shift on a day off', () => {
     const activity = createMyShiftActivity('day_off', 'day_off', '2026-07-05T00:00:00.000Z', '2026-07-06T00:00:00.000Z');
     activity.range = { from: '2026-06-29', to: '2026-07-05' };
     const workDates = ['2026-06-29', '2026-06-30', '2026-07-01', '2026-07-02', '2026-07-03'];
@@ -141,7 +142,26 @@ describe('PWA activity suggestion', () => {
       recommendedLearningWindows: [],
     })));
 
-    assert.equal(getSynchronizedWorkShift(activity, new Date('2026-07-05T12:00:00.000Z')), 'third');
+    activity.days.push({
+      date: '2026-07-06',
+      dayType: 'workday',
+      shift: {
+        id: 'shift-2',
+        name: 'Second shift',
+        startsAt: '2026-07-06T12:00:00.000Z',
+        endsAt: '2026-07-06T20:00:00.000Z',
+        isNightShift: false,
+        status: 'scheduled',
+      },
+      timeline: [],
+      recommendedLearningWindows: [],
+    });
+
+    assert.deepEqual(getSynchronizedShiftDisplay(activity, new Date('2026-07-05T12:00:00.000Z')), {
+      shift: 'second',
+      date: '2026-07-06',
+      isNext: true,
+    });
     assert.equal(createCurrentActivitySuggestion('second', [], new Date('2026-07-05T12:00:00.000Z'), activity).workShift, 'off');
   });
 });
