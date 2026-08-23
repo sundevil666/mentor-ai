@@ -1493,9 +1493,11 @@ body .q-menu {
   border-radius: var(--app-radius-md);
   flex: 1;
   min-height: 140px;
+  overflow-x: hidden;
   overflow-y: auto;
-  padding: 10px;
+  padding: 18px 10px;
   position: relative;
+  scroll-padding-block: 24px;
   scroll-behavior: smooth;
 }
 
@@ -1509,12 +1511,18 @@ body .q-menu {
   display: block;
   font: inherit;
   line-height: 1.5;
+  margin: 0 auto;
   padding: 9px 11px;
+  position: relative;
   text-align: left;
+  transform: scale(1);
+  transform-origin: center center;
   transition:
-    background-color 140ms ease,
-    color 140ms ease;
-  width: 100%;
+    background-color 260ms ease,
+    color 260ms ease,
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+  width: 86%;
+  will-change: transform;
 }
 
 .video-subtitles__cue:hover,
@@ -1528,6 +1536,8 @@ body .q-menu {
   background: color-mix(in srgb, var(--app-primary) 15%, transparent);
   color: var(--app-primary);
   font-weight: 800;
+  transform: scale(1.16);
+  z-index: 1;
 }
 
 .video-subtitles__status {
@@ -2184,6 +2194,10 @@ body .q-menu {
   .exercise-slide-forward-leave-active,
   .exercise-slide-back-enter-active,
   .exercise-slide-back-leave-active {
+    transition: none;
+  }
+
+  .video-subtitles__cue {
     transition: none;
   }
 
