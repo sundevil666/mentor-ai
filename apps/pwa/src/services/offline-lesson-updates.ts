@@ -4,12 +4,14 @@ import {
   cleanupExpiredOfflineLessons,
   getOfflineLessonContentVersion,
   readOfflineLessons,
+  registerOfflineVideo,
   registerOfflineSpeechLesson,
   removeOfflineLesson,
   refreshOfflineSizes,
   registerOfflineGeneratedLesson,
 } from './offline-library.js';
 import { isSpeechBatchCached, preloadSpeechBatch } from './speech-synthesis.js';
+import { getCachedVideoUrls, saveVideoOffline, videoLibrary } from './video-library.js';
 
 export type OfflineLessonUpdateStatus = 'idle' | 'checking' | 'downloading' | 'ready' | 'error';
 export interface OfflineLessonUpdateState {
@@ -21,7 +23,14 @@ export interface OfflineLessonUpdateState {
 
 const listeners = new Set<(state: OfflineLessonUpdateState) => void>();
 let state: OfflineLessonUpdateState = { status: 'idle', completed: 0, total: 0, lastCheckedAt: null };
-let activeUpdate: Promise<{ downloaded: number; current: boolean; eventId: string }> | null = null;
+export interface OfflineLessonUpdateResult {
+  downloaded: number;
+  downloadedLessons: number;
+  downloadedVideos: number;
+  current: boolean;
+  eventId: string;
+}
+let activeUpdate: Promise<OfflineLessonUpdateResult> | null = null;
 const builtInOfflineLessons = [
   { id: 'commute-listening', category: 'listening', title: 'Commute listening' },
   { id: 'shop-listening', category: 'listening', title: 'At a small shop' },
@@ -38,7 +47,7 @@ export function subscribeOfflineLessonUpdates(listener: (state: OfflineLessonUpd
 
 export function updateOfflineLessons(
   loadLesson: (context: LearningContext, createdAt: string) => Promise<GeneratedLesson>,
-): Promise<{ downloaded: number; current: boolean; eventId: string }> {
+): Promise<OfflineLessonUpdateResult> {
   if (activeUpdate) return activeUpdate;
   activeUpdate = performUpdate(loadLesson).finally(() => { activeUpdate = null; });
   return activeUpdate;
@@ -49,11 +58,18 @@ async function performUpdate(loadLesson: (context: LearningContext, createdAt: s
   setState({ status: 'checking', completed: 0, total: 0 });
   try {
     const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
-    const lessons = await fetchOfflineLessons(since);
     const builtInDownloaded = await updateBuiltInLessons(loadLesson);
+    const videosDownloaded = await updateVideos();
+    let privateLessonsAvailable = true;
+    const lessons = await fetchOfflineLessons(since).catch(() => {
+      privateLessonsAvailable = false;
+      return [];
+    });
     const savedLessons = readOfflineLessons().filter((item) => item.category === 'lessons');
     const activeIds = new Set(lessons.map((lesson) => lesson.id));
-    const removed = savedLessons.filter((item) => item.sourceCreatedAt && item.sourceCreatedAt >= since && !activeIds.has(item.id));
+    const removed = privateLessonsAvailable
+      ? savedLessons.filter((item) => item.sourceCreatedAt && item.sourceCreatedAt >= since && !activeIds.has(item.id))
+      : [];
     for (const lesson of removed) await removeOfflineLesson(lesson);
     const savedVersions = new Map(readOfflineLessons().filter((item) => item.category === 'lessons')
       .map((item) => [item.id, item.contentVersion]));
@@ -61,7 +77,13 @@ async function performUpdate(loadLesson: (context: LearningContext, createdAt: s
     if (pending.length === 0) {
       await cleanupExpiredOfflineLessons();
       setState({ status: 'ready', completed: lessons.length, total: lessons.length, lastCheckedAt: new Date().toISOString() });
-      return { downloaded: builtInDownloaded, current: builtInDownloaded === 0, eventId };
+      return {
+        downloaded: builtInDownloaded + videosDownloaded,
+        downloadedLessons: builtInDownloaded,
+        downloadedVideos: videosDownloaded,
+        current: builtInDownloaded + videosDownloaded === 0,
+        eventId,
+      };
     }
 
     setState({ status: 'downloading', completed: 0, total: pending.length });
@@ -77,11 +99,32 @@ async function performUpdate(loadLesson: (context: LearningContext, createdAt: s
     await refreshOfflineSizes();
     await cleanupExpiredOfflineLessons();
     setState({ status: 'ready', completed: lessons.length, total: lessons.length, lastCheckedAt: new Date().toISOString() });
-    return { downloaded: completed + builtInDownloaded, current: false, eventId };
+    return {
+      downloaded: completed + builtInDownloaded + videosDownloaded,
+      downloadedLessons: completed + builtInDownloaded,
+      downloadedVideos: videosDownloaded,
+      current: false,
+      eventId,
+    };
   } catch (error) {
     setState({ status: 'error', lastCheckedAt: new Date().toISOString() });
     throw error;
   }
+}
+
+async function updateVideos() {
+  const cachedUrls = await getCachedVideoUrls();
+  const pending = videoLibrary.filter((video) => !cachedUrls.has(video.sourceUrl));
+  let completed = 0;
+  for (const video of pending) {
+    setState({ status: 'downloading', completed, total: pending.length });
+    await saveVideoOffline(video);
+    registerOfflineVideo(video);
+    completed += 1;
+    setState({ status: 'downloading', completed, total: pending.length });
+  }
+  for (const video of videoLibrary.filter((item) => cachedUrls.has(item.sourceUrl))) registerOfflineVideo(video);
+  return completed;
 }
 
 async function updateBuiltInLessons(

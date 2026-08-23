@@ -470,12 +470,20 @@ onBeforeUnmount(() => {
 async function checkOfflineLessons(showResult: boolean) {
   try {
     const result = await updateOfflineLessons(appStore.loadLesson.bind(appStore));
-    if (result.downloaded > 0) await appStore.recordLessonUpdateNotification(result.downloaded, result.eventId);
+    if (result.downloaded > 0) {
+      await appStore.recordLessonUpdateNotification(
+        result.downloadedLessons,
+        result.downloadedVideos,
+        result.eventId,
+      );
+    }
     if (!showResult) return;
     Notify.create({
       type: 'positive',
       icon: 'offline_pin',
-      message: result.current ? 'Everything is downloaded and available offline' : `${result.downloaded} current lesson${result.downloaded === 1 ? '' : 's'} downloaded`,
+      message: result.current
+        ? 'Everything is downloaded and available offline'
+        : `${result.downloaded} offline item${result.downloaded === 1 ? '' : 's'} downloaded`,
     });
   } catch {
     if (!showResult) return;
