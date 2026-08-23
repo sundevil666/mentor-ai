@@ -5,6 +5,7 @@ import {
   getOfflineLessonContentVersion,
   readOfflineLessons,
   registerOfflineVideo,
+  selectStaleOfflineVideos,
   registerOfflineSpeechLesson,
   removeOfflineLesson,
   refreshOfflineSizes,
@@ -113,6 +114,10 @@ async function performUpdate(loadLesson: (context: LearningContext, createdAt: s
 }
 
 async function updateVideos() {
+  const activeVideoIds = new Set(videoLibrary.map((video) => video.id));
+  const staleVideos = selectStaleOfflineVideos(readOfflineLessons(), activeVideoIds);
+  for (const video of staleVideos) await removeOfflineLesson(video);
+
   const cachedUrls = await getCachedVideoUrls();
   const pending = videoLibrary.filter((video) => !cachedUrls.has(video.sourceUrl));
   let completed = 0;

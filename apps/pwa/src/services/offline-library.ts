@@ -153,6 +153,9 @@ export function selectOfflineLessonsOverLimit(lessons: OfflineLesson[], maxBytes
   }
   return selected;
 }
+export function selectStaleOfflineVideos(lessons: OfflineLesson[], activeVideoIds: ReadonlySet<string>) {
+  return lessons.filter((lesson) => lesson.category === 'videos' && !activeVideoIds.has(lesson.id));
+}
 export async function cleanupExpiredOfflineLessons(now = Date.now()) {
   const expired = selectExpiredOfflineLessons(readOfflineLessons(), readOfflineRetention(), now);
   for (const lesson of expired) await removeOfflineLesson(lesson);

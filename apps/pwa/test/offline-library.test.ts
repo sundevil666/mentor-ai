@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { selectExpiredOfflineLessons, selectOfflineLessonsOverLimit, type OfflineLesson } from '../src/services/offline-library.js';
+import { selectExpiredOfflineLessons, selectOfflineLessonsOverLimit, selectStaleOfflineVideos, type OfflineLesson } from '../src/services/offline-library.js';
 
 describe('offline lesson retention', () => {
   it('selects lessons that were not opened within their category period', () => {
@@ -20,5 +20,14 @@ describe('offline lesson retention', () => {
       { id: 'mandatory', category: 'lessons', title: 'Mandatory', sourceCreatedAt: '2026-08-20T12:00:00.000Z', downloadedAt: '2026-08-20T12:00:00.000Z', lastOpenedAt: '2026-08-20T12:00:00.000Z', estimatedBytes: 80 },
     ];
     assert.deepEqual(selectOfflineLessonsOverLimit(lessons, 100, now).map((lesson) => lesson.id), ['oldest', 'older']);
+  });
+
+  it('removes videos that no longer belong to the current catalog', () => {
+    const lessons: OfflineLesson[] = [
+      { id: 'current', category: 'videos', title: 'Current', downloadedAt: '2026-08-20T12:00:00.000Z', lastOpenedAt: '2026-08-20T12:00:00.000Z', estimatedBytes: 10 },
+      { id: 'legacy', category: 'videos', title: 'Legacy', downloadedAt: '2026-08-20T12:00:00.000Z', lastOpenedAt: '2026-08-20T12:00:00.000Z', estimatedBytes: 10 },
+      { id: 'audio', category: 'listening', title: 'Audio', downloadedAt: '2026-08-20T12:00:00.000Z', lastOpenedAt: '2026-08-20T12:00:00.000Z', estimatedBytes: 10 },
+    ];
+    assert.deepEqual(selectStaleOfflineVideos(lessons, new Set(['current'])).map((item) => item.id), ['legacy']);
   });
 });
