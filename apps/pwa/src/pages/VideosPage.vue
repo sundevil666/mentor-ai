@@ -24,7 +24,6 @@
             class="video-card__player"
             :src="video.sourceUrl"
             controls
-            muted
             playsinline
             preload="metadata"
             @loadedmetadata="restoreVideoPosition(video)"
@@ -207,6 +206,7 @@ async function toggleVideo(videoId: string) {
 
   configureVideoMediaSession(video, audio);
   try {
+    audio.volume = 0;
     await audio.play();
     await player.play();
   } catch {
@@ -216,14 +216,16 @@ async function toggleVideo(videoId: string) {
 
 function handleVideoPlay() {
   const audio = backgroundAudioElement.value;
-  if (audio?.paused) void audio.play();
+  if (!audio) return;
+  audio.volume = document.hidden ? 1 : 0;
+  if (audio.paused) void audio.play();
 }
 
 function handleVideoPause() {
   const audio = backgroundAudioElement.value;
   window.setTimeout(() => {
     if (!document.hidden) audio?.pause();
-  }, 150);
+  }, 500);
 }
 
 function synchronizeAudioToVideo() {
@@ -278,11 +280,14 @@ function handleVisibilityChange() {
   if (!player || !audio) return;
 
   if (document.hidden) {
-    if (!player.paused && audio.paused) void audio.play();
+    audio.currentTime = player.currentTime;
+    audio.volume = 1;
+    if (audio.paused) void audio.play();
     return;
   }
 
   if (!audio.paused) {
+    audio.volume = 0;
     player.currentTime = audio.currentTime;
     void player.play();
   }
@@ -307,8 +312,15 @@ function configureVideoMediaSession(video: LibraryVideo, audio: HTMLAudioElement
     artist: 'Mentor AI',
     album: 'Real English videos',
   });
-  navigator.mediaSession.setActionHandler('play', () => void audio.play());
-  navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+  navigator.mediaSession.setActionHandler('play', () => {
+    audio.volume = document.hidden ? 1 : 0;
+    void audio.play();
+    if (!document.hidden) void activeVideoElement.value?.play();
+  });
+  navigator.mediaSession.setActionHandler('pause', () => {
+    audio.pause();
+    activeVideoElement.value?.pause();
+  });
   navigator.mediaSession.setActionHandler('stop', () => stopActiveVideo());
   navigator.mediaSession.setActionHandler('seekbackward', (details) => {
     audio.currentTime = Math.max(0, audio.currentTime - (details.seekOffset ?? 10));
