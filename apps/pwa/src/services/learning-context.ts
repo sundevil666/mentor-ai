@@ -193,12 +193,15 @@ function inferRemoteShift(startsAt?: string, timeZone?: string, shiftId?: string
 }
 
 function formatDateInTimeZone(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
+  const parts = new Intl.DateTimeFormat('en', {
     timeZone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(date);
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? '';
+  return `${value('year')}-${value('month')}-${value('day')}`;
 }
 
 function durationMinutes(from: Date, endsAt: string, maximum: number): number {

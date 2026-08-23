@@ -166,13 +166,16 @@ export function isMyShiftSyncDue(synchronizedAt: string | null, date = new Date(
 
 export function findCurrentMyShiftDay(activity: MyShiftActivity | null, date = new Date()): MyShiftDay | null {
   if (!activity) return null;
-  const formatter = new Intl.DateTimeFormat('en-CA', {
+  const parts = new Intl.DateTimeFormat('en', {
     timeZone: activity.user.timezone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  });
-  return activity.days.find((day) => day.date === formatter.format(date)) ?? null;
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? '';
+  const dateKey = `${value('year')}-${value('month')}-${value('day')}`;
+  return activity.days.find((day) => day.date === dateKey) ?? null;
 }
 
 async function refreshAccessToken(refreshToken: string): Promise<StoredSession> {

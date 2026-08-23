@@ -60,12 +60,16 @@
           <span>{{ myShiftStatus }}</span>
         </div>
         <div v-if="myShiftConnected" class="activity-signal">
-          <span>{{ synchronizedShiftDisplay?.isNext ? 'Next shift' : 'Current shift' }}</span>
-          <strong>{{ shiftLabel(synchronizedShiftDisplay?.shift ?? null) }}</strong>
+          <span v-if="synchronizedShiftDisplay">
+            {{ synchronizedShiftDisplay.isNext ? 'Next shift' : 'Current shift' }}
+          </span>
+          <span v-else>My Shift schedule</span>
+          <strong>{{ synchronizedShiftDisplay ? shiftLabel(synchronizedShiftDisplay.shift) : 'Schedule unavailable' }}</strong>
           <small v-if="synchronizedShiftDisplay?.isNext">
             {{ formatDisplayDate(synchronizedShiftDisplay.date) }} · synchronized from My Shift
           </small>
-          <small v-else>Synchronized from My Shift · read-only</small>
+          <small v-else-if="synchronizedShiftDisplay">Synchronized from My Shift · read-only</small>
+          <small v-else>Tap Sync My Shift to load the current schedule.</small>
         </div>
         <q-select
           v-else
@@ -271,8 +275,13 @@ async function handleMyShiftAction() {
       return;
     }
     await appStore.refreshMyShiftActivity();
-    myShiftMessage.value = appStore.myShiftSyncError
-      ?? `Schedule synchronized. ${synchronizedShiftDisplay.value?.isNext ? 'Next' : 'Current'} shift: ${shiftLabel(synchronizedShiftDisplay.value?.shift ?? null)}.`;
+    if (appStore.myShiftSyncError) {
+      myShiftMessage.value = appStore.myShiftSyncError;
+    } else if (synchronizedShiftDisplay.value) {
+      myShiftMessage.value = `Schedule synchronized. ${synchronizedShiftDisplay.value.isNext ? 'Next' : 'Current'} shift: ${shiftLabel(synchronizedShiftDisplay.value.shift)}.`;
+    } else {
+      myShiftMessage.value = 'Connected, but My Shift did not return a current or upcoming work shift.';
+    }
   } catch (error) {
     myShiftMessage.value = error instanceof Error ? error.message : 'My Shift request failed.';
   } finally {
