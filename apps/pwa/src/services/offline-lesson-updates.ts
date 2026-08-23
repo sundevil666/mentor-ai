@@ -58,8 +58,8 @@ async function performUpdate(loadLesson: (context: LearningContext, createdAt: s
   setState({ status: 'checking', completed: 0, total: 0 });
   try {
     const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
-    const builtInDownloaded = await updateBuiltInLessons(loadLesson);
     const videosDownloaded = await updateVideos();
+    const builtInDownloaded = await updateBuiltInLessons(loadLesson);
     let privateLessonsAvailable = true;
     const lessons = await fetchOfflineLessons(since).catch(() => {
       privateLessonsAvailable = false;
@@ -116,14 +116,20 @@ async function updateVideos() {
   const cachedUrls = await getCachedVideoUrls();
   const pending = videoLibrary.filter((video) => !cachedUrls.has(video.sourceUrl));
   let completed = 0;
+  let failed = 0;
   for (const video of pending) {
     setState({ status: 'downloading', completed, total: pending.length });
-    await saveVideoOffline(video);
-    registerOfflineVideo(video);
-    completed += 1;
+    try {
+      await saveVideoOffline(video);
+      registerOfflineVideo(video);
+      completed += 1;
+    } catch {
+      failed += 1;
+    }
     setState({ status: 'downloading', completed, total: pending.length });
   }
   for (const video of videoLibrary.filter((item) => cachedUrls.has(item.sourceUrl))) registerOfflineVideo(video);
+  if (failed > 0) throw new Error(`${failed} video${failed === 1 ? '' : 's'} could not be saved offline.`);
   return completed;
 }
 

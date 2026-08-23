@@ -69,8 +69,12 @@ export async function getCachedVideoUrls(): Promise<Set<string>> {
 export async function saveVideoOffline(video: LibraryVideo): Promise<void> {
   if (!('caches' in window)) throw new Error('Offline video storage is not supported on this device.');
   const cache = await caches.open(offlineVideoCacheName);
-  const response = await fetch(video.sourceUrl, { mode: 'no-cors', cache: 'no-store' });
+  const response = await fetch(video.sourceUrl, { mode: 'cors', cache: 'no-store' });
+  if (!response.ok) throw new Error(`Video download failed with HTTP ${response.status}.`);
   await cache.put(video.sourceUrl, response);
+  if (!(await cache.match(video.sourceUrl, { ignoreVary: true }))) {
+    throw new Error('The downloaded video was not saved by this device.');
+  }
 }
 
 export async function deleteOfflineVideo(video: LibraryVideo): Promise<void> {
