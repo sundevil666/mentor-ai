@@ -1343,7 +1343,7 @@ body .q-menu {
 }
 
 .videos-page {
-  min-height: calc(100vh - 50px);
+  min-height: calc(100dvh - 55px - env(safe-area-inset-top));
   padding: 18px 20px 118px;
 }
 
@@ -1356,7 +1356,7 @@ body .q-menu {
 
 .videos-page--detail {
   box-sizing: border-box;
-  height: calc(100dvh - 50px);
+  height: calc(100dvh - 55px - env(safe-area-inset-top));
   min-height: 0 !important;
   overflow: hidden;
 }
