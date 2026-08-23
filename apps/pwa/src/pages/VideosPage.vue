@@ -41,11 +41,33 @@
               <div>
                 <h2>{{ video.title }}</h2>
               </div>
-              <q-badge
+              <q-btn
                 v-if="cachedUrls.has(video.sourceUrl)"
-                color="positive"
-                label="Offline"
-              />
+                aria-label="Delete offline video"
+                class="video-card__offline-action"
+                color="negative"
+                flat
+                icon="delete_outline"
+                round
+                :loading="busyVideoId === video.id"
+                @click="removeVideo(video)"
+              >
+                <q-tooltip>Delete from offline storage</q-tooltip>
+              </q-btn>
+              <q-btn
+                v-else
+                aria-label="Save video offline"
+                class="video-card__offline-action"
+                color="primary"
+                flat
+                icon="download_for_offline"
+                round
+                :disable="!isOnline"
+                :loading="busyVideoId === video.id"
+                @click="saveVideo(video)"
+              >
+                <q-tooltip>Save video for offline viewing</q-tooltip>
+              </q-btn>
             </div>
             <p>{{ video.description }}</p>
             <div class="video-card__meta">

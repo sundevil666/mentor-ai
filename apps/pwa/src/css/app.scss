@@ -1511,6 +1511,12 @@ body .q-menu {
   min-width: 0;
 }
 
+.video-card__offline-action {
+  background: color-mix(in srgb, var(--app-surface) 88%, transparent);
+  border: 1px solid var(--app-border-strong);
+  flex: 0 0 auto;
+}
+
 .video-card__heading h2 {
   color: var(--app-text-strong);
   font-size: 1.25rem;
