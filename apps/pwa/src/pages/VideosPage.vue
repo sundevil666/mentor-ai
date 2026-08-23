@@ -333,10 +333,12 @@ onMounted(() => {
   void refreshCacheStatus();
   void syncAllContentProgress().catch(() => undefined);
   document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('resize', updateActiveSubtitleScale);
 });
 
 onUnmounted(() => {
   document.removeEventListener('visibilitychange', handleVisibilityChange);
+  window.removeEventListener('resize', updateActiveSubtitleScale);
   stopActiveVideo();
   clearVideoMediaSession();
 });
@@ -448,8 +450,25 @@ function updateActiveSubtitle(position: number) {
     const container = subtitleScroller.value;
     const element = container?.querySelector<HTMLElement>(`[data-cue-id="${cue.id}"]`);
     if (!container || !element) return;
+    applySubtitleScale(container, element);
     container.scrollTo({ top: element.offsetTop - container.clientHeight / 2, behavior: 'smooth' });
   });
+}
+
+function updateActiveSubtitleScale() {
+  const container = subtitleScroller.value;
+  const cueId = activeSubtitleCueId.value;
+  const element = cueId ? container?.querySelector<HTMLElement>(`[data-cue-id="${cueId}"]`) : null;
+  if (!container || !element) return;
+  applySubtitleScale(container, element);
+}
+
+function applySubtitleScale(container: HTMLElement, element: HTMLElement) {
+  const availableWidth = Math.max(0, container.clientWidth - 20);
+  const naturalWidth = element.offsetWidth;
+  if (naturalWidth <= 0) return;
+  const scale = Math.min(1.6, Math.max(1.16, availableWidth / naturalWidth));
+  element.style.setProperty('--subtitle-active-scale', scale.toFixed(3));
 }
 
 function setVideoRepeat(repeat: boolean) {
