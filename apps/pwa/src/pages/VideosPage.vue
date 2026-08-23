@@ -112,7 +112,7 @@
             :model-value="videoCurrentTime"
             :min="0"
             :max="videoDuration || selectedVideo.durationSeconds"
-            :step="0.1"
+            :step="1"
             color="primary"
             @update:model-value="seekVideoProgress"
           />

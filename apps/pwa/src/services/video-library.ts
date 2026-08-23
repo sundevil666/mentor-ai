@@ -80,8 +80,9 @@ export async function deleteOfflineVideo(video: LibraryVideo): Promise<void> {
 }
 
 export function formatVideoDuration(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
+  const roundedSeconds = Math.round(totalSeconds);
+  const minutes = Math.floor(roundedSeconds / 60);
+  const seconds = roundedSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
