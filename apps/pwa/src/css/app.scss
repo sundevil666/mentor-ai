@@ -1429,8 +1429,15 @@ body .q-menu {
   margin: 0;
 }
 
-.video-detail__body > .q-btn {
-  min-height: 48px;
+.video-detail__meta {
+  align-items: center;
+  width: 100%;
+}
+
+.video-detail__offline-action {
+  background: var(--app-surface-active);
+  border: 1px solid var(--app-border-strong);
+  margin-left: auto;
 }
 
 .video-card__play-backdrop {

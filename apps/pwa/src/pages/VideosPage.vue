@@ -130,32 +130,38 @@
         </div>
         <div class="video-detail__body">
           <p>{{ selectedVideo.description }}</p>
-          <div class="video-card__meta">
+          <div class="video-card__meta video-detail__meta">
             <span><q-icon name="school" /> {{ selectedVideo.level }}</span>
             <span><q-icon name="schedule" /> {{ formatVideoDuration(selectedVideo.durationSeconds) }}</span>
             <span><q-icon name="storage" /> {{ formatVideoSize(selectedVideo.sizeBytes) }}</span>
+            <q-btn
+              v-if="cachedUrls.has(selectedVideo.sourceUrl)"
+              aria-label="Delete offline video"
+              class="video-detail__offline-action"
+              color="negative"
+              flat
+              icon="delete_outline"
+              round
+              :loading="busyVideoId === selectedVideo.id"
+              @click="removeVideo(selectedVideo)"
+            >
+              <q-tooltip>Delete from offline storage</q-tooltip>
+            </q-btn>
+            <q-btn
+              v-else
+              aria-label="Save video offline"
+              class="video-detail__offline-action"
+              color="primary"
+              flat
+              icon="download_for_offline"
+              round
+              :disable="!isOnline"
+              :loading="busyVideoId === selectedVideo.id"
+              @click="saveVideo(selectedVideo)"
+            >
+              <q-tooltip>Save video for offline viewing</q-tooltip>
+            </q-btn>
           </div>
-          <q-btn
-            v-if="cachedUrls.has(selectedVideo.sourceUrl)"
-            color="negative"
-            icon="delete_outline"
-            label="Delete from cache"
-            no-caps
-            outline
-            :loading="busyVideoId === selectedVideo.id"
-            @click="removeVideo(selectedVideo)"
-          />
-          <q-btn
-            v-else
-            color="primary"
-            icon="download_for_offline"
-            label="Save offline"
-            no-caps
-            unelevated
-            :disable="!isOnline"
-            :loading="busyVideoId === selectedVideo.id"
-            @click="saveVideo(selectedVideo)"
-          />
         </div>
       </section>
 
