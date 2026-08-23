@@ -2091,6 +2091,24 @@ body .q-menu {
     padding: 14px 14px 104px;
   }
 
+  .videos-page--detail {
+    padding-top: 8px;
+  }
+
+  .videos-shell--detail {
+    gap: 8px;
+  }
+
+  .videos-shell--detail .videos-header p {
+    display: none;
+  }
+
+  .videos-shell--detail .videos-header h1 {
+    font-size: 1.3rem;
+    line-height: 1.15;
+    margin: 0;
+  }
+
   .video-card__meta {
     flex-wrap: wrap;
     gap: 8px 14px;
@@ -2098,7 +2116,7 @@ body .q-menu {
 
   .video-playback-settings {
     gap: 8px;
-    padding: 10px 12px;
+    padding: 6px 10px;
   }
 
   .video-detail {
@@ -2107,7 +2125,16 @@ body .q-menu {
   }
 
   .video-detail > .video-card__player {
-    max-height: 38%;
+    max-height: 34%;
+  }
+
+  .video-detail__body {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .videos-shell--detail .video-subtitles {
+    min-height: 168px;
   }
 
   .video-speed-controls {

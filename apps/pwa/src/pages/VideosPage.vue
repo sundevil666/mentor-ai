@@ -102,6 +102,7 @@
           @pause="handleVideoPause"
           @play="handleVideoPlay"
           @seeked="synchronizeAudioToVideo"
+          @timeupdate="handleVideoTimeUpdate"
         >
           <track
             kind="captions"
@@ -321,6 +322,7 @@ const subtitleScroller = ref<HTMLElement | null>(null);
 const isOnline = computed(() => appStore.isOnline);
 const selectedVideo = computed(() => videoLibrary.find((video) => video.id === selectedVideoId.value) ?? null);
 let lastProgressSaveAt = 0;
+let shouldResumeAfterVisibilityChange = false;
 const offlineStorageSummary = computed(() => {
   const cachedVideos = videoLibrary.filter((video) => cachedUrls.value.has(video.sourceUrl));
   const totalBytes = cachedVideos.reduce((total, video) => total + video.sizeBytes, 0);
@@ -387,8 +389,6 @@ async function toggleVideo(videoId: string) {
   applyPlaybackRate(playbackPreference.playbackRate);
   configureVideoMediaSession(video, audio);
   try {
-    audio.volume = 0;
-    await audio.play();
     await player.play();
   } catch {
     Notify.create({ type: 'negative', message: 'Tap play to start this video.' });
@@ -416,7 +416,7 @@ async function loadVideoSubtitles(video: LibraryVideo) {
     if (cues.length === 0) throw new Error('Subtitle track is empty.');
     subtitleCues.value = cues;
     subtitleStatus.value = 'ready';
-    updateActiveSubtitle(backgroundAudioElement.value?.currentTime ?? 0);
+    updateActiveSubtitle(activeMediaTime());
   } catch {
     subtitleStatus.value = 'error';
   }
@@ -429,6 +429,7 @@ function seekToSubtitle(position: number) {
   if (audio) audio.currentTime = position;
   videoCurrentTime.value = position;
   updateActiveSubtitle(position);
+  if (player?.paused && !document.hidden) void player.play();
 }
 
 function seekVideoProgress(position: number | null) {
@@ -487,7 +488,7 @@ function setSubtitlesVisible(visible: boolean) {
   saveActiveVideoPlaybackPreference();
   if (visible) {
     activeSubtitleCueId.value = null;
-    void nextTick(() => updateActiveSubtitle(backgroundAudioElement.value?.currentTime ?? 0));
+    void nextTick(() => updateActiveSubtitle(activeMediaTime()));
   }
 }
 
@@ -508,14 +509,22 @@ function saveActiveVideoPlaybackPreference() {
 function handleVideoPlay() {
   const audio = backgroundAudioElement.value;
   if (!audio) return;
-  audio.volume = document.hidden ? 1 : 0;
-  if (audio.paused) void audio.play();
+  if (document.hidden) {
+    audio.volume = 1;
+    if (audio.paused) void audio.play();
+    return;
+  }
+  shouldResumeAfterVisibilityChange = true;
+  audio.pause();
 }
 
 function handleVideoPause() {
   const audio = backgroundAudioElement.value;
   window.setTimeout(() => {
-    if (!document.hidden) audio?.pause();
+    if (!document.hidden) {
+      shouldResumeAfterVisibilityChange = false;
+      audio?.pause();
+    }
   }, 500);
 }
 
@@ -524,6 +533,16 @@ function synchronizeAudioToVideo() {
   const audio = backgroundAudioElement.value;
   if (!player || !audio || !Number.isFinite(player.currentTime)) return;
   audio.currentTime = player.currentTime;
+}
+
+function handleVideoTimeUpdate() {
+  const player = activeVideoElement.value;
+  if (!player || document.hidden) return;
+  videoCurrentTime.value = player.currentTime;
+  if (Number.isFinite(player.duration)) videoDuration.value = player.duration;
+  updateActiveSubtitle(player.currentTime);
+  updateVideoMediaPosition(player);
+  persistActiveVideoProgress(player);
 }
 
 function synchronizeVideoToAudio() {
@@ -553,21 +572,21 @@ async function handleVideoMetadataLoaded(video: LibraryVideo) {
   updateActiveSubtitle(position);
 }
 
-function persistActiveVideoProgress(audio: HTMLAudioElement, force = false) {
+function persistActiveVideoProgress(media: HTMLMediaElement, force = false) {
   const video = videoLibrary.find((item) => item.id === selectedVideoId.value);
-  if (!video || !Number.isFinite(audio.currentTime)) return;
+  if (!video || !Number.isFinite(media.currentTime)) return;
   const timestamp = Date.now();
   if (!force && timestamp - lastProgressSaveAt < 3000) return;
   lastProgressSaveAt = timestamp;
-  const duration = Number.isFinite(audio.duration) ? audio.duration : video.durationSeconds;
+  const duration = Number.isFinite(media.duration) ? media.duration : video.durationSeconds;
   void saveContentProgress({
     studentId: appStore.studentId,
     category: 'video',
     contentId: video.id,
-    position: audio.currentTime,
-    furthestPosition: audio.currentTime,
+    position: media.currentTime,
+    furthestPosition: media.currentTime,
     duration,
-    completed: duration > 0 && audio.currentTime >= duration - 2,
+    completed: duration > 0 && media.currentTime >= duration - 2,
     updatedAt: new Date().toISOString(),
   });
 }
@@ -578,17 +597,18 @@ function handleVisibilityChange() {
   if (!player || !audio) return;
 
   if (document.hidden) {
+    shouldResumeAfterVisibilityChange = shouldResumeAfterVisibilityChange || !player.paused;
     audio.currentTime = player.currentTime;
     audio.volume = 1;
-    if (audio.paused) void audio.play();
+    if (shouldResumeAfterVisibilityChange && audio.paused) void audio.play();
     return;
   }
 
-  if (!audio.paused) {
-    audio.volume = 0;
+  if (Number.isFinite(audio.currentTime)) {
     player.currentTime = audio.currentTime;
-    void player.play();
   }
+  audio.pause();
+  if (shouldResumeAfterVisibilityChange) void player.play();
 }
 
 function handleBackgroundAudioEnded() {
@@ -599,7 +619,9 @@ function handleBackgroundAudioEnded() {
 }
 
 function stopActiveVideo() {
-  if (backgroundAudioElement.value) persistActiveVideoProgress(backgroundAudioElement.value, true);
+  shouldResumeAfterVisibilityChange = false;
+  const activeMedia = document.hidden ? backgroundAudioElement.value : activeVideoElement.value;
+  if (activeMedia) persistActiveVideoProgress(activeMedia, true);
   activeVideoElement.value?.pause();
   backgroundAudioElement.value?.pause();
 }
@@ -612,32 +634,44 @@ function configureVideoMediaSession(video: LibraryVideo, audio: HTMLAudioElement
     album: 'Real English videos',
   });
   navigator.mediaSession.setActionHandler('play', () => {
-    audio.volume = document.hidden ? 1 : 0;
-    void audio.play();
-    if (!document.hidden) void activeVideoElement.value?.play();
+    if (document.hidden) {
+      audio.volume = 1;
+      void audio.play();
+    } else {
+      audio.pause();
+      void activeVideoElement.value?.play();
+    }
   });
   navigator.mediaSession.setActionHandler('pause', () => {
+    shouldResumeAfterVisibilityChange = false;
     audio.pause();
     activeVideoElement.value?.pause();
   });
   navigator.mediaSession.setActionHandler('stop', () => stopActiveVideo());
   navigator.mediaSession.setActionHandler('seekbackward', (details) => {
-    audio.currentTime = Math.max(0, audio.currentTime - (details.seekOffset ?? 10));
+    seekVideoProgress(Math.max(0, activeMediaTime() - (details.seekOffset ?? 10)));
   });
   navigator.mediaSession.setActionHandler('seekforward', (details) => {
-    audio.currentTime = Math.min(audio.duration || Infinity, audio.currentTime + (details.seekOffset ?? 10));
+    const duration = activeVideoElement.value?.duration || audio.duration || Infinity;
+    seekVideoProgress(Math.min(duration, activeMediaTime() + (details.seekOffset ?? 10)));
   });
   navigator.mediaSession.setActionHandler('seekto', (details) => {
-    if (details.seekTime !== undefined) audio.currentTime = details.seekTime;
+    if (details.seekTime !== undefined) seekVideoProgress(details.seekTime);
   });
 }
 
-function updateVideoMediaPosition(audio: HTMLAudioElement) {
-  if (!('mediaSession' in navigator) || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
+function activeMediaTime() {
+  return document.hidden
+    ? (backgroundAudioElement.value?.currentTime ?? 0)
+    : (activeVideoElement.value?.currentTime ?? 0);
+}
+
+function updateVideoMediaPosition(media: HTMLMediaElement) {
+  if (!('mediaSession' in navigator) || !Number.isFinite(media.duration) || media.duration <= 0) return;
   navigator.mediaSession.setPositionState({
-    duration: audio.duration,
-    playbackRate: audio.playbackRate,
-    position: Math.min(audio.currentTime, audio.duration),
+    duration: media.duration,
+    playbackRate: media.playbackRate,
+    position: Math.min(media.currentTime, media.duration),
   });
 }
 
