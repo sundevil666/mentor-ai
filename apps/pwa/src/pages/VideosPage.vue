@@ -1,6 +1,12 @@
 <template>
-  <q-page class="videos-page">
-    <section class="videos-shell">
+  <q-page
+    class="videos-page"
+    :class="{ 'videos-page--detail': selectedVideo }"
+  >
+    <section
+      class="videos-shell"
+      :class="{ 'videos-shell--detail': selectedVideo }"
+    >
       <header class="videos-header">
         <q-btn
           v-if="selectedVideo"

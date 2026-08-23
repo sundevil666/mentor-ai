@@ -1354,6 +1354,27 @@ body .q-menu {
   max-width: 920px;
 }
 
+.videos-page--detail {
+  box-sizing: border-box;
+  height: calc(100dvh - 50px);
+  min-height: 0 !important;
+  overflow: hidden;
+}
+
+.videos-shell--detail {
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+}
+
+.videos-shell--detail .video-detail {
+  height: auto;
+  min-height: 0;
+}
+
+.videos-shell--detail .video-subtitles {
+  min-height: 0;
+}
+
 .videos-header p {
   color: var(--app-accent);
   font-size: 0.78rem;
