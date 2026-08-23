@@ -56,8 +56,10 @@ import { saveContentProgress } from 'src/services/content-progress';
 import {
   fetchMyShiftActivity,
   isMyShiftConnected,
+  isMyShiftSyncDue,
   type MyShiftActivity,
 } from 'src/services/my-shift';
+import { cacheMyShiftActivity, readCachedMyShiftActivity } from 'src/services/my-shift-cache';
 
 interface LearningSessionState {
   id: string;
@@ -105,6 +107,7 @@ interface AppState {
   preferredWorkShift: WorkShift;
   myShiftActivity: MyShiftActivity | null;
   myShiftSyncError: string | null;
+  myShiftLastSyncAt: string | null;
   pendingSyncEvents: number;
   lastSyncAt: string | null;
   lastRemoteProgressAt: string | null;
@@ -134,6 +137,7 @@ export const useAppStore = defineStore('app', {
     preferredWorkShift: 'unknown',
     myShiftActivity: null,
     myShiftSyncError: null,
+    myShiftLastSyncAt: null,
     pendingSyncEvents: 0,
     lastSyncAt: null,
     lastRemoteProgressAt: null,
@@ -186,6 +190,7 @@ export const useAppStore = defineStore('app', {
       const activitySnapshots = await db.getAll('activity-snapshots');
       const queuedEvents = await db.getAll('sync-queue');
       const updateNotifications = await db.getAll('update-notifications');
+      const myShiftCache = await readCachedMyShiftActivity();
 
       this.studentModel = (savedModel as StudentModel | undefined) ?? initialStudentModel;
       this.session = (savedSession as LearningSessionState | undefined) ?? null;
@@ -203,6 +208,8 @@ export const useAppStore = defineStore('app', {
       this.updateNotifications = (updateNotifications as UpdateNotification[]).sort((left, right) =>
         right.createdAt.localeCompare(left.createdAt),
       );
+      this.myShiftActivity = myShiftCache?.activity ?? null;
+      this.myShiftLastSyncAt = myShiftCache?.synchronizedAt ?? null;
       this.isOnline = navigator.onLine;
       this.authSession = readAuthSession();
       this.isHydrated = true;
@@ -221,7 +228,7 @@ export const useAppStore = defineStore('app', {
       await this.pruneLocalStorage();
 
       if (this.isOnline) {
-        await this.refreshMyShiftActivity();
+        await this.refreshMyShiftActivity(false);
         await this.refreshRemoteLearningState();
       }
     },
@@ -230,7 +237,7 @@ export const useAppStore = defineStore('app', {
       this.isOnline = isOnline;
 
       if (isOnline) {
-        void this.refreshMyShiftActivity();
+        void this.refreshMyShiftActivity(false);
         void this.publishLocalProgressAfterReconnect();
       }
     },
@@ -305,8 +312,9 @@ export const useAppStore = defineStore('app', {
       savePreferredWorkShift(workShift);
     },
 
-    async refreshMyShiftActivity() {
+    async refreshMyShiftActivity(force = true) {
       if (!navigator.onLine || !isMyShiftConnected()) return;
+      if (!force && !isMyShiftSyncDue(this.myShiftLastSyncAt)) return;
 
       const today = new Date();
       const from = toLocalDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1));
@@ -314,6 +322,8 @@ export const useAppStore = defineStore('app', {
 
       try {
         this.myShiftActivity = await fetchMyShiftActivity(from, to);
+        const cached = await cacheMyShiftActivity(this.myShiftActivity);
+        this.myShiftLastSyncAt = cached.synchronizedAt;
         this.myShiftSyncError = null;
       } catch (error) {
         this.myShiftSyncError = getErrorMessage(error);

@@ -71,7 +71,10 @@ My Shift schedule context is enabled with `MY_SHIFT_CLIENT_ID`. Register the pro
 `https://<mentor-host>/settings` (and the equivalent local HTTPS callback when needed) in My Shift,
 then set the issued client ID in the build environment. The PWA uses OAuth 2.0 with PKCE and the
 `activity:read` scope; it never sends the user's email as an Activity API key. Commutes select
-hands-free listening, work periods allow only short review, and days off favor speaking practice.
+hands-free listening, work periods allow only short review, the first hours after work stay short
+and audio-first, and fresh pre-shift windows favor an interactive lesson or focused video. The
+latest schedule is cached for offline use and refreshed at most once per day automatically; a
+manual sync in Settings always checks immediately for changed shifts.
 
 Safari and iOS background behavior cannot be made 100% reliable with PWA code alone. Web Background Sync is best-effort and may not run while the app is fully suspended. The reliable iOS path is a native shell such as Capacitor with BackgroundTasks, silent/visible push notifications, and the same durable IndexedDB/native queue contract. The PWA must still retry immediately on foreground, `online`, visibility return, and service-worker background sync where supported.
 

@@ -7,9 +7,16 @@ import {
   createCurrentActivitySuggestion,
   createPriorityLesson,
 } from '../src/services/learning-context.js';
-import type { MyShiftActivity } from '../src/services/my-shift.js';
+import { isMyShiftSyncDue, type MyShiftActivity } from '../src/services/my-shift.js';
 
 describe('PWA activity suggestion', () => {
+  it('refreshes My Shift once the daily cache interval has elapsed', () => {
+    const now = new Date('2026-06-30T12:00:00.000Z');
+
+    assert.equal(isMyShiftSyncDue('2026-06-29T13:00:00.000Z', now), false);
+    assert.equal(isMyShiftSyncDue('2026-06-29T11:59:59.000Z', now), true);
+  });
+
   it('starts by calibrating the skill with the least evidence', () => {
     const model = structuredClone(initialStudentModel);
     model.listening.evidenceCount = 2;
@@ -86,7 +93,40 @@ describe('PWA activity suggestion', () => {
     assert.equal(suggestion.activityPace, 'deep');
     assert.match(suggestion.reason, /speaking aloud/);
   });
+
+  it('keeps the first hours after a shift short and audio-first', () => {
+    const activity = createWorkdayActivity('2026-06-29T06:00:00.000Z', '2026-06-29T14:00:00.000Z');
+    const suggestion = createCurrentActivitySuggestion('unknown', [], new Date('2026-06-29T15:00:00.000Z'), activity);
+
+    assert.equal(suggestion.mode, 'listening');
+    assert.equal(suggestion.activityPace, 'passive');
+    assert.equal(suggestion.availableMinutes, 5);
+    assert.match(suggestion.reason, /fatigue window/);
+  });
+
+  it('uses the fresh window before a shift for active learning', () => {
+    const activity = createWorkdayActivity('2026-06-29T14:00:00.000Z', '2026-06-29T22:00:00.000Z');
+    const suggestion = createCurrentActivitySuggestion('unknown', [], new Date('2026-06-29T11:00:00.000Z'), activity);
+
+    assert.equal(suggestion.mode, 'home');
+    assert.equal(suggestion.activityPace, 'active');
+    assert.match(suggestion.reason, /focused video/);
+  });
 });
+
+function createWorkdayActivity(startsAt: string, endsAt: string): MyShiftActivity {
+  const activity = createMyShiftActivity('workday', 'commute', startsAt, startsAt);
+  activity.days[0].shift = {
+    id: 'test-shift',
+    name: 'Test shift',
+    startsAt,
+    endsAt,
+    isNightShift: false,
+    status: 'scheduled',
+  };
+  activity.days[0].timeline = [];
+  return activity;
+}
 
 function createMyShiftActivity(
   dayType: string,

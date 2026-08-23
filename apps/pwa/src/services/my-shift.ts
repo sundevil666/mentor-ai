@@ -1,6 +1,7 @@
 const myShiftOrigin = 'https://my-shift-iota.vercel.app';
 const sessionKey = 'mentor-ai-my-shift-session';
 const oauthKey = 'mentor-ai-my-shift-oauth';
+export const myShiftSyncIntervalMs = 24 * 60 * 60 * 1000;
 
 export type MyShiftLessonAvailability =
   | 'recommended'
@@ -155,6 +156,12 @@ export async function fetchMyShiftActivity(from: string, to: string): Promise<My
   }
 
   return (await response.json()) as MyShiftActivity;
+}
+
+export function isMyShiftSyncDue(synchronizedAt: string | null, date = new Date()): boolean {
+  if (!synchronizedAt) return true;
+  const lastSync = new Date(synchronizedAt).getTime();
+  return !Number.isFinite(lastSync) || date.getTime() - lastSync >= myShiftSyncIntervalMs;
 }
 
 export function findCurrentMyShiftDay(activity: MyShiftActivity | null, date = new Date()): MyShiftDay | null {

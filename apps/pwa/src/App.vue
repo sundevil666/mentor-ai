@@ -167,6 +167,7 @@ function stopRemoteSyncPolling() {
 
 function handleVisibilitySync() {
   if (document.visibilityState === 'visible') {
+    void appStore.refreshMyShiftActivity(false);
     void refreshRemoteProgress(true);
   }
 }

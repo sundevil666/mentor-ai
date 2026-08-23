@@ -90,6 +90,33 @@ export function createCurrentActivitySuggestion(
     };
   }
 
+  const shiftStartsAt = day.shift ? new Date(day.shift.startsAt) : null;
+  const shiftEndsAt = day.shift ? new Date(day.shift.endsAt) : null;
+  const hoursUntilShift = shiftStartsAt ? (shiftStartsAt.getTime() - date.getTime()) / 3_600_000 : null;
+  const hoursAfterShift = shiftEndsAt ? (date.getTime() - shiftEndsAt.getTime()) / 3_600_000 : null;
+
+  if (hoursAfterShift !== null && hoursAfterShift >= 0 && hoursAfterShift <= 4) {
+    return {
+      ...fallback,
+      workShift,
+      activityPace: 'passive',
+      mode: 'listening',
+      availableMinutes: 5,
+      reason: 'My Shift shows that your shift has just ended. Mentor AI keeps this fatigue window audio-first and short.',
+    };
+  }
+
+  if (hoursUntilShift !== null && hoursUntilShift > 0 && hoursUntilShift <= 4) {
+    return {
+      ...fallback,
+      workShift,
+      activityPace: 'active',
+      mode: 'home',
+      availableMinutes: nextWindow?.recommendedDurationMinutes ?? 10,
+      reason: 'My Shift shows that you are still fresh before work, so this window favors an interactive lesson or focused video.',
+    };
+  }
+
   if (day.dayType === 'day_off' || current?.type === 'day_off') {
     return {
       ...fallback,
@@ -152,6 +179,10 @@ export function formatActivityMeta(suggestion: ActivitySuggestion): string {
 }
 
 export function formatPaceLabel(suggestion: ActivitySuggestion): string {
+  if (suggestion.mode === 'listening') return 'Audio-first';
+  if (suggestion.mode === 'review') return 'Short review';
+  if (suggestion.mode === 'home' && suggestion.activityPace === 'active') return 'Interactive lesson or video';
+
   switch (suggestion.activityPace) {
     case 'passive':
       return 'Light review';

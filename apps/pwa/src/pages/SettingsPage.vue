@@ -210,7 +210,11 @@ const myShiftStatus = computed(() => {
   if (myShiftMessage.value) return myShiftMessage.value;
   if (!myShiftConfigured) return 'Client ID must be configured before connecting.';
   if (appStore.myShiftSyncError) return appStore.myShiftSyncError;
-  return myShiftConnected.value ? 'Connected. Your schedule guides lesson timing.' : 'Use your My Shift account to share activity.';
+  if (!myShiftConnected.value) return 'Use your My Shift account to share activity.';
+  const synchronized = appStore.myShiftLastSyncAt
+    ? ` Last synchronized ${formatDisplayDate(appStore.myShiftLastSyncAt)}.`
+    : '';
+  return `Connected. Your schedule guides lesson timing.${synchronized}`;
 });
 const activityMeta = computed(() => formatActivityMeta(currentSuggestion.value));
 const paceLabel = computed(() => formatPaceLabel(currentSuggestion.value));
