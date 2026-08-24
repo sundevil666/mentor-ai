@@ -257,20 +257,37 @@
                 <strong>{{ currentExercise.nativePrompt }}</strong>
               </div>
 
-              <div class="dialogue-drill__recorder">
+              <div
+                :class="[
+                  'dialogue-drill__recorder',
+                  {
+                    'dialogue-drill__recorder--active': isRecognizingSpeech,
+                    'dialogue-drill__recorder--captured': speechRecognitionCaptured,
+                    'dialogue-drill__recorder--error': speechRecognitionError,
+                  },
+                ]"
+                role="status"
+                aria-live="polite"
+              >
                 <q-btn
-                  color="primary"
-                  :icon="isRecognizingSpeech ? 'graphic_eq' : 'mic'"
-                  :label="isRecognizingSpeech ? 'Listening...' : 'Record answer'"
+                  :color="isRecognizingSpeech ? 'negative' : 'primary'"
+                  :icon="isRecognizingSpeech ? 'stop_circle' : 'mic'"
+                  :label="isRecognizingSpeech ? 'Stop recording' : speechRecognitionCaptured ? 'Record again' : 'Record answer'"
                   unelevated
                   no-caps
-                  :disable="!speechRecognitionAvailable || isRecognizingSpeech"
+                  :disable="!speechRecognitionAvailable"
                   @click="recordDialogueAnswer"
                 />
                 <q-btn color="primary" flat icon="volume_up" round @click="playAudio">
                   <q-tooltip>Play native answer</q-tooltip>
                 </q-btn>
-                <span>{{ speechSupportMessage }}</span>
+                <span class="dialogue-drill__recorder-status">
+                  <q-icon :name="speechStatusIcon" size="20px" />
+                  <span>
+                    <strong>{{ speechStatusTitle }}</strong>
+                    <small>{{ speechSupportMessage }}</small>
+                  </span>
+                </span>
               </div>
 
               <q-input
@@ -664,6 +681,7 @@ const offlineAudioStatus = ref<'idle' | 'downloading' | 'ready' | 'error'>('idle
 const offlineAudioProgress = ref(0);
 const isRecognizingSpeech = ref(false);
 const speechRecognitionError = ref('');
+const speechRecognitionCaptured = ref(false);
 const selectedListeningItemId = ref<string | null>(null);
 const activeSpeechRunId = ref(0);
 const learningTransitionName = ref('learning-slide-forward');
@@ -722,15 +740,37 @@ const isDialogueTranslationExercise = computed(
 );
 const speechRecognitionAvailable = computed(() => isSpeechRecognitionAvailable());
 const speechSupportMessage = computed(() => {
+  if (isRecognizingSpeech.value) {
+    return 'Speak now. Tap Stop recording when you finish.';
+  }
+
   if (speechRecognitionError.value) {
     return speechRecognitionError.value;
+  }
+
+  if (speechRecognitionCaptured.value) {
+    return 'Your words are shown in the answer field below. You can edit or record again.';
   }
 
   if (!speechRecognitionAvailable.value) {
     return 'Voice recognition is not available on this device. Type the answer here instead.';
   }
 
-  return 'Desktop Chrome/Edge can record and turn your answer into text.';
+  return 'Tap Record answer, then speak. Recording stops automatically after a pause.';
+});
+const speechStatusTitle = computed(() => {
+  if (isRecognizingSpeech.value) return 'Recording now';
+  if (speechRecognitionError.value) return 'Recording failed';
+  if (speechRecognitionCaptured.value) return 'Answer recorded';
+  if (!speechRecognitionAvailable.value) return 'Voice recording unavailable';
+  return 'Ready to record';
+});
+const speechStatusIcon = computed(() => {
+  if (isRecognizingSpeech.value) return 'graphic_eq';
+  if (speechRecognitionError.value) return 'error_outline';
+  if (speechRecognitionCaptured.value) return 'check_circle';
+  if (!speechRecognitionAvailable.value) return 'mic_off';
+  return 'mic_none';
 });
 const listeningPlaylist = computed<ListeningPlaylistItem[]>(() => {
   const lesson = appStore.session?.lesson;
@@ -1081,6 +1121,7 @@ watch(
     void nextTick(() => window.scrollTo({ top: 0, behavior: 'auto' }));
     answer.value = '';
     speechRecognitionError.value = '';
+    speechRecognitionCaptured.value = false;
     stopSpeechRecognition();
     isRecognizingSpeech.value = false;
     if (isListeningPlayer.value) {
@@ -1208,17 +1249,25 @@ async function completeListeningExercise() {
 }
 
 async function recordDialogueAnswer() {
-  if (!speechRecognitionAvailable.value || isRecognizingSpeech.value) {
+  if (!speechRecognitionAvailable.value) {
+    return;
+  }
+
+  if (isRecognizingSpeech.value) {
+    stopSpeechRecognition();
     return;
   }
 
   speechRecognitionError.value = '';
+  speechRecognitionCaptured.value = false;
   isRecognizingSpeech.value = true;
 
   try {
     const result = await recognizeSpeechOnce('en-US');
     answer.value = result.transcript;
+    speechRecognitionCaptured.value = true;
   } catch (error) {
+    speechRecognitionCaptured.value = false;
     speechRecognitionError.value =
       error instanceof Error
         ? error.message

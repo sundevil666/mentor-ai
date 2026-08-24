@@ -612,10 +612,47 @@ body .q-menu {
   width: 100%;
 }
 
-.dialogue-drill__recorder > span {
+.dialogue-drill__recorder--active {
+  background: color-mix(in srgb, var(--q-negative) 8%, var(--app-surface));
+  border-color: color-mix(in srgb, var(--q-negative) 58%, var(--app-border-strong));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--q-negative) 10%, transparent);
+}
+
+.dialogue-drill__recorder--captured {
+  background: color-mix(in srgb, var(--q-positive) 8%, var(--app-surface));
+  border-color: color-mix(in srgb, var(--q-positive) 48%, var(--app-border-strong));
+}
+
+.dialogue-drill__recorder--error {
+  border-color: color-mix(in srgb, var(--q-negative) 58%, var(--app-border-strong));
+}
+
+.dialogue-drill__recorder-status {
+  align-items: center;
+  display: flex;
   flex: 1;
+  gap: 8px;
   font-size: 0.95rem;
   line-height: 1.35;
+}
+
+.dialogue-drill__recorder-status > span {
+  display: grid;
+  gap: 2px;
+}
+
+.dialogue-drill__recorder-status strong,
+.dialogue-drill__recorder-status small {
+  display: block;
+}
+
+.dialogue-drill__recorder-status strong {
+  color: var(--app-text-strong);
+}
+
+.dialogue-drill__recorder-status small {
+  color: var(--app-muted-strong);
+  font-size: 0.82rem;
 }
 
 .handoff-actions {
@@ -2051,7 +2088,7 @@ body .q-menu {
     grid-template-columns: 1fr 48px;
   }
 
-  .dialogue-drill__recorder > span {
+  .dialogue-drill__recorder-status {
     grid-column: 1 / -1;
   }
 
