@@ -61,6 +61,7 @@ import {
 } from 'src/services/my-shift';
 import { cacheMyShiftActivity, readCachedMyShiftActivity } from 'src/services/my-shift-cache';
 import { findOfflineLesson } from 'src/services/offline-library';
+import { selectRetainedUpdateNotifications } from 'src/services/update-notification-retention';
 
 interface LearningSessionState {
   id: string;
@@ -87,8 +88,6 @@ export interface UpdateNotification {
   readAt: string | null;
   kind?: 'app' | 'lessons';
 }
-
-const maxUpdateNotifications = 5;
 
 type QueuedLearningEvent = LearningEvent & {
   status: string;
@@ -259,9 +258,7 @@ export const useAppStore = defineStore('app', {
         ?? this.activitySnapshots[this.activitySnapshots.length - 1]?.workShift
         ?? 'unknown';
       this.pendingSyncEvents = queuedEvents.filter((event) => event.status === 'pending').length;
-      this.updateNotifications = (updateNotifications as UpdateNotification[]).sort((left, right) =>
-        right.createdAt.localeCompare(left.createdAt),
-      ).slice(0, maxUpdateNotifications);
+      this.updateNotifications = selectRetainedUpdateNotifications(updateNotifications as UpdateNotification[]);
       const retainedNotificationIds = new Set(this.updateNotifications.map((notification) => notification.id));
       for (const notification of updateNotifications as UpdateNotification[]) {
         if (!retainedNotificationIds.has(notification.id)) await db.delete('update-notifications', notification.id);
@@ -616,10 +613,12 @@ export const useAppStore = defineStore('app', {
     async saveUpdateNotification(notification: UpdateNotification) {
       const db = await mentorDb;
       await db.put('update-notifications', notification);
-      const next = [notification, ...this.updateNotifications.filter((item) => item.id !== notification.id)]
-        .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-      this.updateNotifications = next.slice(0, maxUpdateNotifications);
-      for (const removed of next.slice(maxUpdateNotifications)) await db.delete('update-notifications', removed.id);
+      const next = [notification, ...this.updateNotifications.filter((item) => item.id !== notification.id)];
+      this.updateNotifications = selectRetainedUpdateNotifications(next);
+      const retainedIds = new Set(this.updateNotifications.map((item) => item.id));
+      for (const removed of next) {
+        if (!retainedIds.has(removed.id)) await db.delete('update-notifications', removed.id);
+      }
     },
 
     async prepareForAppUpdate() {
@@ -649,7 +648,12 @@ export const useAppStore = defineStore('app', {
       const db = await mentorDb;
 
       await db.put('update-notifications', updated);
-      this.updateNotifications = this.updateNotifications.map((item) => item.id === id ? updated : item);
+      const next = this.updateNotifications.map((item) => item.id === id ? updated : item);
+      this.updateNotifications = selectRetainedUpdateNotifications(next);
+      const retainedIds = new Set(this.updateNotifications.map((item) => item.id));
+      for (const removed of next) {
+        if (!retainedIds.has(removed.id)) await db.delete('update-notifications', removed.id);
+      }
     },
 
     async markAllUpdateNotificationsRead() {
@@ -662,12 +666,17 @@ export const useAppStore = defineStore('app', {
       const db = await mentorDb;
 
       const readAt = now();
-      this.updateNotifications = this.updateNotifications.map((notification) => notification.readAt ? notification : {
+      const next = this.updateNotifications.map((notification) => notification.readAt ? notification : {
         ...notification,
         viewedAt: notification.viewedAt ?? readAt,
         readAt,
       });
-      for (const notification of this.updateNotifications) await db.put('update-notifications', notification);
+      for (const notification of next) await db.put('update-notifications', notification);
+      this.updateNotifications = selectRetainedUpdateNotifications(next);
+      const retainedIds = new Set(this.updateNotifications.map((notification) => notification.id));
+      for (const notification of next) {
+        if (!retainedIds.has(notification.id)) await db.delete('update-notifications', notification.id);
+      }
     },
 
     async finishLesson(completedAt: string) {
