@@ -45,6 +45,9 @@ declare global {
 
 let activeRecognition: SpeechRecognitionLike | null = null;
 
+const defaultRecognitionTimeoutMs = 15_000;
+const finalSpeechPauseMs = 1_500;
+
 export function isSpeechRecognitionAvailable(): boolean {
   return getSpeechRecognitionConstructor() !== null;
 }
@@ -54,7 +57,11 @@ export function stopSpeechRecognition() {
   activeRecognition = null;
 }
 
-export function recognizeSpeechOnce(lang = 'en-US', timeoutMs = 8000): Promise<SpeechRecognitionResult> {
+export function recognizeSpeechOnce(
+  lang = 'en-US',
+  timeoutMs = defaultRecognitionTimeoutMs,
+  onTranscript?: (transcript: string) => void,
+): Promise<SpeechRecognitionResult> {
   const SpeechRecognition = getSpeechRecognitionConstructor();
 
   if (!SpeechRecognition) {
@@ -67,14 +74,20 @@ export function recognizeSpeechOnce(lang = 'en-US', timeoutMs = 8000): Promise<S
     const recognition = new SpeechRecognition();
     let settled = false;
     let bestResult: SpeechRecognitionResult = { transcript: '', confidence: 0 };
+    let finalSpeechPauseTimer: number | undefined;
 
     activeRecognition = recognition;
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = lang;
     recognition.maxAlternatives = 1;
 
     const timeout = window.setTimeout(() => {
+      if (bestResult.transcript) {
+        finish(() => resolve(bestResult));
+        return;
+      }
+
       finish(() => reject(new Error('No speech was detected.')));
     }, timeoutMs);
 
@@ -85,6 +98,9 @@ export function recognizeSpeechOnce(lang = 'en-US', timeoutMs = 8000): Promise<S
 
       settled = true;
       window.clearTimeout(timeout);
+      if (finalSpeechPauseTimer !== undefined) {
+        window.clearTimeout(finalSpeechPauseTimer);
+      }
       activeRecognition = null;
       recognition.onresult = null;
       recognition.onerror = null;
@@ -94,19 +110,22 @@ export function recognizeSpeechOnce(lang = 'en-US', timeoutMs = 8000): Promise<S
     }
 
     recognition.onresult = (event) => {
-      const result = event.results[event.results.length - 1]?.[0];
+      const collectedResult = collectSpeechRecognitionResult(event.results);
 
-      if (!result?.transcript) {
+      if (!collectedResult.transcript) {
         return;
       }
 
-      bestResult = {
-        transcript: result.transcript.trim(),
-        confidence: result.confidence || bestResult.confidence,
-      };
+      bestResult = collectedResult;
+      onTranscript?.(bestResult.transcript);
 
-      if (event.results[event.results.length - 1]?.isFinal) {
-        finish(() => resolve(bestResult));
+      if (finalSpeechPauseTimer !== undefined) {
+        window.clearTimeout(finalSpeechPauseTimer);
+      }
+
+      const latestResult = event.results[event.results.length - 1];
+      if (latestResult?.isFinal) {
+        finalSpeechPauseTimer = window.setTimeout(() => recognition.stop(), finalSpeechPauseMs);
       }
     };
 
@@ -125,6 +144,30 @@ export function recognizeSpeechOnce(lang = 'en-US', timeoutMs = 8000): Promise<S
 
     recognition.start();
   });
+}
+
+export function collectSpeechRecognitionResult(
+  results: SpeechRecognitionResultEventLike['results'],
+): SpeechRecognitionResult {
+  const transcripts: string[] = [];
+  let confidence = 0;
+
+  for (let index = 0; index < results.length; index += 1) {
+    const alternative = results[index]?.[0];
+    const transcript = alternative?.transcript.trim();
+
+    if (!transcript) {
+      continue;
+    }
+
+    transcripts.push(transcript);
+    confidence = Math.max(confidence, alternative.confidence || 0);
+  }
+
+  return {
+    transcript: transcripts.join(' ').replace(/\s+/g, ' ').trim(),
+    confidence,
+  };
 }
 
 function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | null {

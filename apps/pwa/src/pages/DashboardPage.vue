@@ -1260,10 +1260,13 @@ async function recordDialogueAnswer() {
 
   speechRecognitionError.value = '';
   speechRecognitionCaptured.value = false;
+  answer.value = '';
   isRecognizingSpeech.value = true;
 
   try {
-    const result = await recognizeSpeechOnce('en-US');
+    const result = await recognizeSpeechOnce('en-US', undefined, (transcript) => {
+      answer.value = transcript;
+    });
     answer.value = result.transcript;
     speechRecognitionCaptured.value = true;
   } catch (error) {
