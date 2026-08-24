@@ -645,12 +645,12 @@ export const useAppStore = defineStore('app', {
         viewedAt: notification.viewedAt ?? now(),
         readAt: now(),
       };
-      const db = await mentorDb;
-
-      await db.put('update-notifications', updated);
       const next = this.updateNotifications.map((item) => item.id === id ? updated : item);
       this.updateNotifications = selectRetainedUpdateNotifications(next);
       const retainedIds = new Set(this.updateNotifications.map((item) => item.id));
+      const db = await mentorDb;
+
+      await db.put('update-notifications', updated);
       for (const removed of next) {
         if (!retainedIds.has(removed.id)) await db.delete('update-notifications', removed.id);
       }
@@ -663,17 +663,17 @@ export const useAppStore = defineStore('app', {
         return;
       }
 
-      const db = await mentorDb;
-
       const readAt = now();
       const next = this.updateNotifications.map((notification) => notification.readAt ? notification : {
         ...notification,
         viewedAt: notification.viewedAt ?? readAt,
         readAt,
       });
-      for (const notification of next) await db.put('update-notifications', notification);
       this.updateNotifications = selectRetainedUpdateNotifications(next);
       const retainedIds = new Set(this.updateNotifications.map((notification) => notification.id));
+      const db = await mentorDb;
+
+      for (const notification of next) await db.put('update-notifications', notification);
       for (const notification of next) {
         if (!retainedIds.has(notification.id)) await db.delete('update-notifications', notification.id);
       }
