@@ -163,7 +163,7 @@
               <q-tooltip>{{ lessonBackLabel }}</q-tooltip>
             </q-btn>
             <div class="lesson-nav__status">
-              <span>{{ appStore.lessonProgress }}% complete</span>
+              <span>{{ displayedLessonProgress }}% complete</span>
               <q-btn
                 v-if="isListeningPlayer"
                 color="primary"
@@ -222,7 +222,7 @@
               <span>{{ lessonRemainingTimeLabel }}</span>
             </div>
             <q-linear-progress
-              :value="appStore.lessonProgress / 100"
+              :value="lessonProgressRatio"
               color="primary"
               track-color="grey-4"
               rounded
@@ -679,12 +679,40 @@ const currentExercise = computed(() => appStore.currentExercise);
 const lessonEstimatedMinutes = computed(() =>
   Math.max(1, Math.round(appStore.session?.lesson.estimatedMinutes ?? 1)),
 );
-const lessonRemainingMinutes = computed(() =>
-  Math.max(0, Math.ceil(lessonEstimatedMinutes.value * (1 - appStore.lessonProgress / 100))),
+const currentExerciseProgress = computed(() => {
+  if (!isListeningPlayer.value || listeningTokens.value.length <= 1) {
+    return 0;
+  }
+
+  return clampIndex(activeWordIndex.value, 0, listeningTokens.value.length - 1)
+    / (listeningTokens.value.length - 1);
+});
+const lessonProgressRatio = computed(() => {
+  const session = appStore.session;
+
+  if (!session || session.lesson.exercises.length === 0) {
+    return 0;
+  }
+
+  if (session.completedAt) {
+    return 1;
+  }
+
+  return Math.min(
+    1,
+    (session.currentExerciseIndex + currentExerciseProgress.value)
+      / session.lesson.exercises.length,
+  );
+});
+const displayedLessonProgress = computed(() => Math.round(lessonProgressRatio.value * 100));
+const lessonRemainingSeconds = computed(() =>
+  Math.max(0, Math.round(lessonEstimatedMinutes.value * 60 * (1 - lessonProgressRatio.value))),
 );
 const lessonTotalTimeLabel = computed(() => `About ${lessonEstimatedMinutes.value} min total`);
 const lessonRemainingTimeLabel = computed(() =>
-  lessonRemainingMinutes.value === 0 ? 'Less than 1 min left' : `About ${lessonRemainingMinutes.value} min left`,
+  lessonRemainingSeconds.value < 60
+    ? `${lessonRemainingSeconds.value} sec left`
+    : `${Math.floor(lessonRemainingSeconds.value / 60)} min ${lessonRemainingSeconds.value % 60} sec left`,
 );
 const isListeningPlayer = computed(() => {
   if (!appStore.session || !currentExercise.value) {
