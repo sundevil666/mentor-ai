@@ -708,12 +708,8 @@ const displayedLessonProgress = computed(() => Math.round(lessonProgressRatio.va
 const lessonRemainingSeconds = computed(() =>
   Math.max(0, Math.round(lessonEstimatedMinutes.value * 60 * (1 - lessonProgressRatio.value))),
 );
-const lessonTotalTimeLabel = computed(() => `About ${lessonEstimatedMinutes.value} min total`);
-const lessonRemainingTimeLabel = computed(() =>
-  lessonRemainingSeconds.value < 60
-    ? `${lessonRemainingSeconds.value} sec left`
-    : `${Math.floor(lessonRemainingSeconds.value / 60)} min ${lessonRemainingSeconds.value % 60} sec left`,
-);
+const lessonTotalTimeLabel = computed(() => formatClockTime(lessonEstimatedMinutes.value * 60));
+const lessonRemainingTimeLabel = computed(() => formatClockTime(lessonRemainingSeconds.value));
 const isListeningPlayer = computed(() => {
   if (!appStore.session || !currentExercise.value) {
     return false;
@@ -1712,6 +1708,14 @@ function normalizeListeningSentence(sentence: string): string {
 
 function clampIndex(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function formatClockTime(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, Math.round(totalSeconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 function findLastNumberIndex(values: number[], maxValue: number): number {
