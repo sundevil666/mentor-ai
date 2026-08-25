@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { parseSpeechSegments } from '../src/services/speech-synthesis.js';
+import { applySpeechRepeat, parseSpeechSegments } from '../src/services/speech-synthesis.js';
 
 describe('speech synthesis voices', () => {
   it('uses Mia for ordinary text', () => {
@@ -21,5 +21,13 @@ describe('speech synthesis voices', () => {
     assert.deepEqual(parseSpeechSegments('Tom: I start work at seven.'), [
       { text: 'I start work at seven.', voice: 'tom' },
     ]);
+  });
+
+  it('uses the native media loop for repeat playback behind a locked screen', () => {
+    const audio = { loop: false };
+
+    applySpeechRepeat(audio, true);
+
+    assert.equal(audio.loop, true);
   });
 });

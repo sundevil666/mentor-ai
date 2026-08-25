@@ -611,6 +611,7 @@ import {
   pauseSpeech,
   preloadSpeechBatch,
   resumeSpeech,
+  setActiveSpeechRepeat,
   speakWithPreferredVoice,
   stopSpeech,
 } from 'src/services/speech-synthesis';
@@ -1407,7 +1408,15 @@ async function prepareListeningOfflineAudio(force = false) {
 }
 
 function toggleListeningRepeat() {
-  isListeningRepeatEnabled.value = !isListeningRepeatEnabled.value;
+  const repeat = !isListeningRepeatEnabled.value;
+  isListeningRepeatEnabled.value = repeat;
+  setActiveSpeechRepeat(repeat);
+
+  // If playback is already active, rebuild it as one native looping media
+  // stream while this button press still carries mobile user activation.
+  if (repeat && (isListeningSpeaking.value || isListeningStarting.value)) {
+    void startListeningAtWord(0);
+  }
 }
 
 function toggleListeningTranslation() {
@@ -1453,7 +1462,9 @@ async function speakListeningPhrase(wordIndex: number, runId: number) {
     return;
   }
 
-  const nextSentenceStart = sentenceStartWordIndexes.value.find((start) => start > wordIndex);
+  const nextSentenceStart = isListeningRepeatEnabled.value
+    ? undefined
+    : sentenceStartWordIndexes.value.find((start) => start > wordIndex);
   const sentenceEndWordIndex = nextSentenceStart ?? tokens.length;
   const playbackTokens = tokens.slice(wordIndex, sentenceEndWordIndex);
   const playbackText = playbackTokens.map((item) => `${item.word}${item.trailing}`).join('');
@@ -1461,6 +1472,7 @@ async function speakListeningPhrase(wordIndex: number, runId: number) {
   activeWordEndIndex.value = wordIndex;
   const started = await speakWithPreferredVoice(playbackText, {
     mediaTitle: selectedListeningItem.value?.title ?? 'English listening practice',
+    repeat: isListeningRepeatEnabled.value,
     onTimeUpdate: (currentTime, duration) => {
       if (runId !== activeSpeechRunId.value || !Number.isFinite(duration) || duration <= 0) {
         return;

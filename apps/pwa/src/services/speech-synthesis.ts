@@ -15,6 +15,7 @@ export interface SpeechPlaybackHandlers {
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   mediaTitle?: string;
   voice?: SpeechVoiceProfile;
+  repeat?: boolean;
 }
 
 let activeAudio: HTMLAudioElement | null = null;
@@ -68,6 +69,7 @@ export async function speakWithPreferredVoice(
     const audio = new Audio(audioUrl);
     audio.preload = 'auto';
     audio.setAttribute('playsinline', '');
+    applySpeechRepeat(audio, handlers.repeat);
     audio.onended = () => {
       if (activeAudio !== audio) return;
       clearActiveAudio();
@@ -110,6 +112,14 @@ export async function preloadSpeech(text: string) {
     setModelStatus('error', 0);
     return false;
   }
+}
+
+export function applySpeechRepeat(audio: Pick<HTMLAudioElement, 'loop'>, repeat = false) {
+  audio.loop = repeat;
+}
+
+export function setActiveSpeechRepeat(repeat: boolean) {
+  if (activeAudio) applySpeechRepeat(activeAudio, repeat);
 }
 
 export async function preloadSpeechBatch(
