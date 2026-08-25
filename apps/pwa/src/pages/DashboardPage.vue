@@ -606,6 +606,7 @@ import {
   type TrainingKey,
 } from 'src/services/learning-context';
 import {
+  hasActiveSpeechPlayback,
   isSpeechBatchCached,
   isSpeechSynthesisAvailable,
   pauseSpeech,
@@ -1409,12 +1410,16 @@ async function prepareListeningOfflineAudio(force = false) {
 
 function toggleListeningRepeat() {
   const repeat = !isListeningRepeatEnabled.value;
+  const wasPlaying = hasActiveSpeechPlayback()
+    || isListeningSpeaking.value
+    || isListeningStarting.value;
   isListeningRepeatEnabled.value = repeat;
-  setActiveSpeechRepeat(repeat);
 
-  // If playback is already active, rebuild it as one native looping media
-  // stream while this button press still carries mobile user activation.
-  if (repeat && (isListeningSpeaking.value || isListeningStarting.value)) {
+  if (!repeat) {
+    setActiveSpeechRepeat(false);
+  } else if (wasPlaying) {
+    // Never loop the current sentence fragment: near the end this can be only
+    // the final word. Rebuild and loop the complete selected text instead.
     void startListeningAtWord(0);
   }
 }

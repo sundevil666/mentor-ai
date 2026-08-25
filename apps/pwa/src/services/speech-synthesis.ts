@@ -122,6 +122,10 @@ export function setActiveSpeechRepeat(repeat: boolean) {
   if (activeAudio) applySpeechRepeat(activeAudio, repeat);
 }
 
+export function hasActiveSpeechPlayback() {
+  return Boolean(activeAudio && !activeAudio.paused);
+}
+
 export async function preloadSpeechBatch(
   texts: string[],
   onProgress?: (completed: number, total: number) => void,
