@@ -1,14 +1,27 @@
 <template>
-  <q-page class="audio-page">
+  <q-page class="audio-page" :class="{ 'audio-page--detail': selectedAudio }">
     <section class="audio-shell">
-      <header class="audio-header">
-        <div><p>Long listening</p><h1>Audio</h1><span>Complete 30-minute programs in clear, slower American English.</span></div>
+      <header class="audio-header" :class="{ 'audio-header--detail': selectedAudio }">
+        <q-btn
+          v-if="selectedAudio"
+          aria-label="Back to audio library"
+          color="primary"
+          flat
+          icon="arrow_back"
+          round
+          @click="closeAudio"
+        />
+        <div>
+          <p>{{ selectedAudio ? 'Audio lesson' : 'Long listening' }}</p>
+          <h1>{{ selectedAudio?.title ?? 'Audio' }}</h1>
+          <span v-if="!selectedAudio">Complete 30-minute programs in clear, slower American English.</span>
+        </div>
       </header>
 
-      <section class="audio-library" aria-label="Audio lesson library">
+      <section v-if="!selectedAudio" class="audio-library" aria-label="Audio lesson library">
         <article v-for="item in audioLibrary" :key="item.id" class="audio-card">
           <button class="audio-card__main" type="button" @click="selectAudio(item)">
-            <q-icon :name="selectedAudio?.id === item.id && isPlaying ? 'graphic_eq' : 'play_circle'" />
+            <q-icon name="chevron_right" />
             <span><strong>{{ item.title }}</strong><small>{{ item.description }}</small></span>
           </button>
           <div class="audio-card__meta">
@@ -21,17 +34,39 @@
         </article>
       </section>
 
-      <section v-if="selectedAudio" class="audio-player" aria-label="Audio player">
-        <div class="audio-player__title">
-          <q-icon name="headphones" />
-          <div><strong>{{ selectedAudio.title }}</strong><span>{{ playbackIsOffline ? 'Playing offline copy' : 'Streaming from VOA' }}</span></div>
+      <article v-else class="audio-detail" aria-label="Audio lesson">
+        <div class="audio-detail__summary">
+          <div class="audio-detail__icon"><q-icon name="headphones" /></div>
+          <p>{{ selectedAudio.description }}</p>
+          <div class="audio-card__meta audio-detail__meta">
+            <span><q-icon name="school" /> {{ selectedAudio.level }}</span>
+            <span><q-icon name="schedule" /> {{ formatAudioDuration(selectedAudio.durationSeconds) }}</span>
+            <span><q-icon name="storage" /> {{ formatAudioSize(selectedAudio.sizeBytes) }}</span>
+            <span><q-icon :name="playbackIsOffline ? 'offline_pin' : 'cloud_queue'" /> {{ playbackIsOffline ? 'Available offline' : 'Streaming' }}</span>
+          </div>
         </div>
-        <audio ref="audioElement" :src="playbackUrl" controls preload="metadata" @ended="handleEnded" @pause="isPlaying = false" @play="isPlaying = true" @timeupdate="saveProgress" />
-        <div class="audio-player__actions">
-          <div aria-label="Playback speed"><q-btn v-for="rate in playbackRates" :key="rate" :label="`${rate}×`" :color="playbackRate === rate ? 'primary' : undefined" :outline="playbackRate !== rate" no-caps @click="setPlaybackRate(rate)" /></div>
-          <a :href="selectedAudio.articleUrl" target="_blank" rel="noopener">Transcript and source <q-icon name="open_in_new" /></a>
+
+        <section class="audio-player" aria-label="Audio player">
+          <audio ref="audioElement" :src="playbackUrl" controls :loop="repeatEnabled" preload="metadata" @ended="handleEnded" @pause="isPlaying = false" @play="isPlaying = true" @timeupdate="saveProgress" />
+          <div class="audio-player__settings">
+            <div>
+              <strong>Playback speed</strong>
+              <div class="audio-speed-controls" aria-label="Playback speed"><q-btn v-for="rate in playbackRates" :key="rate" :label="`${rate}×`" :color="playbackRate === rate ? 'primary' : undefined" :outline="playbackRate !== rate" no-caps @click="setPlaybackRate(rate)" /></div>
+            </div>
+            <div class="audio-repeat-setting">
+              <div><strong>Repeat</strong><span>{{ repeatEnabled ? 'Start again automatically' : 'Stop at the end' }}</span></div>
+              <q-toggle v-model="repeatEnabled" color="primary" icon="repeat" aria-label="Repeat audio" @update:model-value="saveRepeatPreference" />
+            </div>
+          </div>
+          <div class="audio-player__actions">
+            <a :href="selectedAudio.articleUrl" target="_blank" rel="noopener">Transcript and source <q-icon name="open_in_new" /></a>
+          </div>
+        </section>
+        <div class="audio-detail__offline-action">
+          <q-btn v-if="cachedUrls.has(selectedAudio.sourceUrl)" color="negative" flat icon="delete_outline" label="Remove offline copy" no-caps :loading="busyId === selectedAudio.id" @click="removeAudio(selectedAudio)" />
+          <q-btn v-else color="primary" icon="download_for_offline" label="Save offline" no-caps :disable="!isOnline" :loading="busyId === selectedAudio.id" @click="downloadAudio(selectedAudio)" />
         </div>
-      </section>
+      </article>
 
       <p class="audio-credit">Audio and program descriptions: VOA Learning English, public domain. Offline copies stay on this device.</p>
     </section>
@@ -52,6 +87,7 @@ const playbackUrl = ref('');
 const playbackIsOffline = ref(false);
 const playbackRate = ref(1);
 const playbackRates = [0.75, 1, 1.25];
+const repeatEnabled = ref(false);
 const isPlaying = ref(false);
 const isOnline = ref(navigator.onLine);
 let objectUrl: string | null = null;
@@ -70,11 +106,6 @@ onBeforeUnmount(() => {
 });
 
 async function selectAudio(item: LibraryAudio) {
-  if (selectedAudio.value?.id === item.id) {
-    if (audioElement.value?.paused) await audioElement.value.play();
-    else audioElement.value?.pause();
-    return;
-  }
   selectedAudio.value = item;
   markOfflineLessonOpened(item.id, 'audio');
   if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -82,13 +113,26 @@ async function selectAudio(item: LibraryAudio) {
   objectUrl = playback.offline ? playback.url : null;
   playbackUrl.value = playback.url;
   playbackIsOffline.value = playback.offline;
+  if (playback.offline && !cachedUrls.value.has(item.sourceUrl)) {
+    cachedUrls.value = new Set([...cachedUrls.value, item.sourceUrl]);
+    registerOfflineAudio(item);
+  }
+  repeatEnabled.value = readRepeatPreference(item.id);
   await nextTick();
   const player = audioElement.value;
   if (!player) return;
   player.currentTime = readProgress(item.id);
   player.playbackRate = playbackRate.value;
   updateMediaMetadata(item);
-  try { await player.play(); } catch { /* Native controls remain available when autoplay is blocked. */ }
+}
+
+function closeAudio() {
+  audioElement.value?.pause();
+  selectedAudio.value = null;
+  playbackUrl.value = '';
+  isPlaying.value = false;
+  if (objectUrl) URL.revokeObjectURL(objectUrl);
+  objectUrl = null;
 }
 
 async function downloadAudio(item: LibraryAudio) {
@@ -113,6 +157,8 @@ async function removeAudio(item: LibraryAudio) {
 }
 
 function setPlaybackRate(rate: number) { playbackRate.value = rate; if (audioElement.value) audioElement.value.playbackRate = rate; }
+function saveRepeatPreference() { const item = selectedAudio.value; if (item) localStorage.setItem(`mentor-ai:audio-repeat:${item.id}`, String(repeatEnabled.value)); }
+function readRepeatPreference(id: string) { return localStorage.getItem(`mentor-ai:audio-repeat:${id}`) === 'true'; }
 function saveProgress() {
   const player = audioElement.value;
   const item = selectedAudio.value;
