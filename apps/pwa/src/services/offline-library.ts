@@ -84,16 +84,23 @@ export function getOfflineLessonContentVersion(lesson: GeneratedLesson) {
 export async function findOfflineLesson(context: LearningContext): Promise<GeneratedLesson | null> {
   const db = await getMentorDb();
   const lessons = (await db.getAll('lessons')) as GeneratedLesson[];
+  const match = selectOfflineLesson(lessons, context);
+  if (match) markOfflineLessonOpened(match.id, 'lessons');
+  return match;
+}
+export function selectOfflineLesson(lessons: GeneratedLesson[], context: LearningContext): GeneratedLesson | null {
   const matchesMode = (lesson: GeneratedLesson) => context.mode === 'listening'
     ? lesson.exercises.some((exercise) => exercise.targetSkill === 'listening' || exercise.type === 'listening-text')
     : context.mode === 'speaking'
       ? lesson.exercises.some((exercise) => exercise.targetSkill === 'speaking' || exercise.type === 'repeat-speaking' || exercise.type === 'dialogue-translation')
       : true;
-  const match = lessons
-    .filter((lesson) => (!context.selectedConcept || lesson.concept === context.selectedConcept) && matchesMode(lesson))
+  return lessons
+    .filter((lesson) => (
+      (!context.lessonTemplateKey || lesson.lessonTemplateKey === context.lessonTemplateKey)
+      && (!context.selectedConcept || lesson.concept === context.selectedConcept)
+      && matchesMode(lesson)
+    ))
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] ?? null;
-  if (match) markOfflineLessonOpened(match.id, 'lessons');
-  return match;
 }
 export function markOfflineLessonOpened(id: string, category: OfflineCategory) {
   saveLessons(readOfflineLessons().map((lesson) => lesson.id === id && lesson.category === category

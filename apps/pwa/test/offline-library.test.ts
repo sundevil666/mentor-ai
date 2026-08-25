@@ -1,8 +1,28 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { selectExpiredOfflineLessons, selectOfflineLessonsOverLimit, selectStaleOfflineVideos, type OfflineLesson } from '../src/services/offline-library.js';
+import { createLessonPlan, generateLessonFromPlan, initialStudentModel, type GeneratedLesson, type LearningContext } from '@mentor-ai/shared';
+import { selectExpiredOfflineLessons, selectOfflineLesson, selectOfflineLessonsOverLimit, selectStaleOfflineVideos, type OfflineLesson } from '../src/services/offline-library.js';
 
 describe('offline lesson retention', () => {
+  it('selects the exact speaking lesson requested by its library card', () => {
+    const lessons = [
+      createSpeakingLesson('weekly-weak-spots-dialogue', '2026-08-23T12:00:00.000Z'),
+      createSpeakingLesson('polite-speaking', '2026-08-24T12:00:00.000Z'),
+    ];
+    const context: LearningContext = {
+      mode: 'speaking',
+      selectedConcept: 'learning',
+      manualConceptChoice: true,
+      lessonTemplateKey: 'weekly-weak-spots-dialogue',
+      isOffline: true,
+      speechAvailable: true,
+      availableMinutes: 9,
+    };
+
+    assert.equal(selectOfflineLesson(lessons, context)?.lessonTemplateKey, 'weekly-weak-spots-dialogue');
+    assert.equal(selectOfflineLesson(lessons, { ...context, lessonTemplateKey: 'polite-speaking' })?.lessonTemplateKey, 'polite-speaking');
+  });
+
   it('selects lessons that were not opened within their category period', () => {
     const now = Date.parse('2026-08-23T12:00:00.000Z');
     const lessons: OfflineLesson[] = [
@@ -31,3 +51,16 @@ describe('offline lesson retention', () => {
     assert.deepEqual(selectStaleOfflineVideos(lessons, new Set(['current'])).map((item) => item.id), ['legacy']);
   });
 });
+
+function createSpeakingLesson(lessonTemplateKey: string, createdAt: string): GeneratedLesson {
+  const plan = createLessonPlan(initialStudentModel, {
+    mode: 'speaking',
+    selectedConcept: 'learning',
+    manualConceptChoice: true,
+    lessonTemplateKey,
+    isOffline: true,
+    speechAvailable: true,
+    availableMinutes: 9,
+  }, createdAt);
+  return generateLessonFromPlan(plan, createdAt);
+}
