@@ -110,16 +110,12 @@
           ref="activeVideoElement"
           class="video-card__player"
           :src="selectedVideo.sourceUrl"
-          controls
           :loop="activeRepeat"
           muted
           playsinline
           preload="metadata"
           @loadedmetadata="handleVideoMetadataLoaded(selectedVideo)"
-          @keydown="markVideoInteraction"
-          @pause="handleVideoPause"
           @play="handleVideoPlay"
-          @pointerdown="markVideoInteraction"
           @seeked="synchronizeAudioToVideo"
           @seeking="handleVideoSeeking"
           @ended="handleVideoEnded"
@@ -135,8 +131,17 @@
         <div
           class="video-progress"
           aria-label="Video progress"
+          style="grid-template-columns: auto auto minmax(0, 1fr) auto"
         >
           <span>{{ formatVideoDuration(videoCurrentTime) }}</span>
+          <q-btn
+            :aria-label="isVideoPlaybackActive ? 'Pause video' : 'Play video'"
+            color="primary"
+            :icon="isVideoPlaybackActive ? 'pause' : 'play_arrow'"
+            round
+            unelevated
+            @click="toggleActiveVideoPlayback"
+          />
           <q-slider
             :model-value="videoCurrentTime"
             :min="0"
@@ -153,6 +158,8 @@
           :loop="activeRepeat"
           preload="metadata"
           @ended="handleBackgroundAudioEnded"
+          @pause="isVideoPlaybackActive = false"
+          @play="isVideoPlaybackActive = true"
           @timeupdate="synchronizeVideoToAudio"
         />
         <div class="video-playback-settings">
@@ -350,10 +357,7 @@ import {
   type VideoPlaybackRate,
 } from 'src/services/video-preferences';
 import { parseWebVtt, type VideoSubtitleCue } from 'src/services/video-subtitles';
-import {
-  shouldPauseBackgroundAudio,
-  startVideoWithBackgroundAudio,
-} from 'src/services/video-background-playback';
+import { startVideoWithBackgroundAudio } from 'src/services/video-background-playback';
 
 const appStore = useAppStore();
 const cachedUrls = ref(new Set<string>());
@@ -366,6 +370,7 @@ const activePlaybackRate = ref<VideoPlaybackRate>(1);
 const activeSubtitlesVisible = ref(true);
 const videoCurrentTime = ref(0);
 const videoDuration = ref(0);
+const isVideoPlaybackActive = ref(false);
 const subtitleCues = ref<VideoSubtitleCue[]>([]);
 const activeSubtitleCueId = ref<string | null>(null);
 const subtitleStatus = ref<'loading' | 'ready' | 'error'>('loading');
@@ -383,7 +388,6 @@ const isOnline = computed(() => appStore.isOnline);
 const selectedVideo = computed(() => videoLibrary.find((video) => video.id === selectedVideoId.value) ?? null);
 let lastProgressSaveAt = 0;
 let shouldResumeAfterVisibilityChange = false;
-let lastVideoInteractionAt = 0;
 let playbackCycleActive = false;
 let playbackCycleStart = 0;
 let playbackCycleHadForwardSeek = false;
@@ -578,9 +582,6 @@ function saveActiveVideoPlaybackPreference() {
 function handleVideoPlay() {
   const audio = backgroundAudioElement.value;
   if (!audio) return;
-  // A tap used to start playback must not be mistaken for a later system pause
-  // when the user locks the phone immediately afterwards.
-  lastVideoInteractionAt = 0;
   shouldResumeAfterVisibilityChange = true;
   beginPlaybackCycleIfNeeded();
   if (audio.paused) void audio.play();
@@ -605,16 +606,26 @@ function handleVideoEnded() {
   completePlaybackCycle();
 }
 
-function handleVideoPause() {
+async function toggleActiveVideoPlayback() {
+  const player = activeVideoElement.value;
   const audio = backgroundAudioElement.value;
-  if (!shouldPauseBackgroundAudio(document.hidden, lastVideoInteractionAt)) return;
-  lastVideoInteractionAt = 0;
-  shouldResumeAfterVisibilityChange = false;
-  audio?.pause();
-}
+  if (!player || !audio) return;
 
-function markVideoInteraction() {
-  lastVideoInteractionAt = Date.now();
+  if (!audio.paused) {
+    shouldResumeAfterVisibilityChange = false;
+    player.pause();
+    audio.pause();
+    return;
+  }
+
+  shouldResumeAfterVisibilityChange = true;
+  try {
+    await startVideoWithBackgroundAudio(player, audio);
+  } catch {
+    player.pause();
+    audio.pause();
+    Notify.create({ type: 'negative', message: 'Could not resume this video.' });
+  }
 }
 
 function synchronizeAudioToVideo() {
@@ -708,7 +719,6 @@ function handleVisibilityChange() {
   if (!player || !audio) return;
 
   if (document.hidden) {
-    lastVideoInteractionAt = 0;
     shouldResumeAfterVisibilityChange = shouldResumeAfterVisibilityChange || !player.paused;
     audio.currentTime = player.currentTime;
     if (shouldResumeAfterVisibilityChange && audio.paused) void audio.play();
@@ -730,7 +740,6 @@ function handleBackgroundAudioEnded() {
 }
 
 function stopActiveVideo() {
-  lastVideoInteractionAt = 0;
   shouldResumeAfterVisibilityChange = false;
   const activeMedia = document.hidden ? backgroundAudioElement.value : activeVideoElement.value;
   if (activeMedia) persistActiveVideoProgress(activeMedia, true);
