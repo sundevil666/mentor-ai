@@ -96,6 +96,7 @@
           :src="selectedVideo.sourceUrl"
           controls
           :loop="activeRepeat"
+          muted
           playsinline
           preload="metadata"
           @loadedmetadata="handleVideoMetadataLoaded(selectedVideo)"
@@ -324,6 +325,7 @@ const isOnline = computed(() => appStore.isOnline);
 const selectedVideo = computed(() => videoLibrary.find((video) => video.id === selectedVideoId.value) ?? null);
 let lastProgressSaveAt = 0;
 let shouldResumeAfterVisibilityChange = false;
+let videoPauseTimer: number | undefined;
 const offlineStorageSummary = computed(() => {
   const cachedVideos = videoLibrary.filter((video) => cachedUrls.value.has(video.sourceUrl));
   const totalBytes = cachedVideos.reduce((total, video) => total + video.sizeBytes, 0);
@@ -511,19 +513,27 @@ function saveActiveVideoPlaybackPreference() {
 function handleVideoPlay() {
   const audio = backgroundAudioElement.value;
   if (!audio) return;
+  clearVideoPauseTimer();
   shouldResumeAfterVisibilityChange = true;
-  audio.volume = document.hidden ? 1 : 0;
   if (audio.paused) void audio.play();
 }
 
 function handleVideoPause() {
   const audio = backgroundAudioElement.value;
-  window.setTimeout(() => {
-    if (!document.hidden) {
+  clearVideoPauseTimer();
+  videoPauseTimer = window.setTimeout(() => {
+    videoPauseTimer = undefined;
+    if (!document.hidden && activeVideoElement.value?.paused) {
       shouldResumeAfterVisibilityChange = false;
       audio?.pause();
     }
   }, 500);
+}
+
+function clearVideoPauseTimer() {
+  if (videoPauseTimer === undefined) return;
+  window.clearTimeout(videoPauseTimer);
+  videoPauseTimer = undefined;
 }
 
 function synchronizeAudioToVideo() {
@@ -595,9 +605,9 @@ function handleVisibilityChange() {
   if (!player || !audio) return;
 
   if (document.hidden) {
+    clearVideoPauseTimer();
     shouldResumeAfterVisibilityChange = shouldResumeAfterVisibilityChange || !player.paused;
     audio.currentTime = player.currentTime;
-    audio.volume = 1;
     if (shouldResumeAfterVisibilityChange && audio.paused) void audio.play();
     return;
   }
@@ -605,7 +615,6 @@ function handleVisibilityChange() {
   if (Number.isFinite(audio.currentTime)) {
     player.currentTime = audio.currentTime;
   }
-  audio.volume = 0;
   if (shouldResumeAfterVisibilityChange && audio.paused) void audio.play();
   if (shouldResumeAfterVisibilityChange) void player.play();
 }
@@ -618,6 +627,7 @@ function handleBackgroundAudioEnded() {
 }
 
 function stopActiveVideo() {
+  clearVideoPauseTimer();
   shouldResumeAfterVisibilityChange = false;
   const activeMedia = document.hidden ? backgroundAudioElement.value : activeVideoElement.value;
   if (activeMedia) persistActiveVideoProgress(activeMedia, true);
@@ -633,14 +643,8 @@ function configureVideoMediaSession(video: LibraryVideo, audio: HTMLAudioElement
     album: 'Real English videos',
   });
   navigator.mediaSession.setActionHandler('play', () => {
-    if (document.hidden) {
-      audio.volume = 1;
-      void audio.play();
-    } else {
-      audio.volume = 0;
-      if (audio.paused) void audio.play();
-      void activeVideoElement.value?.play();
-    }
+    if (audio.paused) void audio.play();
+    if (!document.hidden) void activeVideoElement.value?.play();
   });
   navigator.mediaSession.setActionHandler('pause', () => {
     shouldResumeAfterVisibilityChange = false;
