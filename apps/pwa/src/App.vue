@@ -126,7 +126,6 @@ async function installUpdate(version: string) {
 
   Notify.create({
     type: 'info',
-    position: 'bottom',
     icon: 'sync',
     message: 'Saving progress and updating…',
     timeout: 0,
@@ -163,7 +162,6 @@ async function showCompletedUpdateNotification() {
   }
   Notify.create({
     type: 'positive',
-    position: 'bottom',
     icon: 'check_circle',
     message: 'Mentor AI was updated',
     caption: progressCaption,

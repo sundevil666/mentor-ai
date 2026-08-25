@@ -130,6 +130,10 @@ body .q-menu {
   order: 4;
 }
 
+.q-notifications__list--top {
+  top: calc(54px + env(safe-area-inset-top));
+}
+
 .theme-toggle-button,
 .settings-nav-button,
 .update-log-button,

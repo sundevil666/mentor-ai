@@ -7,7 +7,11 @@ export default configure(() => ({
   css: ['app.scss'],
   extras: ['roboto-font', 'material-icons'],
   framework: {
-    config: {},
+    config: {
+      notify: {
+        position: 'top-right',
+      },
+    },
     plugins: ['Notify'],
   },
   build: {
