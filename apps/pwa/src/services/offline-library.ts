@@ -1,7 +1,6 @@
-import { deleteSpeechBatch, getSpeechBatchSize } from './speech-synthesis.js';
+import { deleteSpeechBatch, getSpeechBatchSize, isSpeechBatchCached, splitSpeechTextIntoSentences } from './speech-synthesis.js';
 import { deleteOfflineVideo, type LibraryVideo } from './video-library.js';
 import { deleteOfflineAudio, type LibraryAudio } from './audio-library.js';
-import { isSpeechBatchCached } from './speech-synthesis.js';
 import type { GeneratedLesson, LearningContext } from '@mentor-ai/shared';
 
 export type OfflineCategory = 'lessons' | 'listening' | 'speaking' | 'audio' | 'videos';
@@ -192,7 +191,7 @@ function splitLessonSpeechTexts(exercises: Array<{ audioText?: string }>) {
   return exercises.flatMap(({ audioText }) => {
     const text = audioText?.trim();
     if (!text) return [];
-    return text.match(/[^.!?]+[.!?]+(?:[”'"]+)?|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) ?? [];
+    return splitSpeechTextIntoSentences(text);
   });
 }
 function saveLessons(lessons: OfflineLesson[]) { localStorage.setItem(lessonsKey, JSON.stringify(lessons)); }

@@ -611,6 +611,7 @@ import {
   isSpeechSynthesisAvailable,
   pauseSpeech,
   preloadSpeechBatch,
+  preserveDialogueSpeakerLabels,
   resumeSpeech,
   setActiveSpeechRepeat,
   speakWithPreferredVoice,
@@ -805,11 +806,12 @@ const selectedListeningItem = computed(() => {
   return playlist.find((item) => item.id === selectedListeningItemId.value) ?? playlist[0] ?? null;
 });
 const listeningText = computed(
-  () =>
+  () => preserveDialogueSpeakerLabels(
     selectedListeningItem.value?.text ??
-    currentExercise.value?.audioText ??
-    currentExercise.value?.prompt ??
-    '',
+      currentExercise.value?.audioText ??
+      currentExercise.value?.prompt ??
+      '',
+  ),
 );
 const listeningTokens = computed(() => tokenizeListeningText(listeningText.value));
 const listeningSentences = computed<ListeningSentenceItem[]>(() => {
@@ -1805,14 +1807,14 @@ const listeningSentenceTranslations: Record<string, string> = {
   [normalizeListeningSentence('Mia: Are you going by bus or by car?')]:
     'Мия: Ты едешь на автобусе или на машине?',
   [normalizeListeningSentence('Tom: By bus.')]: 'Том: На автобусе.',
-  [normalizeListeningSentence('Could you send me the address again, please?')]:
-    'Можешь отправить мне адрес ещё раз, пожалуйста?',
+  [normalizeListeningSentence('Tom: Could you send me the address again, please?')]:
+    'Том: Можешь отправить мне адрес ещё раз, пожалуйста?',
   [normalizeListeningSentence('Mia: Sure.')]: 'Мия: Конечно.',
-  [normalizeListeningSentence('I also ran into Pavel near the station this morning.')]:
-    'Я ещё случайно встретила Павла возле станции сегодня утром.',
+  [normalizeListeningSentence('Mia: I also ran into Pavel near the station this morning.')]:
+    'Мия: Я ещё случайно встретила Павла возле станции сегодня утром.',
   [normalizeListeningSentence('Tom: Nice.')]: 'Том: Отлично.',
-  [normalizeListeningSentence('I want to ask him about the new schedule later.')]:
-    'Я хочу позже спросить его о новом расписании.',
+  [normalizeListeningSentence('Tom: I want to ask him about the new schedule later.')]:
+    'Том: Я хочу позже спросить его о новом расписании.',
   [normalizeListeningSentence(
     'This morning I am going to work, and I want to use my travel time for English.',
   )]: 'Сегодня утром я еду на работу и хочу использовать время в дороге для английского.',

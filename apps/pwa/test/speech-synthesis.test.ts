@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { applySpeechRepeat, parseSpeechSegments } from '../src/services/speech-synthesis.js';
+import { applySpeechRepeat, parseSpeechSegments, preserveDialogueSpeakerLabels, splitSpeechTextIntoSentences } from '../src/services/speech-synthesis.js';
 
 describe('speech synthesis voices', () => {
   it('uses Mia for ordinary text', () => {
@@ -20,6 +20,23 @@ describe('speech synthesis voices', () => {
   it('keeps the speaker voice when dialogue is cached one sentence at a time', () => {
     assert.deepEqual(parseSpeechSegments('Tom: I start work at seven.'), [
       { text: 'I start work at seven.', voice: 'tom' },
+    ]);
+  });
+
+  it('keeps the same speaker for every sentence in a multi-sentence turn', () => {
+    const dialogue = 'Mia: Good afternoon. Can I help you?\nTom: By bus. Could you send me the address again, please?';
+
+    assert.deepEqual(splitSpeechTextIntoSentences(dialogue), [
+      'Mia: Good afternoon.',
+      'Mia: Can I help you?',
+      'Tom: By bus.',
+      'Tom: Could you send me the address again, please?',
+    ]);
+    assert.deepEqual(parseSpeechSegments(preserveDialogueSpeakerLabels(dialogue)), [
+      { text: 'Good afternoon.', voice: 'mia' },
+      { text: 'Can I help you?', voice: 'mia' },
+      { text: 'By bus.', voice: 'tom' },
+      { text: 'Could you send me the address again, please?', voice: 'tom' },
     ]);
   });
 

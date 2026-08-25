@@ -311,6 +311,28 @@ export function parseSpeechSegments(
   return segments;
 }
 
+export function splitSpeechTextIntoSentences(text: string): string[] {
+  return text.split(/\r?\n/).flatMap((rawLine) => {
+    const line = rawLine.trim();
+    if (!line) return [];
+    const speakerMatch = /^(Mia|Tom):\s*(.+)$/i.exec(line);
+    const speaker = speakerMatch?.[1];
+    const content = speakerMatch?.[2] ?? line;
+    const sentences = content.match(/[^.!?]+[.!?]+(?:[”'"]+)?|[^.!?]+$/g)
+      ?.map((sentence) => sentence.trim())
+      .filter(Boolean) ?? [];
+
+    return speaker
+      ? sentences.map((sentence) => `${speaker}: ${sentence}`)
+      : sentences;
+  });
+}
+
+export function preserveDialogueSpeakerLabels(text: string): string {
+  if (!/(?:^|\n)\s*(?:Mia|Tom):/i.test(text)) return text;
+  return splitSpeechTextIntoSentences(text).join('\n');
+}
+
 function configureMediaSession(audio: HTMLAudioElement, title: string) {
   if (!('mediaSession' in navigator)) return;
   navigator.mediaSession.metadata = new MediaMetadata({
