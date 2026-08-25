@@ -272,6 +272,13 @@
         <span>Speak</span>
       </router-link>
       <router-link
+        class="mobile-start-dock__button"
+        :to="{ name: 'audio' }"
+      >
+        <q-icon name="podcasts" size="24px" />
+        <span>Audio</span>
+      </router-link>
+      <router-link
         class="mobile-start-dock__button mobile-start-dock__button--active"
         :to="{ name: 'videos' }"
       >

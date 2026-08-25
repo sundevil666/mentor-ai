@@ -1,9 +1,10 @@
 import { deleteSpeechBatch, getSpeechBatchSize } from './speech-synthesis.js';
 import { deleteOfflineVideo, type LibraryVideo } from './video-library.js';
+import { deleteOfflineAudio, type LibraryAudio } from './audio-library.js';
 import { isSpeechBatchCached } from './speech-synthesis.js';
 import type { GeneratedLesson, LearningContext } from '@mentor-ai/shared';
 
-export type OfflineCategory = 'lessons' | 'listening' | 'speaking' | 'videos';
+export type OfflineCategory = 'lessons' | 'listening' | 'speaking' | 'audio' | 'videos';
 export type RetentionDays = 7 | 14 | 30 | 90;
 export const mandatoryOfflineDays = 7;
 export const defaultOfflineMaxBytes = 250_000_000;
@@ -18,6 +19,7 @@ export interface OfflineLesson {
   contentVersion?: string;
   speechTexts?: string[];
   video?: LibraryVideo;
+  audio?: LibraryAudio;
   sourceCreatedAt?: string;
 }
 
@@ -25,6 +27,7 @@ export const offlineCategories: Array<{ id: OfflineCategory; label: string; icon
   { id: 'lessons', label: 'Lessons', icon: 'school' },
   { id: 'listening', label: 'Listening', icon: 'headphones' },
   { id: 'speaking', label: 'Speaking', icon: 'record_voice_over' },
+  { id: 'audio', label: 'Audio', icon: 'podcasts' },
   { id: 'videos', label: 'Videos', icon: 'video_library' },
 ];
 const lessonsKey = 'mentor-ai:offline-lessons:v1';
@@ -39,7 +42,7 @@ const legacySpeechCatalog = [
 
 export function readOfflineLessons(): OfflineLesson[] { return readJson(lessonsKey, []); }
 export function readOfflineRetention(): Record<OfflineCategory, RetentionDays> {
-  return { lessons: 30, listening: 30, speaking: 30, videos: 30, ...readJson(retentionKey, {}) };
+  return { lessons: 30, listening: 30, speaking: 30, audio: 30, videos: 30, ...readJson(retentionKey, {}) };
 }
 export function readOfflineMaxBytes() { return readJson(maxBytesKey, defaultOfflineMaxBytes); }
 export function saveOfflineMaxBytes(bytes: number) { localStorage.setItem(maxBytesKey, JSON.stringify(bytes)); }
@@ -51,6 +54,9 @@ export function registerOfflineSpeechLesson(input: { id: string; category: 'list
 }
 export function registerOfflineVideo(video: LibraryVideo) {
   upsert({ id: video.id, category: 'videos', title: video.title, estimatedBytes: video.sizeBytes, video });
+}
+export function registerOfflineAudio(audio: LibraryAudio) {
+  upsert({ id: audio.id, category: 'audio', title: audio.title, estimatedBytes: audio.sizeBytes, audio });
 }
 export async function registerOfflineGeneratedLesson(lesson: GeneratedLesson, speechTexts: string[]) {
   const db = await getMentorDb();
@@ -126,6 +132,7 @@ export async function migrateLegacySpeechDownloads(loadLesson: (context: Learnin
 export async function removeOfflineLesson(lesson: OfflineLesson) {
   if (lesson.speechTexts) await deleteSpeechBatch(lesson.speechTexts);
   if (lesson.video) await deleteOfflineVideo(lesson.video);
+  if (lesson.audio) await deleteOfflineAudio(lesson.audio);
   if (lesson.category === 'lessons') await (await getMentorDb()).delete('lessons', lesson.id);
   saveLessons(readOfflineLessons().filter((item) => !(item.id === lesson.id && item.category === lesson.category)));
 }
@@ -155,6 +162,9 @@ export function selectOfflineLessonsOverLimit(lessons: OfflineLesson[], maxBytes
 }
 export function selectStaleOfflineVideos(lessons: OfflineLesson[], activeVideoIds: ReadonlySet<string>) {
   return lessons.filter((lesson) => lesson.category === 'videos' && !activeVideoIds.has(lesson.id));
+}
+export function selectStaleOfflineAudio(lessons: OfflineLesson[], activeAudioIds: ReadonlySet<string>) {
+  return lessons.filter((lesson) => lesson.category === 'audio' && !activeAudioIds.has(lesson.id));
 }
 export async function cleanupExpiredOfflineLessons(now = Date.now()) {
   const expired = selectExpiredOfflineLessons(readOfflineLessons(), readOfflineRetention(), now);

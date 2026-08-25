@@ -64,7 +64,7 @@ const retention = ref(readOfflineRetention());
 const maxBytes = ref(readOfflineMaxBytes());
 const maxBytesOptions = [{ label: '100 MB', value: 100_000_000 }, { label: '250 MB', value: 250_000_000 }, { label: '500 MB', value: 500_000_000 }, { label: '1 GB', value: 1_000_000_000 }];
 const retentionOptions = [{ label: '1 week', value: 7 }, { label: '2 weeks', value: 14 }, { label: '1 month', value: 30 }, { label: '3 months', value: 90 }];
-const chartColors = ['#5b7cfa', '#8b5cf6', '#22b8a7'];
+const chartColors = ['#5b7cfa', '#8b5cf6', '#22b8a7', '#f59e0b', '#ec4899'];
 const totalBytes = computed(() => lessons.value.reduce((sum, lesson) => sum + lesson.estimatedBytes, 0));
 const donutStyle = computed(() => {
   if (!totalBytes.value) return { background: '#dfe4ee' };

@@ -432,6 +432,12 @@ const primaryNavigationItems: Array<{
     isActive: () => route.name === 'dashboard' && route.query.training === 'speaking',
   },
   {
+    label: 'Audio',
+    icon: 'podcasts',
+    to: { name: 'audio' },
+    isActive: () => route.name === 'audio',
+  },
+  {
     label: 'Video',
     icon: 'video_library',
     to: { name: 'videos' },
@@ -474,6 +480,7 @@ async function checkOfflineLessons(showResult: boolean) {
       await appStore.recordLessonUpdateNotification(
         result.downloadedLessons,
         result.downloadedVideos,
+        result.downloadedAudio,
         result.eventId,
       );
     }

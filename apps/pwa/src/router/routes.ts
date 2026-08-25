@@ -6,6 +6,7 @@ import SettingsPage from 'pages/SettingsPage.vue';
 import StatisticsPage from 'pages/StatisticsPage.vue';
 import VideosPage from 'pages/VideosPage.vue';
 import StoragePage from 'pages/StoragePage.vue';
+import AudioPage from 'pages/AudioPage.vue';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -17,6 +18,12 @@ const routes: RouteRecordRaw[] = [
         name: 'dashboard',
         component: DashboardPage,
         meta: { routeOrder: 0 },
+      },
+      {
+        path: 'audio',
+        name: 'audio',
+        component: AudioPage,
+        meta: { routeOrder: 1 },
       },
       {
         path: 'videos',

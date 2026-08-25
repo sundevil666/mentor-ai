@@ -9,7 +9,7 @@ describe('offline lesson retention', () => {
       { id: 'old', category: 'listening', title: 'Old', downloadedAt: '2026-08-01T12:00:00.000Z', lastOpenedAt: '2026-08-01T12:00:00.000Z', estimatedBytes: 10 },
       { id: 'recent', category: 'speaking', title: 'Recent', downloadedAt: '2026-08-20T12:00:00.000Z', lastOpenedAt: '2026-08-20T12:00:00.000Z', estimatedBytes: 10 },
     ];
-    assert.deepEqual(selectExpiredOfflineLessons(lessons, { lessons: 30, listening: 14, speaking: 7, videos: 30 }, now).map((lesson) => lesson.id), ['old']);
+    assert.deepEqual(selectExpiredOfflineLessons(lessons, { lessons: 30, listening: 14, speaking: 7, audio: 30, videos: 30 }, now).map((lesson) => lesson.id), ['old']);
   });
 
   it('keeps lessons added in the last seven days even when the size limit is exceeded', () => {
