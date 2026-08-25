@@ -54,6 +54,34 @@ describe('learning state service', () => {
     assert.equal(speakingLesson.exercises.some((exercise) => exercise.targetSkill === 'speaking'), true);
   });
 
+  it('keeps the selected listening lesson content distinct', async () => {
+    const commuteLesson = await learningStateService.getCurrentLesson({
+      mode: 'listening',
+      selectedConcept: 'learning',
+      manualConceptChoice: true,
+      lessonTemplateKey: 'commute-listening',
+      isOffline: false,
+      speechAvailable: true,
+      availableMinutes: 10,
+    });
+    const shopLesson = await learningStateService.getCurrentLesson({
+      mode: 'listening',
+      selectedConcept: 'learning',
+      manualConceptChoice: true,
+      lessonTemplateKey: 'shop-listening',
+      isOffline: false,
+      speechAvailable: true,
+      availableMinutes: 7,
+    });
+
+    assert.equal(commuteLesson.lessonTemplateKey, 'commute-listening');
+    assert.equal(commuteLesson.exercises[0].audioText.includes('going to work'), true);
+    assert.equal(shopLesson.lessonTemplateKey, 'shop-listening');
+    assert.equal(shopLesson.title, 'Listening: at a small shop');
+    assert.equal(shopLesson.exercises[0].audioText.includes('bottle of water and two apples'), true);
+    assert.notEqual(shopLesson.exercises[0].audioText, commuteLesson.exercises[0].audioText);
+  });
+
   it('does not reuse the cached current lesson when a lesson card requests a specific template', async () => {
     const readingLesson = await learningStateService.getCurrentLesson({
       mode: 'home',

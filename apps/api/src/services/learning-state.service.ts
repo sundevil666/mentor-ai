@@ -274,6 +274,10 @@ function isListeningLesson(lesson: GeneratedLesson): boolean {
 }
 
 function ensureLongListeningLesson(lesson: GeneratedLesson): GeneratedLesson {
+  if (lesson.lessonTemplateKey && lesson.lessonTemplateKey !== 'commute-listening') {
+    return lesson;
+  }
+
   const firstExercise = lesson.exercises[0];
 
   if (!firstExercise || firstExercise.targetSkill !== 'listening') {
