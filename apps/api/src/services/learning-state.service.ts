@@ -6,6 +6,7 @@ import {
   type GeneratedLesson,
   type LearningSessionHandoff,
   type ContentProgress,
+  type ContentEngagementEvent,
   type LearningContext,
   type LearningEvent,
   type SpeechResult,
@@ -87,6 +88,20 @@ export const learningStateService = {
     const contentProgress = [...merged.values()];
     await learningStateRepository.write({ ...state, contentProgress }, user);
     return contentProgress;
+  },
+
+  async mergeContentEngagementEvents(incoming: ContentEngagementEvent[], user?: AuthenticatedUser) {
+    const state = await learningStateRepository.read(user);
+    const merged = new Map(state.contentEngagementEvents.map((event) => [event.id, event]));
+
+    for (const candidate of incoming) {
+      const safe = sanitizeContentEngagementEvent(candidate, state.student.id);
+      if (safe && !merged.has(safe.id)) merged.set(safe.id, safe);
+    }
+
+    const contentEngagementEvents = [...merged.values()].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+    await learningStateRepository.write({ ...state, contentEngagementEvents }, user);
+    return contentEngagementEvents.filter((event) => event.studentId === state.student.id);
   },
 
   async upsertSessionHandoff(handoff: LearningSessionHandoff, user?: AuthenticatedUser) {
@@ -550,6 +565,43 @@ function promoteTeacherMemory(
 
 function now(): string {
   return new Date().toISOString();
+}
+
+function sanitizeContentEngagementEvent(
+  event: ContentEngagementEvent,
+  studentId: string,
+): ContentEngagementEvent | undefined {
+  const allowedTypes = new Set(['started', 'finished', 'full-play', 'feedback-selected']);
+  const allowedCategories = new Set(['lesson', 'video', 'audio', 'reading', 'vocabulary']);
+  const allowedFeedback = new Set([
+    'clear',
+    'mostly-clear',
+    'needs-explanation',
+    'too-difficult',
+    'enjoy-listening',
+    'not-my-format',
+  ]);
+  if (
+    event.studentId !== studentId ||
+    !event.id ||
+    !event.contentId ||
+    !event.sourceDeviceId ||
+    !allowedCategories.has(event.category) ||
+    !allowedTypes.has(event.type) ||
+    !Number.isFinite(Date.parse(event.createdAt)) ||
+    (event.type === 'feedback-selected' && (!event.feedback || !allowedFeedback.has(event.feedback)))
+  ) return undefined;
+
+  return {
+    id: event.id.slice(0, 160),
+    studentId,
+    category: event.category,
+    contentId: event.contentId.slice(0, 160),
+    type: event.type,
+    feedback: event.type === 'feedback-selected' ? event.feedback : undefined,
+    sourceDeviceId: event.sourceDeviceId.slice(0, 160),
+    createdAt: event.createdAt,
+  };
 }
 
 function sanitizeContentProgress(progress: ContentProgress): ContentProgress {

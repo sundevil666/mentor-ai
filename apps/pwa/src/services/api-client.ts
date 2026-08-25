@@ -1,6 +1,7 @@
 import type {
   ApiResponse,
   ContentProgress,
+  ContentEngagementEvent,
   ExerciseResult,
   GeneratedLesson,
   LearningContext,
@@ -138,6 +139,18 @@ export async function synchronizeContentProgress(progress: ContentProgress[]): P
   });
   if (!response.ok) throw new Error('Content progress synchronization failed.');
   return ((await response.json()) as ApiResponse<ContentProgress[]>).data;
+}
+
+export async function synchronizeContentEngagement(
+  engagementEvents: ContentEngagementEvent[],
+): Promise<ContentEngagementEvent[]> {
+  const response = await fetch(`${apiBaseUrl}/api/synchronization`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ engagementEvents }),
+  });
+  if (!response.ok) throw new Error('Content engagement synchronization failed.');
+  return ((await response.json()) as ApiResponse<ContentEngagementEvent[]>).data;
 }
 
 export async function synchronizeLearningEvidence(

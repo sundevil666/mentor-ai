@@ -10,6 +10,7 @@
   "include": [
     "src/services/activity-suggestion.ts",
     "src/services/app-update.ts",
+    "src/services/content-engagement-summary.ts",
     "src/services/api-client.ts",
     "src/services/auth.ts",
     "src/services/indexed-db.ts",

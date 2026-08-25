@@ -458,6 +458,29 @@ export interface ContentProgress {
   updatedAt: string;
 }
 
+export type ContentFeedbackValue =
+  | 'clear'
+  | 'mostly-clear'
+  | 'needs-explanation'
+  | 'too-difficult'
+  | 'enjoy-listening'
+  | 'not-my-format';
+
+export type ContentEngagementEventType = 'started' | 'finished' | 'full-play' | 'feedback-selected';
+
+/** Append-only content evidence. Stable event ids let offline devices merge
+ * playback counters without double-counting a retry. */
+export interface ContentEngagementEvent {
+  id: string;
+  studentId: string;
+  category: ContentProgressCategory;
+  contentId: string;
+  type: ContentEngagementEventType;
+  feedback?: ContentFeedbackValue;
+  sourceDeviceId: string;
+  createdAt: string;
+}
+
 export interface StatisticsSnapshot {
   id: string;
   studentId: string;

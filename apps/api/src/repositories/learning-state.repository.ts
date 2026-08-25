@@ -6,6 +6,7 @@ import {
   initialStudentModel,
   type GeneratedLesson,
   type ContentProgress,
+  type ContentEngagementEvent,
   type ExerciseResult,
   type LearningSessionHandoff,
   type LearningEvent,
@@ -38,6 +39,7 @@ interface LearningStateRecord {
   acknowledgements: SynchronizationAcknowledgement[];
   sessionHandoffs: LearningSessionHandoff[];
   contentProgress: ContentProgress[];
+  contentEngagementEvents: ContentEngagementEvent[];
 }
 
 const demoState: LearningStateRecord = {
@@ -54,6 +56,7 @@ const demoState: LearningStateRecord = {
   acknowledgements: [],
   sessionHandoffs: [],
   contentProgress: [],
+  contentEngagementEvents: [],
 };
 
 export const learningStateRepository = {
@@ -120,6 +123,7 @@ function normalizeState(state: Partial<LearningStateRecord>, user?: Authenticate
     acknowledgements: state.acknowledgements ?? [],
     sessionHandoffs: state.sessionHandoffs ?? [],
     contentProgress: state.contentProgress ?? [],
+    contentEngagementEvents: state.contentEngagementEvents ?? [],
   };
 }
 

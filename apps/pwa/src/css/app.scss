@@ -1707,6 +1707,17 @@ body .q-menu {
   gap: 5px;
 }
 
+.video-card__engagement {
+  flex-basis: 100%;
+  color: var(--mentor-ink, #243247);
+  font-weight: 600;
+}
+
+.video-card__feedback {
+  flex: 1 1 240px;
+  min-width: min(240px, 100%);
+}
+
 .video-card__actions {
   display: grid;
   gap: 10px;

@@ -53,6 +53,22 @@
               <span><q-icon name="school" /> {{ video.level }}</span>
               <span><q-icon name="schedule" /> {{ formatVideoDuration(video.durationSeconds) }}</span>
               <span><q-icon name="storage" /> {{ formatVideoSize(video.sizeBytes) }}</span>
+              <span class="video-card__engagement">
+                <q-icon name="insights" />
+                {{ engagementLabel(video.id) }}
+              </span>
+              <q-select
+                class="video-card__feedback"
+                dense
+                emit-value
+                label="Tell my mentor"
+                map-options
+                outlined
+                :model-value="engagementSummaries.get(video.id)?.feedback ?? null"
+                :options="feedbackOptions"
+                @click.stop
+                @update:model-value="saveVideoFeedback(video.id, $event)"
+              />
               <q-btn
                 v-if="cachedUrls.has(video.sourceUrl)"
                 aria-label="Delete offline video"
@@ -105,6 +121,8 @@
           @play="handleVideoPlay"
           @pointerdown="markVideoInteraction"
           @seeked="synchronizeAudioToVideo"
+          @seeking="handleVideoSeeking"
+          @ended="handleVideoEnded"
           @timeupdate="handleVideoTimeUpdate"
         >
           <track
@@ -176,6 +194,18 @@
             <span><q-icon name="school" /> {{ selectedVideo.level }}</span>
             <span><q-icon name="schedule" /> {{ formatVideoDuration(selectedVideo.durationSeconds) }}</span>
             <span><q-icon name="storage" /> {{ formatVideoSize(selectedVideo.sizeBytes) }}</span>
+            <span class="video-card__engagement"><q-icon name="insights" /> {{ engagementLabel(selectedVideo.id) }}</span>
+            <q-select
+              class="video-card__feedback"
+              dense
+              emit-value
+              label="Tell my mentor"
+              map-options
+              outlined
+              :model-value="engagementSummaries.get(selectedVideo.id)?.feedback ?? null"
+              :options="feedbackOptions"
+              @update:model-value="saveVideoFeedback(selectedVideo.id, $event)"
+            />
             <q-btn
               v-if="cachedUrls.has(selectedVideo.sourceUrl)"
               aria-label="Delete offline video"
@@ -306,6 +336,13 @@ import {
 import { useAppStore } from 'src/stores/app-store';
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineVideo } from 'src/services/offline-library';
 import { loadContentProgress, saveContentProgress, syncAllContentProgress } from 'src/services/content-progress';
+import type { ContentFeedbackValue } from '@mentor-ai/shared';
+import {
+  loadContentEngagementSummaries,
+  recordContentEngagement,
+  syncContentEngagement,
+  type ContentEngagementSummary,
+} from 'src/services/content-engagement';
 import {
   readVideoPlaybackPreference,
   saveVideoPlaybackPreference,
@@ -333,11 +370,25 @@ const subtitleCues = ref<VideoSubtitleCue[]>([]);
 const activeSubtitleCueId = ref<string | null>(null);
 const subtitleStatus = ref<'loading' | 'ready' | 'error'>('loading');
 const subtitleScroller = ref<HTMLElement | null>(null);
+const engagementSummaries = ref(new Map<string, ContentEngagementSummary>());
+const feedbackOptions: Array<{ label: string; value: ContentFeedbackValue }> = [
+  { label: 'Everything is clear', value: 'clear' },
+  { label: 'Mostly clear — repeat later', value: 'mostly-clear' },
+  { label: 'I need an explanation', value: 'needs-explanation' },
+  { label: 'This is too difficult', value: 'too-difficult' },
+  { label: 'I simply enjoy listening to this', value: 'enjoy-listening' },
+  { label: 'This format does not suit me', value: 'not-my-format' },
+];
 const isOnline = computed(() => appStore.isOnline);
 const selectedVideo = computed(() => videoLibrary.find((video) => video.id === selectedVideoId.value) ?? null);
 let lastProgressSaveAt = 0;
 let shouldResumeAfterVisibilityChange = false;
 let lastVideoInteractionAt = 0;
+let playbackCycleActive = false;
+let playbackCycleStart = 0;
+let playbackCycleHadForwardSeek = false;
+let playbackCycleFinished = false;
+let lastObservedPlaybackPosition = 0;
 const offlineStorageSummary = computed(() => {
   const cachedVideos = videoLibrary.filter((video) => cachedUrls.value.has(video.sourceUrl));
   const totalBytes = cachedVideos.reduce((total, video) => total + video.sizeBytes, 0);
@@ -349,6 +400,8 @@ const offlineStorageSummary = computed(() => {
 onMounted(() => {
   void refreshCacheStatus();
   void syncAllContentProgress().catch(() => undefined);
+  void refreshEngagementSummaries();
+  void syncContentEngagement().then(refreshEngagementSummaries).catch(() => undefined);
   document.addEventListener('visibilitychange', handleVisibilityChange);
   window.addEventListener('resize', updateActiveSubtitleScale);
 });
@@ -529,7 +582,27 @@ function handleVideoPlay() {
   // when the user locks the phone immediately afterwards.
   lastVideoInteractionAt = 0;
   shouldResumeAfterVisibilityChange = true;
+  beginPlaybackCycleIfNeeded();
   if (audio.paused) void audio.play();
+}
+
+function beginPlaybackCycleIfNeeded() {
+  if (playbackCycleActive || !selectedVideoId.value) return;
+  playbackCycleActive = true;
+  playbackCycleStart = activeMediaTime();
+  lastObservedPlaybackPosition = playbackCycleStart;
+  playbackCycleHadForwardSeek = false;
+  playbackCycleFinished = false;
+  void recordVideoEngagement(selectedVideoId.value, 'started');
+}
+
+function handleVideoSeeking() {
+  const position = activeVideoElement.value?.currentTime ?? 0;
+  if (position > lastObservedPlaybackPosition + 2) playbackCycleHadForwardSeek = true;
+}
+
+function handleVideoEnded() {
+  completePlaybackCycle();
 }
 
 function handleVideoPause() {
@@ -559,6 +632,7 @@ function handleVideoTimeUpdate() {
   updateActiveSubtitle(player.currentTime);
   updateVideoMediaPosition(player);
   persistActiveVideoProgress(player);
+  observePlaybackCycle(player);
 }
 
 function synchronizeVideoToAudio() {
@@ -572,6 +646,27 @@ function synchronizeVideoToAudio() {
   if (Math.abs(player.currentTime - audio.currentTime) > 0.45) player.currentTime = audio.currentTime;
   updateVideoMediaPosition(audio);
   persistActiveVideoProgress(audio);
+  observePlaybackCycle(audio);
+}
+
+function observePlaybackCycle(media: HTMLMediaElement) {
+  if (playbackCycleFinished && media.currentTime < 2) {
+    playbackCycleActive = false;
+    beginPlaybackCycleIfNeeded();
+  }
+  lastObservedPlaybackPosition = media.currentTime;
+  if (Number.isFinite(media.duration) && media.duration > 0 && media.currentTime >= media.duration - 1) {
+    completePlaybackCycle();
+  }
+}
+
+function completePlaybackCycle() {
+  if (!playbackCycleActive || playbackCycleFinished || !selectedVideoId.value) return;
+  playbackCycleFinished = true;
+  void recordVideoEngagement(selectedVideoId.value, 'finished');
+  if (playbackCycleStart <= 2 && !playbackCycleHadForwardSeek) {
+    void recordVideoEngagement(selectedVideoId.value, 'full-play');
+  }
 }
 
 async function handleVideoMetadataLoaded(video: LibraryVideo) {
@@ -641,6 +736,40 @@ function stopActiveVideo() {
   if (activeMedia) persistActiveVideoProgress(activeMedia, true);
   activeVideoElement.value?.pause();
   backgroundAudioElement.value?.pause();
+  playbackCycleActive = false;
+  playbackCycleFinished = false;
+}
+
+async function saveVideoFeedback(videoId: string, feedback: ContentFeedbackValue | null) {
+  if (!feedback) return;
+  await recordVideoEngagement(videoId, 'feedback-selected', feedback);
+  Notify.create({ type: 'positive', message: 'Your mentor will use this feedback for the next recommendations.' });
+}
+
+async function recordVideoEngagement(
+  videoId: string,
+  type: 'started' | 'finished' | 'full-play' | 'feedback-selected',
+  feedback?: ContentFeedbackValue,
+) {
+  await recordContentEngagement({
+    studentId: appStore.studentId,
+    category: 'video',
+    contentId: videoId,
+    type,
+    feedback,
+  });
+  await refreshEngagementSummaries();
+}
+
+async function refreshEngagementSummaries() {
+  engagementSummaries.value = await loadContentEngagementSummaries('video');
+}
+
+function engagementLabel(videoId: string) {
+  const summary = engagementSummaries.value.get(videoId);
+  return summary
+    ? `${summary.starts} starts · ${summary.finishes} finishes · ${summary.fullPlays} full plays`
+    : '0 starts · 0 finishes · 0 full plays';
 }
 
 function configureVideoMediaSession(video: LibraryVideo, audio: HTMLAudioElement) {

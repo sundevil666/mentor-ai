@@ -7,6 +7,7 @@ import {
   listSessionHandoffs,
   listContentProgress,
   mergeContentProgress,
+  mergeContentEngagementEvents,
   synchronizeLearningEvents,
   upsertSessionHandoff,
 } from '../controllers/learning-state.controller.js';
@@ -24,5 +25,6 @@ learningStateRouter.get('/session-handoffs', listSessionHandoffs);
 learningStateRouter.put('/session-handoffs', upsertSessionHandoff);
 learningStateRouter.get('/content-progress', listContentProgress);
 learningStateRouter.post('/content-progress-synchronize', mergeContentProgress);
+learningStateRouter.post('/content-engagement-synchronize', mergeContentEngagementEvents);
 learningStateRouter.get('/configuration', getConfiguration);
 learningStateRouter.post('/synchronization', synchronizeLearningEvents);

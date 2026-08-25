@@ -259,4 +259,26 @@ describe('learning state service', () => {
     assert.equal(progress.position, 420);
     assert.equal(progress.furthestPosition, 420);
   });
+
+  it('merges engagement evidence once and rejects another student data', async () => {
+    const timestamp = Date.now();
+    const valid = {
+      id: `engagement-${timestamp}`,
+      studentId: 'demo-student',
+      category: 'video',
+      contentId: 'video-feedback-test',
+      type: 'feedback-selected',
+      feedback: 'mostly-clear',
+      sourceDeviceId: 'phone',
+      createdAt: '2026-08-25T10:00:00.000Z',
+    };
+    const invalid = { ...valid, id: `other-${timestamp}`, studentId: 'another-student' };
+
+    await learningStateService.mergeContentEngagementEvents([valid, invalid]);
+    const merged = await learningStateService.mergeContentEngagementEvents([valid]);
+
+    assert.equal(merged.filter((event) => event.id === valid.id).length, 1);
+    assert.equal(merged.some((event) => event.id === invalid.id), false);
+    assert.equal(merged.find((event) => event.id === valid.id)?.feedback, 'mostly-clear');
+  });
 });
