@@ -464,6 +464,7 @@ export type ContentFeedbackValue =
   | 'needs-explanation'
   | 'too-difficult'
   | 'enjoy-listening'
+  | 'enjoy-format'
   | 'not-my-format';
 
 export type ContentEngagementEventType = 'started' | 'finished' | 'full-play' | 'feedback-selected';

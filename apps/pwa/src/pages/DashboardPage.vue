@@ -44,6 +44,7 @@
               <span>{{ paceLabel }}</span>
               <span>{{ priorityLesson.evidenceCount }} answers observed</span>
             </div>
+            <ContentMentorFeedback category="lesson" :content-id="priorityContentId" />
             <q-btn
               class="priority-lesson__button"
               color="primary"
@@ -51,7 +52,7 @@
               no-caps
               icon-right="arrow_forward"
               label="Do this lesson first"
-              @click="startTraining(priorityLesson.trainingKey)"
+              @click="startPriorityLesson"
             />
           </article>
 
@@ -74,27 +75,32 @@
                   <span>{{ section.label }}</span>
                 </div>
                 <div class="lesson-library__grid">
-                  <button
+                  <article
                     v-for="lesson in section.lessons"
                     :key="lesson.templateKey"
                     class="lesson-card"
-                    type="button"
-                    @click="startLessonChoice(section.concept, lesson.templateKey)"
                   >
-                    <span class="lesson-card__title">
-                      {{ lesson.title }}
-                      <q-icon
-                        v-if="lesson.preferredDevice"
-                        :name="deviceRecommendation(lesson.preferredDevice).icon"
-                        size="18px"
-                        class="lesson-device-icon"
-                        :aria-label="deviceRecommendation(lesson.preferredDevice).label"
-                      >
-                        <q-tooltip>{{ deviceRecommendation(lesson.preferredDevice).tooltip }}</q-tooltip>
-                      </q-icon>
-                    </span>
-                    <strong>{{ lesson.focus }}</strong>
-                  </button>
+                    <button
+                      class="lesson-card__body"
+                      type="button"
+                      @click="startLessonChoice(section.concept, lesson.templateKey)"
+                    >
+                      <span class="lesson-card__title">
+                        {{ lesson.title }}
+                        <q-icon
+                          v-if="lesson.preferredDevice"
+                          :name="deviceRecommendation(lesson.preferredDevice).icon"
+                          size="18px"
+                          class="lesson-device-icon"
+                          :aria-label="deviceRecommendation(lesson.preferredDevice).label"
+                        >
+                          <q-tooltip>{{ deviceRecommendation(lesson.preferredDevice).tooltip }}</q-tooltip>
+                        </q-icon>
+                      </span>
+                      <strong>{{ lesson.focus }}</strong>
+                    </button>
+                    <ContentMentorFeedback category="lesson" :content-id="lesson.templateKey" />
+                  </article>
                 </div>
               </section>
             </div>
@@ -122,6 +128,7 @@
                   <strong>{{ lesson.focus }}</strong>
                   <span>{{ lesson.minutes }} min</span>
                 </button>
+                <ContentMentorFeedback category="lesson" :content-id="lesson.templateKey" />
                 <div class="training-library-card__offline">
                   <q-icon
                     :name="libraryDownloadIcon(lesson.templateKey)"
@@ -628,6 +635,8 @@ import {
 } from 'src/services/user-preferences';
 import { useAppStore } from 'src/stores/app-store';
 import { markOfflineLessonOpened, registerOfflineSpeechLesson } from 'src/services/offline-library';
+import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
+import { recordContentEngagement, syncContentEngagement } from 'src/services/content-engagement';
 
 type LessonChoice = {
   templateKey: string;
@@ -679,6 +688,7 @@ const isListeningPlaylistVisible = ref(false);
 const isLessonLibraryVisible = ref(false);
 const selectedLessonLibrary = ref<TrainingLibraryKey>('home');
 const lessonReturnDestination = ref<LessonReturnDestination>('home');
+const activeEngagementContentId = ref<string | null>(null);
 const libraryDownloadStatus = ref<Record<string, 'idle' | 'checking' | 'downloading' | 'ready' | 'error'>>({});
 const offlineAudioStatus = ref<'idle' | 'downloading' | 'ready' | 'error'>('idle');
 const offlineAudioProgress = ref(0);
@@ -988,6 +998,7 @@ const recommendedTraining = computed(() => {
   };
 });
 const priorityLesson = computed(() => createPriorityLesson(appStore.studentModel));
+const priorityContentId = computed(() => `priority:${priorityLesson.value.trainingKey}`);
 async function openTrainingLibrary(library: 'listening' | 'speaking') {
   if (appStore.session) await returnToLessonChoice();
   selectedLessonLibrary.value = library;
@@ -996,6 +1007,7 @@ async function openTrainingLibrary(library: 'listening' | 'speaking') {
 }
 
 async function startLibraryLesson(lesson: TrainingLibraryLesson) {
+  recordLessonStart(lesson.templateKey);
   markOfflineLessonOpened(lesson.templateKey, lesson.mode);
   lessonReturnDestination.value = selectedLessonLibrary.value;
   answer.value = '';
@@ -1081,6 +1093,7 @@ onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();
   }
+  void syncContentEngagement().catch(() => undefined);
 
   if (!appStore.session && (route.query.training === 'listening' || route.query.training === 'speaking')) {
     await openTrainingLibrary(route.query.training);
@@ -1115,6 +1128,17 @@ watch(
       void returnToLessonChoice('home');
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  },
+);
+
+watch(
+  () => appStore.session?.completedAt,
+  (completedAt) => {
+    const contentId = activeEngagementContentId.value;
+    if (!completedAt || !contentId) return;
+    activeEngagementContentId.value = null;
+    void recordContentEngagement({ studentId: appStore.studentId, category: 'lesson', contentId, type: 'finished' });
+    void recordContentEngagement({ studentId: appStore.studentId, category: 'lesson', contentId, type: 'full-play' });
   },
 );
 
@@ -1202,6 +1226,7 @@ async function startConcept(concept: LearningConcept) {
 }
 
 async function startLessonChoice(concept: LearningConcept, lessonTemplateKey: string) {
+  recordLessonStart(lessonTemplateKey);
   lessonReturnDestination.value = 'specific-lessons';
   answer.value = '';
   isLessonLibraryVisible.value = false;
@@ -1222,6 +1247,21 @@ async function startTraining(training: TrainingKey) {
   }
 
   await startWithMode(training);
+}
+
+async function startPriorityLesson() {
+  recordLessonStart(priorityContentId.value);
+  await startTraining(priorityLesson.value.trainingKey);
+}
+
+function recordLessonStart(contentId: string) {
+  activeEngagementContentId.value = contentId;
+  void recordContentEngagement({
+    studentId: appStore.studentId,
+    category: 'lesson',
+    contentId,
+    type: 'started',
+  });
 }
 
 async function continueFromDevice(handoffId: string) {

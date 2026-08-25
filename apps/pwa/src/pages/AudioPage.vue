@@ -31,6 +31,7 @@
             <q-btn v-if="cachedUrls.has(item.sourceUrl)" :aria-label="`Delete ${item.title} from offline storage`" color="negative" flat icon="delete_outline" round :loading="busyId === item.id" @click="removeAudio(item)" />
             <q-btn v-else :aria-label="`Save ${item.title} offline`" color="primary" flat icon="download_for_offline" round :disable="!isOnline" :loading="busyId === item.id" @click="downloadAudio(item)" />
           </div>
+          <ContentMentorFeedback category="audio" :content-id="item.id" />
         </article>
       </section>
 
@@ -44,10 +45,11 @@
             <span><q-icon name="storage" /> {{ formatAudioSize(selectedAudio.sizeBytes) }}</span>
             <span><q-icon :name="playbackIsOffline ? 'offline_pin' : 'cloud_queue'" /> {{ playbackIsOffline ? 'Available offline' : 'Streaming' }}</span>
           </div>
+          <ContentMentorFeedback category="audio" :content-id="selectedAudio.id" />
         </div>
 
         <section class="audio-player" aria-label="Audio player">
-          <audio ref="audioElement" :src="playbackUrl" controls :loop="repeatEnabled" preload="metadata" @ended="handleEnded" @pause="isPlaying = false" @play="isPlaying = true" @timeupdate="saveProgress" />
+          <audio ref="audioElement" :src="playbackUrl" controls :loop="repeatEnabled" preload="metadata" @ended="handleEnded" @pause="isPlaying = false" @play="handlePlay" @seeking="handleSeeking" @timeupdate="saveProgress" />
           <div class="audio-player__settings">
             <div>
               <strong>Playback speed</strong>
@@ -78,7 +80,11 @@ import { Notify } from 'quasar';
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { audioLibrary, deleteOfflineAudio, formatAudioDuration, formatAudioSize, getCachedAudioUrls, resolveAudioPlaybackUrl, saveAudioOffline, type LibraryAudio } from 'src/services/audio-library';
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineAudio } from 'src/services/offline-library';
+import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
+import { recordContentEngagement, syncContentEngagement } from 'src/services/content-engagement';
+import { useAppStore } from 'src/stores/app-store';
 
+const appStore = useAppStore();
 const audioElement = ref<HTMLAudioElement | null>(null);
 const selectedAudio = ref<LibraryAudio | null>(null);
 const cachedUrls = ref<Set<string>>(new Set());
@@ -91,12 +97,18 @@ const repeatEnabled = ref(false);
 const isPlaying = ref(false);
 const isOnline = ref(navigator.onLine);
 let objectUrl: string | null = null;
+let playbackCycleActive = false;
+let playbackCycleStart = 0;
+let playbackCycleHadForwardSeek = false;
+let playbackCycleFinished = false;
+let lastObservedPlaybackPosition = 0;
 
 onMounted(async () => {
   cachedUrls.value = await getCachedAudioUrls();
   window.addEventListener('online', updateOnlineState);
   window.addEventListener('offline', updateOnlineState);
   configureMediaSession();
+  void syncContentEngagement().catch(() => undefined);
 });
 
 onBeforeUnmount(() => {
@@ -131,6 +143,8 @@ function closeAudio() {
   selectedAudio.value = null;
   playbackUrl.value = '';
   isPlaying.value = false;
+  playbackCycleActive = false;
+  playbackCycleFinished = false;
   if (objectUrl) URL.revokeObjectURL(objectUrl);
   objectUrl = null;
 }
@@ -164,10 +178,53 @@ function saveProgress() {
   const item = selectedAudio.value;
   if (!player || !item || !Number.isFinite(player.currentTime)) return;
   localStorage.setItem(`mentor-ai:audio-progress:${item.id}`, String(Math.floor(player.currentTime)));
+  observePlaybackCycle(player);
   if ('mediaSession' in navigator && Number.isFinite(player.duration) && player.duration > 0) navigator.mediaSession.setPositionState({ duration: player.duration, playbackRate: player.playbackRate, position: Math.min(player.currentTime, player.duration) });
 }
 function readProgress(id: string) { const saved = Number(localStorage.getItem(`mentor-ai:audio-progress:${id}`)); return Number.isFinite(saved) && saved > 0 ? saved : 0; }
-function handleEnded() { const item = selectedAudio.value; if (item) localStorage.removeItem(`mentor-ai:audio-progress:${item.id}`); isPlaying.value = false; }
+function handlePlay() {
+  isPlaying.value = true;
+  if (playbackCycleActive || !selectedAudio.value) return;
+  playbackCycleActive = true;
+  playbackCycleStart = audioElement.value?.currentTime ?? 0;
+  lastObservedPlaybackPosition = playbackCycleStart;
+  playbackCycleHadForwardSeek = false;
+  playbackCycleFinished = false;
+  void recordAudioEngagement('started');
+}
+function handleSeeking() {
+  const position = audioElement.value?.currentTime ?? 0;
+  if (position > lastObservedPlaybackPosition + 2) playbackCycleHadForwardSeek = true;
+}
+function observePlaybackCycle(player: HTMLAudioElement) {
+  if (playbackCycleFinished && player.currentTime < 2) {
+    playbackCycleActive = false;
+    handlePlay();
+  }
+  lastObservedPlaybackPosition = player.currentTime;
+  if (Number.isFinite(player.duration) && player.duration > 0 && player.currentTime >= player.duration - 1) completePlaybackCycle();
+}
+function completePlaybackCycle() {
+  if (!playbackCycleActive || playbackCycleFinished) return;
+  playbackCycleFinished = true;
+  void recordAudioEngagement('finished');
+  if (playbackCycleStart <= 2 && !playbackCycleHadForwardSeek) void recordAudioEngagement('full-play');
+}
+function handleEnded() {
+  const item = selectedAudio.value;
+  completePlaybackCycle();
+  if (item) localStorage.removeItem(`mentor-ai:audio-progress:${item.id}`);
+  isPlaying.value = false;
+}
+function recordAudioEngagement(type: 'started' | 'finished' | 'full-play') {
+  if (!selectedAudio.value) return Promise.resolve();
+  return recordContentEngagement({
+    studentId: appStore.studentId,
+    category: 'audio',
+    contentId: selectedAudio.value.id,
+    type,
+  });
+}
 function configureMediaSession() {
   if (!('mediaSession' in navigator)) return;
   navigator.mediaSession.setActionHandler('play', () => { void audioElement.value?.play(); });

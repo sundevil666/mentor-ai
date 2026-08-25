@@ -579,6 +579,7 @@ function sanitizeContentEngagementEvent(
     'needs-explanation',
     'too-difficult',
     'enjoy-listening',
+    'enjoy-format',
     'not-my-format',
   ]);
   if (
