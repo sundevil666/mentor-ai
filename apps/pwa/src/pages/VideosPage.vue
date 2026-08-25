@@ -303,6 +303,7 @@ import {
   type VideoPlaybackRate,
 } from 'src/services/video-preferences';
 import { parseWebVtt, type VideoSubtitleCue } from 'src/services/video-subtitles';
+import { startVideoWithBackgroundAudio } from 'src/services/video-background-playback';
 
 const appStore = useAppStore();
 const cachedUrls = ref(new Set<string>());
@@ -389,8 +390,9 @@ async function toggleVideo(videoId: string) {
   applyPlaybackRate(playbackPreference.playbackRate);
   configureVideoMediaSession(video, audio);
   try {
-    await player.play();
+    await startVideoWithBackgroundAudio(player, audio);
   } catch {
+    audio.pause();
     Notify.create({ type: 'negative', message: 'Tap play to start this video.' });
   }
 }
@@ -509,13 +511,9 @@ function saveActiveVideoPlaybackPreference() {
 function handleVideoPlay() {
   const audio = backgroundAudioElement.value;
   if (!audio) return;
-  if (document.hidden) {
-    audio.volume = 1;
-    if (audio.paused) void audio.play();
-    return;
-  }
   shouldResumeAfterVisibilityChange = true;
-  audio.pause();
+  audio.volume = document.hidden ? 1 : 0;
+  if (audio.paused) void audio.play();
 }
 
 function handleVideoPause() {
@@ -607,7 +605,8 @@ function handleVisibilityChange() {
   if (Number.isFinite(audio.currentTime)) {
     player.currentTime = audio.currentTime;
   }
-  audio.pause();
+  audio.volume = 0;
+  if (shouldResumeAfterVisibilityChange && audio.paused) void audio.play();
   if (shouldResumeAfterVisibilityChange) void player.play();
 }
 
@@ -638,7 +637,8 @@ function configureVideoMediaSession(video: LibraryVideo, audio: HTMLAudioElement
       audio.volume = 1;
       void audio.play();
     } else {
-      audio.pause();
+      audio.volume = 0;
+      if (audio.paused) void audio.play();
       void activeVideoElement.value?.play();
     }
   });
