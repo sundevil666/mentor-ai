@@ -4,6 +4,18 @@ export interface VideoPlaybackMedia {
   play(): Promise<void>;
 }
 
+const videoInteractionWindowMs = 1_500;
+
+export function shouldPauseBackgroundAudio(
+  documentHidden: boolean,
+  lastVideoInteractionAt: number,
+  now = Date.now(),
+) {
+  return !documentHidden
+    && lastVideoInteractionAt > 0
+    && now - lastVideoInteractionAt <= videoInteractionWindowMs;
+}
+
 export async function startVideoWithBackgroundAudio(
   video: VideoPlaybackMedia,
   backgroundAudio: VideoPlaybackMedia,

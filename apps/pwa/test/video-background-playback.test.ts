@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  shouldPauseBackgroundAudio,
   startVideoWithBackgroundAudio,
   type VideoPlaybackMedia,
 } from '../src/services/video-background-playback.js';
@@ -36,5 +37,15 @@ describe('video background playback', () => {
     assert.equal(backgroundAudio.currentTime, 37);
     releaseAudio();
     await playback;
+  });
+
+  it('keeps audio running when the system pauses video during screen lock', () => {
+    assert.equal(shouldPauseBackgroundAudio(false, 0, 10_000), false);
+    assert.equal(shouldPauseBackgroundAudio(true, 9_500, 10_000), false);
+  });
+
+  it('pauses audio after a recent interaction with the visible video controls', () => {
+    assert.equal(shouldPauseBackgroundAudio(false, 9_500, 10_000), true);
+    assert.equal(shouldPauseBackgroundAudio(false, 8_000, 10_000), false);
   });
 });
