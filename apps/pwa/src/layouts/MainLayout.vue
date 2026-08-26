@@ -72,6 +72,7 @@
                   <span>{{ appStore.unreadUpdateNotificationCount }} unread</span>
                 </div>
                 <q-btn
+                  v-close-popup
                   dense
                   flat
                   icon="done_all"
