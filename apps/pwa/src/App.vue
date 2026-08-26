@@ -1,5 +1,48 @@
 <template>
   <router-view />
+  <transition name="update-overlay">
+    <div
+      v-if="appStore.isAppUpdateInstalling"
+      class="app-update-overlay"
+      role="status"
+      aria-live="assertive"
+      aria-busy="true"
+    >
+      <div
+        class="app-update-overlay__glow"
+        aria-hidden="true"
+      />
+      <div class="app-update-overlay__card">
+        <div
+          class="app-update-overlay__spinner"
+          aria-hidden="true"
+        >
+          <q-spinner-orbit
+            color="primary"
+            size="72px"
+          />
+          <q-icon
+            class="app-update-overlay__icon"
+            name="auto_awesome"
+            color="primary"
+            size="26px"
+          />
+        </div>
+        <div class="app-update-overlay__eyebrow">
+          Mentor AI
+        </div>
+        <h1>Updating the application</h1>
+        <p>We are saving your progress and preparing the latest version.</p>
+        <div class="app-update-overlay__notice">
+          <q-icon
+            name="touch_app"
+            size="20px"
+          />
+          <span>No action is needed. Please keep the app open.</span>
+        </div>
+      </div>
+    </div>
+  </transition>
 </template>
 
 <script setup lang="ts">
@@ -89,15 +132,19 @@ async function handleManualUpdateCheck() {
     return;
   }
   appStore.setAppUpdateInstalling(true);
-  const result = await checkForAppUpdate();
-  if (result?.manifest) {
-    handleServerUpdateAvailable(result);
+  try {
+    const result = await checkForAppUpdate();
+    if (result?.manifest) {
+      handleServerUpdateAvailable(result);
+      await installUpdate(result.manifest.version);
+      return;
+    }
     appStore.setAppUpdateInstalling(false);
-    await installUpdate(result.manifest.version);
-    return;
+    Notify.create({ type: 'positive', icon: 'check_circle', message: 'Mentor AI is up to date' });
+  } catch {
+    appStore.setAppUpdateInstalling(false);
+    Notify.create({ type: 'negative', icon: 'cloud_off', message: 'Could not update Mentor AI', caption: 'Check the connection and try again.' });
   }
-  appStore.setAppUpdateInstalling(false);
-  Notify.create({ type: 'positive', icon: 'check_circle', message: 'Mentor AI is up to date' });
 }
 
 async function installUpdate(version: string) {
@@ -108,31 +155,24 @@ async function installUpdate(version: string) {
   isReloadingForUpdate = true;
   appStore.setAppUpdateInstalling(true);
 
-  if (!appStore.isHydrated) {
-    await appStore.hydrate();
+  try {
+    if (!appStore.isHydrated) await appStore.hydrate();
+    const lessonProgress = await appStore.prepareForAppUpdate();
+    if (appStore.session) await router.replace({ name: 'dashboard' });
+
+    rememberPendingAppUpdate({
+      targetVersion: version,
+      requestedAt: new Date().toISOString(),
+      ...lessonProgress,
+    });
+
+    await activatePendingServiceWorkerUpdate();
+    window.location.replace(createAppUpdateReloadUrl(window.location, version));
+  } catch {
+    isReloadingForUpdate = false;
+    appStore.setAppUpdateInstalling(false);
+    Notify.create({ type: 'negative', icon: 'cloud_off', message: 'Could not install the update', caption: 'Your progress is safe. Check the connection and try again.' });
   }
-
-  const lessonProgress = await appStore.prepareForAppUpdate();
-
-  if (appStore.session) {
-    await router.replace({ name: 'dashboard' });
-  }
-
-  rememberPendingAppUpdate({
-    targetVersion: version,
-    requestedAt: new Date().toISOString(),
-    ...lessonProgress,
-  });
-
-  Notify.create({
-    type: 'info',
-    icon: 'sync',
-    message: 'Saving progress and updating…',
-    timeout: 0,
-  });
-
-  await activatePendingServiceWorkerUpdate();
-  window.location.replace(createAppUpdateReloadUrl(window.location, version));
 }
 
 async function showCompletedUpdateNotification() {
@@ -228,3 +268,103 @@ async function refreshRemoteProgress(showNotification: boolean) {
   });
 }
 </script>
+
+<style scoped>
+.app-update-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 24px;
+  background: linear-gradient(145deg, rgba(240, 253, 250, 0.98), rgba(239, 246, 255, 0.99));
+  cursor: wait;
+  touch-action: none;
+  user-select: none;
+}
+
+.app-update-overlay__glow {
+  position: absolute;
+  width: min(82vw, 560px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(20, 184, 166, 0.2), transparent 68%);
+  animation: update-glow 2.4s ease-in-out infinite;
+}
+
+.app-update-overlay__card {
+  position: relative;
+  width: min(100%, 420px);
+  padding: 36px 28px 30px;
+  border: 1px solid rgba(15, 118, 110, 0.13);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.16);
+  text-align: center;
+  backdrop-filter: blur(18px);
+}
+
+.app-update-overlay__spinner {
+  position: relative;
+  display: grid;
+  width: 88px;
+  height: 88px;
+  margin: 0 auto 18px;
+  place-items: center;
+}
+
+.app-update-overlay__icon { position: absolute; }
+
+.app-update-overlay__eyebrow {
+  margin-bottom: 6px;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.app-update-overlay h1 {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(24px, 7vw, 32px);
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.app-update-overlay p {
+  margin: 14px auto 22px;
+  color: #475569;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.app-update-overlay__notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  color: #115e59;
+  background: #ccfbf1;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.update-overlay-enter-active,
+.update-overlay-leave-active { transition: opacity 180ms ease; }
+.update-overlay-enter-from,
+.update-overlay-leave-to { opacity: 0; }
+
+@keyframes update-glow {
+  0%, 100% { opacity: 0.7; transform: scale(0.94); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-update-overlay__glow { animation: none; }
+}
+</style>
