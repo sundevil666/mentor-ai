@@ -44,7 +44,7 @@
           preload="metadata"
           @ended="handleEnded"
           @loadedmetadata="restoreProgress"
-          @pause="playing = false"
+          @pause="handlePause"
           @play="handlePlay"
           @timeupdate="handleTimeUpdate"
         />
@@ -108,6 +108,7 @@ import { loadContentProgress, saveContentProgress, syncAllContentProgress } from
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineStory } from 'src/services/offline-library';
 import { deleteOfflineStory, formatStoryDuration, formatStorySize, getCachedStoryUrls, saveStoryOffline, storyLibrary, type LibraryStory } from 'src/services/story-library';
 import { useAppStore } from 'src/stores/app-store';
+import { configurePlaybackAudioSession } from 'src/services/audio-session';
 
 const appStore = useAppStore();
 const selectedStoryId = ref<string | null>(null);
@@ -126,6 +127,7 @@ const selectedStory = computed(() => storyLibrary.find((story) => story.id === s
 const offlineSummary = computed(() => `${storyLibrary.length} stories · ${formatStoryDuration(storyLibrary.reduce((sum, story) => sum + story.durationSeconds, 0))} total listening.`);
 
 onMounted(async () => {
+  configurePlaybackAudioSession();
   cachedUrls.value = await getCachedStoryUrls();
   engagementSummaries.value = await loadContentEngagementSummaries('audio');
   document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -137,6 +139,7 @@ onUnmounted(() => {
 });
 
 async function openStory(id: string) {
+  configurePlaybackAudioSession();
   selectedStoryId.value = id;
   markOfflineLessonOpened(id, 'stories');
   await nextTick();
@@ -147,14 +150,21 @@ async function togglePlayback() {
   const audio = audioElement.value;
   if (!audio) return;
   if (audio.paused) {
+    configurePlaybackAudioSession();
     try { await audio.play(); } catch { Notify.create({ type: 'negative', message: 'Tap play again to start this story.' }); }
   } else audio.pause();
 }
 function seek(value: number | null) { if (audioElement.value && value !== null) audioElement.value.currentTime = value; }
 function setPlaybackRate(rate: number) { playbackRate.value = rate; if (audioElement.value) audioElement.value.playbackRate = rate; }
 function handlePlay() {
+  configurePlaybackAudioSession();
   playing.value = true;
+  setMediaSessionPlaybackState('playing');
   if (selectedStory.value) void recordEngagement(selectedStory.value.id, 'started');
+}
+function handlePause() {
+  playing.value = false;
+  setMediaSessionPlaybackState('paused');
 }
 function handleTimeUpdate() {
   const audio = audioElement.value;
@@ -202,15 +212,36 @@ function configureMediaSession() {
   const story = selectedStory.value;
   if (!story || !('mediaSession' in navigator)) return;
   navigator.mediaSession.metadata = new MediaMetadata({ title: story.title, artist: story.reader, album: 'Stories & Tales' });
-  navigator.mediaSession.setActionHandler('play', () => { void audioElement.value?.play(); });
-  navigator.mediaSession.setActionHandler('pause', () => audioElement.value?.pause());
+  navigator.mediaSession.setActionHandler('play', () => { void resumeStoryFromMediaSession(); });
+  navigator.mediaSession.setActionHandler('pause', () => {
+    audioElement.value?.pause();
+    setMediaSessionPlaybackState('paused');
+  });
   navigator.mediaSession.setActionHandler('seekbackward', () => seek(Math.max(0, currentTime.value - 10)));
   navigator.mediaSession.setActionHandler('seekforward', () => seek(Math.min(duration.value, currentTime.value + 10)));
   navigator.mediaSession.setActionHandler('seekto', (details) => seek(details.seekTime ?? null));
+}
+async function resumeStoryFromMediaSession() {
+  const audio = audioElement.value;
+  if (!audio) return;
+  configurePlaybackAudioSession();
+  try {
+    await audio.play();
+    setMediaSessionPlaybackState('playing');
+  } catch {
+    setMediaSessionPlaybackState('paused');
+  }
+}
+function setMediaSessionPlaybackState(state: 'none' | 'paused' | 'playing') {
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = state;
 }
 function updateMediaPosition() {
   if (!('mediaSession' in navigator) || !duration.value || currentTime.value > duration.value) return;
   try { navigator.mediaSession.setPositionState({ duration: duration.value, playbackRate: playbackRate.value, position: currentTime.value }); } catch { /* Unsupported on older Safari. */ }
 }
-function clearMediaSession() { if ('mediaSession' in navigator) navigator.mediaSession.metadata = null; }
+function clearMediaSession() {
+  if (!('mediaSession' in navigator)) return;
+  navigator.mediaSession.metadata = null;
+  navigator.mediaSession.playbackState = 'none';
+}
 </script>
