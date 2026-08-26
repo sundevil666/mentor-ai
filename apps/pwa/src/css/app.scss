@@ -2398,6 +2398,7 @@ body .q-menu {
 .audio-detail__meta span:last-child { margin-left: auto; }
 .audio-player { display: grid; gap: 18px; padding: 22px; border-block: 1px solid var(--app-border); background: var(--app-surface-soft); }
 .audio-player audio { width: 100%; }
+.story-audio { display: block; width: 100%; }
 .audio-player__settings { display: grid; gap: 18px; grid-template-columns: 1fr 1fr; }
 .audio-player__settings > div { display: grid; gap: 8px; }
 .audio-speed-controls { display: flex; gap: 6px; }

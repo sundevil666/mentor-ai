@@ -40,6 +40,7 @@
           ref="audioElement"
           class="story-audio"
           :src="selectedStory.sourceUrl"
+          controls
           :loop="repeat"
           preload="metadata"
           @ended="handleEnded"
