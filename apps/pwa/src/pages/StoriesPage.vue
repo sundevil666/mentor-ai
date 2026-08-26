@@ -108,8 +108,7 @@ import { loadContentProgress, saveContentProgress, syncAllContentProgress } from
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineStory } from 'src/services/offline-library';
 import { deleteOfflineStory, formatStoryDuration, formatStorySize, getCachedStoryUrls, saveStoryOffline, storyLibrary, type LibraryStory } from 'src/services/story-library';
 import { useAppStore } from 'src/stores/app-store';
-import { configurePlaybackAudioSession } from 'src/services/audio-session';
-import { restartAudioFromSystemControls } from 'src/services/system-media-resume';
+import { configurePlaybackAudioSession, useNativeMediaPlayPause } from 'src/services/audio-session';
 
 const appStore = useAppStore();
 const selectedStoryId = ref<string | null>(null);
@@ -213,25 +212,10 @@ function configureMediaSession() {
   const story = selectedStory.value;
   if (!story || !('mediaSession' in navigator)) return;
   navigator.mediaSession.metadata = new MediaMetadata({ title: story.title, artist: story.reader, album: 'Stories & Tales' });
-  navigator.mediaSession.setActionHandler('play', () => { void resumeStoryFromMediaSession(); });
-  navigator.mediaSession.setActionHandler('pause', () => {
-    audioElement.value?.pause();
-    setMediaSessionPlaybackState('paused');
-  });
+  useNativeMediaPlayPause(navigator.mediaSession);
   navigator.mediaSession.setActionHandler('seekbackward', () => seek(Math.max(0, currentTime.value - 10)));
   navigator.mediaSession.setActionHandler('seekforward', () => seek(Math.min(duration.value, currentTime.value + 10)));
   navigator.mediaSession.setActionHandler('seekto', (details) => seek(details.seekTime ?? null));
-}
-async function resumeStoryFromMediaSession() {
-  const audio = audioElement.value;
-  if (!audio) return;
-  configurePlaybackAudioSession();
-  try {
-    await restartAudioFromSystemControls(audio);
-    setMediaSessionPlaybackState('playing');
-  } catch {
-    setMediaSessionPlaybackState('paused');
-  }
 }
 function setMediaSessionPlaybackState(state: 'none' | 'paused' | 'playing') {
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = state;

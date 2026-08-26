@@ -83,8 +83,7 @@ import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineAudio } fr
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import { recordContentEngagement, syncContentEngagement } from 'src/services/content-engagement';
 import { useAppStore } from 'src/stores/app-store';
-import { configurePlaybackAudioSession } from 'src/services/audio-session';
-import { restartAudioFromSystemControls } from 'src/services/system-media-resume';
+import { configurePlaybackAudioSession, useNativeMediaPlayPause } from 'src/services/audio-session';
 
 const appStore = useAppStore();
 const audioElement = ref<HTMLAudioElement | null>(null);
@@ -230,24 +229,9 @@ function recordAudioEngagement(type: 'started' | 'finished' | 'full-play') {
 }
 function configureMediaSession() {
   if (!('mediaSession' in navigator)) return;
-  navigator.mediaSession.setActionHandler('play', () => { void resumeAudioFromMediaSession(); });
-  navigator.mediaSession.setActionHandler('pause', () => {
-    audioElement.value?.pause();
-    setMediaSessionPlaybackState('paused');
-  });
+  useNativeMediaPlayPause(navigator.mediaSession);
   navigator.mediaSession.setActionHandler('seekbackward', (details) => seekBy(-(details.seekOffset ?? 15)));
   navigator.mediaSession.setActionHandler('seekforward', (details) => seekBy(details.seekOffset ?? 15));
-}
-async function resumeAudioFromMediaSession() {
-  const player = audioElement.value;
-  if (!player) return;
-  configurePlaybackAudioSession();
-  try {
-    await restartAudioFromSystemControls(player);
-    setMediaSessionPlaybackState('playing');
-  } catch {
-    setMediaSessionPlaybackState('paused');
-  }
 }
 function setMediaSessionPlaybackState(state: 'none' | 'paused' | 'playing') {
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = state;

@@ -12,3 +12,8 @@ export function configurePlaybackAudioSession(target: Navigator = navigator): bo
   audioSession.type = 'playback';
   return true;
 }
+
+export function useNativeMediaPlayPause(mediaSession: Pick<MediaSession, 'setActionHandler'>): void {
+  mediaSession.setActionHandler('play', null);
+  mediaSession.setActionHandler('pause', null);
+}
