@@ -83,6 +83,7 @@ import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineAudio } fr
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import { recordContentEngagement, syncContentEngagement } from 'src/services/content-engagement';
 import { useAppStore } from 'src/stores/app-store';
+import { configurePlaybackAudioSession } from 'src/services/audio-session';
 
 const appStore = useAppStore();
 const audioElement = ref<HTMLAudioElement | null>(null);
@@ -103,6 +104,7 @@ let playbackCycleFinished = false;
 let lastObservedPlaybackPosition = 0;
 
 onMounted(async () => {
+  configurePlaybackAudioSession();
   cachedUrls.value = await getCachedAudioUrls();
   window.addEventListener('online', updateOnlineState);
   window.addEventListener('offline', updateOnlineState);
@@ -177,6 +179,7 @@ function saveProgress() {
 }
 function readProgress(id: string) { const saved = Number(localStorage.getItem(`mentor-ai:audio-progress:${id}`)); return Number.isFinite(saved) && saved > 0 ? saved : 0; }
 function handlePlay() {
+  configurePlaybackAudioSession();
   isPlaying.value = true;
   setMediaSessionPlaybackState('playing');
   if (playbackCycleActive || !selectedAudio.value) return;
@@ -237,6 +240,7 @@ function configureMediaSession() {
 async function resumeAudioFromMediaSession() {
   const player = audioElement.value;
   if (!player) return;
+  configurePlaybackAudioSession();
   try {
     await player.play();
     setMediaSessionPlaybackState('playing');
