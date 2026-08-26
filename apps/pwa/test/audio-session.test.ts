@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { configurePlaybackAudioSession } from '../src/services/audio-session.js';
+import { configurePlaybackAudioSession, isIosStandalone } from '../src/services/audio-session.js';
 
 describe('audio session', () => {
   it('declares long-form playback to iOS before audio starts', () => {
@@ -15,5 +15,11 @@ describe('audio session', () => {
 
   it('falls back safely in browsers without the Audio Session API', () => {
     assert.equal(configurePlaybackAudioSession({} as Navigator), false);
+  });
+
+  it('detects an iPhone Home Screen web app', () => {
+    assert.equal(isIosStandalone({ userAgent: 'Mozilla/5.0 (iPhone)', standalone: true } as unknown as Navigator), true);
+    assert.equal(isIosStandalone({ userAgent: 'Mozilla/5.0 (iPhone)', standalone: false } as unknown as Navigator), false);
+    assert.equal(isIosStandalone({ userAgent: 'Mozilla/5.0 (Macintosh)', standalone: true } as unknown as Navigator), false);
   });
 });

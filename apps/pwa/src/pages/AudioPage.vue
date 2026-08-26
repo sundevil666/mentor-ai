@@ -62,6 +62,15 @@
           </div>
           <div class="audio-player__actions">
             <a :href="selectedAudio.articleUrl" target="_blank" rel="noopener">Transcript and source <q-icon name="open_in_new" /></a>
+            <q-btn
+              v-if="isIosStandalone()"
+              color="primary"
+              icon="open_in_new"
+              label="Open in Safari for lock-screen audio"
+              no-caps
+              outline
+              @click="openAudioInSafari"
+            />
           </div>
         </section>
         <div class="audio-detail__offline-action">
@@ -83,7 +92,7 @@ import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineAudio } fr
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import { recordContentEngagement, syncContentEngagement } from 'src/services/content-engagement';
 import { useAppStore } from 'src/stores/app-store';
-import { configurePlaybackAudioSession, useRecoveringMediaPlayPause } from 'src/services/audio-session';
+import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 
 const appStore = useAppStore();
 const audioElement = ref<HTMLAudioElement | null>(null);
@@ -110,6 +119,9 @@ onMounted(async () => {
   window.addEventListener('offline', updateOnlineState);
   configureMediaSession();
   void syncContentEngagement().catch(() => undefined);
+  const requestedAudioId = new URLSearchParams(window.location.search).get('audio');
+  const requestedAudio = audioLibrary.find((item) => item.id === requestedAudioId);
+  if (requestedAudio) await selectAudio(requestedAudio);
 });
 
 onBeforeUnmount(() => {
@@ -143,6 +155,14 @@ function closeAudio() {
   isPlaying.value = false;
   playbackCycleActive = false;
   playbackCycleFinished = false;
+}
+
+function openAudioInSafari() {
+  if (!selectedAudio.value) return;
+  const url = new URL('/audio', window.location.origin);
+  url.searchParams.set('audio', selectedAudio.value.id);
+  url.searchParams.set('safari-audio', '1');
+  window.open(url, '_blank', 'noopener');
 }
 
 async function downloadAudio(item: LibraryAudio) {

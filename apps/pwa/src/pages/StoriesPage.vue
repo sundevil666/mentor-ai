@@ -61,6 +61,16 @@
             <q-btn v-for="rate in playbackRates" :key="rate" :color="playbackRate === rate ? 'primary' : undefined" :label="`${rate}×`" :outline="playbackRate !== rate" no-caps unelevated @click="setPlaybackRate(rate)" />
           </div>
         </div>
+        <q-btn
+          v-if="isIosStandalone()"
+          class="full-width"
+          color="primary"
+          icon="open_in_new"
+          label="Open this story in Safari for lock-screen audio"
+          no-caps
+          outline
+          @click="openStoryInSafari"
+        />
         <div class="video-detail__body">
           <div class="video-card__meta video-detail__meta">
             <span><q-icon name="school" /> {{ selectedStory.level }}</span>
@@ -109,7 +119,7 @@ import { loadContentProgress, saveContentProgress, syncAllContentProgress } from
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineStory } from 'src/services/offline-library';
 import { deleteOfflineStory, formatStoryDuration, formatStorySize, getCachedStoryUrls, saveStoryOffline, storyLibrary, type LibraryStory } from 'src/services/story-library';
 import { useAppStore } from 'src/stores/app-store';
-import { configurePlaybackAudioSession, useRecoveringMediaPlayPause } from 'src/services/audio-session';
+import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 
 const appStore = useAppStore();
 const selectedStoryId = ref<string | null>(null);
@@ -132,6 +142,8 @@ onMounted(async () => {
   cachedUrls.value = await getCachedStoryUrls();
   engagementSummaries.value = await loadContentEngagementSummaries('audio');
   document.addEventListener('visibilitychange', handleVisibilityChange);
+  const requestedStoryId = new URLSearchParams(window.location.search).get('story');
+  if (requestedStoryId && storyLibrary.some((story) => story.id === requestedStoryId)) await openStory(requestedStoryId);
 });
 onUnmounted(() => {
   persistProgress();
@@ -147,6 +159,14 @@ async function openStory(id: string) {
   configureMediaSession();
 }
 function closeStory() { persistProgress(); audioElement.value?.pause(); selectedStoryId.value = null; clearMediaSession(); }
+function openStoryInSafari() {
+  const story = selectedStory.value;
+  if (!story) return;
+  const url = new URL('/stories', window.location.origin);
+  url.searchParams.set('story', story.id);
+  url.searchParams.set('safari-audio', '1');
+  window.open(url, '_blank', 'noopener');
+}
 async function togglePlayback() {
   const audio = audioElement.value;
   if (!audio) return;

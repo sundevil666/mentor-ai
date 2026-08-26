@@ -4,7 +4,13 @@ type PlaybackAudioSession = {
 
 type NavigatorWithAudioSession = Navigator & {
   audioSession?: PlaybackAudioSession;
+  standalone?: boolean;
 };
+
+export function isIosStandalone(target: Navigator = navigator): boolean {
+  const iosNavigator = target as NavigatorWithAudioSession;
+  return /iPad|iPhone|iPod/.test(target.userAgent) && iosNavigator.standalone === true;
+}
 
 export function configurePlaybackAudioSession(target: Navigator = navigator): boolean {
   const audioSession = (target as NavigatorWithAudioSession).audioSession;
