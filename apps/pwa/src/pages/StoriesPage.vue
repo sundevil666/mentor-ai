@@ -109,7 +109,7 @@ import { loadContentProgress, saveContentProgress, syncAllContentProgress } from
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineStory } from 'src/services/offline-library';
 import { deleteOfflineStory, formatStoryDuration, formatStorySize, getCachedStoryUrls, saveStoryOffline, storyLibrary, type LibraryStory } from 'src/services/story-library';
 import { useAppStore } from 'src/stores/app-store';
-import { configurePlaybackAudioSession, useNativeMediaPlayPause } from 'src/services/audio-session';
+import { configurePlaybackAudioSession, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 
 const appStore = useAppStore();
 const selectedStoryId = ref<string | null>(null);
@@ -213,7 +213,7 @@ function configureMediaSession() {
   const story = selectedStory.value;
   if (!story || !('mediaSession' in navigator)) return;
   navigator.mediaSession.metadata = new MediaMetadata({ title: story.title, artist: story.reader, album: 'Stories & Tales' });
-  useNativeMediaPlayPause(navigator.mediaSession);
+  useRecoveringMediaPlayPause(navigator.mediaSession, () => audioElement.value);
   navigator.mediaSession.setActionHandler('seekbackward', () => seek(Math.max(0, currentTime.value - 10)));
   navigator.mediaSession.setActionHandler('seekforward', () => seek(Math.min(duration.value, currentTime.value + 10)));
   navigator.mediaSession.setActionHandler('seekto', (details) => seek(details.seekTime ?? null));

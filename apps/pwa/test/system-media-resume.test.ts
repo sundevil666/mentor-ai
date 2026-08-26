@@ -1,20 +1,33 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { useNativeMediaPlayPause } from '../src/services/audio-session.js';
+import { useRecoveringMediaPlayPause } from '../src/services/audio-session.js';
 
 describe('system media controls', () => {
-  it('leaves lock-screen play and pause to the native media process', () => {
-    const handlers = new Map<string, unknown>();
+  it('nudges the decoder before resuming from the lock screen', async () => {
+    const handlers = new Map<string, MediaSessionActionHandler | null>();
     const mediaSession = {
       setActionHandler(action: MediaSessionAction, handler: MediaSessionActionHandler | null) {
         handlers.set(action, handler);
       },
     };
+    let playCalls = 0;
+    let pauseCalls = 0;
+    const audio = {
+      currentTime: 26.5,
+      duration: 120,
+      readyState: 4,
+      play: async () => { playCalls += 1; },
+      pause: () => { pauseCalls += 1; },
+    };
 
-    useNativeMediaPlayPause(mediaSession);
+    useRecoveringMediaPlayPause(mediaSession, () => audio as HTMLAudioElement);
+    handlers.get('play')?.({ action: 'play' });
+    await Promise.resolve();
+    handlers.get('pause')?.({ action: 'pause' });
 
-    assert.equal(handlers.get('play'), null);
-    assert.equal(handlers.get('pause'), null);
+    assert.equal(audio.currentTime, 26.51);
+    assert.equal(playCalls, 1);
+    assert.equal(pauseCalls, 1);
   });
 });

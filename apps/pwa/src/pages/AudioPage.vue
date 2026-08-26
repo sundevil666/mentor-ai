@@ -83,7 +83,7 @@ import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineAudio } fr
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import { recordContentEngagement, syncContentEngagement } from 'src/services/content-engagement';
 import { useAppStore } from 'src/stores/app-store';
-import { configurePlaybackAudioSession, useNativeMediaPlayPause } from 'src/services/audio-session';
+import { configurePlaybackAudioSession, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 
 const appStore = useAppStore();
 const audioElement = ref<HTMLAudioElement | null>(null);
@@ -229,7 +229,7 @@ function recordAudioEngagement(type: 'started' | 'finished' | 'full-play') {
 }
 function configureMediaSession() {
   if (!('mediaSession' in navigator)) return;
-  useNativeMediaPlayPause(navigator.mediaSession);
+  useRecoveringMediaPlayPause(navigator.mediaSession, () => audioElement.value);
   navigator.mediaSession.setActionHandler('seekbackward', (details) => seekBy(-(details.seekOffset ?? 15)));
   navigator.mediaSession.setActionHandler('seekforward', (details) => seekBy(details.seekOffset ?? 15));
 }
