@@ -96,7 +96,6 @@ const playbackRates = [0.75, 1, 1.25];
 const repeatEnabled = ref(false);
 const isPlaying = ref(false);
 const isOnline = ref(navigator.onLine);
-let objectUrl: string | null = null;
 let playbackCycleActive = false;
 let playbackCycleStart = 0;
 let playbackCycleHadForwardSeek = false;
@@ -114,15 +113,12 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('online', updateOnlineState);
   window.removeEventListener('offline', updateOnlineState);
-  if (objectUrl) URL.revokeObjectURL(objectUrl);
 });
 
 async function selectAudio(item: LibraryAudio) {
   selectedAudio.value = item;
   markOfflineLessonOpened(item.id, 'audio');
-  if (objectUrl) URL.revokeObjectURL(objectUrl);
   const playback = await resolveAudioPlaybackUrl(item);
-  objectUrl = playback.offline ? playback.url : null;
   playbackUrl.value = playback.url;
   playbackIsOffline.value = playback.offline;
   if (playback.offline && !cachedUrls.value.has(item.sourceUrl)) {
@@ -145,8 +141,6 @@ function closeAudio() {
   isPlaying.value = false;
   playbackCycleActive = false;
   playbackCycleFinished = false;
-  if (objectUrl) URL.revokeObjectURL(objectUrl);
-  objectUrl = null;
 }
 
 async function downloadAudio(item: LibraryAudio) {

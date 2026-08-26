@@ -6,6 +6,7 @@ import {
 } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
 import { NetworkFirst } from 'workbox-strategies';
+import { createCachedMediaResponse } from '../src/services/media-range-response';
 
 declare const self: ServiceWorkerGlobalScope & typeof globalThis;
 
@@ -28,6 +29,7 @@ type StoredAuthSession = {
 };
 
 const learningSyncTag = 'mentor-ai-learning-sync';
+const offlineAudioCacheName = 'mentor-ai-offline-audio-v1';
 const offlineVideoCacheName = 'mentor-ai-offline-videos-v1';
 
 self.skipWaiting();
@@ -71,14 +73,19 @@ self.addEventListener('message', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.destination !== 'video' || event.request.method !== 'GET') {
+  const mediaCacheName = event.request.destination === 'audio'
+    ? offlineAudioCacheName
+    : event.request.destination === 'video'
+      ? offlineVideoCacheName
+      : null;
+  if (!mediaCacheName || event.request.method !== 'GET') {
     return;
   }
 
   event.respondWith(
-    caches.open(offlineVideoCacheName).then(async (cache) => {
+    caches.open(mediaCacheName).then(async (cache) => {
       const cached = await cache.match(event.request.url, { ignoreVary: true });
-      return cached ?? fetch(event.request);
+      return cached ? createCachedMediaResponse(event.request, cached) : fetch(event.request);
     }),
   );
 });

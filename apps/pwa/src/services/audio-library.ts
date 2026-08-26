@@ -76,7 +76,10 @@ export async function resolveAudioPlaybackUrl(audio: LibraryAudio): Promise<{ ur
   if (!('caches' in window)) return { url: audio.sourceUrl, offline: false };
   const response = await (await caches.open(offlineAudioCacheName)).match(audio.sourceUrl, { ignoreVary: true });
   if (!response) return { url: audio.sourceUrl, offline: false };
-  return { url: URL.createObjectURL(await response.blob()), offline: true };
+  // Keep a stable HTTPS media URL so iOS can hand playback to its native
+  // media process while the PWA is suspended. The service worker serves the
+  // cached response for this URL when an offline copy exists.
+  return { url: audio.sourceUrl, offline: true };
 }
 
 export function formatAudioDuration(seconds: number) {
