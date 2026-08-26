@@ -1856,6 +1856,13 @@ body .q-menu {
 }
 
 @media (max-width: 640px) {
+  .update-log-menu {
+    left: max(12px, env(safe-area-inset-left)) !important;
+    max-width: none !important;
+    right: max(12px, env(safe-area-inset-right)) !important;
+    width: auto;
+  }
+
   .app-header .q-toolbar {
     gap: 2px;
     min-height: calc(54px + env(safe-area-inset-top));
