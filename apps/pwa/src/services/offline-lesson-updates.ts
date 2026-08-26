@@ -4,17 +4,17 @@ import {
   cleanupExpiredOfflineLessons,
   getOfflineLessonContentVersion,
   readOfflineLessons,
-  registerOfflineVideo,
+  registerOfflineStory,
   registerOfflineAudio,
   selectStaleOfflineAudio,
-  selectStaleOfflineVideos,
+  selectStaleOfflineStories,
   registerOfflineSpeechLesson,
   removeOfflineLesson,
   refreshOfflineSizes,
   registerOfflineGeneratedLesson,
 } from './offline-library.js';
 import { isSpeechBatchCached, preloadSpeechBatch } from './speech-synthesis.js';
-import { getCachedVideoUrls, saveVideoOffline, videoLibrary } from './video-library.js';
+import { getCachedStoryUrls, saveStoryOffline, storyLibrary } from './story-library.js';
 import { audioLibrary, getCachedAudioUrls, saveAudioOffline } from './audio-library.js';
 
 export type OfflineLessonUpdateStatus = 'idle' | 'checking' | 'downloading' | 'ready' | 'error';
@@ -30,7 +30,7 @@ let state: OfflineLessonUpdateState = { status: 'idle', completed: 0, total: 0, 
 export interface OfflineLessonUpdateResult {
   downloaded: number;
   downloadedLessons: number;
-  downloadedVideos: number;
+  downloadedStories: number;
   downloadedAudio: number;
   current: boolean;
   eventId: string;
@@ -63,7 +63,7 @@ async function performUpdate(loadLesson: (context: LearningContext, createdAt: s
   setState({ status: 'checking', completed: 0, total: 0 });
   try {
     const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
-    const videosDownloaded = await updateVideos();
+    const storiesDownloaded = await updateStories();
     const audioDownloaded = await updateAudio();
     const builtInDownloaded = await updateBuiltInLessons(loadLesson);
     let privateLessonsAvailable = true;
@@ -84,11 +84,11 @@ async function performUpdate(loadLesson: (context: LearningContext, createdAt: s
       await cleanupExpiredOfflineLessons();
       setState({ status: 'ready', completed: lessons.length, total: lessons.length, lastCheckedAt: new Date().toISOString() });
       return {
-        downloaded: builtInDownloaded + videosDownloaded + audioDownloaded,
+        downloaded: builtInDownloaded + storiesDownloaded + audioDownloaded,
         downloadedLessons: builtInDownloaded,
-        downloadedVideos: videosDownloaded,
+        downloadedStories: storiesDownloaded,
         downloadedAudio: audioDownloaded,
-        current: builtInDownloaded + videosDownloaded + audioDownloaded === 0,
+        current: builtInDownloaded + storiesDownloaded + audioDownloaded === 0,
         eventId,
       };
     }
@@ -107,9 +107,9 @@ async function performUpdate(loadLesson: (context: LearningContext, createdAt: s
     await cleanupExpiredOfflineLessons();
     setState({ status: 'ready', completed: lessons.length, total: lessons.length, lastCheckedAt: new Date().toISOString() });
     return {
-      downloaded: completed + builtInDownloaded + videosDownloaded + audioDownloaded,
+      downloaded: completed + builtInDownloaded + storiesDownloaded + audioDownloaded,
       downloadedLessons: completed + builtInDownloaded,
-      downloadedVideos: videosDownloaded,
+      downloadedStories: storiesDownloaded,
       downloadedAudio: audioDownloaded,
       current: false,
       eventId,
@@ -148,28 +148,28 @@ async function updateAudio() {
   return completed;
 }
 
-async function updateVideos() {
-  const activeVideoIds = new Set(videoLibrary.map((video) => video.id));
-  const staleVideos = selectStaleOfflineVideos(readOfflineLessons(), activeVideoIds);
-  for (const video of staleVideos) await removeOfflineLesson(video);
+async function updateStories() {
+  const activeStoryIds = new Set(storyLibrary.map((story) => story.id));
+  const staleStories = selectStaleOfflineStories(readOfflineLessons(), activeStoryIds);
+  for (const story of staleStories) await removeOfflineLesson(story);
 
-  const cachedUrls = await getCachedVideoUrls();
-  const pending = videoLibrary.filter((video) => !cachedUrls.has(video.sourceUrl));
+  const cachedUrls = await getCachedStoryUrls();
+  const pending = storyLibrary.filter((story) => !cachedUrls.has(new URL(story.sourceUrl, window.location.origin).href));
   let completed = 0;
   let failed = 0;
-  for (const video of pending) {
+  for (const story of pending) {
     setState({ status: 'downloading', completed, total: pending.length });
     try {
-      await saveVideoOffline(video);
-      registerOfflineVideo(video);
+      await saveStoryOffline(story);
+      registerOfflineStory(story);
       completed += 1;
     } catch {
       failed += 1;
     }
     setState({ status: 'downloading', completed, total: pending.length });
   }
-  for (const video of videoLibrary.filter((item) => cachedUrls.has(item.sourceUrl))) registerOfflineVideo(video);
-  if (failed > 0) throw new Error(`${failed} video${failed === 1 ? '' : 's'} could not be saved offline.`);
+  for (const story of storyLibrary.filter((item) => cachedUrls.has(new URL(item.sourceUrl, window.location.origin).href))) registerOfflineStory(story);
+  if (failed > 0) throw new Error(`${failed} audio ${failed === 1 ? 'story' : 'stories'} could not be saved offline.`);
   return completed;
 }
 

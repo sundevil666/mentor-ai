@@ -112,7 +112,7 @@ describe('PWA activity suggestion', () => {
 
     assert.equal(suggestion.mode, 'home');
     assert.equal(suggestion.activityPace, 'active');
-    assert.match(suggestion.reason, /focused video/);
+    assert.match(suggestion.reason, /focused audio story/);
   });
 
   it('shows the synchronized shift using the My Shift timezone', () => {

@@ -4,7 +4,7 @@ import DashboardPage from 'pages/DashboardPage.vue';
 import ErrorNotFound from 'pages/ErrorNotFound.vue';
 import SettingsPage from 'pages/SettingsPage.vue';
 import StatisticsPage from 'pages/StatisticsPage.vue';
-import VideosPage from 'pages/VideosPage.vue';
+import StoriesPage from 'pages/StoriesPage.vue';
 import StoragePage from 'pages/StoragePage.vue';
 import AudioPage from 'pages/AudioPage.vue';
 
@@ -26,11 +26,12 @@ const routes: RouteRecordRaw[] = [
         meta: { routeOrder: 1 },
       },
       {
-        path: 'videos',
-        name: 'videos',
-        component: VideosPage,
+        path: 'stories',
+        name: 'stories',
+        component: StoriesPage,
         meta: { routeOrder: 1 },
       },
+      { path: 'videos', redirect: { name: 'stories' } },
       {
         path: 'storage', name: 'storage', component: StoragePage, meta: { routeOrder: 2 },
       },

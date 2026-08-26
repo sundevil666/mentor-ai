@@ -438,10 +438,10 @@ const primaryNavigationItems: Array<{
     isActive: () => route.name === 'audio',
   },
   {
-    label: 'Video',
-    icon: 'video_library',
-    to: { name: 'videos' },
-    isActive: () => route.name === 'videos',
+    label: 'Stories',
+    icon: 'auto_stories',
+    to: { name: 'stories' },
+    isActive: () => route.name === 'stories',
   },
 ];
 
@@ -479,7 +479,7 @@ async function checkOfflineLessons(showResult: boolean) {
     if (result.downloaded > 0) {
       await appStore.recordLessonUpdateNotification(
         result.downloadedLessons,
-        result.downloadedVideos,
+        result.downloadedStories,
         result.downloadedAudio,
         result.eventId,
       );

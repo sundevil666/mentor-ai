@@ -121,7 +121,7 @@ export function createCurrentActivitySuggestion(
       activityPace: 'active',
       mode: 'home',
       availableMinutes: nextWindow?.recommendedDurationMinutes ?? 10,
-      reason: 'My Shift shows that you are still fresh before work, so this window favors an interactive lesson or focused video.',
+      reason: 'My Shift shows that you are still fresh before work, so this window favors an interactive lesson or focused audio story.',
     };
   }
 
@@ -235,7 +235,7 @@ export function formatActivityMeta(suggestion: ActivitySuggestion): string {
 export function formatPaceLabel(suggestion: ActivitySuggestion): string {
   if (suggestion.mode === 'listening') return 'Audio-first';
   if (suggestion.mode === 'review') return 'Short review';
-  if (suggestion.mode === 'home' && suggestion.activityPace === 'active') return 'Interactive lesson or video';
+  if (suggestion.mode === 'home' && suggestion.activityPace === 'active') return 'Interactive lesson or audio story';
 
   switch (suggestion.activityPace) {
     case 'passive':

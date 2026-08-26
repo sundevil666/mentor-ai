@@ -30,7 +30,7 @@ type StoredAuthSession = {
 
 const learningSyncTag = 'mentor-ai-learning-sync';
 const offlineAudioCacheName = 'mentor-ai-offline-audio-v1';
-const offlineVideoCacheName = 'mentor-ai-offline-videos-v1';
+const offlineStoryCacheName = 'mentor-ai-offline-stories-v1';
 
 self.skipWaiting();
 clientsClaim();
@@ -73,18 +73,14 @@ self.addEventListener('message', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  const mediaCacheName = event.request.destination === 'audio'
-    ? offlineAudioCacheName
-    : event.request.destination === 'video'
-      ? offlineVideoCacheName
-      : null;
-  if (!mediaCacheName || event.request.method !== 'GET') {
+  if (event.request.destination !== 'audio' || event.request.method !== 'GET') {
     return;
   }
 
   event.respondWith(
-    caches.open(mediaCacheName).then(async (cache) => {
-      const cached = await cache.match(event.request.url, { ignoreVary: true });
+    Promise.all([caches.open(offlineStoryCacheName), caches.open(offlineAudioCacheName)]).then(async ([storyCache, audioCache]) => {
+      const cached = await storyCache.match(event.request.url, { ignoreVary: true })
+        ?? await audioCache.match(event.request.url, { ignoreVary: true });
       return cached ? createCachedMediaResponse(event.request, cached) : fetch(event.request);
     }),
   );

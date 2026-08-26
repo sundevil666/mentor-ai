@@ -591,7 +591,7 @@ export const useAppStore = defineStore('app', {
       return notification;
     },
 
-    async recordLessonUpdateNotification(downloadedLessons: number, downloadedVideos: number, downloadedAudio: number, eventId: string) {
+    async recordLessonUpdateNotification(downloadedLessons: number, downloadedStories: number, downloadedAudio: number, eventId: string) {
       const createdAt = now();
       const id = `lessons-${eventId}`;
       const existing = this.updateNotifications.find((notification) => notification.id === id);
@@ -600,7 +600,7 @@ export const useAppStore = defineStore('app', {
         id,
         version: 'offline',
         title: 'Offline content updated',
-        message: `${downloadedLessons} lesson${downloadedLessons === 1 ? '' : 's'}, ${downloadedAudio} audio program${downloadedAudio === 1 ? '' : 's'} and ${downloadedVideos} video${downloadedVideos === 1 ? '' : 's'} downloaded and available offline.`,
+        message: `${downloadedLessons} lesson${downloadedLessons === 1 ? '' : 's'}, ${downloadedAudio} audio program${downloadedAudio === 1 ? '' : 's'} and ${downloadedStories} audio ${downloadedStories === 1 ? 'story' : 'stories'} downloaded and available offline.`,
         createdAt,
         viewedAt: null,
         readAt: null,
