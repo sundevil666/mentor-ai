@@ -86,7 +86,7 @@
         </div>
       </section>
 
-      <p v-if="!selectedStory" class="video-storage-note">{{ offlineSummary }} All four public-domain recordings are bundled with the app.</p>
+      <p v-if="!selectedStory" class="video-storage-note">{{ offlineSummary }} Every public-domain recording is bundled with the app in 30–40 minute listening parts.</p>
     </section>
 
     <nav class="mobile-start-dock" aria-label="Primary navigation">
