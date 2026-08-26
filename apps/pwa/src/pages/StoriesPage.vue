@@ -213,7 +213,8 @@ function configureMediaSession() {
   const story = selectedStory.value;
   if (!story || !('mediaSession' in navigator)) return;
   navigator.mediaSession.metadata = new MediaMetadata({ title: story.title, artist: story.reader, album: 'Stories & Tales' });
-  useRecoveringMediaPlayPause(navigator.mediaSession, () => audioElement.value);
+  const usesNativeIosControls = useRecoveringMediaPlayPause(navigator.mediaSession, () => audioElement.value);
+  if (usesNativeIosControls) return;
   navigator.mediaSession.setActionHandler('seekbackward', () => seek(Math.max(0, currentTime.value - 10)));
   navigator.mediaSession.setActionHandler('seekforward', () => seek(Math.min(duration.value, currentTime.value + 10)));
   navigator.mediaSession.setActionHandler('seekto', (details) => seek(details.seekTime ?? null));

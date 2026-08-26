@@ -18,7 +18,18 @@ type ResumableAudio = Pick<HTMLAudioElement, 'currentTime' | 'duration' | 'pause
 export function useRecoveringMediaPlayPause(
   mediaSession: Pick<MediaSession, 'setActionHandler'>,
   getAudio: () => ResumableAudio | null,
-): void {
+  target: Navigator = navigator,
+): boolean {
+  if (/iPad|iPhone|iPod/.test(target.userAgent)) {
+    // A Home Screen web app can lose its audio decoder when any JavaScript
+    // MediaSession action handler is registered. Leave every remote command
+    // to WebKit's native HTMLAudioElement integration on iOS.
+    for (const action of ['play', 'pause', 'seekbackward', 'seekforward', 'seekto'] as MediaSessionAction[]) {
+      try { mediaSession.setActionHandler(action, null); } catch { /* Older Safari may not expose every action. */ }
+    }
+    return true;
+  }
+
   mediaSession.setActionHandler('play', () => {
     const audio = getAudio();
     if (!audio) return;
@@ -34,4 +45,5 @@ export function useRecoveringMediaPlayPause(
     void audio.play().catch(() => undefined);
   });
   mediaSession.setActionHandler('pause', () => getAudio()?.pause());
+  return false;
 }

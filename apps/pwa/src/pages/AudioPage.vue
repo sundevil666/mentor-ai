@@ -229,7 +229,8 @@ function recordAudioEngagement(type: 'started' | 'finished' | 'full-play') {
 }
 function configureMediaSession() {
   if (!('mediaSession' in navigator)) return;
-  useRecoveringMediaPlayPause(navigator.mediaSession, () => audioElement.value);
+  const usesNativeIosControls = useRecoveringMediaPlayPause(navigator.mediaSession, () => audioElement.value);
+  if (usesNativeIosControls) return;
   navigator.mediaSession.setActionHandler('seekbackward', (details) => seekBy(-(details.seekOffset ?? 15)));
   navigator.mediaSession.setActionHandler('seekforward', (details) => seekBy(details.seekOffset ?? 15));
 }
