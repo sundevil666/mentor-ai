@@ -49,7 +49,7 @@
         </div>
 
         <section class="audio-player" aria-label="Audio player">
-          <audio ref="audioElement" :src="playbackUrl" controls :loop="repeatEnabled" preload="metadata" @ended="handleEnded" @pause="isPlaying = false" @play="handlePlay" @seeking="handleSeeking" @timeupdate="saveProgress" />
+          <audio ref="audioElement" :src="playbackUrl" controls :loop="repeatEnabled" preload="metadata" @ended="handleEnded" @pause="handlePause" @play="handlePlay" @seeking="handleSeeking" @timeupdate="saveProgress" />
           <div class="audio-player__settings">
             <div>
               <strong>Playback speed</strong>
@@ -184,6 +184,7 @@ function saveProgress() {
 function readProgress(id: string) { const saved = Number(localStorage.getItem(`mentor-ai:audio-progress:${id}`)); return Number.isFinite(saved) && saved > 0 ? saved : 0; }
 function handlePlay() {
   isPlaying.value = true;
+  setMediaSessionPlaybackState('playing');
   if (playbackCycleActive || !selectedAudio.value) return;
   playbackCycleActive = true;
   playbackCycleStart = audioElement.value?.currentTime ?? 0;
@@ -191,6 +192,10 @@ function handlePlay() {
   playbackCycleHadForwardSeek = false;
   playbackCycleFinished = false;
   void recordAudioEngagement('started');
+}
+function handlePause() {
+  isPlaying.value = false;
+  setMediaSessionPlaybackState('paused');
 }
 function handleSeeking() {
   const position = audioElement.value?.currentTime ?? 0;
@@ -227,10 +232,26 @@ function recordAudioEngagement(type: 'started' | 'finished' | 'full-play') {
 }
 function configureMediaSession() {
   if (!('mediaSession' in navigator)) return;
-  navigator.mediaSession.setActionHandler('play', () => { void audioElement.value?.play(); });
-  navigator.mediaSession.setActionHandler('pause', () => audioElement.value?.pause());
+  navigator.mediaSession.setActionHandler('play', () => { void resumeAudioFromMediaSession(); });
+  navigator.mediaSession.setActionHandler('pause', () => {
+    audioElement.value?.pause();
+    setMediaSessionPlaybackState('paused');
+  });
   navigator.mediaSession.setActionHandler('seekbackward', (details) => seekBy(-(details.seekOffset ?? 15)));
   navigator.mediaSession.setActionHandler('seekforward', (details) => seekBy(details.seekOffset ?? 15));
+}
+async function resumeAudioFromMediaSession() {
+  const player = audioElement.value;
+  if (!player) return;
+  try {
+    await player.play();
+    setMediaSessionPlaybackState('playing');
+  } catch {
+    setMediaSessionPlaybackState('paused');
+  }
+}
+function setMediaSessionPlaybackState(state: 'none' | 'paused' | 'playing') {
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = state;
 }
 function updateMediaMetadata(item: LibraryAudio) { if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: item.title, artist: 'VOA Learning English', album: 'Mentor AI · Audio' }); }
 function seekBy(seconds: number) { const player = audioElement.value; if (player) player.currentTime = Math.max(0, Math.min(player.duration || Number.MAX_SAFE_INTEGER, player.currentTime + seconds)); }

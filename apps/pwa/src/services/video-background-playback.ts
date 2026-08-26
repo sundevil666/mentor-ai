@@ -15,3 +15,16 @@ export async function startVideoWithBackgroundAudio(
   // user activation on mobile browsers.
   await Promise.all([video.play(), backgroundAudio.play()]);
 }
+
+export async function resumeVideoFromSystemControls(
+  video: VideoPlaybackMedia,
+  backgroundAudio: VideoPlaybackMedia,
+  pageIsHidden: boolean,
+): Promise<void> {
+  if (pageIsHidden) {
+    await backgroundAudio.play();
+    return;
+  }
+
+  await startVideoWithBackgroundAudio(video, backgroundAudio);
+}

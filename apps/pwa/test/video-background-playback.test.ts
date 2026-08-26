@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  resumeVideoFromSystemControls,
   startVideoWithBackgroundAudio,
   type VideoPlaybackMedia,
 } from '../src/services/video-background-playback.js';
@@ -36,6 +37,43 @@ describe('video background playback', () => {
     assert.equal(backgroundAudio.currentTime, 37);
     releaseAudio();
     await playback;
+  });
+
+  it('resumes only the background audio from system controls while the PWA is hidden', async () => {
+    const calls: string[] = [];
+    const video: VideoPlaybackMedia = {
+      currentTime: 37,
+      muted: true,
+      play: async () => { calls.push('video'); },
+    };
+    const backgroundAudio: VideoPlaybackMedia = {
+      currentTime: 37,
+      muted: false,
+      play: async () => { calls.push('audio'); },
+    };
+
+    await resumeVideoFromSystemControls(video, backgroundAudio, true);
+
+    assert.deepEqual(calls, ['audio']);
+  });
+
+  it('resumes synchronized video and audio from system controls in the foreground', async () => {
+    const calls: string[] = [];
+    const video: VideoPlaybackMedia = {
+      currentTime: 21,
+      muted: false,
+      play: async () => { calls.push('video'); },
+    };
+    const backgroundAudio: VideoPlaybackMedia = {
+      currentTime: 19,
+      muted: false,
+      play: async () => { calls.push('audio'); },
+    };
+
+    await resumeVideoFromSystemControls(video, backgroundAudio, false);
+
+    assert.deepEqual(calls, ['video', 'audio']);
+    assert.equal(backgroundAudio.currentTime, 21);
   });
 
 });

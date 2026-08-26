@@ -158,7 +158,7 @@
           :loop="activeRepeat"
           preload="metadata"
           @ended="handleBackgroundAudioEnded"
-          @pause="isVideoPlaybackActive = false"
+          @pause="handleBackgroundAudioPause"
           @play="isVideoPlaybackActive = true"
           @timeupdate="synchronizeVideoToAudio"
         />
@@ -357,7 +357,7 @@ import {
   type VideoPlaybackRate,
 } from 'src/services/video-preferences';
 import { parseWebVtt, type VideoSubtitleCue } from 'src/services/video-subtitles';
-import { startVideoWithBackgroundAudio } from 'src/services/video-background-playback';
+import { resumeVideoFromSystemControls, startVideoWithBackgroundAudio } from 'src/services/video-background-playback';
 
 const appStore = useAppStore();
 const cachedUrls = ref(new Set<string>());
@@ -585,6 +585,12 @@ function handleVideoPlay() {
   shouldResumeAfterVisibilityChange = true;
   beginPlaybackCycleIfNeeded();
   if (audio.paused) void audio.play();
+  setMediaSessionPlaybackState('playing');
+}
+
+function handleBackgroundAudioPause() {
+  isVideoPlaybackActive.value = false;
+  setMediaSessionPlaybackState('paused');
 }
 
 function beginPlaybackCycleIfNeeded() {
@@ -788,14 +794,12 @@ function configureVideoMediaSession(video: LibraryVideo, audio: HTMLAudioElement
     artist: 'Mentor AI',
     album: 'Real English videos',
   });
-  navigator.mediaSession.setActionHandler('play', () => {
-    if (audio.paused) void audio.play();
-    if (!document.hidden) void activeVideoElement.value?.play();
-  });
+  navigator.mediaSession.setActionHandler('play', () => { void resumeVideoFromMediaSession(audio); });
   navigator.mediaSession.setActionHandler('pause', () => {
     shouldResumeAfterVisibilityChange = false;
     audio.pause();
     activeVideoElement.value?.pause();
+    setMediaSessionPlaybackState('paused');
   });
   navigator.mediaSession.setActionHandler('stop', () => stopActiveVideo());
   navigator.mediaSession.setActionHandler('seekbackward', (details) => {
@@ -808,6 +812,22 @@ function configureVideoMediaSession(video: LibraryVideo, audio: HTMLAudioElement
   navigator.mediaSession.setActionHandler('seekto', (details) => {
     if (details.seekTime !== undefined) seekVideoProgress(details.seekTime);
   });
+}
+
+async function resumeVideoFromMediaSession(audio: HTMLAudioElement) {
+  const player = activeVideoElement.value;
+  if (!player) return;
+  shouldResumeAfterVisibilityChange = true;
+  try {
+    await resumeVideoFromSystemControls(player, audio, document.hidden);
+    setMediaSessionPlaybackState('playing');
+  } catch {
+    setMediaSessionPlaybackState('paused');
+  }
+}
+
+function setMediaSessionPlaybackState(state: 'none' | 'paused' | 'playing') {
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = state;
 }
 
 function activeMediaTime() {
@@ -828,6 +848,7 @@ function updateVideoMediaPosition(media: HTMLMediaElement) {
 function clearVideoMediaSession() {
   if (!('mediaSession' in navigator)) return;
   navigator.mediaSession.metadata = null;
+  navigator.mediaSession.playbackState = 'none';
   const actions = ['play', 'pause', 'stop', 'seekbackward', 'seekforward', 'seekto'] as const;
   for (const action of actions) {
     navigator.mediaSession.setActionHandler(action, null);
