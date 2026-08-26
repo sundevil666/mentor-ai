@@ -84,6 +84,7 @@ import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import { recordContentEngagement, syncContentEngagement } from 'src/services/content-engagement';
 import { useAppStore } from 'src/stores/app-store';
 import { configurePlaybackAudioSession } from 'src/services/audio-session';
+import { restartAudioFromSystemControls } from 'src/services/system-media-resume';
 
 const appStore = useAppStore();
 const audioElement = ref<HTMLAudioElement | null>(null);
@@ -242,7 +243,7 @@ async function resumeAudioFromMediaSession() {
   if (!player) return;
   configurePlaybackAudioSession();
   try {
-    await player.play();
+    await restartAudioFromSystemControls(player);
     setMediaSessionPlaybackState('playing');
   } catch {
     setMediaSessionPlaybackState('paused');

@@ -109,6 +109,7 @@ import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineStory } fr
 import { deleteOfflineStory, formatStoryDuration, formatStorySize, getCachedStoryUrls, saveStoryOffline, storyLibrary, type LibraryStory } from 'src/services/story-library';
 import { useAppStore } from 'src/stores/app-store';
 import { configurePlaybackAudioSession } from 'src/services/audio-session';
+import { restartAudioFromSystemControls } from 'src/services/system-media-resume';
 
 const appStore = useAppStore();
 const selectedStoryId = ref<string | null>(null);
@@ -226,7 +227,7 @@ async function resumeStoryFromMediaSession() {
   if (!audio) return;
   configurePlaybackAudioSession();
   try {
-    await audio.play();
+    await restartAudioFromSystemControls(audio);
     setMediaSessionPlaybackState('playing');
   } catch {
     setMediaSessionPlaybackState('paused');
