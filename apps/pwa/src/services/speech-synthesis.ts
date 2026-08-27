@@ -114,6 +114,15 @@ export async function preloadSpeech(text: string) {
   }
 }
 
+export async function getSpeechAudioBlob(
+  text: string,
+  voice: SpeechVoiceProfile = 'mia',
+) {
+  const trimmedText = text.trim();
+  if (!trimmedText) throw new Error('Speech text is required.');
+  return generateSpeech(trimmedText, voice);
+}
+
 export function applySpeechRepeat(audio: Pick<HTMLAudioElement, 'loop'>, repeat = false) {
   audio.loop = repeat;
 }

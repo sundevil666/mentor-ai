@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { createPatternAudioScript, patternLibrary } from '../src/services/pattern-library.js';
+import { createPatternPlaylistWav } from '../src/services/pattern-playlist.js';
 
 describe('phrase pattern library', () => {
   it('starts with one complete reusable pattern rather than placeholder lessons', () => {
@@ -18,4 +19,31 @@ describe('phrase pattern library', () => {
     const script = createPatternAudioScript(pattern);
     for (const example of pattern.examples) assert.equal(script.split(example.phrase).length - 1, 2);
   });
+
+  it('builds one playable WAV with a repetition pause after every phrase', async () => {
+    const first = createFakeAudioBuffer([0.5, -0.5], 2);
+    const second = createFakeAudioBuffer([0.25], 2);
+    const playlist = createPatternPlaylistWav([first, second], 1);
+    const bytes = new Uint8Array(await playlist.arrayBuffer());
+    const view = new DataView(bytes.buffer);
+
+    assert.equal(new TextDecoder().decode(bytes.slice(0, 4)), 'RIFF');
+    assert.equal(new TextDecoder().decode(bytes.slice(8, 12)), 'WAVE');
+    assert.equal(view.getUint32(24, true), 2);
+    assert.equal(view.getUint32(40, true), 14);
+    assert.equal(view.getInt16(44, true), 16_383);
+    assert.equal(view.getInt16(46, true), -16_384);
+    assert.equal(view.getInt16(48, true), 0);
+    assert.equal(view.getInt16(50, true), 0);
+  });
 });
+
+function createFakeAudioBuffer(samples: number[], sampleRate: number) {
+  const data = Float32Array.from(samples);
+  return {
+    numberOfChannels: 1,
+    sampleRate,
+    length: data.length,
+    getChannelData: () => data,
+  };
+}

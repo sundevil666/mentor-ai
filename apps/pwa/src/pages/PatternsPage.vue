@@ -26,15 +26,82 @@
         >
           <span>Keep</span><strong>Could you</strong><span class="pattern-frame__slot">change the action</span><strong>please?</strong>
         </div>
-        <q-btn
-          class="pattern-listen-all"
-          color="primary"
-          :icon="isLessonPlaying ? 'stop' : 'headphones'"
-          :label="isLessonPlaying ? 'Stop audio lesson' : 'Listen to the full lesson'"
-          no-caps
-          :loading="audioLoading"
-          @click="toggleFullLesson"
-        />
+        <section
+          class="pattern-playlist"
+          aria-label="Could you practice playlist"
+        >
+          <div class="pattern-playlist__heading">
+            <div>
+              <span>Hands-free playlist</span>
+              <strong>Could you… · {{ pattern.examples.length }} phrases</strong>
+              <small>Phrase → 4-second pause to repeat → next phrase</small>
+            </div>
+            <q-icon
+              :name="playlistOffline ? 'offline_pin' : 'cloud_download'"
+              size="28px"
+            />
+          </div>
+          <audio
+            v-if="playlistUrl"
+            ref="playlistAudio"
+            :src="playlistUrl"
+            controls
+            :loop="repeatEnabled"
+            preload="metadata"
+            @pause="isLessonPlaying = false"
+            @play="isLessonPlaying = true"
+          />
+          <q-linear-progress
+            v-if="playlistPreparing"
+            color="primary"
+            rounded
+            size="8px"
+            :value="playlistProgress"
+          />
+          <div class="pattern-playlist__actions">
+            <q-btn
+              color="primary"
+              :icon="isLessonPlaying ? 'pause' : 'play_arrow'"
+              :label="isLessonPlaying ? 'Pause' : playlistUrl ? 'Play entire loop' : 'Prepare and play'"
+              no-caps
+              :loading="playlistPreparing"
+              @click="togglePlaylist"
+            />
+            <div class="pattern-playlist__repeat">
+              <span><strong>Repeat</strong><small>Play the complete list again</small></span>
+              <q-toggle
+                v-model="repeatEnabled"
+                color="primary"
+                icon="repeat"
+                aria-label="Repeat playlist"
+                @update:model-value="saveRepeatPreference"
+              />
+            </div>
+            <q-btn
+              v-if="playlistOffline"
+              color="negative"
+              flat
+              icon="delete_outline"
+              label="Remove download"
+              no-caps
+              @click="removePlaylist"
+            />
+            <q-btn
+              v-else
+              color="primary"
+              flat
+              icon="download_for_offline"
+              label="Download offline"
+              no-caps
+              :loading="playlistPreparing"
+              @click="downloadPlaylist"
+            />
+          </div>
+          <span
+            v-if="playlistOffline"
+            class="pattern-playlist__offline"
+          ><q-icon name="check_circle" /> Downloaded. This playlist works without internet.</span>
+        </section>
       </article>
 
       <section
@@ -106,9 +173,11 @@
 
 <script setup lang="ts">
 import { Notify } from 'quasar';
-import { computed, onBeforeUnmount, ref } from 'vue';
-import { createPatternAudioScript, patternLibrary, type PhrasePatternExample } from 'src/services/pattern-library';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { patternLibrary, type PhrasePatternExample } from 'src/services/pattern-library';
 import { speakWithPreferredVoice, stopSpeech } from 'src/services/speech-synthesis';
+import { deletePatternPlaylist, getCachedPatternPlaylist, preparePatternPlaylist } from 'src/services/pattern-playlist';
+import { configurePlaybackAudioSession } from 'src/services/audio-session';
 
 const pattern = patternLibrary[0]!;
 const progressKey = `mentor-ai:pattern-progress:${pattern.id}`;
@@ -116,11 +185,26 @@ const completedIds = ref(readCompletedIds());
 const revealedIds = ref(new Set<string>());
 const playingId = ref<string | null>(null);
 const isLessonPlaying = ref(false);
-const audioLoading = ref(false);
+const playlistAudio = ref<HTMLAudioElement | null>(null);
+const playlistUrl = ref('');
+const playlistOffline = ref(false);
+const playlistPreparing = ref(false);
+const playlistCompleted = ref(0);
+const repeatEnabled = ref(localStorage.getItem(`mentor-ai:pattern-repeat:${pattern.id}`) !== 'false');
 const completedCount = computed(() => completedIds.value.size);
 const progress = computed(() => completedCount.value / pattern.examples.length);
+const playlistProgress = computed(() => playlistCompleted.value / pattern.examples.length);
 
-onBeforeUnmount(stopSpeech);
+onMounted(async () => {
+  const cached = await getCachedPatternPlaylist(pattern.id);
+  if (cached) setPlaylistBlob(cached);
+});
+
+onBeforeUnmount(() => {
+  stopSpeech();
+  playlistAudio.value?.pause();
+  revokePlaylistUrl();
+});
 
 function readCompletedIds() {
   try {
@@ -143,20 +227,75 @@ function toggleCompleted(id: string) {
 }
 
 async function playExample(example: PhrasePatternExample) {
-  stopSpeech(); isLessonPlaying.value = false; playingId.value = example.id;
+  stopPlaylist(); stopSpeech(); playingId.value = example.id;
   const started = await speakWithPreferredVoice(example.phrase, { mediaTitle: pattern.title, onEnd: () => { playingId.value = null; }, onError: showAudioError });
   if (!started) playingId.value = null;
 }
 
-async function toggleFullLesson() {
-  if (isLessonPlaying.value || audioLoading.value) { stopSpeech(); isLessonPlaying.value = false; audioLoading.value = false; return; }
-  stopSpeech(); playingId.value = null; audioLoading.value = true;
-  const started = await speakWithPreferredVoice(createPatternAudioScript(pattern), { mediaTitle: `Pattern: ${pattern.title}`, onEnd: () => { isLessonPlaying.value = false; }, onError: showAudioError });
-  audioLoading.value = false; isLessonPlaying.value = started;
+async function togglePlaylist() {
+  const player = playlistAudio.value;
+  if (player && !player.paused) { player.pause(); return; }
+  stopSpeech();
+  playingId.value = null;
+  if (!playlistUrl.value && !(await ensurePlaylist())) return;
+  await nextTick();
+  configurePlaybackAudioSession();
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: `Pattern: ${pattern.title}`,
+      artist: 'Mentor AI',
+      album: 'Hands-free pattern practice',
+    });
+  }
+  try { await playlistAudio.value?.play(); } catch { showAudioError(); }
+}
+
+async function downloadPlaylist() {
+  if (await ensurePlaylist()) Notify.create({ type: 'positive', icon: 'offline_pin', message: 'Could you playlist downloaded for offline practice.' });
+}
+
+async function ensurePlaylist() {
+  if (playlistUrl.value) return true;
+  playlistPreparing.value = true;
+  playlistCompleted.value = 0;
+  try {
+    const result = await preparePatternPlaylist(pattern, (completed) => { playlistCompleted.value = completed; });
+    setPlaylistBlob(result.blob);
+    return true;
+  } catch { showAudioError(); return false; }
+  finally { playlistPreparing.value = false; }
+}
+
+async function removePlaylist() {
+  stopPlaylist();
+  await deletePatternPlaylist(pattern.id);
+  revokePlaylistUrl();
+  playlistOffline.value = false;
+  Notify.create({ type: 'positive', message: 'Offline playlist removed from this device.' });
+}
+
+function setPlaylistBlob(blob: Blob) {
+  revokePlaylistUrl();
+  playlistUrl.value = URL.createObjectURL(blob);
+  playlistOffline.value = true;
+}
+
+function revokePlaylistUrl() {
+  if (playlistUrl.value) URL.revokeObjectURL(playlistUrl.value);
+  playlistUrl.value = '';
+}
+
+function stopPlaylist() {
+  playlistAudio.value?.pause();
+  isLessonPlaying.value = false;
+}
+
+function saveRepeatPreference() {
+  localStorage.setItem(`mentor-ai:pattern-repeat:${pattern.id}`, String(repeatEnabled.value));
 }
 
 function showAudioError() {
-  playingId.value = null; isLessonPlaying.value = false; audioLoading.value = false;
+  playingId.value = null; isLessonPlaying.value = false; playlistPreparing.value = false;
   Notify.create({ type: 'negative', icon: 'volume_off', message: 'Could not play this phrase', caption: 'Check the connection and try again.' });
 }
 </script>
