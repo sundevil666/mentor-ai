@@ -129,6 +129,10 @@
           <q-tooltip>More</q-tooltip>
           <q-menu anchor="bottom right" self="top right">
             <q-list class="more-nav-menu" dense>
+              <q-item clickable :to="{ name: 'stories' }">
+                <q-item-section avatar><q-icon name="auto_stories" /></q-item-section>
+                <q-item-section>Stories</q-item-section>
+              </q-item>
               <q-item clickable :to="{ name: 'storage' }">
                 <q-item-section avatar><q-icon name="storage" /></q-item-section>
                 <q-item-section>Storage</q-item-section>
@@ -433,16 +437,16 @@ const primaryNavigationItems: Array<{
     isActive: () => route.name === 'dashboard' && route.query.training === 'speaking',
   },
   {
+    label: 'Patterns',
+    icon: 'view_agenda',
+    to: { name: 'patterns' },
+    isActive: () => route.name === 'patterns',
+  },
+  {
     label: 'Audio',
     icon: 'podcasts',
     to: { name: 'audio' },
     isActive: () => route.name === 'audio',
-  },
-  {
-    label: 'Stories',
-    icon: 'auto_stories',
-    to: { name: 'stories' },
-    isActive: () => route.name === 'stories',
   },
 ];
 

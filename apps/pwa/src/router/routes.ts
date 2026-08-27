@@ -7,6 +7,7 @@ import StatisticsPage from 'pages/StatisticsPage.vue';
 import StoriesPage from 'pages/StoriesPage.vue';
 import StoragePage from 'pages/StoragePage.vue';
 import AudioPage from 'pages/AudioPage.vue';
+import PatternsPage from 'pages/PatternsPage.vue';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -18,6 +19,12 @@ const routes: RouteRecordRaw[] = [
         name: 'dashboard',
         component: DashboardPage,
         meta: { routeOrder: 0 },
+      },
+      {
+        path: 'patterns',
+        name: 'patterns',
+        component: PatternsPage,
+        meta: { routeOrder: 1 },
       },
       {
         path: 'audio',
