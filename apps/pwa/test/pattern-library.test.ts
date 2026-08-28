@@ -9,9 +9,17 @@ describe('phrase pattern library', () => {
     assert.equal(patternLibrary.length, 1);
     const pattern = patternLibrary[0]!;
     assert.equal(pattern.id, 'could-you-please');
-    assert.ok(pattern.examples.length >= 6);
+    assert.equal(pattern.examples.length, 20);
     assert.ok(pattern.examples.every((example) => example.phrase.startsWith('Could you ')));
     assert.ok(pattern.examples.every((example) => example.phrase.endsWith(', please?')));
+  });
+
+  it('requires every current and future pattern to contain 20 useful substitutions', () => {
+    for (const pattern of patternLibrary) {
+      assert.equal(pattern.examples.length, 20, `${pattern.id} must contain 20 examples`);
+      assert.equal(new Set(pattern.examples.map((example) => example.id)).size, 20);
+      assert.equal(new Set(pattern.examples.map((example) => example.phrase)).size, 20);
+    }
   });
 
   it('includes every practice phrase twice in the audio drill', () => {
