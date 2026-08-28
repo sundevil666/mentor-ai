@@ -24,37 +24,77 @@
           </div>
 
           <template v-if="selectedLessonLibrary === 'home'">
+          <section class="home-overview" aria-label="Learning progress">
+            <article class="level-card">
+              <div class="level-card__copy">
+                <span>Your level</span>
+                <strong>{{ levelProgress.level }}</strong>
+                <small>{{ levelProgress.percent }}% of {{ levelProgress.level }}</small>
+              </div>
+              <q-circular-progress
+                :value="levelProgress.percent"
+                size="82px"
+                :thickness="0.13"
+                color="primary"
+                track-color="grey-3"
+                show-value
+              >{{ levelProgress.percent }}%</q-circular-progress>
+            </article>
+            <div class="home-metrics">
+              <article v-for="metric in homeMetrics" :key="metric.label" class="home-metric">
+                <q-icon :name="metric.icon" size="22px" />
+                <strong>{{ metric.value }}</strong>
+                <span>{{ metric.label }}</span>
+              </article>
+            </div>
+            <article class="focus-card">
+              <q-icon name="track_changes" size="24px" />
+              <div>
+                <strong>Focus next: {{ weakestSkill.label }}</strong>
+                <span>{{ weakestSkill.reason }}</span>
+              </div>
+            </article>
+          </section>
+
           <article class="priority-lesson">
             <div class="priority-lesson__topline">
-              <span><q-icon name="auto_awesome" /> {{ priorityLesson.phaseLabel }}</span>
-              <strong>{{ currentSuggestion.availableMinutes }} min</strong>
+              <span><q-icon :name="isRecommendedLessonPinned ? 'push_pin' : 'auto_awesome'" /> {{ isRecommendedLessonPinned ? 'Pinned lesson' : 'Do this first' }}</span>
+              <strong>{{ recommendedHomeLesson.minutes }} min</strong>
             </div>
             <div class="priority-lesson__body">
               <div class="priority-lesson__icon">
-                <q-icon :name="recommendedTraining.icon" size="34px" />
+                <q-icon :name="recommendedHomeLesson.mode === 'listening' ? 'headphones' : 'record_voice_over'" size="34px" />
               </div>
               <div>
-                <span class="priority-lesson__skill">Priority · {{ priorityLesson.skillLabel }}</span>
-                <h2>{{ priorityLesson.title }}</h2>
-                <p>{{ priorityLesson.reason }}</p>
+                <span class="priority-lesson__skill">Priority · {{ recommendedHomeLesson.skillLabel }}</span>
+                <h2>{{ recommendedHomeLesson.title }}</h2>
+                <p>{{ recommendedHomeLesson.focus }}</p>
               </div>
             </div>
             <div class="priority-lesson__signals">
               <span>{{ activityMeta }}</span>
               <span>{{ paceLabel }}</span>
-              <span>{{ priorityLesson.evidenceCount }} answers observed</span>
+              <span>{{ recommendedLessonCompletionCount }}× completed</span>
             </div>
-            <ContentMentorFeedback category="lesson" :content-id="priorityContentId" />
-            <q-btn
-              class="priority-lesson__button"
-              color="primary"
-              unelevated
-              no-caps
-              icon-right="arrow_forward"
-              label="Do this lesson first"
-              @click="startPriorityLesson"
-            />
+            <ContentMentorFeedback category="lesson" :content-id="recommendedHomeLesson.templateKey" />
+            <div class="priority-lesson__actions">
+              <q-btn class="priority-lesson__button" color="primary" unelevated no-caps icon-right="arrow_forward" label="Start priority lesson" @click="startRecommendedHomeLesson" />
+              <q-btn color="primary" flat no-caps :icon="isRecommendedLessonPinned ? 'bookmark_remove' : 'push_pin'" :label="isRecommendedLessonPinned ? 'Unpin' : 'Pin lesson'" @click="toggleRecommendedLessonPin" />
+              <q-btn v-if="!isRecommendedLessonPinned" color="primary" flat no-caps icon="swap_horiz" label="Suggest another" @click="suggestNextHomeLesson" />
+            </div>
           </article>
+
+          <section class="lesson-queue" aria-label="Recommended lesson list">
+            <div class="lesson-queue__heading">
+              <div><span>Up next</span><h2>Your lesson plan</h2></div>
+              <small>Automatically reordered after each completed lesson</small>
+            </div>
+            <button v-for="(lesson, index) in homeLessonQueue" :key="lesson.templateKey" type="button" class="lesson-queue__item" @click="startHomeLesson(lesson)">
+              <span class="lesson-queue__number">{{ index + 1 }}</span>
+              <span><strong>{{ lesson.title }}</strong><small>{{ lesson.focus }} · {{ lesson.minutes }} min</small></span>
+              <q-icon :name="lesson.mode === 'listening' ? 'headphones' : 'record_voice_over'" size="22px" />
+            </button>
+          </section>
 
           <q-expansion-item
             v-model="isLessonLibraryVisible"
@@ -607,10 +647,8 @@ import {
   createPriorityLesson,
   createCurrentActivitySuggestion,
   createLearningContext,
-  findTrainingMode,
   formatActivityMeta,
   formatPaceLabel,
-  type TrainingKey,
 } from 'src/services/learning-context';
 import {
   hasActiveSpeechPlayback,
@@ -673,6 +711,7 @@ type ListeningSentenceItem = {
 type TrainingLibraryKey = 'home' | 'listening' | 'speaking';
 type LessonReturnDestination = TrainingLibraryKey | 'specific-lessons';
 type TrainingLibraryLesson = LessonChoice & { mode: 'listening' | 'speaking'; minutes: number };
+type HomeLesson = TrainingLibraryLesson & { skillLabel: string };
 
 const appStore = useAppStore();
 const route = useRoute();
@@ -686,6 +725,8 @@ const isListeningRepeatEnabled = ref(false);
 const isListeningTranslationVisible = ref(false);
 const isListeningPlaylistVisible = ref(false);
 const isLessonLibraryVisible = ref(false);
+const pinnedHomeLessonKey = ref(readHomePreference('mentor-ai:home-pinned-lesson'));
+const skippedHomeLessonKey = ref(readHomePreference('mentor-ai:home-skipped-lesson'));
 const selectedLessonLibrary = ref<TrainingLibraryKey>('home');
 const lessonReturnDestination = ref<LessonReturnDestination>('home');
 const activeEngagementContentId = ref<string | null>(null);
@@ -967,6 +1008,87 @@ const trainingLibraries: Record<'listening' | 'speaking', {
 const activeTrainingLibrary = computed(() =>
   selectedLessonLibrary.value === 'speaking' ? trainingLibraries.speaking : trainingLibraries.listening,
 );
+const allHomeLessons = computed<HomeLesson[]>(() => [
+  ...trainingLibraries.listening.lessons.map((lesson) => ({ ...lesson, skillLabel: 'Listening' })),
+  ...trainingLibraries.speaking.lessons.map((lesson) => ({ ...lesson, skillLabel: 'Speaking' })),
+]);
+const lessonCompletionCounts = computed(() => {
+  const counts = new Map<string, number>();
+  for (const snapshot of appStore.statisticsSnapshots) {
+    const key = snapshot.lessonTemplateKey;
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+});
+const weakestSkill = computed(() => {
+  const skills = [
+    { key: 'listening', label: 'listening', value: appStore.studentModel.listening.score.value },
+    { key: 'speaking', label: 'speaking', value: appStore.studentModel.speaking.score.value },
+    { key: 'vocabulary', label: 'vocabulary', value: appStore.studentModel.vocabulary.score.value },
+    { key: 'grammar', label: 'grammar', value: appStore.studentModel.grammar.score.value },
+  ];
+  const weakest = skills.sort((left, right) => left.value - right.value)[0] ?? skills[0]!;
+  return {
+    ...weakest,
+    reason: `This is currently your lowest skill at ${Math.round(weakest.value * 100)}%.`,
+  };
+});
+const homeLessonQueue = computed(() => {
+  const priorityMode = priorityLesson.value.trainingKey === 'listening' ? 'listening' : 'speaking';
+  return [...allHomeLessons.value].sort((left, right) => {
+    const leftSkipped = left.templateKey === skippedHomeLessonKey.value ? 1 : 0;
+    const rightSkipped = right.templateKey === skippedHomeLessonKey.value ? 1 : 0;
+    if (leftSkipped !== rightSkipped) return leftSkipped - rightSkipped;
+    const leftMode = left.mode === priorityMode ? 0 : 1;
+    const rightMode = right.mode === priorityMode ? 0 : 1;
+    if (leftMode !== rightMode) return leftMode - rightMode;
+    return (lessonCompletionCounts.value.get(left.templateKey) ?? 0)
+      - (lessonCompletionCounts.value.get(right.templateKey) ?? 0);
+  });
+});
+const recommendedHomeLesson = computed(() =>
+  allHomeLessons.value.find((lesson) => lesson.templateKey === pinnedHomeLessonKey.value)
+    ?? homeLessonQueue.value[0]!,
+);
+const isRecommendedLessonPinned = computed(() =>
+  pinnedHomeLessonKey.value === recommendedHomeLesson.value.templateKey,
+);
+const recommendedLessonCompletionCount = computed(() =>
+  lessonCompletionCounts.value.get(recommendedHomeLesson.value.templateKey) ?? 0,
+);
+const levelProgress = computed(() => {
+  const evidence = appStore.studentModel.vocabulary.evidenceCount
+    + appStore.studentModel.grammar.evidenceCount
+    + appStore.studentModel.listening.evidenceCount
+    + appStore.studentModel.speaking.evidenceCount;
+  const average = evidence === 0 ? 0 : (
+    appStore.studentModel.vocabulary.score.value
+    + appStore.studentModel.grammar.score.value
+    + appStore.studentModel.listening.score.value
+    + appStore.studentModel.speaking.score.value
+  ) / 4;
+  const a0Threshold = 0.5;
+  if (average >= a0Threshold) {
+    return {
+      level: 'A1',
+      percent: Math.min(100, Math.round(((average - a0Threshold) / (1 - a0Threshold)) * 100)),
+    };
+  }
+  return { level: 'A0', percent: Math.round((average / a0Threshold) * 100) };
+});
+const homeMetrics = computed(() => {
+  const totals = appStore.statisticsSnapshots.reduce((summary, snapshot) => ({
+    listeningSeconds: summary.listeningSeconds + (snapshot.listeningSeconds ?? 0),
+    activeSeconds: summary.activeSeconds + (snapshot.activeSeconds ?? 0),
+    spokenWords: summary.spokenWords + (snapshot.spokenWords ?? 0),
+  }), { listeningSeconds: 0, activeSeconds: 0, spokenWords: 0 });
+  return [
+    { icon: 'headphones', value: formatHours(totals.listeningSeconds), label: 'listened' },
+    { icon: 'record_voice_over', value: totals.spokenWords.toLocaleString(), label: 'words spoken' },
+    { icon: 'timer', value: formatDuration(totals.activeSeconds), label: 'active practice' },
+    { icon: 'task_alt', value: String(appStore.completedLessonsCount), label: 'lessons done' },
+  ];
+});
 const lessonBackLabel = computed(() => {
   if (lessonReturnDestination.value === 'listening') return 'Back to Listening lessons';
   if (lessonReturnDestination.value === 'speaking') return 'Back to Speaking lessons';
@@ -987,18 +1109,7 @@ function deviceRecommendation(device: PreferredLessonDevice) {
         tooltip: 'iPhone is preferred for convenient listening on the move.',
       };
 }
-const recommendedTraining = computed(() => {
-  const key = priorityLesson.value.trainingKey;
-  const training = findTrainingMode(key);
-
-  return {
-    ...training,
-    label: `Start ${training.shortLabel}`,
-    reason: `${training.reason} ${currentSuggestion.value.reason}`,
-  };
-});
 const priorityLesson = computed(() => createPriorityLesson(appStore.studentModel));
-const priorityContentId = computed(() => `priority:${priorityLesson.value.trainingKey}`);
 async function openTrainingLibrary(library: 'listening' | 'speaking') {
   if (appStore.session) await returnToLessonChoice();
   selectedLessonLibrary.value = library;
@@ -1212,19 +1323,6 @@ async function startWithMode(mode: LearningMode) {
   await appStore.startLesson(createLearningContext(currentSuggestion.value, { mode }));
 }
 
-async function startConcept(concept: LearningConcept) {
-  lessonReturnDestination.value = selectedLessonLibrary.value;
-  answer.value = '';
-  isLessonLibraryVisible.value = false;
-  setForwardTransition();
-  await appStore.startLesson(
-    createLearningContext(currentSuggestion.value, {
-      selectedConcept: concept,
-      manualConceptChoice: true,
-    }),
-  );
-}
-
 async function startLessonChoice(concept: LearningConcept, lessonTemplateKey: string) {
   recordLessonStart(lessonTemplateKey);
   lessonReturnDestination.value = 'specific-lessons';
@@ -1240,18 +1338,25 @@ async function startLessonChoice(concept: LearningConcept, lessonTemplateKey: st
   );
 }
 
-async function startTraining(training: TrainingKey) {
-  if (training === 'vocabulary') {
-    await startConcept('vocabulary');
-    return;
-  }
-
-  await startWithMode(training);
+async function startHomeLesson(lesson: HomeLesson) {
+  lessonReturnDestination.value = 'home';
+  await startLibraryLesson(lesson);
 }
 
-async function startPriorityLesson() {
-  recordLessonStart(priorityContentId.value);
-  await startTraining(priorityLesson.value.trainingKey);
+async function startRecommendedHomeLesson() {
+  await startHomeLesson(recommendedHomeLesson.value);
+}
+
+function toggleRecommendedLessonPin() {
+  pinnedHomeLessonKey.value = isRecommendedLessonPinned.value
+    ? null
+    : recommendedHomeLesson.value.templateKey;
+  saveHomePreference('mentor-ai:home-pinned-lesson', pinnedHomeLessonKey.value);
+}
+
+function suggestNextHomeLesson() {
+  skippedHomeLessonKey.value = recommendedHomeLesson.value.templateKey;
+  saveHomePreference('mentor-ai:home-skipped-lesson', skippedHomeLessonKey.value);
 }
 
 function recordLessonStart(contentId: string) {
@@ -1827,6 +1932,26 @@ function formatClockTime(totalSeconds: number): string {
   const seconds = safeSeconds % 60;
 
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function formatHours(totalSeconds: number): string {
+  return `${(totalSeconds / 3600).toFixed(1)} h`;
+}
+
+function formatDuration(totalSeconds: number): string {
+  if (totalSeconds < 3600) return `${Math.round(totalSeconds / 60)} min`;
+  return `${(totalSeconds / 3600).toFixed(1)} h`;
+}
+
+function readHomePreference(key: string): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  return localStorage.getItem(key);
+}
+
+function saveHomePreference(key: string, value: string | null) {
+  if (typeof localStorage === 'undefined') return;
+  if (value) localStorage.setItem(key, value);
+  else localStorage.removeItem(key);
 }
 
 function findLastNumberIndex(values: number[], maxValue: number): number {

@@ -495,6 +495,10 @@ export interface StatisticsSnapshot {
   speechAttempts: number;
   pronunciationIssueCount: number;
   pronunciationFocus: string[];
+  activeSeconds?: number;
+  listeningSeconds?: number;
+  spokenWords?: number;
+  lessonTemplateKey?: string;
   fatigueSignal: SignalScore;
   learningMode?: LearningMode;
   workShift?: WorkShift;

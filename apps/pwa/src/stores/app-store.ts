@@ -758,6 +758,17 @@ export const useAppStore = defineStore('app', {
       const correct = completed.filter((result) => result.correct).length;
       const responseTime = completed.reduce((sum, result) => sum + result.responseTimeMs, 0);
       const pronunciationIssues = this.session.speechResults.flatMap((result) => result.pronunciationIssues);
+      const activeSeconds = Math.max(
+        0,
+        Math.min(
+          Math.round((Date.parse(createdAt) - Date.parse(this.session.startedAt)) / 1000),
+          Math.round(this.session.lesson.estimatedMinutes * 60 * 2),
+        ),
+      );
+      const spokenWords = this.session.speechResults.reduce(
+        (total, result) => total + countWords(result.heardText ?? ''),
+        0,
+      );
 
       const snapshot: StatisticsSnapshot = {
         id: `statistics-${this.session.id}-${createdAt}`,
@@ -772,6 +783,10 @@ export const useAppStore = defineStore('app', {
         speechAttempts: this.session.events.filter((event) => event.type === 'speech-attempted').length,
         pronunciationIssueCount: pronunciationIssues.length,
         pronunciationFocus: Array.from(new Set(pronunciationIssues.map((issue) => issue.word))).slice(0, 4),
+        activeSeconds,
+        listeningSeconds: this.session.context.mode === 'listening' ? activeSeconds : 0,
+        spokenWords,
+        lessonTemplateKey: this.session.lesson.lessonTemplateKey,
         fatigueSignal: this.studentModel.fatigue,
         learningMode: this.session.context.mode,
         workShift: this.session.context.workShift,
@@ -1288,6 +1303,10 @@ function toLearningEvent(event: QueuedLearningEvent): LearningEvent {
 
 function now(): string {
   return new Date().toISOString();
+}
+
+function countWords(value: string): number {
+  return value.trim().match(/[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu)?.length ?? 0;
 }
 
 function createSessionId(createdAt: string): string {
