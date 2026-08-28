@@ -10,6 +10,10 @@ Mentor AI is a personal AI English learning platform built as a production-orien
 - `docs` - architecture and operating notes.
 - `.ai/private` - local personal data directory ignored by Git.
 
+The product and engineering contract for private book import, cross-device reading,
+reading-aloud analysis, and AI Teacher mentoring is documented in
+[`docs/19-personal-book-reading-mentor.md`](docs/19-personal-book-reading-mentor.md).
+
 ## Current PWA Scope
 
 The PWA can run a complete practical learning session without the API:
