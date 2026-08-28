@@ -65,7 +65,13 @@ The first production identity slice should add Google OAuth with these boundarie
 - logout keeps local offline evidence available unless the student explicitly clears the device;
 - API requests should carry a server-validated session token, never a client-trusted student ID.
 
-The current Google sign-in implementation uses `GOOGLE_CLIENT_ID`, `GOOGLE_ALLOWED_EMAILS`, and `GOOGLE_SESSION_SECRET`. When those variables are set, cloud learning routes require a valid Google sign-in session and only allow emails from the allowlist. Each allowed Google account is mapped to an internal user ID and stored under its own private learning-state file.
+The current Google sign-in implementation uses `GOOGLE_CLIENT_ID`, `GOOGLE_ALLOWED_EMAILS`, and `GOOGLE_SESSION_SECRET`. When `GOOGLE_CLIENT_ID` and `GOOGLE_ALLOWED_EMAILS` are set, `GOOGLE_SESSION_SECRET` is required and must contain at least 32 characters; the API refuses to start with a missing or shorter secret. Generate a strong secret without printing it in application logs, then store the generated value in the deployment environment:
+
+```sh
+openssl rand -base64 48
+```
+
+Cloud learning routes then require a valid Google sign-in session and only allow emails from the allowlist. Each allowed Google account is mapped to an internal user ID and stored under its own private learning-state file. Leave the Google variables unset to run the local demo mode without Google authentication. `LESSON_IMPORT_TOKEN` is independent and is never used to sign Google sessions.
 
 My Shift schedule context is enabled with `MY_SHIFT_CLIENT_ID`. Register the production callback
 `https://<mentor-host>/settings` (and the equivalent local HTTPS callback when needed) in My Shift,

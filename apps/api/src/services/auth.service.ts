@@ -113,6 +113,10 @@ function createSessionToken(user: AuthenticatedUser): string {
 }
 
 function signPayload(payloadBase64: string): string {
+  if (!config.googleSessionSecret) {
+    throw new Error('Google session signing is unavailable because GOOGLE_SESSION_SECRET is not configured.');
+  }
+
   return crypto.createHmac('sha256', config.googleSessionSecret).update(payloadBase64).digest('base64url');
 }
 

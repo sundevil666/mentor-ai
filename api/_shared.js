@@ -1,5 +1,7 @@
 const crypto = require('node:crypto');
 
+validateGoogleAuthConfiguration(process.env);
+
 exports.sendJson = (response, statusCode, data) => {
   response.statusCode = statusCode;
   response.setHeader('Content-Type', 'application/json');
@@ -158,10 +160,39 @@ function verifySessionToken(token) {
 }
 
 function signPayload(payloadBase64) {
-  return crypto
-    .createHmac('sha256', process.env.GOOGLE_SESSION_SECRET || process.env.LESSON_IMPORT_TOKEN || 'mentor-ai-dev-secret')
-    .update(payloadBase64)
-    .digest('base64url');
+  const googleSessionSecret = process.env.GOOGLE_SESSION_SECRET;
+
+  if (!googleSessionSecret) {
+    throw new Error('Google session signing is unavailable because GOOGLE_SESSION_SECRET is not configured.');
+  }
+
+  return crypto.createHmac('sha256', googleSessionSecret).update(payloadBase64).digest('base64url');
+}
+
+function validateGoogleAuthConfiguration(environment) {
+  const googleClientId = environment.GOOGLE_CLIENT_ID && environment.GOOGLE_CLIENT_ID.trim();
+  const googleAllowedEmails = (environment.GOOGLE_ALLOWED_EMAILS || '')
+    .split(',')
+    .map((email) => email.trim())
+    .filter(Boolean);
+
+  if (!googleClientId || googleAllowedEmails.length === 0) {
+    return;
+  }
+
+  const googleSessionSecret = environment.GOOGLE_SESSION_SECRET;
+
+  if (!googleSessionSecret) {
+    throw new Error(
+      'Invalid Google authentication configuration: GOOGLE_SESSION_SECRET is required when GOOGLE_CLIENT_ID and GOOGLE_ALLOWED_EMAILS are configured.',
+    );
+  }
+
+  if (googleSessionSecret.length < 32) {
+    throw new Error(
+      'Invalid Google authentication configuration: GOOGLE_SESSION_SECRET must be at least 32 characters long.',
+    );
+  }
 }
 
 function createUserId(stableGoogleSubject) {
