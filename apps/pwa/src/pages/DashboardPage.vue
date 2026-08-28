@@ -631,6 +631,7 @@ import {
 } from 'src/services/user-preferences';
 import { useAppStore } from 'src/stores/app-store';
 import {
+  getSpeechTextsContentVersion,
   isOfflineSpeechLessonUpdateAvailable,
   markOfflineLessonOpened,
   readOfflineLessons,
@@ -1439,6 +1440,10 @@ async function toggleListeningPlayback() {
     return;
   }
 
+  if (!isListeningSpeaking.value && await requireCurrentLessonUpdateBeforePlayback()) {
+    return;
+  }
+
   if (isListeningStarting.value) {
     activeSpeechRunId.value += 1;
     stopSpeech();
@@ -1466,6 +1471,35 @@ async function toggleListeningPlayback() {
   }
 
   await startListeningAtWord(activeWordIndex.value);
+}
+
+async function requireCurrentLessonUpdateBeforePlayback() {
+  const session = appStore.session;
+  const templateKey = session?.lesson.lessonTemplateKey;
+  const mode = session?.context.mode;
+  if (!session || !templateKey || !navigator.onLine || (mode !== 'listening' && mode !== 'speaking')) return false;
+
+  try {
+    const freshLesson = await fetchCurrentLesson(session.context, true);
+    const currentTexts = getLessonOfflineSpeechTexts(session.lesson.exercises);
+    const freshTexts = getLessonOfflineSpeechTexts(freshLesson.exercises);
+    if (getSpeechTextsContentVersion(currentTexts) === getSpeechTextsContentVersion(freshTexts)) return false;
+
+    const choice = trainingLibraries[mode].lessons.find((lesson) => lesson.templateKey === templateKey) ?? {
+      templateKey,
+      title: freshLesson.title,
+      focus: freshLesson.title,
+      mode,
+      minutes: freshLesson.estimatedMinutes,
+    };
+    stopListeningAudio();
+    pendingLessonUpdate.value = { choice, context: session.context, speechTexts: freshTexts };
+    lessonUpdateError.value = '';
+    showLessonUpdateDialog.value = true;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function jumpWord(direction: -1 | 1) {
