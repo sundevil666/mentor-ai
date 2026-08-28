@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import { initialStudentModel, type ActivitySnapshot, type WorkShift } from '@mentor-ai/shared';
 import { inferActivitySuggestion } from '../src/services/activity-suggestion.js';
 import {
+  chooseRecommendedTraining,
   createCurrentActivitySuggestion,
   createPriorityLesson,
   getSynchronizedShiftDisplay,
@@ -84,6 +85,7 @@ describe('PWA activity suggestion', () => {
     assert.equal(suggestion.activityPace, 'passive');
     assert.equal(suggestion.availableMinutes, 30);
     assert.match(suggestion.reason, /commuting/);
+    assert.equal(chooseRecommendedTraining(suggestion, initialStudentModel), 'listening');
   });
 
   it('chooses speaking-friendly practice on a My Shift day off', () => {
@@ -94,6 +96,7 @@ describe('PWA activity suggestion', () => {
     assert.equal(suggestion.mode, 'home');
     assert.equal(suggestion.activityPace, 'deep');
     assert.match(suggestion.reason, /speaking aloud/);
+    assert.equal(chooseRecommendedTraining(suggestion, initialStudentModel), 'speaking');
   });
 
   it('keeps the first hours after a shift short and audio-first', () => {

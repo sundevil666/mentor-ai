@@ -265,11 +265,19 @@ export function createShiftTimingRows(suggestion: ActivitySuggestion): ShiftTimi
 }
 
 export function chooseRecommendedTraining(suggestion: ActivitySuggestion, studentModel: StudentModel): TrainingKey {
-  if (suggestion.mode === 'listening' || suggestion.dayType === 'weekend') {
+  if (suggestion.mode === 'listening') {
     return 'listening';
   }
 
   if (suggestion.activityPace === 'passive' || suggestion.mode === 'review') {
+    return 'listening';
+  }
+
+  if (suggestion.workShift === 'off' || suggestion.activityPace === 'deep') {
+    return 'speaking';
+  }
+
+  if (suggestion.dayType === 'weekend') {
     return 'listening';
   }
 

@@ -579,7 +579,7 @@ import type { LearningMode, PreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
-  createPriorityLesson,
+  chooseRecommendedTraining,
   createCurrentActivitySuggestion,
   createLearningContext,
 } from 'src/services/learning-context';
@@ -938,7 +938,9 @@ const weakestSkill = computed(() => {
   };
 });
 const homeLessonQueue = computed(() => {
-  const priorityMode = priorityLesson.value.trainingKey === 'listening' ? 'listening' : 'speaking';
+  const priorityMode = chooseRecommendedTraining(currentSuggestion.value, appStore.studentModel) === 'listening'
+    ? 'listening'
+    : 'speaking';
   return [...allHomeLessons.value].sort((left, right) => {
     const leftSkipped = left.templateKey === skippedHomeLessonKey.value ? 1 : 0;
     const rightSkipped = right.templateKey === skippedHomeLessonKey.value ? 1 : 0;
@@ -1023,7 +1025,6 @@ function deviceRecommendation(device: PreferredLessonDevice) {
         tooltip: 'iPhone is preferred for convenient listening on the move.',
       };
 }
-const priorityLesson = computed(() => createPriorityLesson(appStore.studentModel));
 async function openTrainingLibrary(library: 'listening' | 'speaking') {
   if (appStore.session) await returnToLessonChoice();
   selectedLessonLibrary.value = library;
