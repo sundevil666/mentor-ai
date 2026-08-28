@@ -12,6 +12,10 @@ export type LibraryAudio = {
 
 export const offlineAudioCacheName = 'mentor-ai-offline-audio-v1';
 
+export function getAudioContentVersion(audio: LibraryAudio) {
+  return hashCatalogItem([audio.sourceUrl, audio.durationSeconds, audio.sizeBytes, audio.publishedAt]);
+}
+
 export const audioLibrary: LibraryAudio[] = [
   {
     id: 'voa-yellowstone-open-boat',
@@ -90,4 +94,14 @@ export function formatAudioDuration(seconds: number) {
 
 export function formatAudioSize(bytes: number) {
   return `${(bytes / 1_000_000).toFixed(1)} MB`;
+}
+
+function hashCatalogItem(parts: Array<string | number>) {
+  const value = JSON.stringify(parts);
+  let hash = 2_166_136_261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return (hash >>> 0).toString(36);
 }

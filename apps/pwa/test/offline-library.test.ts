@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createLessonPlan, generateLessonFromPlan, initialStudentModel, type GeneratedLesson, type LearningContext } from '@mentor-ai/shared';
 import { getSpeechTextsContentVersion, isOfflineSpeechLessonUpdateAvailable, selectExpiredOfflineLessons, selectOfflineLesson, selectOfflineLessonsOverLimit, selectStaleOfflineStories, type OfflineLesson } from '../src/services/offline-library.js';
+import { audioLibrary, getAudioContentVersion } from '../src/services/audio-library.js';
+import { getStoryContentVersion, storyLibrary } from '../src/services/story-library.js';
 
 describe('offline lesson retention', () => {
   it('selects the exact speaking lesson requested by its library card', () => {
@@ -71,6 +73,14 @@ describe('offline lesson retention', () => {
 
     assert.equal(isOfflineSpeechLessonUpdateAvailable(saved, ['Mia: New two minute lesson.']), true);
     assert.equal(isOfflineSpeechLessonUpdateAvailable(saved, saved.speechTexts ?? []), false);
+  });
+
+  it('versions long-form audio and stories from playback-critical metadata', () => {
+    const audio = audioLibrary[0]!;
+    const story = storyLibrary[0]!;
+
+    assert.notEqual(getAudioContentVersion({ ...audio, durationSeconds: audio.durationSeconds + 1 }), getAudioContentVersion(audio));
+    assert.notEqual(getStoryContentVersion({ ...story, sourceUrl: `${story.sourceUrl}?revised=1` }), getStoryContentVersion(story));
   });
 });
 

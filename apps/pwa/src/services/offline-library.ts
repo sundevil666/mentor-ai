@@ -1,6 +1,6 @@
 import { deleteSpeechBatch, getSpeechBatchSize, isSpeechBatchCached, splitSpeechTextIntoSentences } from './speech-synthesis.js';
-import { deleteOfflineStory, type LibraryStory } from './story-library.js';
-import { deleteOfflineAudio, type LibraryAudio } from './audio-library.js';
+import { deleteOfflineStory, getStoryContentVersion, type LibraryStory } from './story-library.js';
+import { deleteOfflineAudio, getAudioContentVersion, type LibraryAudio } from './audio-library.js';
 import type { GeneratedLesson, LearningContext } from '@mentor-ai/shared';
 
 export type OfflineCategory = 'lessons' | 'listening' | 'speaking' | 'audio' | 'stories' | 'videos';
@@ -57,10 +57,10 @@ export async function replaceOfflineSpeechLesson(input: { id: string; category: 
   await deleteUnreferencedSpeechTexts(previous?.speechTexts ?? [], input.speechTexts);
 }
 export function registerOfflineStory(story: LibraryStory) {
-  upsert({ id: story.id, category: 'stories', title: story.title, estimatedBytes: story.sizeBytes, story });
+  upsert({ id: story.id, category: 'stories', title: story.title, contentVersion: getStoryContentVersion(story), estimatedBytes: story.sizeBytes, story });
 }
 export function registerOfflineAudio(audio: LibraryAudio) {
-  upsert({ id: audio.id, category: 'audio', title: audio.title, estimatedBytes: audio.sizeBytes, audio });
+  upsert({ id: audio.id, category: 'audio', title: audio.title, contentVersion: getAudioContentVersion(audio), estimatedBytes: audio.sizeBytes, audio });
 }
 export async function registerOfflineGeneratedLesson(lesson: GeneratedLesson, speechTexts: string[]) {
   const previous = readOfflineLessons().find((item) => item.id === lesson.id && item.category === 'lessons');

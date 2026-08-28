@@ -15,8 +15,8 @@ import {
   registerOfflineGeneratedLesson,
 } from './offline-library.js';
 import { isSpeechBatchCached, preloadSpeechBatch } from './speech-synthesis.js';
-import { getCachedStoryUrls, saveStoryOffline, storyLibrary } from './story-library.js';
-import { audioLibrary, getCachedAudioUrls, saveAudioOffline } from './audio-library.js';
+import { getCachedStoryUrls, getStoryContentVersion, saveStoryOffline, storyLibrary } from './story-library.js';
+import { audioLibrary, getAudioContentVersion, getCachedAudioUrls, saveAudioOffline } from './audio-library.js';
 
 export type OfflineLessonUpdateStatus = 'idle' | 'checking' | 'downloading' | 'ready' | 'error';
 export interface OfflineLessonUpdateState {
@@ -130,7 +130,10 @@ async function updateAudio() {
   }
 
   const cachedUrls = await getCachedAudioUrls();
-  const pending = audioLibrary.filter((audio) => !cachedUrls.has(audio.sourceUrl));
+  const saved = new Map(readOfflineLessons().filter((item) => item.category === 'audio').map((item) => [item.id, item]));
+  const pending = audioLibrary.filter((audio) => (
+    !cachedUrls.has(audio.sourceUrl) || saved.get(audio.id)?.contentVersion !== getAudioContentVersion(audio)
+  ));
   let completed = 0;
   let failed = 0;
   for (const audio of pending) {
@@ -144,7 +147,8 @@ async function updateAudio() {
     }
     setState({ status: 'downloading', completed, total: pending.length });
   }
-  for (const audio of audioLibrary.filter((item) => cachedUrls.has(item.sourceUrl))) {
+  const pendingIds = new Set(pending.map((audio) => audio.id));
+  for (const audio of audioLibrary.filter((item) => cachedUrls.has(item.sourceUrl) && !pendingIds.has(item.id))) {
     registerOfflineAudio(audio);
   }
   if (failed > 0) throw new Error(`${failed} audio program${failed === 1 ? '' : 's'} could not be saved offline.`);
@@ -157,7 +161,11 @@ async function updateStories() {
   for (const story of staleStories) await removeOfflineLesson(story);
 
   const cachedUrls = await getCachedStoryUrls();
-  const pending = storyLibrary.filter((story) => !cachedUrls.has(new URL(story.sourceUrl, window.location.origin).href));
+  const saved = new Map(readOfflineLessons().filter((item) => item.category === 'stories').map((item) => [item.id, item]));
+  const pending = storyLibrary.filter((story) => (
+    !cachedUrls.has(new URL(story.sourceUrl, window.location.origin).href)
+    || saved.get(story.id)?.contentVersion !== getStoryContentVersion(story)
+  ));
   let completed = 0;
   let failed = 0;
   for (const story of pending) {
@@ -171,7 +179,10 @@ async function updateStories() {
     }
     setState({ status: 'downloading', completed, total: pending.length });
   }
-  for (const story of storyLibrary.filter((item) => cachedUrls.has(new URL(item.sourceUrl, window.location.origin).href))) registerOfflineStory(story);
+  const pendingIds = new Set(pending.map((story) => story.id));
+  for (const story of storyLibrary.filter((item) => (
+    cachedUrls.has(new URL(item.sourceUrl, window.location.origin).href) && !pendingIds.has(item.id)
+  ))) registerOfflineStory(story);
   if (failed > 0) throw new Error(`${failed} audio ${failed === 1 ? 'story' : 'stories'} could not be saved offline.`);
   return completed;
 }

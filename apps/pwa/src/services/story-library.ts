@@ -14,6 +14,16 @@ export type LibraryStory = {
 
 export const offlineStoryCacheName = 'mentor-ai-offline-stories-v1';
 
+export function getStoryContentVersion(story: LibraryStory) {
+  const value = JSON.stringify([story.sourceUrl, story.durationSeconds, story.sizeBytes, story.reader]);
+  let hash = 2_166_136_261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
 export const storyLibrary: LibraryStory[] = [
   {
     id: 'aladdin-and-the-magic-lamp',
