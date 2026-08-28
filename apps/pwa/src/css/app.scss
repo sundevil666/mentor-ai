@@ -2510,7 +2510,6 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
 .audio-header p { margin: 0 0 4px; color: var(--category-accent); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
 .audio-header h1 { margin: 0; font-size: clamp(2rem, 7vw, 3rem); line-height: 1.05; }
 .audio-header span, .audio-credit { color: var(--app-muted, #687386); }
-.audio-library-tabs { background: var(--app-surface); border: 1px solid var(--app-border); border-radius: 16px; padding: 4px; }
 .audio-library { display: grid; gap: 14px; }
 .audio-card, .audio-detail { border: 1px solid var(--category-border); border-radius: 20px; background: var(--app-surface); box-shadow: 0 12px 32px rgba(31, 45, 70, 0.08); }
 .audio-card { border-left: 4px solid var(--category-accent); }

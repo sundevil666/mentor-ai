@@ -3,13 +3,11 @@ import { beforeEach, describe, it } from 'node:test';
 
 import {
   clearLastRoutePreference,
-  readAudioLibraryTabPreference,
   readListeningProgressPreference,
   readLastRoutePreference,
   readPreferredWorkShift,
   readThemePreference,
   saveListeningProgressPreference,
-  saveAudioLibraryTabPreference,
   saveLastRoutePreference,
   savePreferredWorkShift,
   saveThemePreference,
@@ -38,13 +36,6 @@ describe('PWA user preferences', () => {
 
     assert.equal(readThemePreference(), 'dark');
     assert.match(document.cookie, /mentor_ai_theme=dark/);
-  });
-
-  it('persists the selected audio library tab in cookies', () => {
-    saveAudioLibraryTabPreference('stories');
-
-    assert.equal(readAudioLibraryTabPreference(), 'stories');
-    assert.match(document.cookie, /mentor_ai_audio_library_tab=stories/);
   });
 
   it('persists the last opened restorable route in cookies', () => {

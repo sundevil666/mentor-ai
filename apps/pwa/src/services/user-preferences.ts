@@ -1,7 +1,6 @@
 import type { WorkShift } from '@mentor-ai/shared';
 
 export type ThemePreference = 'dark' | 'light';
-export type AudioLibraryTab = 'programs' | 'stories';
 
 const cookieMaxAgeSeconds = 60 * 60 * 24 * 365;
 const maxListeningProgressEntries = 100;
@@ -9,10 +8,8 @@ const preferredWorkShiftKey = 'mentor_ai_preferred_work_shift';
 const themeKey = 'mentor_ai_theme';
 const lastRouteKey = 'mentor_ai_last_route';
 const listeningProgressKey = 'mentor_ai_listening_progress';
-const audioLibraryTabKey = 'mentor_ai_audio_library_tab';
 const validWorkShifts = new Set<WorkShift>(['unknown', 'first', 'second', 'third', 'off']);
 const validThemes = new Set<ThemePreference>(['dark', 'light']);
-const validAudioLibraryTabs = new Set<AudioLibraryTab>(['programs', 'stories']);
 const restorableRouteDenyList = new Set(['/settings']);
 
 export interface ListeningProgressPreference {
@@ -36,17 +33,6 @@ export function readThemePreference(): ThemePreference | null {
 
 export function saveThemePreference(theme: ThemePreference) {
   writeCookie(themeKey, theme);
-}
-
-export function readAudioLibraryTabPreference(): AudioLibraryTab | null {
-  const value = readCookie(audioLibraryTabKey);
-  return value !== null && validAudioLibraryTabs.has(value as AudioLibraryTab)
-    ? value as AudioLibraryTab
-    : null;
-}
-
-export function saveAudioLibraryTabPreference(tab: AudioLibraryTab) {
-  writeCookie(audioLibraryTabKey, tab);
 }
 
 export function readLastRoutePreference(): string | null {

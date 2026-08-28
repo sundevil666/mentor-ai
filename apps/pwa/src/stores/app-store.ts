@@ -51,11 +51,8 @@ import {
   type RetentionRecord,
 } from 'src/services/storage-retention';
 import {
-  readAudioLibraryTabPreference,
   readPreferredWorkShift,
-  saveAudioLibraryTabPreference,
   savePreferredWorkShift,
-  type AudioLibraryTab,
 } from 'src/services/user-preferences';
 import { formatDisplayDate } from 'src/services/date-format';
 import { saveContentProgress } from 'src/services/content-progress';
@@ -115,7 +112,6 @@ interface AppState {
   statisticsSnapshots: StatisticsSnapshot[];
   activitySnapshots: ActivitySnapshot[];
   preferredWorkShift: WorkShift;
-  audioLibraryTab: AudioLibraryTab;
   myShiftActivity: MyShiftActivity | null;
   myShiftSyncError: string | null;
   myShiftLastSyncAt: string | null;
@@ -194,7 +190,6 @@ export const useAppStore = defineStore('app', {
     statisticsSnapshots: [],
     activitySnapshots: [],
     preferredWorkShift: 'unknown',
-    audioLibraryTab: readAudioLibraryTabPreference() ?? 'programs',
     myShiftActivity: null,
     myShiftSyncError: null,
     myShiftLastSyncAt: null,
@@ -234,11 +229,6 @@ export const useAppStore = defineStore('app', {
   },
 
   actions: {
-    setAudioLibraryTab(tab: AudioLibraryTab) {
-      this.audioLibraryTab = tab;
-      saveAudioLibraryTabPreference(tab);
-    },
-
     setAvailableAppUpdate(version: string, message?: string) {
       this.availableAppUpdate = { version, message };
     },
