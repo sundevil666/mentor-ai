@@ -49,7 +49,12 @@ export function saveOfflineRetention(category: OfflineCategory, days: RetentionD
   localStorage.setItem(retentionKey, JSON.stringify({ ...readOfflineRetention(), [category]: days }));
 }
 export function registerOfflineSpeechLesson(input: { id: string; category: 'listening' | 'speaking'; title: string; speechTexts: string[] }) {
-  upsert({ ...input, estimatedBytes: input.speechTexts.join('').length * 48 });
+  upsert({ ...input, contentVersion: getSpeechTextsContentVersion(input.speechTexts), estimatedBytes: input.speechTexts.join('').length * 48 });
+}
+export async function replaceOfflineSpeechLesson(input: { id: string; category: 'listening' | 'speaking'; title: string; speechTexts: string[] }) {
+  const previous = readOfflineLessons().find((item) => item.id === input.id && item.category === input.category);
+  registerOfflineSpeechLesson(input);
+  await deleteUnreferencedSpeechTexts(previous?.speechTexts ?? [], input.speechTexts);
 }
 export function registerOfflineStory(story: LibraryStory) {
   upsert({ id: story.id, category: 'stories', title: story.title, estimatedBytes: story.sizeBytes, story });
@@ -58,6 +63,7 @@ export function registerOfflineAudio(audio: LibraryAudio) {
   upsert({ id: audio.id, category: 'audio', title: audio.title, estimatedBytes: audio.sizeBytes, audio });
 }
 export async function registerOfflineGeneratedLesson(lesson: GeneratedLesson, speechTexts: string[]) {
+  const previous = readOfflineLessons().find((item) => item.id === lesson.id && item.category === 'lessons');
   const db = await getMentorDb();
   await db.put('lessons', lesson);
   upsert({
@@ -70,6 +76,7 @@ export async function registerOfflineGeneratedLesson(lesson: GeneratedLesson, sp
     contentVersion: getOfflineLessonContentVersion(lesson),
     estimatedBytes: JSON.stringify(lesson).length * 2,
   });
+  await deleteUnreferencedSpeechTexts(previous?.speechTexts ?? [], speechTexts);
 }
 export function getOfflineLessonContentVersion(lesson: GeneratedLesson) {
   const value = JSON.stringify(lesson);
@@ -79,6 +86,9 @@ export function getOfflineLessonContentVersion(lesson: GeneratedLesson) {
     hash = Math.imul(hash, 16_777_619);
   }
   return (hash >>> 0).toString(36);
+}
+export function getSpeechTextsContentVersion(texts: string[]) {
+  return getStringContentVersion(JSON.stringify(texts.map((text) => text.trim()).filter(Boolean)));
 }
 export async function findOfflineLesson(context: LearningContext): Promise<GeneratedLesson | null> {
   const db = await getMentorDb();
@@ -199,6 +209,23 @@ function splitLessonSpeechTexts(exercises: Array<{ audioText?: string }>) {
     if (!text) return [];
     return splitSpeechTextIntoSentences(text);
   });
+}
+async function deleteUnreferencedSpeechTexts(previousTexts: string[], replacementTexts: string[]) {
+  const replacement = new Set(replacementTexts.map((text) => text.trim()).filter(Boolean));
+  const referenced = new Set(readOfflineLessons().flatMap((lesson) => lesson.speechTexts ?? []).map((text) => text.trim()));
+  const obsolete = previousTexts.filter((text) => {
+    const normalized = text.trim();
+    return normalized && !replacement.has(normalized) && !referenced.has(normalized);
+  });
+  if (obsolete.length > 0) await deleteSpeechBatch(obsolete);
+}
+function getStringContentVersion(value: string) {
+  let hash = 2_166_136_261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return (hash >>> 0).toString(36);
 }
 function saveLessons(lessons: OfflineLesson[]) { localStorage.setItem(lessonsKey, JSON.stringify(lessons)); }
 async function getMentorDb() { return (await import('./indexed-db.js')).mentorDb; }

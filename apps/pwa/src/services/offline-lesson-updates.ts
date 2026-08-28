@@ -3,12 +3,13 @@ import { fetchOfflineLessons } from './api-client.js';
 import {
   cleanupExpiredOfflineLessons,
   getOfflineLessonContentVersion,
+  getSpeechTextsContentVersion,
   readOfflineLessons,
   registerOfflineStory,
   registerOfflineAudio,
   selectStaleOfflineAudio,
   selectStaleOfflineStories,
-  registerOfflineSpeechLesson,
+  replaceOfflineSpeechLesson,
   removeOfflineLesson,
   refreshOfflineSizes,
   registerOfflineGeneratedLesson,
@@ -188,13 +189,16 @@ async function updateBuiltInLessons(
       availableMinutes: 10,
     }, new Date().toISOString());
     const texts = getSpeechTexts(lesson);
-    if (texts.length === 0 || await isSpeechBatchCached(texts)) {
-      if (texts.length > 0) registerOfflineSpeechLesson({ ...item, speechTexts: texts });
+    const saved = readOfflineLessons().find((lesson) => lesson.id === item.id && lesson.category === item.category);
+    const currentVersion = getSpeechTextsContentVersion(texts);
+    if (texts.length === 0 || (saved?.contentVersion === currentVersion && await isSpeechBatchCached(texts))) {
       continue;
     }
-    const result = await preloadSpeechBatch(texts);
-    if (result.failed > 0) throw new Error(`Could not download ${item.title}.`);
-    registerOfflineSpeechLesson({ ...item, speechTexts: texts });
+    if (!(await isSpeechBatchCached(texts))) {
+      const result = await preloadSpeechBatch(texts);
+      if (result.failed > 0) throw new Error(`Could not download ${item.title}.`);
+    }
+    await replaceOfflineSpeechLesson({ ...item, speechTexts: texts });
     downloaded += 1;
   }
   return downloaded;

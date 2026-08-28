@@ -11,19 +11,19 @@ export const privateLessonRepository = {
 
     if (pool) {
       await ensurePrivateLessonsTable();
-      const result = await pool.query<{ lesson: GeneratedLesson; added_at: Date | string }>(
+      const result = await pool.query<{ lesson: GeneratedLesson; changed_at: Date | string }>(
         `
-          SELECT lesson, created_at AS added_at
+          SELECT lesson, updated_at AS changed_at
           FROM private_lessons
-          WHERE is_active = true AND created_at >= $1
-          ORDER BY created_at DESC
+          WHERE is_active = true AND updated_at >= $1
+          ORDER BY updated_at DESC
         `,
         [since.toISOString()],
       );
 
       return result.rows.map((row) => ({
         ...row.lesson,
-        createdAt: new Date(row.added_at).toISOString(),
+        createdAt: new Date(row.changed_at).toISOString(),
       })).filter(isGeneratedLesson);
     }
 

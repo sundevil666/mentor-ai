@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createLessonPlan, generateLessonFromPlan, initialStudentModel, type GeneratedLesson, type LearningContext } from '@mentor-ai/shared';
-import { selectExpiredOfflineLessons, selectOfflineLesson, selectOfflineLessonsOverLimit, selectStaleOfflineStories, type OfflineLesson } from '../src/services/offline-library.js';
+import { getSpeechTextsContentVersion, selectExpiredOfflineLessons, selectOfflineLesson, selectOfflineLessonsOverLimit, selectStaleOfflineStories, type OfflineLesson } from '../src/services/offline-library.js';
 
 describe('offline lesson retention', () => {
   it('selects the exact speaking lesson requested by its library card', () => {
@@ -49,6 +49,13 @@ describe('offline lesson retention', () => {
       { id: 'audio', category: 'listening', title: 'Audio', downloadedAt: '2026-08-20T12:00:00.000Z', lastOpenedAt: '2026-08-20T12:00:00.000Z', estimatedBytes: 10 },
     ];
     assert.deepEqual(selectStaleOfflineStories(lessons, new Set(['current'])).map((item) => item.id), ['legacy']);
+  });
+
+  it('detects changed lesson audio while ignoring harmless surrounding whitespace', () => {
+    const savedVersion = getSpeechTextsContentVersion(['Mia: The old track.']);
+
+    assert.equal(getSpeechTextsContentVersion([' Mia: The old track. ']), savedVersion);
+    assert.notEqual(getSpeechTextsContentVersion(['Mia: The updated track.']), savedVersion);
   });
 });
 
