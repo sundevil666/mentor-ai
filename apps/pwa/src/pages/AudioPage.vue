@@ -18,9 +18,21 @@
         </div>
       </header>
 
-      <section v-if="!selectedAudio" class="audio-library" aria-label="Audio lesson library">
-        <h2 class="audio-library__heading">Programs</h2>
-        <article v-for="item in audioLibrary" :key="item.id" class="audio-card">
+      <template v-if="!selectedAudio">
+        <q-tabs
+          v-model="activeLibraryTab"
+          class="audio-library-tabs"
+          active-color="primary"
+          indicator-color="primary"
+          align="justify"
+          no-caps
+        >
+          <q-tab name="programs" icon="podcasts" label="Programs" />
+          <q-tab name="stories" icon="auto_stories" label="Stories" />
+        </q-tabs>
+
+        <section v-if="activeLibraryTab === 'programs'" class="audio-library" aria-label="Audio programs library">
+          <article v-for="item in audioLibrary" :key="item.id" class="audio-card">
           <button class="audio-card__main" type="button" @click="selectAudio(item)">
             <q-icon name="chevron_right" />
             <span><strong>{{ item.title }}</strong><small>{{ item.description }}</small></span>
@@ -33,10 +45,11 @@
             <q-btn v-else :aria-label="`Save ${item.title} offline`" color="primary" flat icon="download_for_offline" round :disable="!isOnline" :loading="busyId === item.id" @click="downloadAudio(item)" />
           </div>
           <ContentMentorFeedback category="audio" :content-id="item.id" />
-        </article>
+          </article>
+        </section>
 
-        <h2 class="audio-library__heading">Stories &amp; Tales</h2>
-        <article v-for="story in storyLibrary" :key="story.id" class="audio-card">
+        <section v-else class="audio-library" aria-label="Audio stories library">
+          <article v-for="story in storyLibrary" :key="story.id" class="audio-card">
           <router-link
             class="audio-card__main"
             :to="{ name: 'stories', query: { story: story.id } }"
@@ -50,8 +63,9 @@
             <span><q-icon name="storage" /> {{ formatStorySize(story.sizeBytes) }}</span>
           </div>
           <ContentMentorFeedback category="audio" :content-id="story.id" />
-        </article>
-      </section>
+          </article>
+        </section>
+      </template>
 
       <article v-else class="audio-detail" aria-label="Audio lesson">
         <div class="audio-detail__summary">
@@ -104,16 +118,21 @@
 
 <script setup lang="ts">
 import { Notify } from 'quasar';
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { audioLibrary, deleteOfflineAudio, formatAudioDuration, formatAudioSize, getCachedAudioUrls, resolveAudioPlaybackUrl, saveAudioOffline, type LibraryAudio } from 'src/services/audio-library';
 import { formatStoryDuration, formatStorySize, storyLibrary } from 'src/services/story-library';
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineAudio } from 'src/services/offline-library';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import { recordContentEngagement, syncContentEngagement } from 'src/services/content-engagement';
 import { useAppStore } from 'src/stores/app-store';
+import type { AudioLibraryTab } from 'src/services/user-preferences';
 import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 
 const appStore = useAppStore();
+const activeLibraryTab = computed<AudioLibraryTab>({
+  get: () => appStore.audioLibraryTab,
+  set: (tab) => appStore.setAudioLibraryTab(tab),
+});
 const audioElement = ref<HTMLAudioElement | null>(null);
 const selectedAudio = ref<LibraryAudio | null>(null);
 const cachedUrls = ref<Set<string>>(new Set());
