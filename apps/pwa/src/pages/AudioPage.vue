@@ -19,6 +19,7 @@
       </header>
 
       <section v-if="!selectedAudio" class="audio-library" aria-label="Audio lesson library">
+        <h2 class="audio-library__heading">Programs</h2>
         <article v-for="item in audioLibrary" :key="item.id" class="audio-card">
           <button class="audio-card__main" type="button" @click="selectAudio(item)">
             <q-icon name="chevron_right" />
@@ -32,6 +33,23 @@
             <q-btn v-else :aria-label="`Save ${item.title} offline`" color="primary" flat icon="download_for_offline" round :disable="!isOnline" :loading="busyId === item.id" @click="downloadAudio(item)" />
           </div>
           <ContentMentorFeedback category="audio" :content-id="item.id" />
+        </article>
+
+        <h2 class="audio-library__heading">Stories &amp; Tales</h2>
+        <article v-for="story in storyLibrary" :key="story.id" class="audio-card">
+          <router-link
+            class="audio-card__main"
+            :to="{ name: 'stories', query: { story: story.id } }"
+          >
+            <q-icon name="chevron_right" />
+            <span><strong>{{ story.title }}</strong><small>{{ story.description }}</small></span>
+          </router-link>
+          <div class="audio-card__meta">
+            <span><q-icon name="school" /> {{ story.level }}</span>
+            <span><q-icon name="schedule" /> {{ formatStoryDuration(story.durationSeconds) }}</span>
+            <span><q-icon name="storage" /> {{ formatStorySize(story.sizeBytes) }}</span>
+          </div>
+          <ContentMentorFeedback category="audio" :content-id="story.id" />
         </article>
       </section>
 
@@ -79,7 +97,7 @@
         </div>
       </article>
 
-      <p class="audio-credit">Audio and program descriptions: VOA Learning English, public domain. Offline copies stay on this device.</p>
+      <p class="audio-credit">Programs: VOA Learning English. Stories: LibriVox public-domain recordings. Offline copies stay on this device.</p>
     </section>
   </q-page>
 </template>
@@ -88,6 +106,7 @@
 import { Notify } from 'quasar';
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { audioLibrary, deleteOfflineAudio, formatAudioDuration, formatAudioSize, getCachedAudioUrls, resolveAudioPlaybackUrl, saveAudioOffline, type LibraryAudio } from 'src/services/audio-library';
+import { formatStoryDuration, formatStorySize, storyLibrary } from 'src/services/story-library';
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineAudio } from 'src/services/offline-library';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import { recordContentEngagement, syncContentEngagement } from 'src/services/content-engagement';

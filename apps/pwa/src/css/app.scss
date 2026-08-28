@@ -2438,9 +2438,10 @@ body .q-menu {
 .audio-header h1 { margin: 0; font-size: clamp(2rem, 7vw, 3rem); line-height: 1.05; }
 .audio-header span, .audio-credit { color: var(--app-muted, #687386); }
 .audio-library { display: grid; gap: 14px; }
+.audio-library__heading { color: var(--app-text-strong); font-size: 1.15rem; margin: 10px 2px 0; }
 .audio-card, .audio-detail { border: 1px solid rgba(125, 140, 165, 0.2); border-radius: 20px; background: var(--app-surface); box-shadow: 0 12px 32px rgba(31, 45, 70, 0.08); }
 .audio-card { padding: 16px; }
-.audio-card__main { display: flex; width: 100%; align-items: center; gap: 14px; padding: 0; border: 0; color: inherit; text-align: left; background: transparent; cursor: pointer; }
+.audio-card__main { display: flex; width: 100%; align-items: center; gap: 14px; padding: 0; border: 0; color: inherit; text-align: left; text-decoration: none; background: transparent; cursor: pointer; }
 .audio-card__main > .q-icon { flex: 0 0 auto; order: 2; color: var(--q-primary); font-size: 34px; }
 .audio-card__main span { display: grid; flex: 1; gap: 5px; }
 .audio-card__main strong { font-size: 1.08rem; }
