@@ -9,19 +9,36 @@ export interface PatternPlaylistResult {
   offline: boolean;
 }
 
-export async function getCachedPatternPlaylist(patternId: string) {
+export function getPatternPlaylistContentVersion(pattern: PhrasePattern) {
+  const value = JSON.stringify({ phrases: pattern.examples.map((example) => example.phrase), pause: PATTERN_REPEAT_PAUSE_SECONDS });
+  let hash = 2_166_136_261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+export async function getCachedPatternPlaylist(pattern: PhrasePattern) {
   if (!('caches' in window)) return null;
   const response = await (await caches.open(PATTERN_PLAYLIST_CACHE_NAME)).match(
-    createPatternPlaylistRequest(patternId),
+    createPatternPlaylistRequest(pattern),
   );
   return response ? response.blob() : null;
+}
+
+export async function hasOutdatedPatternPlaylist(pattern: PhrasePattern) {
+  if (!('caches' in window)) return false;
+  const cache = await caches.open(PATTERN_PLAYLIST_CACHE_NAME);
+  const currentUrl = createPatternPlaylistRequest(pattern).url;
+  return (await cache.keys()).some((request) => isPatternPlaylistRequest(request, pattern.id) && request.url !== currentUrl);
 }
 
 export async function preparePatternPlaylist(
   pattern: PhrasePattern,
   onProgress?: (completed: number, total: number) => void,
 ): Promise<PatternPlaylistResult> {
-  const cached = await getCachedPatternPlaylist(pattern.id);
+  const cached = await getCachedPatternPlaylist(pattern);
   if (cached) return { blob: cached, offline: true };
 
   const context = new AudioContext();
@@ -37,7 +54,7 @@ export async function preparePatternPlaylist(
     const wav = createPatternPlaylistWav(decoded, PATTERN_REPEAT_PAUSE_SECONDS);
     if ('caches' in window) {
       await (await caches.open(PATTERN_PLAYLIST_CACHE_NAME)).put(
-        createPatternPlaylistRequest(pattern.id),
+        createPatternPlaylistRequest(pattern),
         new Response(wav, { headers: { 'Content-Type': 'audio/wav' } }),
       );
     }
@@ -49,9 +66,19 @@ export async function preparePatternPlaylist(
 
 export async function deletePatternPlaylist(patternId: string) {
   if (!('caches' in window)) return;
-  await (await caches.open(PATTERN_PLAYLIST_CACHE_NAME)).delete(
-    createPatternPlaylistRequest(patternId),
-  );
+  const cache = await caches.open(PATTERN_PLAYLIST_CACHE_NAME);
+  await Promise.all((await cache.keys())
+    .filter((request) => isPatternPlaylistRequest(request, patternId))
+    .map((request) => cache.delete(request)));
+}
+
+export async function deleteOutdatedPatternPlaylists(pattern: PhrasePattern) {
+  if (!('caches' in window)) return;
+  const cache = await caches.open(PATTERN_PLAYLIST_CACHE_NAME);
+  const currentUrl = createPatternPlaylistRequest(pattern).url;
+  await Promise.all((await cache.keys())
+    .filter((request) => isPatternPlaylistRequest(request, pattern.id) && request.url !== currentUrl)
+    .map((request) => cache.delete(request)));
 }
 
 export function createPatternPlaylistWav(
@@ -109,8 +136,14 @@ function encodePcmToWav(channels: Float32Array[], sampleRate: number) {
   return new Blob([buffer], { type: 'audio/wav' });
 }
 
-function createPatternPlaylistRequest(patternId: string) {
-  return new Request(`${window.location.origin}/__pattern-playlist/${encodeURIComponent(patternId)}.wav`);
+function createPatternPlaylistRequest(pattern: PhrasePattern) {
+  const version = getPatternPlaylistContentVersion(pattern);
+  return new Request(`${window.location.origin}/__pattern-playlist/${encodeURIComponent(pattern.id)}-${version}.wav`);
+}
+
+function isPatternPlaylistRequest(request: Request, patternId: string) {
+  const prefix = `${window.location.origin}/__pattern-playlist/${encodeURIComponent(patternId)}`;
+  return request.url === `${prefix}.wav` || request.url.startsWith(`${prefix}-`);
 }
 
 function writeAscii(view: DataView, offset: number, value: string) {

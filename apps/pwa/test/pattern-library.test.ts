@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { createPatternAudioScript, patternLibrary } from '../src/services/pattern-library.js';
-import { createPatternPlaylistWav } from '../src/services/pattern-playlist.js';
+import { createPatternPlaylistWav, getPatternPlaylistContentVersion } from '../src/services/pattern-playlist.js';
 
 describe('phrase pattern library', () => {
   it('starts with one complete reusable pattern rather than placeholder lessons', () => {
@@ -26,6 +26,12 @@ describe('phrase pattern library', () => {
     const pattern = patternLibrary[0]!;
     const script = createPatternAudioScript(pattern);
     for (const example of pattern.examples) assert.equal(script.split(example.phrase).length - 1, 2);
+  });
+
+  it('changes the offline playlist version when its phrases change', () => {
+    const pattern = patternLibrary[0]!;
+    const changed = { ...pattern, examples: pattern.examples.map((example, index) => index === 0 ? { ...example, phrase: `${example.phrase} Updated.` } : example) };
+    assert.notEqual(getPatternPlaylistContentVersion(changed), getPatternPlaylistContentVersion(pattern));
   });
 
   it('builds one playable WAV with a repetition pause after every phrase', async () => {

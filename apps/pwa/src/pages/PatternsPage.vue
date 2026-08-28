@@ -209,6 +209,17 @@
         <q-icon name="tips_and_updates" /> <span>Do not memorize separate sentences. Memorize <strong>{{ selectedPattern?.title }}</strong> and put a new action in the middle.</span>
       </p>
     </section>
+    <q-dialog v-model="showPlaylistUpdateDialog" persistent>
+      <q-card>
+        <q-card-section>
+          <div class="text-h6">Pattern lesson update available</div>
+          <p class="q-mb-none q-mt-sm">The downloaded loop is an older version. Update it before playback to get all {{ selectedPattern?.examples.length }} phrases.</p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn color="primary" icon="system_update_alt" label="Update lesson" no-caps unelevated :loading="playlistPreparing" @click="updatePlaylist" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -218,7 +229,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { patternLibrary, type PhrasePatternExample } from 'src/services/pattern-library';
 import { speakWithPreferredVoice, stopSpeech } from 'src/services/speech-synthesis';
-import { deletePatternPlaylist, getCachedPatternPlaylist, preparePatternPlaylist } from 'src/services/pattern-playlist';
+import { deleteOutdatedPatternPlaylists, deletePatternPlaylist, getCachedPatternPlaylist, hasOutdatedPatternPlaylist, preparePatternPlaylist } from 'src/services/pattern-playlist';
 import { configurePlaybackAudioSession } from 'src/services/audio-session';
 
 const route = useRoute();
@@ -234,6 +245,7 @@ const playlistUrl = ref('');
 const playlistOffline = ref(false);
 const playlistPreparing = ref(false);
 const playlistCompleted = ref(0);
+const showPlaylistUpdateDialog = ref(false);
 const repeatEnabled = ref(true);
 const completedCount = computed(() => completedIds.value.size);
 const progress = computed(() => completedCount.value / (selectedPattern.value?.examples.length ?? 1));
@@ -250,8 +262,11 @@ watch(selectedPattern, async (nextPattern) => {
     ? localStorage.getItem(`mentor-ai:pattern-repeat:${nextPattern.id}`) !== 'false'
     : true;
   if (!nextPattern) return;
-  const cached = await getCachedPatternPlaylist(nextPattern.id);
+  const cached = await getCachedPatternPlaylist(nextPattern);
   if (selectedPattern.value?.id === nextPattern.id && cached) setPlaylistBlob(cached);
+  if (selectedPattern.value?.id === nextPattern.id && !cached && await hasOutdatedPatternPlaylist(nextPattern)) {
+    showPlaylistUpdateDialog.value = true;
+  }
 }, { immediate: true });
 
 onBeforeUnmount(() => {
@@ -307,6 +322,7 @@ async function togglePlaylist() {
   if (!pattern) return;
   const player = playlistAudio.value;
   if (player && !player.paused) { player.pause(); return; }
+  if (showPlaylistUpdateDialog.value) return;
   stopSpeech();
   playingId.value = null;
   if (!playlistUrl.value && !(await ensurePlaylist())) return;
@@ -320,6 +336,14 @@ async function togglePlaylist() {
     });
   }
   try { await playlistAudio.value?.play(); } catch { showAudioError(); }
+}
+
+async function updatePlaylist() {
+  const pattern = selectedPattern.value;
+  if (!pattern || !(await ensurePlaylist())) return;
+  await deleteOutdatedPatternPlaylists(pattern);
+  showPlaylistUpdateDialog.value = false;
+  Notify.create({ type: 'positive', icon: 'offline_pin', message: `${pattern.title} updated and ready offline.` });
 }
 
 async function downloadPlaylist() {
