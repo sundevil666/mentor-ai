@@ -56,95 +56,20 @@
             </article>
           </section>
 
-          <article class="priority-lesson">
-            <div class="priority-lesson__topline">
-              <span><q-icon :name="isRecommendedLessonPinned ? 'push_pin' : 'auto_awesome'" /> {{ isRecommendedLessonPinned ? 'Pinned lesson' : 'Do this first' }}</span>
-              <strong>{{ recommendedHomeLesson.minutes }} min</strong>
-            </div>
-            <div class="priority-lesson__body">
-              <div class="priority-lesson__icon">
-                <q-icon :name="recommendedHomeLesson.mode === 'listening' ? 'headphones' : 'record_voice_over'" size="34px" />
-              </div>
-              <div>
-                <span class="priority-lesson__skill">Priority · {{ recommendedHomeLesson.skillLabel }}</span>
-                <h2>{{ recommendedHomeLesson.title }}</h2>
-                <p>{{ recommendedHomeLesson.focus }}</p>
-              </div>
-            </div>
-            <div class="priority-lesson__signals">
-              <span>{{ activityMeta }}</span>
-              <span>{{ paceLabel }}</span>
-              <span>{{ recommendedLessonCompletionCount }}× completed</span>
-            </div>
-            <ContentMentorFeedback category="lesson" :content-id="recommendedHomeLesson.templateKey" />
-            <div class="priority-lesson__actions">
-              <q-btn class="priority-lesson__button" color="primary" unelevated no-caps icon-right="arrow_forward" label="Start priority lesson" @click="startRecommendedHomeLesson" />
-              <q-btn color="primary" flat no-caps :icon="isRecommendedLessonPinned ? 'bookmark_remove' : 'push_pin'" :label="isRecommendedLessonPinned ? 'Unpin' : 'Pin lesson'" @click="toggleRecommendedLessonPin" />
-              <q-btn v-if="!isRecommendedLessonPinned" color="primary" flat no-caps icon="swap_horiz" label="Suggest another" @click="suggestNextHomeLesson" />
+          <article class="priority-link">
+            <button type="button" class="priority-link__main" @click="startRecommendedHomeLesson">
+              <q-icon :name="recommendedHomeLesson.mode === 'listening' ? 'headphones' : 'record_voice_over'" size="26px" />
+              <span>
+                <small>{{ isRecommendedLessonPinned ? 'Pinned lesson' : 'Do this first' }} · {{ recommendedHomeLesson.minutes }} min</small>
+                <strong>{{ recommendedHomeLesson.title }}</strong>
+              </span>
+              <q-icon name="arrow_forward" size="24px" />
+            </button>
+            <div class="priority-link__actions">
+              <q-btn dense flat no-caps color="primary" :icon="isRecommendedLessonPinned ? 'bookmark_remove' : 'push_pin'" :label="isRecommendedLessonPinned ? 'Unpin' : 'Pin'" @click="toggleRecommendedLessonPin" />
+              <q-btn v-if="!isRecommendedLessonPinned" dense flat no-caps color="primary" icon="swap_horiz" label="Another" @click="suggestNextHomeLesson" />
             </div>
           </article>
-
-          <section class="lesson-queue" aria-label="Recommended lesson list">
-            <div class="lesson-queue__heading">
-              <div><span>Up next</span><h2>Your lesson plan</h2></div>
-              <small>Automatically reordered after each completed lesson</small>
-            </div>
-            <button v-for="(lesson, index) in homeLessonQueue" :key="lesson.templateKey" type="button" class="lesson-queue__item" @click="startHomeLesson(lesson)">
-              <span class="lesson-queue__number">{{ index + 1 }}</span>
-              <span><strong>{{ lesson.title }}</strong><small>{{ lesson.focus }} · {{ lesson.minutes }} min</small></span>
-              <q-icon :name="lesson.mode === 'listening' ? 'headphones' : 'record_voice_over'" size="22px" />
-            </button>
-          </section>
-
-          <q-expansion-item
-            v-model="isLessonLibraryVisible"
-            class="lesson-library-expander"
-            dense-toggle
-            icon="tune"
-            label="Specific lesson"
-            switch-toggle-side
-          >
-            <div class="lesson-library">
-              <section
-                v-for="section in lessonSections"
-                :key="section.concept"
-                class="lesson-library__section"
-              >
-                <div class="lesson-library__heading">
-                  <q-icon :name="section.icon" size="20px" />
-                  <span>{{ section.label }}</span>
-                </div>
-                <div class="lesson-library__grid">
-                  <article
-                    v-for="lesson in section.lessons"
-                    :key="lesson.templateKey"
-                    class="lesson-card"
-                  >
-                    <button
-                      class="lesson-card__body"
-                      type="button"
-                      @click="startLessonChoice(section.concept, lesson.templateKey)"
-                    >
-                      <span class="lesson-card__title">
-                        {{ lesson.title }}
-                        <q-icon
-                          v-if="lesson.preferredDevice"
-                          :name="deviceRecommendation(lesson.preferredDevice).icon"
-                          size="18px"
-                          class="lesson-device-icon"
-                          :aria-label="deviceRecommendation(lesson.preferredDevice).label"
-                        >
-                          <q-tooltip>{{ deviceRecommendation(lesson.preferredDevice).tooltip }}</q-tooltip>
-                        </q-icon>
-                      </span>
-                      <strong>{{ lesson.focus }}</strong>
-                    </button>
-                    <ContentMentorFeedback category="lesson" :content-id="lesson.templateKey" />
-                  </article>
-                </div>
-              </section>
-            </div>
-          </q-expansion-item>
           </template>
 
           <section v-else class="training-library">
@@ -639,16 +564,13 @@
 </template>
 
 <script setup lang="ts">
-import type { LearningConcept, LearningMode, PreferredLessonDevice } from '@mentor-ai/shared';
-import { getPreferredLessonDevice } from '@mentor-ai/shared';
+import type { LearningMode, PreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   createPriorityLesson,
   createCurrentActivitySuggestion,
   createLearningContext,
-  formatActivityMeta,
-  formatPaceLabel,
 } from 'src/services/learning-context';
 import {
   hasActiveSpeechPlayback,
@@ -681,12 +603,6 @@ type LessonChoice = {
   title: string;
   focus: string;
   preferredDevice?: PreferredLessonDevice;
-};
-type LessonSection = {
-  concept: LearningConcept;
-  label: string;
-  icon: string;
-  lessons: LessonChoice[];
 };
 type ListeningToken = {
   index: number;
@@ -947,8 +863,6 @@ const inputLabel = computed(() =>
 const currentSuggestion = computed(() =>
   createCurrentActivitySuggestion(appStore.preferredWorkShift, appStore.activitySnapshots, new Date(), appStore.myShiftActivity),
 );
-const paceLabel = computed(() => formatPaceLabel(currentSuggestion.value));
-const activityMeta = computed(() => formatActivityMeta(currentSuggestion.value));
 const remoteContinueOptions = computed(() =>
   appStore.remoteSessionHandoffs.map((handoff) => ({
     id: handoff.id,
@@ -956,27 +870,6 @@ const remoteContinueOptions = computed(() =>
     detail: `${handoff.lesson.title} · ${Math.min(handoff.currentExerciseIndex + 1, handoff.lesson.exercises.length)}/${handoff.lesson.exercises.length}`,
   })),
 );
-const lessonSections: LessonSection[] = [
-  {
-    concept: 'learning',
-    label: 'Real practice',
-    icon: 'school',
-    lessons: [
-      {
-        templateKey: 'weekly-weak-spots-dialogue',
-        title: 'Work conversation',
-        focus: 'Five complete spoken phrases for a real workday',
-        preferredDevice: getPreferredLessonDevice('weekly-weak-spots-dialogue'),
-      },
-      {
-        templateKey: 'commute-listening',
-        title: 'Commute listening',
-        focus: 'A complete ten-minute listening session',
-        preferredDevice: getPreferredLessonDevice('commute-listening'),
-      },
-    ],
-  },
-];
 const trainingLibraries: Record<'listening' | 'speaking', {
   label: string;
   title: string;
@@ -1052,9 +945,6 @@ const recommendedHomeLesson = computed(() =>
 );
 const isRecommendedLessonPinned = computed(() =>
   pinnedHomeLessonKey.value === recommendedHomeLesson.value.templateKey,
-);
-const recommendedLessonCompletionCount = computed(() =>
-  lessonCompletionCounts.value.get(recommendedHomeLesson.value.templateKey) ?? 0,
 );
 const levelProgress = computed(() => {
   const evidence = appStore.studentModel.vocabulary.evidenceCount
@@ -1321,21 +1211,6 @@ async function startWithMode(mode: LearningMode) {
   isLessonLibraryVisible.value = false;
   setForwardTransition();
   await appStore.startLesson(createLearningContext(currentSuggestion.value, { mode }));
-}
-
-async function startLessonChoice(concept: LearningConcept, lessonTemplateKey: string) {
-  recordLessonStart(lessonTemplateKey);
-  lessonReturnDestination.value = 'specific-lessons';
-  answer.value = '';
-  isLessonLibraryVisible.value = false;
-  setForwardTransition();
-  await appStore.startLesson(
-    createLearningContext(currentSuggestion.value, {
-      selectedConcept: concept,
-      manualConceptChoice: true,
-      lessonTemplateKey,
-    }),
-  );
 }
 
 async function startHomeLesson(lesson: HomeLesson) {
