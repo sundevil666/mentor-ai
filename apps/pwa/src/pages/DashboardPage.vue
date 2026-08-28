@@ -571,11 +571,36 @@
         </section>
       </transition>
     </section>
+
+    <q-dialog v-model="showLessonUpdateDialog" persistent>
+      <q-card class="lesson-update-dialog">
+        <q-card-section>
+          <div class="text-h6">Lesson update available</div>
+          <p class="q-mb-none q-mt-sm">
+            {{ pendingLessonUpdate?.choice.title }} has newer text and audio. Update it before playback so the lesson and voice track match.
+          </p>
+        </q-card-section>
+        <q-card-section v-if="lessonUpdateError" class="text-negative">
+          {{ lessonUpdateError }}
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn
+            color="primary"
+            icon="system_update_alt"
+            label="Update lesson"
+            no-caps
+            unelevated
+            :loading="isLessonUpdateInstalling"
+            @click="installPendingLessonUpdate"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup lang="ts">
-import type { LearningMode, PreferredLessonDevice } from '@mentor-ai/shared';
+import type { LearningContext, LearningMode, PreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
@@ -605,7 +630,14 @@ import {
   saveListeningProgressPreference,
 } from 'src/services/user-preferences';
 import { useAppStore } from 'src/stores/app-store';
-import { markOfflineLessonOpened, registerOfflineSpeechLesson } from 'src/services/offline-library';
+import {
+  isOfflineSpeechLessonUpdateAvailable,
+  markOfflineLessonOpened,
+  readOfflineLessons,
+  registerOfflineSpeechLesson,
+  replaceOfflineSpeechLesson,
+} from 'src/services/offline-library';
+import { fetchCurrentLesson } from 'src/services/api-client';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import { recordContentEngagement, syncContentEngagement } from 'src/services/content-engagement';
 
@@ -639,6 +671,11 @@ type TrainingLibraryKey = 'home' | 'listening' | 'speaking';
 type LessonReturnDestination = TrainingLibraryKey | 'specific-lessons';
 type TrainingLibraryLesson = LessonChoice & { mode: 'listening' | 'speaking'; minutes: number };
 type HomeLesson = TrainingLibraryLesson & { skillLabel: string };
+type PendingLessonUpdate = {
+  choice: TrainingLibraryLesson;
+  context: LearningContext;
+  speechTexts: string[];
+};
 
 const appStore = useAppStore();
 const route = useRoute();
@@ -658,6 +695,10 @@ const selectedLessonLibrary = ref<TrainingLibraryKey>('home');
 const lessonReturnDestination = ref<LessonReturnDestination>('home');
 const activeEngagementContentId = ref<string | null>(null);
 const libraryDownloadStatus = ref<Record<string, 'idle' | 'checking' | 'downloading' | 'ready' | 'error'>>({});
+const showLessonUpdateDialog = ref(false);
+const isLessonUpdateInstalling = ref(false);
+const lessonUpdateError = ref('');
+const pendingLessonUpdate = ref<PendingLessonUpdate | null>(null);
 const offlineAudioStatus = ref<'idle' | 'downloading' | 'ready' | 'error'>('idle');
 const offlineAudioProgress = ref(0);
 const isRecognizingSpeech = ref(false);
@@ -1033,17 +1074,62 @@ async function openTrainingLibrary(library: 'listening' | 'speaking') {
 }
 
 async function startLibraryLesson(lesson: TrainingLibraryLesson) {
+  const context = createLearningContext(currentSuggestion.value, {
+    mode: lesson.mode,
+    selectedConcept: 'learning',
+    manualConceptChoice: true,
+    lessonTemplateKey: lesson.templateKey,
+  });
+  if (navigator.onLine) {
+    try {
+      const freshLesson = await fetchCurrentLesson(context, true);
+      const speechTexts = getLessonOfflineSpeechTexts(freshLesson.exercises);
+      const saved = readOfflineLessons().find((item) => item.id === lesson.templateKey && item.category === lesson.mode);
+      if (isOfflineSpeechLessonUpdateAvailable(saved, speechTexts)) {
+        pendingLessonUpdate.value = { choice: lesson, context, speechTexts };
+        lessonUpdateError.value = '';
+        showLessonUpdateDialog.value = true;
+        return;
+      }
+    } catch {
+      // Opening the previously downloaded lesson remains possible if the update check is unavailable.
+    }
+  }
+  await beginLibraryLesson(lesson, context);
+}
+
+async function beginLibraryLesson(lesson: TrainingLibraryLesson, context: LearningContext) {
   recordLessonStart(lesson.templateKey);
   markOfflineLessonOpened(lesson.templateKey, lesson.mode);
   lessonReturnDestination.value = selectedLessonLibrary.value;
   answer.value = '';
   setForwardTransition();
-  await appStore.startLesson(createLearningContext(currentSuggestion.value, {
-    mode: lesson.mode,
-    selectedConcept: 'learning',
-    manualConceptChoice: true,
-    lessonTemplateKey: lesson.templateKey,
-  }));
+  await appStore.startLesson(context);
+}
+
+async function installPendingLessonUpdate() {
+  const pending = pendingLessonUpdate.value;
+  if (!pending || isLessonUpdateInstalling.value) return;
+  isLessonUpdateInstalling.value = true;
+  lessonUpdateError.value = '';
+  try {
+    const result = await preloadSpeechBatch(pending.speechTexts);
+    if (result.failed > 0) throw new Error('The new audio could not be downloaded. Check the connection and try again.');
+    await replaceOfflineSpeechLesson({
+      id: pending.choice.templateKey,
+      category: pending.choice.mode,
+      title: pending.choice.title,
+      speechTexts: pending.speechTexts,
+    });
+    libraryDownloadStatus.value[pending.choice.templateKey] = 'ready';
+    showLessonUpdateDialog.value = false;
+    pendingLessonUpdate.value = null;
+    await beginLibraryLesson(pending.choice, pending.context);
+  } catch (error) {
+    lessonUpdateError.value = error instanceof Error ? error.message : 'The lesson could not be updated.';
+  } finally {
+    isLessonUpdateInstalling.value = false;
+  }
 }
 
 async function downloadLibraryLesson(lesson: TrainingLibraryLesson) {

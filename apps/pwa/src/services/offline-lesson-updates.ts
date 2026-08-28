@@ -52,14 +52,16 @@ export function subscribeOfflineLessonUpdates(listener: (state: OfflineLessonUpd
 }
 
 export function updateOfflineLessons(
-  loadLesson: (context: LearningContext, createdAt: string) => Promise<GeneratedLesson>,
+  loadLesson: (context: LearningContext, createdAt: string, forceRefresh?: boolean) => Promise<GeneratedLesson>,
 ): Promise<OfflineLessonUpdateResult> {
   if (activeUpdate) return activeUpdate;
   activeUpdate = performUpdate(loadLesson).finally(() => { activeUpdate = null; });
   return activeUpdate;
 }
 
-async function performUpdate(loadLesson: (context: LearningContext, createdAt: string) => Promise<GeneratedLesson>) {
+async function performUpdate(
+  loadLesson: (context: LearningContext, createdAt: string, forceRefresh?: boolean) => Promise<GeneratedLesson>,
+) {
   const eventId = new Date().toISOString();
   setState({ status: 'checking', completed: 0, total: 0 });
   try {
@@ -175,7 +177,7 @@ async function updateStories() {
 }
 
 async function updateBuiltInLessons(
-  loadLesson: (context: LearningContext, createdAt: string) => Promise<GeneratedLesson>,
+  loadLesson: (context: LearningContext, createdAt: string, forceRefresh?: boolean) => Promise<GeneratedLesson>,
 ) {
   let downloaded = 0;
   for (const item of builtInOfflineLessons) {
@@ -187,7 +189,7 @@ async function updateBuiltInLessons(
       isOffline: false,
       speechAvailable: true,
       availableMinutes: 10,
-    }, new Date().toISOString());
+    }, new Date().toISOString(), true);
     const texts = getSpeechTexts(lesson);
     const saved = readOfflineLessons().find((lesson) => lesson.id === item.id && lesson.category === item.category);
     const currentVersion = getSpeechTextsContentVersion(texts);

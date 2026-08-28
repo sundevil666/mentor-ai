@@ -315,11 +315,11 @@ export const useAppStore = defineStore('app', {
       await this.refreshRemoteLearningState();
     },
 
-    async startLesson(context?: LearningContext) {
+    async startLesson(context?: LearningContext, forceRefresh = false) {
       const createdAt = now();
       const learningContext =
         context ?? createDefaultLearningContext(this.activitySnapshots, this.preferredWorkShift, this.myShiftActivity);
-      const lesson = await this.loadLesson(learningContext, createdAt);
+      const lesson = await this.loadLesson(learningContext, createdAt, forceRefresh);
       const sessionId = createSessionId(createdAt);
       const firstExercise = lesson.exercises[0];
       const startedEvent = createLearningEvent(this.studentId, sessionId, lesson, undefined, 'lesson-started', createdAt);
@@ -357,10 +357,10 @@ export const useAppStore = defineStore('app', {
       });
     },
 
-    async loadLesson(context: LearningContext, createdAt: string): Promise<GeneratedLesson> {
+    async loadLesson(context: LearningContext, createdAt: string, forceRefresh = false): Promise<GeneratedLesson> {
       if (navigator.onLine) {
         try {
-          const lesson = await fetchCurrentLesson(context);
+          const lesson = await fetchCurrentLesson(context, forceRefresh);
           logDiagnostic('lesson.loaded', { lessonId: lesson.id, source: 'api' });
           return lesson;
         } catch (error) {

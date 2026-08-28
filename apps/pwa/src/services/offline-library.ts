@@ -90,6 +90,11 @@ export function getOfflineLessonContentVersion(lesson: GeneratedLesson) {
 export function getSpeechTextsContentVersion(texts: string[]) {
   return getStringContentVersion(JSON.stringify(texts.map((text) => text.trim()).filter(Boolean)));
 }
+export function isOfflineSpeechLessonUpdateAvailable(saved: OfflineLesson | undefined, freshTexts: string[]) {
+  if (!saved?.speechTexts?.length) return false;
+  const savedVersion = saved.contentVersion ?? getSpeechTextsContentVersion(saved.speechTexts);
+  return savedVersion !== getSpeechTextsContentVersion(freshTexts);
+}
 export async function findOfflineLesson(context: LearningContext): Promise<GeneratedLesson | null> {
   const db = await getMentorDb();
   const lessons = (await db.getAll('lessons')) as GeneratedLesson[];

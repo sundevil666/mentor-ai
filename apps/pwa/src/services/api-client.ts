@@ -73,14 +73,14 @@ export async function fetchAppConfiguration(): Promise<AppConfiguration> {
   return body.data;
 }
 
-export async function fetchCurrentLesson(context: LearningContext): Promise<GeneratedLesson> {
+export async function fetchCurrentLesson(context: LearningContext, forceRefresh = false): Promise<GeneratedLesson> {
   const response = await fetch(`${apiBaseUrl}/api/lessons/current`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...authHeaders(),
     },
-    body: JSON.stringify({ context }),
+    body: JSON.stringify({ context, forceRefresh }),
   });
 
   if (!response.ok) {

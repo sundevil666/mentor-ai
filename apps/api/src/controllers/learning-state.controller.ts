@@ -6,7 +6,11 @@ import { sendData } from './http-response.js';
 export const getStudentState: RequestHandler = sendData((req) => learningStateService.getStudentState(req.authUser));
 
 export const getCurrentLesson: RequestHandler = sendData((req) =>
-  learningStateService.getCurrentLesson(req.body?.context as LearningContext | undefined, req.authUser),
+  learningStateService.getCurrentLesson(
+    req.body?.context as LearningContext | undefined,
+    req.authUser,
+    req.body?.forceRefresh === true,
+  ),
 );
 
 export const getRecommendations: RequestHandler = sendData((req) => learningStateService.getRecommendations(req.authUser));

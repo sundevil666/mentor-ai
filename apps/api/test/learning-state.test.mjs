@@ -108,6 +108,23 @@ describe('learning state service', () => {
     assert.equal(vocabularyLesson.exercises[0].prompt, 'Choose the meaning of "arrive".');
   });
 
+  it('regenerates a selected lesson when the client explicitly checks for an update', async () => {
+    const context = {
+      mode: 'listening',
+      selectedConcept: 'learning',
+      manualConceptChoice: true,
+      lessonTemplateKey: 'shop-listening',
+      isOffline: false,
+      speechAvailable: true,
+      availableMinutes: 7,
+    };
+    const cached = await learningStateService.getCurrentLesson(context);
+    const refreshed = await learningStateService.getCurrentLesson(context, undefined, true);
+
+    assert.equal(refreshed.lessonTemplateKey, context.lessonTemplateKey);
+    assert.notStrictEqual(refreshed, cached);
+  });
+
   it('accepts new synchronized evidence and marks repeats as duplicates', async () => {
     const event = {
       id: `event-service-check-${Date.now()}`,

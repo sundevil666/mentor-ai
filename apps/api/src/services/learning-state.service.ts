@@ -32,10 +32,14 @@ export const learningStateService = {
     };
   },
 
-  async getCurrentLesson(context: LearningContext = defaultLearningContext(), user?: AuthenticatedUser) {
+  async getCurrentLesson(
+    context: LearningContext = defaultLearningContext(),
+    user?: AuthenticatedUser,
+    forceRefresh = false,
+  ) {
     const state = await learningStateRepository.read(user);
 
-    if (state.currentLesson && isLessonSuitableForContext(state.currentLesson, context)) {
+    if (!forceRefresh && state.currentLesson && isLessonSuitableForContext(state.currentLesson, context)) {
       return state.currentLesson;
     }
 

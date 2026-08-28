@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createLessonPlan, generateLessonFromPlan, initialStudentModel, type GeneratedLesson, type LearningContext } from '@mentor-ai/shared';
-import { getSpeechTextsContentVersion, selectExpiredOfflineLessons, selectOfflineLesson, selectOfflineLessonsOverLimit, selectStaleOfflineStories, type OfflineLesson } from '../src/services/offline-library.js';
+import { getSpeechTextsContentVersion, isOfflineSpeechLessonUpdateAvailable, selectExpiredOfflineLessons, selectOfflineLesson, selectOfflineLessonsOverLimit, selectStaleOfflineStories, type OfflineLesson } from '../src/services/offline-library.js';
 
 describe('offline lesson retention', () => {
   it('selects the exact speaking lesson requested by its library card', () => {
@@ -56,6 +56,21 @@ describe('offline lesson retention', () => {
 
     assert.equal(getSpeechTextsContentVersion([' Mia: The old track. ']), savedVersion);
     assert.notEqual(getSpeechTextsContentVersion(['Mia: The updated track.']), savedVersion);
+  });
+
+  it('offers an explicit update when a downloaded lesson has newer audio', () => {
+    const saved: OfflineLesson = {
+      id: 'could-you',
+      category: 'listening',
+      title: 'A Could You',
+      downloadedAt: '2026-08-28T10:00:00.000Z',
+      lastOpenedAt: '2026-08-28T10:00:00.000Z',
+      estimatedBytes: 10,
+      speechTexts: ['Mia: Old 36 second lesson.'],
+    };
+
+    assert.equal(isOfflineSpeechLessonUpdateAvailable(saved, ['Mia: New two minute lesson.']), true);
+    assert.equal(isOfflineSpeechLessonUpdateAvailable(saved, saved.speechTexts ?? []), false);
   });
 });
 
