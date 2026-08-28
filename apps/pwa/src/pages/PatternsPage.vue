@@ -1,5 +1,5 @@
 <template>
-  <q-page class="patterns-page">
+  <q-page class="patterns-page category-theme--patterns">
     <section class="patterns-shell">
       <header
         v-if="!patternSelected"

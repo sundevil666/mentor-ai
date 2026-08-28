@@ -1,5 +1,5 @@
 <template>
-  <q-page class="videos-page" :class="{ 'videos-page--detail': selectedStory }">
+  <q-page class="videos-page category-theme--stories" :class="{ 'videos-page--detail': selectedStory }">
     <section class="videos-shell" :class="{ 'videos-shell--detail': selectedStory }">
       <header class="videos-header">
         <q-btn v-if="selectedStory" aria-label="Back to story list" color="primary" flat icon="arrow_back" round @click="closeStory" />

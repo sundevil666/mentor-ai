@@ -239,7 +239,7 @@
         v-for="item in primaryNavigationItems"
         :key="item.label"
         class="mobile-start-dock__button"
-        :class="{ 'mobile-start-dock__button--active': item.isActive() }"
+        :class="[`mobile-start-dock__button--${item.tone}`, { 'mobile-start-dock__button--active': item.isActive() }]"
         :to="item.to"
       >
         <q-icon :name="item.icon" size="24px" />
@@ -415,42 +415,49 @@ const syncStatusTooltip = computed(() => {
 const primaryNavigationItems: Array<{
   label: string;
   icon: string;
+  tone: 'home' | 'listening' | 'speaking' | 'patterns' | 'audio' | 'stories';
   to: RouteLocationRaw;
   isActive: () => boolean;
 }> = [
   {
     label: 'Home',
     icon: 'home',
+    tone: 'home',
     to: { name: 'dashboard' },
     isActive: () => route.name === 'dashboard' && route.query.training === undefined,
   },
   {
     label: 'Listen',
     icon: 'headphones',
+    tone: 'listening',
     to: { name: 'dashboard', query: { training: 'listening' } },
     isActive: () => route.name === 'dashboard' && route.query.training === 'listening',
   },
   {
     label: 'Speak',
     icon: 'record_voice_over',
+    tone: 'speaking',
     to: { name: 'dashboard', query: { training: 'speaking' } },
     isActive: () => route.name === 'dashboard' && route.query.training === 'speaking',
   },
   {
     label: 'Patterns',
     icon: 'view_agenda',
+    tone: 'patterns',
     to: { name: 'patterns' },
     isActive: () => route.name === 'patterns',
   },
   {
     label: 'Audio',
     icon: 'podcasts',
+    tone: 'audio',
     to: { name: 'audio' },
     isActive: () => route.name === 'audio',
   },
   {
     label: 'Stories',
     icon: 'auto_stories',
+    tone: 'stories',
     to: { name: 'stories' },
     isActive: () => route.name === 'stories',
   },

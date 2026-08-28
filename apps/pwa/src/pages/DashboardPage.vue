@@ -1,5 +1,5 @@
 <template>
-  <q-page class="learning-page">
+  <q-page class="learning-page" :class="`category-theme--${selectedLessonLibrary}`">
     <section class="learning-shell">
       <transition :name="learningTransitionName">
         <section v-if="!appStore.isHydrated" key="hydrating" class="learning-start">

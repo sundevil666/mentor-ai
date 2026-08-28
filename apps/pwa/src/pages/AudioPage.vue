@@ -1,5 +1,5 @@
 <template>
-  <q-page class="audio-page" :class="{ 'audio-page--detail': selectedAudio }">
+  <q-page class="audio-page category-theme--audio" :class="{ 'audio-page--detail': selectedAudio }">
     <section class="audio-shell">
       <header class="audio-header" :class="{ 'audio-header--detail': selectedAudio }">
         <q-btn
