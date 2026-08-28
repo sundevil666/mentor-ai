@@ -448,6 +448,12 @@ const primaryNavigationItems: Array<{
     to: { name: 'audio' },
     isActive: () => route.name === 'audio',
   },
+  {
+    label: 'Stories',
+    icon: 'auto_stories',
+    to: { name: 'stories' },
+    isActive: () => route.name === 'stories',
+  },
 ];
 
 onMounted(async () => {

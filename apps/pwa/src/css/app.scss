@@ -1336,7 +1336,7 @@ body .q-menu {
   box-shadow: 0 18px 42px rgba(17, 24, 39, 0.16);
   display: grid;
   gap: 6px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   left: 50%;
   max-width: 520px;
   padding: 8px;
@@ -2164,7 +2164,7 @@ body .q-menu {
     padding: 8px 8px max(8px, env(safe-area-inset-bottom));
     transform: none;
     width: 100%;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
   .mobile-start-dock__button {
