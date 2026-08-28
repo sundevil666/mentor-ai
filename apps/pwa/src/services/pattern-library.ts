@@ -10,6 +10,8 @@ export interface PhrasePattern {
   id: string;
   title: string;
   frame: string;
+  prefix: string;
+  suffix: string;
   description: string;
   level: string;
   estimatedMinutes: number;
@@ -21,6 +23,8 @@ export const patternLibrary: PhrasePattern[] = [
     id: 'could-you-please',
     title: 'Could you …, please?',
     frame: 'Could you [action], please?',
+    prefix: 'Could you',
+    suffix: ', please?',
     description: 'A polite, reusable request for work, travel, shops, and everyday life.',
     level: 'A1–A2',
     estimatedMinutes: 6,

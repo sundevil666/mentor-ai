@@ -1,30 +1,67 @@
 <template>
   <q-page class="patterns-page">
     <section class="patterns-shell">
-      <header class="patterns-header">
+      <header
+        v-if="!patternSelected"
+        class="patterns-header"
+      >
         <p>Reusable English</p><h1>Patterns</h1>
-        <span>Learn one flexible phrase frame, then change the words to fit the situation.</span>
+        <span>Choose one phrase pattern and train it until it becomes automatic.</span>
       </header>
 
-      <article class="pattern-card">
-        <div class="pattern-card__topline">
-          <span><q-icon name="auto_awesome" /> Start here</span>
-          <span>{{ pattern.level }} · About {{ pattern.estimatedMinutes }} min</span>
+      <section
+        v-if="!patternSelected"
+        class="pattern-library"
+        aria-label="Pattern library"
+      >
+        <button
+          v-for="(item, index) in patternLibrary"
+          :key="item.id"
+          class="pattern-library-card"
+          type="button"
+          @click="openPattern(item.id)"
+        >
+          <span class="pattern-library-card__icon"><q-icon name="view_agenda" /></span>
+          <span class="pattern-library-card__body">
+            <small>Pattern {{ index + 1 }}</small>
+            <strong>{{ item.title }}</strong>
+            <span>{{ item.description }}</span>
+            <span class="pattern-library-card__meta">
+              {{ item.level }} · About {{ item.estimatedMinutes }} min · {{ item.examples.length }} phrases
+            </span>
+          </span>
+          <q-icon name="chevron_right" />
+        </button>
+      </section>
+
+      <header
+        v-else
+        class="patterns-detail-header"
+      >
+        <q-btn
+          aria-label="Back to pattern library"
+          color="primary"
+          flat
+          icon="arrow_back"
+          round
+          @click="closePattern"
+        />
+        <div>
+          <p>Pattern practice</p>
+          <h1>{{ selectedPattern?.title }}</h1>
+          <span>{{ selectedPattern?.description }}</span>
         </div>
-        <div class="pattern-card__body">
-          <div class="pattern-card__icon">
-            <q-icon
-              name="view_agenda"
-              size="30px"
-            />
-          </div>
-          <div><small>Pattern 1</small><h2>{{ pattern.title }}</h2><p>{{ pattern.description }}</p></div>
-        </div>
+      </header>
+
+      <article
+        v-if="patternSelected"
+        class="pattern-card pattern-card--detail"
+      >
         <div
           class="pattern-frame"
           aria-label="Phrase pattern"
         >
-          <span>Keep</span><strong>Could you</strong><span class="pattern-frame__slot">change the action</span><strong>please?</strong>
+          <span>Keep</span><strong>{{ selectedPattern?.prefix }}</strong><span class="pattern-frame__slot">change the action</span><strong>{{ selectedPattern?.suffix }}</strong>
         </div>
         <section
           class="pattern-playlist"
@@ -33,7 +70,7 @@
           <div class="pattern-playlist__heading">
             <div>
               <span>Hands-free playlist</span>
-              <strong>Could you… · {{ pattern.examples.length }} phrases</strong>
+              <strong>{{ selectedPattern?.title }} · {{ selectedPattern?.examples.length }} phrases</strong>
               <small>Phrase → 4-second pause to repeat → next phrase</small>
             </div>
             <q-icon
@@ -105,6 +142,7 @@
       </article>
 
       <section
+        v-if="patternSelected"
         class="pattern-examples"
         aria-labelledby="pattern-examples-title"
       >
@@ -114,7 +152,7 @@
               Change only the middle
             </h2>
           </div>
-          <strong>{{ completedCount }}/{{ pattern.examples.length }}</strong>
+          <strong>{{ completedCount }}/{{ selectedPattern?.examples.length }}</strong>
         </div>
         <q-linear-progress
           rounded
@@ -123,7 +161,7 @@
           :value="progress"
         />
         <article
-          v-for="example in pattern.examples"
+          v-for="example in selectedPattern?.examples"
           :key="example.id"
           class="pattern-example"
           :class="{ 'pattern-example--done': completedIds.has(example.id) }"
@@ -137,7 +175,7 @@
             <span
               v-if="revealedIds.has(example.id)"
               class="pattern-example__answer"
-            >Could you <mark>{{ example.slotValue }}</mark>, please?<small>{{ example.translation }}</small></span>
+            >{{ selectedPattern?.prefix }} <mark>{{ example.slotValue }}</mark>{{ selectedPattern?.suffix }}<small>{{ example.translation }}</small></span>
             <span
               v-else
               class="pattern-example__prompt"
@@ -164,8 +202,11 @@
           </div>
         </article>
       </section>
-      <p class="pattern-tip">
-        <q-icon name="tips_and_updates" /> <span>Do not memorize six separate sentences. Memorize <strong>Could you …, please?</strong> and put a new action in the middle.</span>
+      <p
+        v-if="patternSelected"
+        class="pattern-tip"
+      >
+        <q-icon name="tips_and_updates" /> <span>Do not memorize separate sentences. Memorize <strong>{{ selectedPattern?.title }}</strong> and put a new action in the middle.</span>
       </p>
     </section>
   </q-page>
@@ -173,15 +214,18 @@
 
 <script setup lang="ts">
 import { Notify } from 'quasar';
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { patternLibrary, type PhrasePatternExample } from 'src/services/pattern-library';
 import { speakWithPreferredVoice, stopSpeech } from 'src/services/speech-synthesis';
 import { deletePatternPlaylist, getCachedPatternPlaylist, preparePatternPlaylist } from 'src/services/pattern-playlist';
 import { configurePlaybackAudioSession } from 'src/services/audio-session';
 
-const pattern = patternLibrary[0]!;
-const progressKey = `mentor-ai:pattern-progress:${pattern.id}`;
-const completedIds = ref(readCompletedIds());
+const route = useRoute();
+const router = useRouter();
+const selectedPattern = computed(() => patternLibrary.find((item) => item.id === route.query.pattern));
+const patternSelected = computed(() => Boolean(selectedPattern.value));
+const completedIds = ref(new Set<string>());
 const revealedIds = ref(new Set<string>());
 const playingId = ref<string | null>(null);
 const isLessonPlaying = ref(false);
@@ -190,15 +234,25 @@ const playlistUrl = ref('');
 const playlistOffline = ref(false);
 const playlistPreparing = ref(false);
 const playlistCompleted = ref(0);
-const repeatEnabled = ref(localStorage.getItem(`mentor-ai:pattern-repeat:${pattern.id}`) !== 'false');
+const repeatEnabled = ref(true);
 const completedCount = computed(() => completedIds.value.size);
-const progress = computed(() => completedCount.value / pattern.examples.length);
-const playlistProgress = computed(() => playlistCompleted.value / pattern.examples.length);
+const progress = computed(() => completedCount.value / (selectedPattern.value?.examples.length ?? 1));
+const playlistProgress = computed(() => playlistCompleted.value / (selectedPattern.value?.examples.length ?? 1));
 
-onMounted(async () => {
-  const cached = await getCachedPatternPlaylist(pattern.id);
-  if (cached) setPlaylistBlob(cached);
-});
+watch(selectedPattern, async (nextPattern) => {
+  stopPlaylist();
+  stopSpeech();
+  revokePlaylistUrl();
+  playingId.value = null;
+  revealedIds.value = new Set();
+  completedIds.value = nextPattern ? readCompletedIds(nextPattern.id) : new Set();
+  repeatEnabled.value = nextPattern
+    ? localStorage.getItem(`mentor-ai:pattern-repeat:${nextPattern.id}`) !== 'false'
+    : true;
+  if (!nextPattern) return;
+  const cached = await getCachedPatternPlaylist(nextPattern.id);
+  if (selectedPattern.value?.id === nextPattern.id && cached) setPlaylistBlob(cached);
+}, { immediate: true });
 
 onBeforeUnmount(() => {
   stopSpeech();
@@ -206,11 +260,23 @@ onBeforeUnmount(() => {
   revokePlaylistUrl();
 });
 
-function readCompletedIds() {
+function readCompletedIds(patternId: string) {
   try {
-    const value = JSON.parse(localStorage.getItem(progressKey) ?? '[]') as unknown;
+    const value = JSON.parse(localStorage.getItem(`mentor-ai:pattern-progress:${patternId}`) ?? '[]') as unknown;
     return new Set(Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []);
   } catch { return new Set<string>(); }
+}
+
+function openPattern(id: string) {
+  void router.push({ name: 'patterns', query: { pattern: id } });
+}
+
+function closePattern() {
+  stopPlaylist();
+  stopSpeech();
+  playingId.value = null;
+  revealedIds.value = new Set();
+  void router.push({ name: 'patterns' });
 }
 
 function toggleAnswer(id: string) {
@@ -220,19 +286,25 @@ function toggleAnswer(id: string) {
 }
 
 function toggleCompleted(id: string) {
+  const pattern = selectedPattern.value;
+  if (!pattern) return;
   const next = new Set(completedIds.value);
   if (next.has(id)) next.delete(id); else next.add(id);
   completedIds.value = next;
-  localStorage.setItem(progressKey, JSON.stringify([...next]));
+  localStorage.setItem(`mentor-ai:pattern-progress:${pattern.id}`, JSON.stringify([...next]));
 }
 
 async function playExample(example: PhrasePatternExample) {
+  const pattern = selectedPattern.value;
+  if (!pattern) return;
   stopPlaylist(); stopSpeech(); playingId.value = example.id;
   const started = await speakWithPreferredVoice(example.phrase, { mediaTitle: pattern.title, onEnd: () => { playingId.value = null; }, onError: showAudioError });
   if (!started) playingId.value = null;
 }
 
 async function togglePlaylist() {
+  const pattern = selectedPattern.value;
+  if (!pattern) return;
   const player = playlistAudio.value;
   if (player && !player.paused) { player.pause(); return; }
   stopSpeech();
@@ -251,10 +323,13 @@ async function togglePlaylist() {
 }
 
 async function downloadPlaylist() {
-  if (await ensurePlaylist()) Notify.create({ type: 'positive', icon: 'offline_pin', message: 'Could you playlist downloaded for offline practice.' });
+  const pattern = selectedPattern.value;
+  if (pattern && await ensurePlaylist()) Notify.create({ type: 'positive', icon: 'offline_pin', message: `${pattern.title} playlist downloaded for offline practice.` });
 }
 
 async function ensurePlaylist() {
+  const pattern = selectedPattern.value;
+  if (!pattern) return false;
   if (playlistUrl.value) return true;
   playlistPreparing.value = true;
   playlistCompleted.value = 0;
@@ -267,6 +342,8 @@ async function ensurePlaylist() {
 }
 
 async function removePlaylist() {
+  const pattern = selectedPattern.value;
+  if (!pattern) return;
   stopPlaylist();
   await deletePatternPlaylist(pattern.id);
   revokePlaylistUrl();
@@ -291,7 +368,8 @@ function stopPlaylist() {
 }
 
 function saveRepeatPreference() {
-  localStorage.setItem(`mentor-ai:pattern-repeat:${pattern.id}`, String(repeatEnabled.value));
+  const pattern = selectedPattern.value;
+  if (pattern) localStorage.setItem(`mentor-ai:pattern-repeat:${pattern.id}`, String(repeatEnabled.value));
 }
 
 function showAudioError() {
