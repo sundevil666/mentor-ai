@@ -110,6 +110,7 @@ interface AppState {
   isOnline: boolean;
   studentModel: StudentModel;
   session: LearningSessionState | null;
+  pausedSession: LearningSessionState | null;
   latestRecommendation: Recommendation | null;
   statisticsSnapshots: StatisticsSnapshot[];
   activitySnapshots: ActivitySnapshot[];
@@ -130,6 +131,7 @@ interface AppState {
 }
 
 const sessionStoreKey = 'active-session';
+const pausedSessionStoreKey = 'paused-session';
 const sessionCheckpointKey = 'mentor-ai:active-session-checkpoint';
 
 function readSessionCheckpoint(): LearningSessionState | null {
@@ -187,6 +189,7 @@ export const useAppStore = defineStore('app', {
     isOnline: typeof navigator === 'undefined' ? true : navigator.onLine,
     studentModel: initialStudentModel,
     session: null,
+    pausedSession: null,
     latestRecommendation: null,
     statisticsSnapshots: [],
     activitySnapshots: [],
@@ -248,6 +251,7 @@ export const useAppStore = defineStore('app', {
       const db = await mentorDb;
       const savedModel = await db.get('student-models', initialStudentModel.id);
       const savedSession = await db.get('learning-sessions', sessionStoreKey);
+      const savedPausedSession = await db.get('learning-sessions', pausedSessionStoreKey);
       const checkpointSession = readSessionCheckpoint();
       const statistics = await db.getAll('statistics');
       const activitySnapshots = await db.getAll('activity-snapshots');
@@ -256,11 +260,17 @@ export const useAppStore = defineStore('app', {
       const myShiftCache = await readCachedMyShiftActivity();
 
       this.studentModel = (savedModel as StudentModel | undefined) ?? initialStudentModel;
-      this.session = checkpointSession ?? (savedSession as LearningSessionState | undefined) ?? null;
-      if (checkpointSession) {
-        await db.put('learning-sessions', toStorageRecord(checkpointSession), sessionStoreKey);
+      const restoredSession = checkpointSession ?? (savedSession as LearningSessionState | undefined) ?? null;
+      this.session = null;
+      this.pausedSession = restoredSession && !restoredSession.completedAt
+        ? toStorageRecord(restoredSession)
+        : (savedPausedSession as LearningSessionState | undefined) ?? null;
+      clearSessionCheckpoint();
+      await db.delete('learning-sessions', sessionStoreKey);
+      if (this.pausedSession) {
+        await db.put('learning-sessions', this.pausedSession, pausedSessionStoreKey);
       }
-      this.latestRecommendation = this.session?.recommendation ?? createRecommendationFromModel(this.studentModel, now());
+      this.latestRecommendation = restoredSession?.recommendation ?? createRecommendationFromModel(this.studentModel, now());
       this.statisticsSnapshots = (statistics as StatisticsSnapshot[]).sort((left, right) =>
         left.createdAt.localeCompare(right.createdAt),
       );
@@ -533,15 +543,32 @@ export const useAppStore = defineStore('app', {
         return;
       }
 
+      if (!this.session.completedAt) {
+        this.pausedSession = toStorageRecord(this.session);
+      }
       this.session = null;
       clearSessionCheckpoint();
       const db = await mentorDb;
+      if (this.pausedSession) {
+        await db.put('learning-sessions', this.pausedSession, pausedSessionStoreKey);
+      }
       await db.delete('learning-sessions', sessionStoreKey);
+    },
+
+    async resumePausedLesson() {
+      if (!this.pausedSession) return;
+      this.session = toStorageRecord(this.pausedSession);
+      this.pausedSession = null;
+      const db = await mentorDb;
+      await db.delete('learning-sessions', pausedSessionStoreKey);
+      await this.persistSession();
+      await this.publishSessionHandoff();
     },
 
     async resetLocalLearning() {
       this.studentModel = initialStudentModel;
       this.session = null;
+      this.pausedSession = null;
       clearSessionCheckpoint();
       this.latestRecommendation = createRecommendationFromModel(initialStudentModel, now());
       this.pendingSyncEvents = 0;
@@ -556,6 +583,7 @@ export const useAppStore = defineStore('app', {
       const db = await mentorDb;
       await db.put('student-models', this.studentModel);
       await db.delete('learning-sessions', sessionStoreKey);
+      await db.delete('learning-sessions', pausedSessionStoreKey);
       await db.clear('statistics');
       await db.clear('activity-snapshots');
       await db.clear('sync-queue');

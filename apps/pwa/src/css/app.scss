@@ -1249,10 +1249,10 @@ body .q-menu {
 .level-card__copy span { color: var(--app-accent); font-size: .78rem; font-weight: 800; text-transform: uppercase; }
 .level-card__copy strong { color: var(--app-text-strong); font-size: 2.35rem; line-height: 1; }
 .level-card__copy small { color: var(--app-muted-strong); }
-.home-metrics { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.home-metric { color: var(--app-primary); display: grid; gap: 5px; min-width: 0; padding: 14px; }
-.home-metric strong { color: var(--app-text-strong); font-size: 1.2rem; }
-.home-metric span { color: var(--app-muted-strong); font-size: .78rem; }
+.home-metrics { display: grid; gap: 6px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.home-metric { color: var(--app-primary); display: grid; gap: 3px; min-width: 0; padding: 10px 8px; }
+.home-metric strong { color: var(--app-text-strong); font-size: 1.05rem; }
+.home-metric span { color: var(--app-muted-strong); font-size: .68rem; line-height: 1.15; }
 .focus-card { align-items: center; color: var(--app-primary); display: flex; gap: 12px; padding: 14px 16px; }
 .focus-card div { display: grid; gap: 2px; }
 .focus-card strong { color: var(--app-text-strong); }
@@ -1263,6 +1263,7 @@ body .q-menu {
 .priority-link__main small { color: var(--app-accent); font-size: .76rem; font-weight: 800; text-transform: uppercase; }
 .priority-link__main strong { color: var(--app-text-strong); font-size: 1.05rem; }
 .priority-link__actions { border-top: 1px solid var(--app-border); display: flex; gap: 4px; padding: 2px 8px; }
+.priority-link--resume { border-color: var(--app-border-strong); }
 
 .priority-lesson__topline,
 .priority-lesson__signals {
@@ -1921,7 +1922,6 @@ body .q-menu {
     padding: 18px;
   }
 
-  .home-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .priority-link { border-radius: 16px; }
 
   .priority-lesson__body {

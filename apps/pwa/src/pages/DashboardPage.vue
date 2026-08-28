@@ -60,7 +60,7 @@
             <button type="button" class="priority-link__main" @click="startRecommendedHomeLesson">
               <q-icon :name="recommendedHomeLesson.mode === 'listening' ? 'headphones' : 'record_voice_over'" size="26px" />
               <span>
-                <small>{{ isRecommendedLessonPinned ? 'Pinned lesson' : 'Do this first' }} · {{ recommendedHomeLesson.minutes }} min</small>
+                <small>{{ isPausedLessonRecommended ? 'Continue · ' + pausedLessonProgress + '%' : (isRecommendedLessonPinned ? 'Pinned lesson' : 'Do this first') + ' · ' + recommendedHomeLesson.minutes + ' min' }}</small>
                 <strong>{{ recommendedHomeLesson.title }}</strong>
               </span>
               <q-icon name="arrow_forward" size="24px" />
@@ -69,6 +69,17 @@
               <q-btn dense flat no-caps color="primary" :icon="isRecommendedLessonPinned ? 'bookmark_remove' : 'push_pin'" :label="isRecommendedLessonPinned ? 'Unpin' : 'Pin'" @click="toggleRecommendedLessonPin" />
               <q-btn v-if="!isRecommendedLessonPinned" dense flat no-caps color="primary" icon="swap_horiz" label="Another" @click="suggestNextHomeLesson" />
             </div>
+          </article>
+
+          <article v-if="pausedLesson && !isPausedLessonRecommended" class="priority-link priority-link--resume">
+            <button type="button" class="priority-link__main" @click="resumePausedLesson">
+              <q-icon name="history" size="26px" />
+              <span>
+                <small>Continue where you stopped · {{ pausedLessonProgress }}%</small>
+                <strong>{{ pausedLesson.lesson.title }}</strong>
+              </span>
+              <q-icon name="arrow_forward" size="24px" />
+            </button>
           </article>
           </template>
 
@@ -943,6 +954,19 @@ const recommendedHomeLesson = computed(() =>
   allHomeLessons.value.find((lesson) => lesson.templateKey === pinnedHomeLessonKey.value)
     ?? homeLessonQueue.value[0]!,
 );
+const pausedLesson = computed(() => appStore.pausedSession);
+const pausedLessonProgress = computed(() => {
+  const session = pausedLesson.value;
+  if (!session || session.lesson.exercises.length === 0) return 0;
+  return Math.round((session.currentExerciseIndex / session.lesson.exercises.length) * 100);
+});
+const isPausedLessonRecommended = computed(() => {
+  const session = pausedLesson.value;
+  return Boolean(
+    session?.lesson.lessonTemplateKey
+    && session.lesson.lessonTemplateKey === recommendedHomeLesson.value.templateKey,
+  );
+});
 const isRecommendedLessonPinned = computed(() =>
   pinnedHomeLessonKey.value === recommendedHomeLesson.value.templateKey,
 );
@@ -1219,7 +1243,16 @@ async function startHomeLesson(lesson: HomeLesson) {
 }
 
 async function startRecommendedHomeLesson() {
+  if (isPausedLessonRecommended.value) {
+    await resumePausedLesson();
+    return;
+  }
   await startHomeLesson(recommendedHomeLesson.value);
+}
+
+async function resumePausedLesson() {
+  setForwardTransition();
+  await appStore.resumePausedLesson();
 }
 
 function toggleRecommendedLessonPin() {
