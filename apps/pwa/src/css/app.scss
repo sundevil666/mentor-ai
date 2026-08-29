@@ -1526,116 +1526,83 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   gap: 14px;
 }
 
-.personal-books__intro {
-  align-items: center;
-  background: var(--app-surface);
-  border: 1px solid var(--category-border);
-  border-radius: var(--app-radius-lg);
-  display: flex;
-  gap: 18px;
-  justify-content: space-between;
-  padding: 18px;
-}
-
-.personal-books__intro h2,
 .personal-books__empty h2 {
   color: var(--app-text-strong);
   font-size: 1.25rem;
   margin: 0 0 5px;
 }
 
-.personal-books__intro p,
 .personal-books__empty p {
   color: var(--app-muted-strong);
   line-height: 1.5;
   margin: 0;
 }
 
-.personal-books__eyebrow {
-  color: var(--category-accent) !important;
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
 .personal-books__file-input {
   display: none;
 }
 
-.personal-books__sync-note {
-  background: var(--category-soft);
-  border: 1px solid var(--category-border);
-  color: var(--app-text);
-}
-
-.personal-books__grid {
+.personal-book-list {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
-.personal-book-card {
+.personal-book-row {
+  align-items: center;
   background: var(--app-surface);
   border: 1px solid var(--category-border);
-  border-radius: var(--app-radius-lg);
-  box-shadow: 0 12px 30px rgba(17, 24, 39, 0.07);
-  cursor: pointer;
+  border-radius: var(--app-radius-md);
+  box-shadow: 0 8px 22px rgba(17, 24, 39, 0.06);
   display: grid;
-  grid-template-columns: 108px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   overflow: hidden;
-  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
-.personal-book-card:hover,
-.personal-book-card:focus-visible {
-  border-color: var(--category-accent);
-  box-shadow: 0 18px 42px rgba(17, 24, 39, 0.13);
-  outline: none;
-  transform: translateY(-2px);
-}
-
-.personal-book-card__cover {
+.personal-book-row__open {
   align-items: center;
-  background: linear-gradient(145deg, var(--category-accent), color-mix(in srgb, var(--category-accent) 65%, #14271c));
-  color: #fff;
-  display: flex;
-  justify-content: center;
-  min-height: 170px;
-}
-
-.personal-book-card__body {
-  display: grid;
-  gap: 10px;
-  padding: 16px;
-}
-
-.personal-book-card__heading {
-  align-items: flex-start;
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
-}
-
-.personal-book-card__heading h2 {
+  appearance: none;
+  background: transparent;
+  border: 0;
   color: var(--app-text-strong);
-  font-size: 1.2rem;
-  line-height: 1.3;
-  margin: 0 0 3px;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-weight: 800;
+  gap: 12px;
+  min-height: 64px;
+  min-width: 0;
+  padding: 16px;
+  text-align: left;
+  width: 100%;
 }
 
-.personal-book-card__heading p,
-.personal-book-card__progress-label {
-  color: var(--app-muted-strong);
-  margin: 0;
+.personal-book-row__open .q-icon {
+  color: var(--category-accent);
+  flex: 0 0 auto;
+  font-size: 26px;
 }
 
-.personal-book-card__progress {
-  margin-top: auto;
+.personal-book-row__open span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.personal-book-card__progress-label {
-  font-size: 0.8rem;
-  font-weight: 700;
+.personal-book-row > .q-btn {
+  margin-right: 8px;
+}
+
+.personal-book-row__open:hover,
+.personal-book-row__open:focus-visible {
+  background: var(--category-soft);
+  outline: none;
+}
+
+.personal-books__add-button {
+  bottom: calc(90px + env(safe-area-inset-bottom));
+  position: fixed;
+  right: max(22px, env(safe-area-inset-right));
+  z-index: 21;
 }
 
 .personal-books__empty {
@@ -2468,29 +2435,6 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   .video-card__meta {
     flex-wrap: wrap;
     gap: 8px 14px;
-  }
-
-  .personal-books__intro {
-    align-items: stretch;
-    flex-direction: column;
-    padding: 16px;
-  }
-
-  .personal-books__intro > .q-btn {
-    min-height: 48px;
-    width: 100%;
-  }
-
-  .personal-book-card {
-    grid-template-columns: 78px minmax(0, 1fr);
-  }
-
-  .personal-book-card__cover {
-    min-height: 178px;
-  }
-
-  .personal-book-card__body {
-    padding: 14px;
   }
 
   .personal-reader__paper {

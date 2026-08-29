@@ -112,57 +112,26 @@
       </section>
 
       <section v-else-if="!selectedBook && activeTab === 'books'" class="personal-books" aria-label="My books">
-        <div class="personal-books__intro">
-          <div>
-            <p class="personal-books__eyebrow">My Books</p>
-            <h2>Your books stay private</h2>
-            <p>Import a DRM-free EPUB or UTF-8 TXT file. It is stored offline on this device.</p>
-          </div>
-          <q-btn color="primary" icon="upload_file" label="Import book" no-caps unelevated :loading="importingBook" @click="chooseBookFile" />
-          <input ref="bookFileInput" class="personal-books__file-input" type="file" accept=".epub,.txt,application/epub+zip,text/plain" @change="handleBookFileSelection">
-        </div>
+        <input ref="bookFileInput" class="personal-books__file-input" type="file" accept=".epub,.txt,application/epub+zip,text/plain" @change="handleBookFileSelection">
 
-        <q-banner class="personal-books__sync-note" rounded>
-          <template #avatar><q-icon color="primary" name="devices" /></template>
-          Books and reading positions are saved on this device now. Private cross-device book upload is the next synchronization stage.
-        </q-banner>
-
-        <div v-if="personalBooks.length" class="personal-books__grid">
-          <article
+        <div v-if="personalBooks.length" class="personal-book-list">
+          <div
             v-for="book in personalBooks"
             :key="book.id"
-            class="personal-book-card"
-            role="link"
-            tabindex="0"
-            @click="openBook(book.id)"
-            @keydown.enter="openBook(book.id)"
-            @keydown.space.prevent="openBook(book.id)"
+            class="personal-book-row"
           >
-            <div class="personal-book-card__cover"><q-icon name="menu_book" size="48px" /></div>
-            <div class="personal-book-card__body">
-              <div class="personal-book-card__heading">
-                <div>
-                  <h2>{{ book.title }}</h2>
-                  <p>{{ book.author || 'Unknown author' }}</p>
-                </div>
-                <q-btn aria-label="Delete book" color="negative" flat icon="delete_outline" round @click.stop="confirmDeleteBook(book)" />
-              </div>
-              <div class="video-card__meta">
-                <span><q-icon name="description" /> {{ book.format.toUpperCase() }}</span>
-                <span><q-icon name="format_list_numbered" /> {{ book.chapterCount }} {{ book.chapterCount === 1 ? 'part' : 'parts' }}</span>
-                <span><q-icon name="notes" /> {{ formatWordCount(book.wordCount) }}</span>
-              </div>
-              <q-linear-progress class="personal-book-card__progress" rounded size="8px" :value="bookProgress(book).ratio" color="primary" track-color="grey-3" />
-              <p class="personal-book-card__progress-label">{{ bookProgress(book).label }}</p>
-            </div>
-          </article>
+            <button class="personal-book-row__open" type="button" @click="openBook(book.id)">
+              <q-icon name="menu_book" />
+              <span>{{ book.title }}</span>
+            </button>
+            <q-btn :aria-label="`Delete ${book.title}`" color="negative" flat icon="delete_outline" round @click="confirmDeleteBook(book)" />
+          </div>
         </div>
 
         <div v-else class="personal-books__empty">
           <q-icon name="library_books" size="64px" />
           <h2>No books yet</h2>
-          <p>Import your first EPUB or TXT book to read it offline.</p>
-          <q-btn color="primary" icon="upload_file" label="Choose a book" no-caps outline @click="chooseBookFile" />
+          <p>Tap + to import your first EPUB or TXT book.</p>
         </div>
       </section>
 
@@ -193,6 +162,17 @@
 
       <p v-if="!selectedStory && !selectedBook && activeTab === 'audio'" class="video-storage-note">{{ offlineSummary }} Every public-domain recording is bundled with the app in 30–40 minute listening parts.</p>
     </section>
+
+    <q-btn
+      v-if="!selectedStory && !selectedBook && activeTab === 'books'"
+      aria-label="Add a book"
+      class="personal-books__add-button"
+      color="primary"
+      fab
+      icon="add"
+      :loading="importingBook"
+      @click="chooseBookFile"
+    />
 
     <q-dialog v-model="showImportConfirmation" persistent>
       <q-card class="personal-book-import-dialog">
@@ -368,14 +348,6 @@ function persistBookProgress() {
     updatedAt: new Date().toISOString(),
   }));
 }
-function bookProgress(book: PersonalBook) {
-  const progress = readBookProgress(book.id, book.pageCount);
-  const completedParts = book.pageCount ? Math.min(book.pageCount, progress.furthestPageIndex + 1) : 0;
-  return {
-    ratio: book.pageCount ? completedParts / book.pageCount : 0,
-    label: completedParts ? `${completedParts} of ${book.pageCount} parts reached` : 'Not started',
-  };
-}
 function bookProgressKey(bookId: string) { return `mentor-ai:personal-book-progress:${bookId}`; }
 function readBookProgress(bookId: string, pageCount: number): { currentPageIndex: number; furthestPageIndex: number } {
   if (typeof localStorage === 'undefined') return { currentPageIndex: 0, furthestPageIndex: -1 };
@@ -409,7 +381,6 @@ async function removeBook(book: PersonalBook) {
     Notify.create({ type: 'negative', message: 'Could not delete this book.' });
   }
 }
-function formatWordCount(value: number) { return `${new Intl.NumberFormat('en').format(value)} words`; }
 function openStoryInSafari() {
   const story = selectedStory.value;
   if (!story) return;
