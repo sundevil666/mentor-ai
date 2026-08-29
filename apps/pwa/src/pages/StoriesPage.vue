@@ -114,6 +114,14 @@
       <section v-else-if="!selectedBook && activeTab === 'books'" class="personal-books" aria-label="My books">
         <input ref="bookFileInput" class="personal-books__file-input" type="file" accept=".epub,.txt,application/epub+zip,text/plain" @change="handleBookFileSelection">
 
+        <q-banner dense rounded :class="bookSyncError ? 'bg-red-1 text-negative' : 'bg-blue-1 text-primary'">
+          <template #avatar><q-icon :name="bookSyncError ? 'cloud_off' : 'cloud_done'" /></template>
+          {{ bookSyncStatus }}
+          <template #action>
+            <q-btn flat no-caps :disable="!getAuthToken()" :loading="bookSyncing" label="Sync now" @click="retryPersonalBookSync" />
+          </template>
+        </q-banner>
+
         <div v-if="personalBooks.length" class="personal-book-list">
           <div
             v-for="book in personalBooks"
@@ -322,6 +330,9 @@ const maxReaderFontSize = 32;
 const readerFontSize = ref(20);
 const readingMode = ref(false);
 const personalBooks = ref<PersonalBook[]>([]);
+const bookSyncing = ref(false);
+const bookSyncError = ref('');
+const cloudBookCount = ref<number | null>(null);
 const bookFileInput = ref<HTMLInputElement | null>(null);
 const pendingBookFile = ref<File | null>(null);
 const showImportConfirmation = ref(false);
@@ -343,9 +354,17 @@ let lastReaderViewportWidth = 0;
 let lastReaderViewportHeight = 0;
 let readerSelectionTimer = 0;
 let readerLookupRequestId = 0;
+let personalBookSyncPromise: Promise<void> | null = null;
 const playbackRates = [0.75, 1, 1.25, 1.5];
 const selectedStory = computed(() => storyLibrary.find((story) => story.id === selectedStoryId.value) ?? null);
 const offlineSummary = computed(() => `${storyLibrary.length} stories · ${formatStoryDuration(storyLibrary.reduce((sum, story) => sum + story.durationSeconds, 0))} total listening.`);
+const bookSyncStatus = computed(() => {
+  if (!getAuthToken()) return 'Sign in with Google to synchronize books across devices.';
+  if (bookSyncing.value) return `Syncing ${personalBooks.value.length} local book${personalBooks.value.length === 1 ? '' : 's'}…`;
+  if (bookSyncError.value) return `Cloud sync failed: ${bookSyncError.value}`;
+  if (cloudBookCount.value !== null) return `${cloudBookCount.value} book${cloudBookCount.value === 1 ? '' : 's'} in your Google account cloud library.`;
+  return 'Cloud library is ready to synchronize.';
+});
 const currentBookChapterIndex = computed(() => {
   let activeIndex = 0;
   chapterPageIndexes.value.forEach((pageIndex, chapterIndex) => {
@@ -367,6 +386,7 @@ onMounted(async () => {
   cachedUrls.value = await getCachedStoryUrls();
   engagementSummaries.value = await loadContentEngagementSummaries('audio');
   document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('online', handleBookSyncWakeup);
   document.addEventListener('keydown', handleReaderKeydown);
   document.addEventListener('selectionchange', handleReaderSelectionChange);
   const requestedStoryId = new URLSearchParams(window.location.search).get('story');
@@ -382,6 +402,7 @@ onUnmounted(() => {
   stopReaderPagination();
   clearMediaSession();
   document.removeEventListener('visibilitychange', handleVisibilityChange);
+  window.removeEventListener('online', handleBookSyncWakeup);
   document.removeEventListener('keydown', handleReaderKeydown);
   document.removeEventListener('selectionchange', handleReaderSelectionChange);
   window.clearTimeout(readerSelectionTimer);
@@ -447,12 +468,29 @@ async function confirmBookImport() {
   }
 }
 
-async function syncPersonalBooks() {
-  if (!getAuthToken()) return;
-  const cloudBooks = await synchronizePersonalReadingBooks(await listPersonalBookArchives());
-  await mergePersonalBookArchives(cloudBooks);
-  personalBooks.value = await listPersonalBooks();
+function syncPersonalBooks(): Promise<void> {
+  if (!getAuthToken()) return Promise.resolve();
+  if (personalBookSyncPromise) return personalBookSyncPromise;
+  bookSyncing.value = true;
+  bookSyncError.value = '';
+  personalBookSyncPromise = (async () => {
+    const localArchives = await listPersonalBookArchives();
+    const cloudBooks = await synchronizePersonalReadingBooks(localArchives);
+    cloudBookCount.value = cloudBooks.length;
+    await mergePersonalBookArchives(cloudBooks);
+    personalBooks.value = await listPersonalBooks();
+  })().catch((error) => {
+    bookSyncError.value = error instanceof Error ? error.message : 'Unknown synchronization error.';
+    throw error;
+  }).finally(() => {
+    bookSyncing.value = false;
+    personalBookSyncPromise = null;
+  });
+  return personalBookSyncPromise;
 }
+
+function handleBookSyncWakeup() { void syncPersonalBooks().catch(() => undefined); }
+function retryPersonalBookSync() { void syncPersonalBooks().catch(() => undefined); }
 async function openBook(bookId: string) {
   const loaded = await loadPersonalBook(bookId);
   if (!loaded || loaded.pages.length === 0) {
@@ -870,7 +908,10 @@ async function recordEngagement(id: string, type: 'started' | 'finished') {
   void syncContentEngagement();
 }
 function engagementLabel(id: string) { const summary = engagementSummaries.value.get(id); return summary ? `${summary.starts} starts · ${summary.finishes} finished` : 'Not started'; }
-function handleVisibilityChange() { persistProgress(); }
+function handleVisibilityChange() {
+  persistProgress();
+  if (document.visibilityState === 'visible') handleBookSyncWakeup();
+}
 function configureMediaSession() {
   const story = selectedStory.value;
   if (!story || !('mediaSession' in navigator)) return;

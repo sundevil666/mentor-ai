@@ -23,9 +23,11 @@ export async function synchronizePersonalReadingBooks(
     )
   `);
 
+  let acceptedBooks = 0;
   for (const candidate of incoming.slice(0, maxBooksPerAccount)) {
     const archive = sanitizePersonalReadingBookArchive(candidate);
     if (!archive) continue;
+    acceptedBooks += 1;
     await pool.query(
       `INSERT INTO personal_reading_books (student_id, book_id, archive, book_updated_at, stored_at)
        VALUES ($1, $2, $3::jsonb, $4, now())
@@ -46,6 +48,13 @@ export async function synchronizePersonalReadingBooks(
      LIMIT $2`,
     [user.id, maxBooksPerAccount],
   );
+  console.info(JSON.stringify({
+    event: 'personal-books.synchronized',
+    account: user.id.slice(-8),
+    incomingBooks: incoming.length,
+    acceptedBooks,
+    storedBooks: result.rows.length,
+  }));
   return result.rows.map((row) => row.archive);
 }
 
