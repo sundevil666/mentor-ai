@@ -22,4 +22,16 @@ describe('audio session', () => {
     assert.equal(isIosStandalone({ userAgent: 'Mozilla/5.0 (iPhone)', standalone: false } as unknown as Navigator), false);
     assert.equal(isIosStandalone({ userAgent: 'Mozilla/5.0 (Macintosh)', standalone: true } as unknown as Navigator), false);
   });
+
+  it('detects an iPad Home Screen app using its desktop user agent', () => {
+    const ipad = {
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15)',
+      platform: 'MacIntel',
+      maxTouchPoints: 5,
+      standalone: true,
+    } as unknown as Navigator;
+
+    assert.equal(isIosStandalone(ipad), true);
+    assert.equal(isIosStandalone({ ...ipad, standalone: false } as unknown as Navigator), false);
+  });
 });

@@ -9,7 +9,9 @@ type NavigatorWithAudioSession = Navigator & {
 
 export function isIosStandalone(target: Navigator = navigator): boolean {
   const iosNavigator = target as NavigatorWithAudioSession;
-  return /iPad|iPhone|iPod/.test(target.userAgent) && iosNavigator.standalone === true;
+  const appleMobileDevice = /iPad|iPhone|iPod/.test(target.userAgent)
+    || (target.platform === 'MacIntel' && target.maxTouchPoints > 1);
+  return appleMobileDevice && iosNavigator.standalone === true;
 }
 
 export function configurePlaybackAudioSession(target: Navigator = navigator): boolean {
