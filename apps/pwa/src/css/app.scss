@@ -1711,11 +1711,20 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
 }
 
 .personal-reader {
+  --reader-paper-background: #f4efe5;
+  --reader-paper-text: #332f2a;
+  --reader-paper-muted: #6a6258;
   display: grid;
   gap: 14px;
   grid-template-rows: auto auto minmax(0, 1fr);
   padding: 0 2px 30px;
   scroll-behavior: smooth;
+}
+
+body.body--dark .personal-reader {
+  --reader-paper-background: #20211e;
+  --reader-paper-text: #d9d4c9;
+  --reader-paper-muted: #aaa397;
 }
 
 .personal-reader__toolbar {
@@ -1765,7 +1774,7 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
 }
 
 .personal-reader__paper {
-  background: var(--app-surface);
+  background: var(--reader-paper-background);
   border: 1px solid var(--app-border-strong);
   border-radius: var(--app-radius-lg);
   box-shadow: 0 14px 34px rgba(17, 24, 39, 0.08);
@@ -1773,9 +1782,10 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   column-fill: auto;
   column-gap: var(--reader-column-gap, 0);
   column-width: var(--reader-column-width, auto);
-  color: var(--app-text-strong);
-  font-family: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, Georgia, serif;
+  color: var(--reader-paper-text);
+  font-family: 'Iowan Old Style', Charter, 'Bitstream Charter', Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
   height: 100%;
+  letter-spacing: 0.003em;
   line-height: 1.82;
   overflow: visible;
   padding: 15px;
@@ -1918,9 +1928,6 @@ body.body--book-reading-mode .mobile-start-dock {
 
 .personal-reader--focus {
   --reader-focus-background: #d8d0c2;
-  --reader-paper-background: #f5f0e6;
-  --reader-paper-text: #302d29;
-  --reader-paper-muted: #675f55;
   background: var(--reader-focus-background);
   gap: 0;
   grid-template-columns: minmax(0, 1fr) min(var(--reader-sidebar-width, 230px), 42vw);
@@ -1968,9 +1975,6 @@ body.body--book-reading-mode .mobile-start-dock {
 
 body.body--dark .personal-reader--focus {
   --reader-focus-background: #121311;
-  --reader-paper-background: #1d1e1b;
-  --reader-paper-text: #d8d3c8;
-  --reader-paper-muted: #aaa396;
 }
 
 .personal-reader__sidebar {
