@@ -1021,7 +1021,7 @@ function showMicrophoneAccessHelp() {
   const installedPwa = window.matchMedia('(display-mode: standalone)').matches
     || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
   const message = appleTablet && installedPwa
-    ? '<ol><li>Fully close Mentor AI from the iPad app switcher, then reopen it and try once.</li><li>If it is still blocked, open iPad Settings → Privacy & Security → Microphone and enable Mentor AI.</li><li>Also open Speech Recognition in Privacy & Security and enable Mentor AI if it is listed.</li><li>If Mentor AI is not listed, open the same site in Safari → Page Menu → More → Website Settings → Microphone → Allow, then reopen the PWA.</li></ol>'
+    ? '<ol><li>Fully close the Mentor AI PWA from the iPad app switcher.</li><li>Open the same Mentor AI website in Safari.</li><li>Tap Page Menu beside the address bar → More → Website Settings → Microphone → Allow.</li><li>In iPad Settings → Apps → Safari → Microphone, choose Ask or Allow.</li><li>If Safari appears under Settings → Privacy & Security → Speech Recognition, enable it.</li><li>Reopen the Mentor AI PWA and try the microphone again.</li></ol>'
     : appleTablet
       ? '<ol><li>In Safari, open Mentor AI.</li><li>Tap the Page Menu beside the address bar, then More.</li><li>Open Website Settings and set Microphone to Allow.</li><li>If it is still blocked, open iPad Settings → Privacy & Security → Microphone and Speech Recognition, then allow Safari.</li><li>Return here and tap the button below.</li></ol>'
     : '<ol><li>Open this site’s permissions in your browser.</li><li>Set Microphone to Allow.</li><li>Return here and tap the button below.</li></ol>';
