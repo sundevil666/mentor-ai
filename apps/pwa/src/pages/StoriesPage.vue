@@ -150,7 +150,7 @@
             label="Chapter / part"
             :model-value="currentBookChapterPageIndex"
             :options="bookPageOptions"
-            @update:model-value="goToBookPage"
+            @update:model-value="goToBookChapter"
           />
           <span>{{ currentBookPageIndex + 1 }} / {{ readerPageCount }}</span>
         </div>
@@ -311,7 +311,7 @@
               label="Chapter / part"
               :model-value="currentBookChapterPageIndex"
               :options="bookPageOptions"
-              @update:model-value="goToBookPage"
+              @update:model-value="goToBookChapter"
             />
             <span>{{ currentBookPageIndex + 1 }} / {{ readerPageCount }}</span>
             <nav aria-label="Book navigation">
@@ -380,6 +380,7 @@ import { speakWithPreferredVoice } from 'src/services/speech-synthesis';
 import { createDailyReadingProgress, dailyReadingGoalWords, dailyWordsRead, localReadingDate, readingGoalMessage, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { alignReadingSpeech, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
+import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
 
 const appStore = useAppStore();
 type StoryLibraryTab = 'audio' | 'books';
@@ -443,6 +444,7 @@ const busy = ref(false);
 let lastProgressSave = 0;
 let readerResizeObserver: ResizeObserver | null = null;
 let readerResizeFrame = 0;
+let readerPaginationRequestId = 0;
 let lastReaderViewportWidth = 0;
 let lastReaderViewportHeight = 0;
 let readerSelectionTimer = 0;
@@ -682,6 +684,13 @@ function goToBookPage(pageIndex: number | null) {
   scrollToReaderPage();
   persistBookProgress();
   readingSpeechAnchor = getVisibleReaderWordAnchor();
+}
+function goToBookChapter(pageIndex: number | null) {
+  if (pageIndex === null || !Number.isInteger(pageIndex)) return;
+  const chapterIndex = chapterPageIndexes.value.findIndex((chapterPageIndex) => chapterPageIndex === pageIndex);
+  if (chapterIndex < 0) return;
+  persistBookProgress();
+  void repaginateReader({ legacyChapterIndex: chapterIndex });
 }
 function formatBookPartLabel(index: number, title?: string) {
   const normalizedTitle = title?.replace(/\s+/g, ' ').trim();
@@ -964,9 +973,9 @@ function readReaderSidebarScale() {
   return Number.isInteger(value) ? Math.max(minReaderSidebarScale, Math.min(maxReaderSidebarScale, value)) : minReaderSidebarScale;
 }
 function changeReaderSidebarScale(change: -1 | 1) {
+  const progressRatio = getCurrentReaderProgressRatio();
   readerSidebarScale.value = Math.max(minReaderSidebarScale, Math.min(maxReaderSidebarScale, readerSidebarScale.value + change));
   if (typeof localStorage !== 'undefined') localStorage.setItem(readerSidebarScaleKey, String(readerSidebarScale.value));
-  const progressRatio = getCurrentReaderProgressRatio();
   void repaginateReader({ progressRatio });
 }
 function bookReaderSettingsKey(bookId: string) { return `mentor-ai:personal-book-reader-settings:${bookId}`; }
@@ -1088,24 +1097,40 @@ function stopReaderPagination() {
   cancelAnimationFrame(readerResizeFrame);
   lastReaderViewportWidth = 0;
   lastReaderViewportHeight = 0;
+  readerPaginationRequestId += 1;
 }
 async function repaginateReader(position: BookReaderProgress = { progressRatio: getCurrentReaderProgressRatio(), furthestProgressRatio: 0 }) {
+  const requestId = ++readerPaginationRequestId;
   await nextTick();
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  if (requestId !== readerPaginationRequestId) return;
   const viewport = readerContent.value;
   const paper = readerPaper.value;
   if (!viewport || !paper || viewport.clientWidth <= 0) return;
-  const pageWidth = viewport.clientWidth;
-  const viewportStyle = getComputedStyle(viewport);
-  const horizontalGutter = Number.parseFloat(viewportStyle.paddingLeft) + Number.parseFloat(viewportStyle.paddingRight);
-  const columnWidth = Math.max(120, pageWidth - horizontalGutter);
+  const paperStyle = getComputedStyle(paper);
+  const paperPaddingLeft = Number.parseFloat(paperStyle.paddingLeft);
+  const paperPaddingRight = Number.parseFloat(paperStyle.paddingRight);
+  const geometry = calculateReaderPaginationGeometry({
+    viewportClientWidth: viewport.clientWidth,
+    paperClientWidth: paper.clientWidth,
+    paperPaddingLeft,
+    paperPaddingRight,
+  });
+  const { columnGap, columnWidth, pageWidth } = geometry;
   paper.style.setProperty('--reader-column-width', `${columnWidth}px`);
-  paper.style.setProperty('--reader-column-gap', `${horizontalGutter}px`);
+  paper.style.setProperty('--reader-column-gap', `${columnGap}px`);
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-  readerPageCount.value = Math.max(1, Math.ceil((paper.scrollWidth + horizontalGutter - 1) / pageWidth));
-  readerPageStride.value = (paper.scrollWidth + horizontalGutter) / readerPageCount.value;
+  if (requestId !== readerPaginationRequestId) return;
+  readerPageCount.value = calculateReaderPageCount({
+    columnGap,
+    pageWidth,
+    paperPaddingLeft,
+    paperPaddingRight,
+    paperScrollWidth: paper.scrollWidth,
+  });
+  readerPageStride.value = pageWidth;
   viewport.style.setProperty('--reader-paper-scroll-width', `${paper.scrollWidth}px`);
-  viewport.style.setProperty('--reader-end-gutter', `${horizontalGutter + Math.max(0, pageWidth - readerPageStride.value)}px`);
+  viewport.style.setProperty('--reader-end-gutter', `${columnGap}px`);
   chapterPageIndexes.value = selectedBookPages.value.map((_, chapterIndex) => {
     const chapter = paper.querySelector<HTMLElement>(`[data-book-chapter-index="${chapterIndex}"]`);
     return Math.max(0, Math.min(readerPageCount.value - 1, Math.floor(((chapter?.offsetLeft ?? 0) + 1) / readerPageStride.value)));
