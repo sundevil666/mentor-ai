@@ -269,16 +269,14 @@
               </div>
             </div>
             <div class="personal-reader__heard-words" aria-live="polite" aria-label="Words heard by the microphone">
-              <span class="personal-reader__heard-words-label">Microphone heard</span>
-              <div v-if="readingSpeechVisibleWords.length" class="personal-reader__heard-words-list">
-                <span
-                  v-for="(word, index) in readingSpeechVisibleWords"
-                  :key="`${word.text}-${index}`"
-                  :class="{ 'personal-reader__heard-word--interim': word.interim }"
-                >{{ word.text }}</span>
-              </div>
-              <span v-else class="personal-reader__heard-words-empty">{{ readingSpeechActive ? 'Listening now. Speak and recognized words will appear here.' : 'Turn on the microphone, then read aloud.' }}</span>
-              <small>These recognized words are used for your reading analysis. Audio is not saved.</small>
+              <span class="personal-reader__heard-words-label">Last word heard</span>
+              <strong
+                v-if="readingSpeechLastWord"
+                class="personal-reader__heard-word"
+                :class="{ 'personal-reader__heard-word--interim': readingSpeechLastWord.interim }"
+              >{{ readingSpeechLastWord.text }}</strong>
+              <span v-else class="personal-reader__heard-words-empty">{{ readingSpeechActive ? 'Listening…' : '—' }}</span>
+              <small>This recognized word is used for your reading analysis. Audio is not saved.</small>
             </div>
             <div v-if="readingSpeechAcceptedWords" class="personal-reader__speech-stats">
               <strong>{{ readingSpeechMatchPercent }}%</strong>
@@ -565,11 +563,12 @@ const renderedBookPages = computed(() => {
 });
 const readerReferenceWords = computed(() => renderedBookPages.value.flatMap((page) => page.paragraphs.flatMap((paragraph) => paragraph.filter((token) => token.isWord).map((token) => token.text))));
 const readingSpeechActive = computed(() => readingSpeechStatus.value === 'listening' || readingSpeechStatus.value === 'noise' || readingSpeechStatus.value === 'requesting');
-const maxVisibleSpeechWords = 24;
-const readingSpeechVisibleWords = computed(() => [
-  ...readingSpeechFinalWords.value.map((text) => ({ text, interim: false })),
-  ...readingSpeechInterimWords.value.map((text) => ({ text, interim: true })),
-].slice(-maxVisibleSpeechWords));
+const readingSpeechLastWord = computed(() => {
+  const interimWord = readingSpeechInterimWords.value.at(-1);
+  if (interimWord) return { text: interimWord, interim: true };
+  const finalWord = readingSpeechFinalWords.value.at(-1);
+  return finalWord ? { text: finalWord, interim: false } : null;
+});
 const readingSpeechMatchPercent = computed(() => readingSpeechSpokenWords.value > 0 ? Math.round(readingSpeechAcceptedWords.value / readingSpeechSpokenWords.value * 100) : 0);
 const readingSpeechHasSignal = computed(() => readingSpeechLevel.value >= 0.035);
 const readingSpeechActionLabel = computed(() => {
@@ -1006,7 +1005,7 @@ function isMicrophonePermissionError(error: unknown) {
 }
 function handleReadingSpeechTranscript(transcript: string) {
   const heardWords = tokenizeReadingSpeech(transcript);
-  readingSpeechFinalWords.value = [...readingSpeechFinalWords.value, ...heardWords].slice(-maxVisibleSpeechWords);
+  readingSpeechFinalWords.value = heardWords.slice(-1);
   readingSpeechInterimWords.value = [];
   const spokenCount = heardWords.length;
   if (spokenCount < 3) return;
