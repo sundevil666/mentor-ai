@@ -298,4 +298,28 @@ describe('learning state service', () => {
     assert.equal(merged.some((event) => event.id === invalid.id), false);
     assert.equal(merged.find((event) => event.id === valid.id)?.feedback, 'mostly-clear');
   });
+
+  it('turns repeated reader lookups into vocabulary review evidence', async () => {
+    const item = {
+      id: `reader-vocabulary:demo-student:gripping-${Date.now()}`,
+      studentId: 'demo-student',
+      bookId: 'book-1',
+      chapterId: 'chapter-1',
+      text: 'gripping',
+      normalizedText: 'gripping',
+      kind: 'word',
+      translation: 'захватывающий',
+      phonetic: '/ˈɡrɪpɪŋ/',
+      lookupCount: 3,
+      firstLookedUpAt: '2026-08-29T10:00:00.000Z',
+      lastLookedUpAt: '2026-08-29T11:00:00.000Z',
+    };
+
+    const merged = await learningStateService.mergeReaderVocabularyItems([item]);
+    const state = await learningStateService.getStudentState();
+
+    assert.equal(merged.find((candidate) => candidate.id === item.id)?.lookupCount, 3);
+    assert.equal(state.studentModel.knownWeaknesses.some((signal) => signal.evidenceIds.includes(item.id)), true);
+    assert.equal(state.studentModel.reviewPriorities.some((priority) => priority.target === 'gripping'), true);
+  });
 });

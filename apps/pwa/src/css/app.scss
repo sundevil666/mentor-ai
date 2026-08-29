@@ -1720,6 +1720,8 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   overflow: visible;
   padding: 0;
   width: 100%;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .personal-reader__paper p {
@@ -1834,6 +1836,62 @@ body.body--book-reading-mode .mobile-start-dock {
   display: flex;
   gap: 10px;
   justify-content: space-between;
+}
+
+.personal-reader__lookup {
+  background: var(--category-soft);
+  border: 1px solid var(--category-border);
+  border-radius: var(--app-radius-md);
+  display: grid;
+  gap: 8px;
+  max-height: min(36dvh, 320px);
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.personal-reader__lookup p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.personal-reader__lookup-heading,
+.personal-reader__lookup-loading {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.personal-reader__lookup-heading strong,
+.personal-reader__lookup-phonetic {
+  color: var(--app-muted-strong);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.personal-reader__lookup-text {
+  color: var(--app-text-strong);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.personal-reader__lookup-translation {
+  color: var(--app-text-strong);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.personal-reader__lookup-hint,
+.personal-reader__lookup-loading,
+.personal-reader__lookup-error {
+  color: var(--app-muted-strong);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.personal-reader__lookup-error {
+  color: var(--q-negative);
 }
 
 .personal-reader__sidebar-navigation {

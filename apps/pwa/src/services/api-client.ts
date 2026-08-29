@@ -8,6 +8,8 @@ import type {
   LearningSessionHandoff,
   LearningEvent,
   Recommendation,
+  ReaderTextLookup,
+  ReaderVocabularyItem,
   SpeechResult,
   StatisticsSnapshot,
   Student,
@@ -71,6 +73,29 @@ export async function fetchAppConfiguration(): Promise<AppConfiguration> {
 
   const body = (await response.json()) as ApiResponse<AppConfiguration>;
   return body.data;
+}
+
+export async function fetchReaderTextLookup(text: string): Promise<ReaderTextLookup> {
+  const response = await fetch(`${apiBaseUrl}/api/reader/lookup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ text }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { data?: { message?: string }; error?: { message?: string } } | null;
+    throw new Error(body?.error?.message ?? body?.data?.message ?? 'Translation is unavailable right now.');
+  }
+  return ((await response.json()) as ApiResponse<ReaderTextLookup>).data;
+}
+
+export async function synchronizeReaderVocabulary(items: ReaderVocabularyItem[]): Promise<ReaderVocabularyItem[]> {
+  const response = await fetch(`${apiBaseUrl}/api/reader/vocabulary-synchronize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ items }),
+  });
+  if (!response.ok) throw new Error('Reader vocabulary synchronization failed.');
+  return ((await response.json()) as ApiResponse<ReaderVocabularyItem[]>).data;
 }
 
 export async function fetchCurrentLesson(context: LearningContext, forceRefresh = false): Promise<GeneratedLesson> {

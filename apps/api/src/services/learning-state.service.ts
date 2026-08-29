@@ -9,6 +9,7 @@ import {
   type ContentEngagementEvent,
   type LearningContext,
   type LearningEvent,
+  type ReaderVocabularyItem,
   type SpeechResult,
   type SyncStatus,
   type StudentModel,
@@ -106,6 +107,49 @@ export const learningStateService = {
     const contentEngagementEvents = [...merged.values()].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
     await learningStateRepository.write({ ...state, contentEngagementEvents }, user);
     return contentEngagementEvents.filter((event) => event.studentId === state.student.id);
+  },
+
+  async mergeReaderVocabularyItems(incoming: ReaderVocabularyItem[], user?: AuthenticatedUser) {
+    const state = await learningStateRepository.read(user);
+    const merged = new Map(state.readerVocabularyItems.map((item) => [item.id, item]));
+    for (const candidate of incoming) {
+      const safe = sanitizeReaderVocabularyItem(candidate, state.student.id);
+      if (!safe) continue;
+      const current = merged.get(safe.id);
+      if (!current || safe.lookupCount > current.lookupCount || safe.lastLookedUpAt > current.lastLookedUpAt) merged.set(safe.id, safe);
+    }
+    const readerVocabularyItems = [...merged.values()].sort((left, right) => right.lastLookedUpAt.localeCompare(left.lastLookedUpAt));
+    const repeatedItems = readerVocabularyItems.filter((item) => item.lookupCount >= 2).slice(0, 20);
+    const vocabularySignals = repeatedItems.map((item) => ({
+      id: `reader-vocabulary-weakness:${item.id}`,
+      skill: 'vocabulary' as const,
+      description: `Repeatedly translated while reading: “${item.text}”.`,
+      evidenceIds: [item.id],
+      confidence: Math.min(0.95, 0.55 + item.lookupCount * 0.05),
+      observedAt: item.lastLookedUpAt,
+    }));
+    const reviewPriorities = repeatedItems.slice(0, 10).map((item) => ({
+      id: `reader-vocabulary-review:${item.id}`,
+      skill: 'vocabulary' as const,
+      target: item.text,
+      reason: `Looked up ${item.lookupCount} times while reading.`,
+      dueAt: item.lastLookedUpAt,
+    }));
+    const studentModel = repeatedItems.length === 0 ? state.studentModel : {
+      ...state.studentModel,
+      version: state.studentModel.version + 1,
+      knownWeaknesses: [
+        ...state.studentModel.knownWeaknesses.filter((signal) => !signal.id.startsWith('reader-vocabulary-weakness:')),
+        ...vocabularySignals,
+      ],
+      reviewPriorities: [
+        ...state.studentModel.reviewPriorities.filter((priority) => !priority.id.startsWith('reader-vocabulary-review:')),
+        ...reviewPriorities,
+      ],
+      updatedAt: now(),
+    };
+    await learningStateRepository.write({ ...state, studentModel, readerVocabularyItems }, user);
+    return readerVocabularyItems.filter((item) => item.studentId === state.student.id);
   },
 
   async upsertSessionHandoff(handoff: LearningSessionHandoff, user?: AuthenticatedUser) {
@@ -619,6 +663,34 @@ function sanitizeContentProgress(progress: ContentProgress): ContentProgress {
     furthestPosition: Math.max(position, progress.furthestPosition || 0),
     duration,
     completed: Boolean(progress.completed),
+  };
+}
+
+function sanitizeReaderVocabularyItem(item: ReaderVocabularyItem, studentId: string): ReaderVocabularyItem | undefined {
+  const text = typeof item.text === 'string' ? item.text.replace(/\s+/g, ' ').trim().slice(0, 500) : '';
+  const translation = typeof item.translation === 'string' ? item.translation.replace(/\s+/g, ' ').trim().slice(0, 1_000) : '';
+  if (
+    item.studentId !== studentId ||
+    !item.id ||
+    !item.bookId ||
+    !text ||
+    !translation ||
+    !Number.isFinite(Date.parse(item.firstLookedUpAt)) ||
+    !Number.isFinite(Date.parse(item.lastLookedUpAt))
+  ) return undefined;
+  return {
+    id: item.id.slice(0, 700),
+    studentId,
+    bookId: item.bookId.slice(0, 160),
+    chapterId: item.chapterId?.slice(0, 160),
+    text,
+    normalizedText: text.toLocaleLowerCase('en'),
+    kind: /\s/.test(text) ? 'phrase' : 'word',
+    translation,
+    phonetic: item.phonetic?.replace(/\s+/g, ' ').trim().slice(0, 160) || undefined,
+    lookupCount: Math.max(1, Math.min(10_000, Math.floor(item.lookupCount || 1))),
+    firstLookedUpAt: item.firstLookedUpAt,
+    lastLookedUpAt: item.lastLookedUpAt,
   };
 }
 

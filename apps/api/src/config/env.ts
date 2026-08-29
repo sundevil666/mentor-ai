@@ -46,4 +46,5 @@ export const config = {
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean),
   googleSessionSecret: process.env.GOOGLE_SESSION_SECRET,
+  googleTranslateApiKey: process.env.GOOGLE_TRANSLATE_API_KEY,
 };

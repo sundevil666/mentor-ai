@@ -156,7 +156,7 @@
           <span>{{ readerPageCount }} {{ readerPageCount === 1 ? 'page' : 'pages' }}</span>
         </div>
         <div ref="readerContent" class="personal-reader__content">
-          <article ref="readerPaper" class="personal-reader__paper" :style="{ fontSize: `${readerFontSize}px` }">
+          <article ref="readerPaper" class="personal-reader__paper" :style="{ fontSize: `${readerFontSize}px` }" @click="handleReaderTextTap">
             <section
               v-for="(page, pageIndex) in selectedBookPages"
               :key="page.id"
@@ -188,6 +188,22 @@
               <q-btn aria-label="Increase text size" color="primary" icon="text_increase" round unelevated :disable="readerFontSize >= maxReaderFontSize" @click="changeReaderFontSize(1)" />
             </div>
           </div>
+
+          <section class="personal-reader__lookup" aria-live="polite" aria-label="Selected text helper">
+            <div v-if="selectedReaderText" class="personal-reader__lookup-heading">
+              <strong>{{ readerLookupKind === 'word' ? 'Word' : 'Phrase' }}</strong>
+              <q-btn aria-label="Play selected text" color="primary" icon="volume_up" round size="sm" unelevated @click="speakReaderText(selectedReaderText)" />
+            </div>
+            <p v-if="selectedReaderText" class="personal-reader__lookup-text">{{ selectedReaderText }}</p>
+            <p v-if="readerLookup?.phonetic" class="personal-reader__lookup-phonetic">{{ readerLookup.phonetic }}</p>
+            <div v-if="readerLookupLoading" class="personal-reader__lookup-loading">
+              <q-spinner color="primary" size="24px" />
+              <span>Translating…</span>
+            </div>
+            <p v-else-if="readerLookup" class="personal-reader__lookup-translation">{{ readerLookup.translation }}</p>
+            <p v-else-if="readerLookupError" class="personal-reader__lookup-error">{{ readerLookupError }}</p>
+            <p v-else class="personal-reader__lookup-hint">Tap a word, or press and hold to select a phrase.</p>
+          </section>
 
           <div class="personal-reader__sidebar-navigation">
             <q-select
@@ -250,7 +266,7 @@
 <script setup lang="ts">
 import { Dialog, Notify } from 'quasar';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
-import type { ReadingChapter, ReadingPage } from '@mentor-ai/shared';
+import type { ReaderTextLookup, ReadingChapter, ReadingPage } from '@mentor-ai/shared';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import { loadContentEngagementSummaries, recordContentEngagement, syncContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
 import { loadContentProgress, saveContentProgress, syncAllContentProgress } from 'src/services/content-progress';
@@ -259,6 +275,9 @@ import { deleteOfflineStory, formatStoryDuration, formatStorySize, getCachedStor
 import { useAppStore } from 'src/stores/app-store';
 import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 import { deletePersonalBook, importPersonalBook, listPersonalBooks, loadPersonalBook, markPersonalBookOpened, type PersonalBook } from 'src/services/personal-book-library';
+import { fetchReaderTextLookup, synchronizeReaderVocabulary } from 'src/services/api-client';
+import { listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
+import { speakWithPreferredVoice } from 'src/services/speech-synthesis';
 
 const appStore = useAppStore();
 type StoryLibraryTab = 'audio' | 'books';
@@ -274,6 +293,10 @@ const readerPaper = ref<HTMLElement | null>(null);
 const readerPageCount = ref(1);
 const readerPageStride = ref(1);
 const chapterPageIndexes = ref<number[]>([]);
+const selectedReaderText = ref('');
+const readerLookup = ref<ReaderTextLookup | null>(null);
+const readerLookupLoading = ref(false);
+const readerLookupError = ref('');
 const minReaderFontSize = 14;
 const maxReaderFontSize = 32;
 const readerFontSize = ref(20);
@@ -298,6 +321,8 @@ let readerResizeObserver: ResizeObserver | null = null;
 let readerResizeFrame = 0;
 let lastReaderViewportWidth = 0;
 let lastReaderViewportHeight = 0;
+let readerSelectionTimer = 0;
+let readerLookupRequestId = 0;
 const playbackRates = [0.75, 1, 1.25, 1.5];
 const selectedStory = computed(() => storyLibrary.find((story) => story.id === selectedStoryId.value) ?? null);
 const offlineSummary = computed(() => `${storyLibrary.length} stories · ${formatStoryDuration(storyLibrary.reduce((sum, story) => sum + story.durationSeconds, 0))} total listening.`);
@@ -309,6 +334,7 @@ const currentBookChapterIndex = computed(() => {
   return activeIndex;
 });
 const currentBookChapterPageIndex = computed(() => chapterPageIndexes.value[currentBookChapterIndex.value] ?? 0);
+const readerLookupKind = computed(() => /\s/.test(selectedReaderText.value) ? 'phrase' : 'word');
 const bookPageOptions = computed(() => selectedBookPages.value.map((page, index) => ({
   label: formatBookPartLabel(index, selectedBookChapters.value.find((chapter) => chapter.id === page.chapterId)?.title),
   value: chapterPageIndexes.value[index] ?? 0,
@@ -321,6 +347,7 @@ onMounted(async () => {
   engagementSummaries.value = await loadContentEngagementSummaries('audio');
   document.addEventListener('visibilitychange', handleVisibilityChange);
   document.addEventListener('keydown', handleReaderKeydown);
+  document.addEventListener('selectionchange', handleReaderSelectionChange);
   const requestedStoryId = new URLSearchParams(window.location.search).get('story');
   if (requestedStoryId && storyLibrary.some((story) => story.id === requestedStoryId)) {
     activeTab.value = 'audio';
@@ -335,6 +362,8 @@ onUnmounted(() => {
   clearMediaSession();
   document.removeEventListener('visibilitychange', handleVisibilityChange);
   document.removeEventListener('keydown', handleReaderKeydown);
+  document.removeEventListener('selectionchange', handleReaderSelectionChange);
+  window.clearTimeout(readerSelectionTimer);
 });
 
 async function openStory(id: string) {
@@ -420,6 +449,7 @@ function closeBook() {
   readerPageCount.value = 1;
   readerPageStride.value = 1;
   chapterPageIndexes.value = [];
+  clearReaderLookup();
 }
 function goToBookPage(pageIndex: number | null) {
   if (pageIndex === null || !Number.isInteger(pageIndex)) return;
@@ -438,6 +468,103 @@ function getChapterTitle(chapterId?: string) {
 }
 function splitBookParagraphs(text: string) {
   return text.split(/\n{2,}/).filter(Boolean);
+}
+function handleReaderTextTap(event: MouseEvent) {
+  const selection = window.getSelection();
+  if (selection && !selection.isCollapsed && isReaderSelection(selection)) {
+    queueReaderSelectionLookup();
+    return;
+  }
+  const word = getWordAtPoint(event.clientX, event.clientY);
+  if (word) void selectReaderText(word, true);
+}
+function handleReaderSelectionChange() {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || !isReaderSelection(selection)) return;
+  queueReaderSelectionLookup();
+}
+function queueReaderSelectionLookup() {
+  window.clearTimeout(readerSelectionTimer);
+  readerSelectionTimer = window.setTimeout(() => {
+    const selection = window.getSelection();
+    const text = selection && isReaderSelection(selection) ? normalizeReaderSelection(selection.toString()) : '';
+    if (text) void selectReaderText(text, false);
+  }, 450);
+}
+function isReaderSelection(selection: Selection) {
+  const paper = readerPaper.value;
+  return Boolean(paper && selection.anchorNode && selection.focusNode && paper.contains(selection.anchorNode) && paper.contains(selection.focusNode));
+}
+function getWordAtPoint(x: number, y: number) {
+  const documentWithCaret = document as Document & {
+    caretRangeFromPoint?: (clientX: number, clientY: number) => Range | null;
+    caretPositionFromPoint?: (clientX: number, clientY: number) => { offsetNode: Node; offset: number } | null;
+  };
+  let node: Node | null = null;
+  let offset = 0;
+  const range = documentWithCaret.caretRangeFromPoint?.(x, y);
+  if (range) {
+    node = range.startContainer;
+    offset = range.startOffset;
+  } else {
+    const position = documentWithCaret.caretPositionFromPoint?.(x, y);
+    node = position?.offsetNode ?? null;
+    offset = position?.offset ?? 0;
+  }
+  if (!node || node.nodeType !== Node.TEXT_NODE || !readerPaper.value?.contains(node)) return '';
+  const text = node.textContent ?? '';
+  const matches = Array.from(text.matchAll(/[\p{L}]+(?:[-'’][\p{L}]+)*/gu));
+  return matches.find((match) => {
+    const start = match.index ?? 0;
+    return offset >= start && offset <= start + match[0].length;
+  })?.[0] ?? '';
+}
+function normalizeReaderSelection(value: string) {
+  return value.replace(/\s+/g, ' ').trim().slice(0, 500);
+}
+async function selectReaderText(rawText: string, speakImmediately: boolean) {
+  const text = normalizeReaderSelection(rawText);
+  if (!text || !selectedBook.value) return;
+  selectedReaderText.value = text;
+  readerLookup.value = null;
+  readerLookupError.value = '';
+  readerLookupLoading.value = true;
+  const requestId = ++readerLookupRequestId;
+  if (speakImmediately) void speakReaderText(text);
+  try {
+    const lookup = await fetchReaderTextLookup(text);
+    if (requestId !== readerLookupRequestId) return;
+    readerLookup.value = lookup;
+    await recordReaderVocabularyLookup({
+      studentId: appStore.studentId,
+      bookId: selectedBook.value.id,
+      chapterId: selectedBookPages.value[currentBookChapterIndex.value]?.chapterId,
+      lookup,
+    });
+    void syncReaderVocabulary();
+  } catch (error) {
+    if (requestId === readerLookupRequestId) readerLookupError.value = error instanceof Error ? error.message : 'Translation is unavailable right now.';
+  } finally {
+    if (requestId === readerLookupRequestId) readerLookupLoading.value = false;
+  }
+}
+async function syncReaderVocabulary() {
+  try {
+    await synchronizeReaderVocabulary(await listReaderVocabulary(appStore.studentId));
+  } catch {
+    // The local vocabulary record remains available and retries on the next lookup.
+  }
+}
+async function speakReaderText(text: string) {
+  const played = await speakWithPreferredVoice(text, { mediaTitle: `Book: ${selectedBook.value?.title ?? 'selected text'}` });
+  if (!played) Notify.create({ type: 'warning', message: 'Pronunciation is unavailable right now.' });
+}
+function clearReaderLookup() {
+  readerLookupRequestId += 1;
+  selectedReaderText.value = '';
+  readerLookup.value = null;
+  readerLookupLoading.value = false;
+  readerLookupError.value = '';
 }
 function setReadingMode(value: boolean) {
   const progressRatio = getCurrentReaderProgressRatio();

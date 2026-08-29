@@ -362,6 +362,29 @@ export interface VocabularyPracticeItem {
   createdAt: string;
 }
 
+export interface ReaderTextLookup {
+  text: string;
+  translation: string;
+  phonetic?: string;
+  sourceLanguage: 'en';
+  targetLanguage: 'ru';
+}
+
+export interface ReaderVocabularyItem {
+  id: string;
+  studentId: string;
+  bookId: string;
+  chapterId?: string;
+  text: string;
+  normalizedText: string;
+  kind: 'word' | 'phrase';
+  translation: string;
+  phonetic?: string;
+  lookupCount: number;
+  firstLookedUpAt: string;
+  lastLookedUpAt: string;
+}
+
 export interface LearningEvent {
   id: string;
   studentId: string;

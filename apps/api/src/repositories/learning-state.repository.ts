@@ -12,6 +12,7 @@ import {
   type LearningEvent,
   type Observation,
   type Recommendation,
+  type ReaderVocabularyItem,
   type SpeechResult,
   type StatisticsSnapshot,
   type Student,
@@ -40,6 +41,7 @@ interface LearningStateRecord {
   sessionHandoffs: LearningSessionHandoff[];
   contentProgress: ContentProgress[];
   contentEngagementEvents: ContentEngagementEvent[];
+  readerVocabularyItems: ReaderVocabularyItem[];
 }
 
 const demoState: LearningStateRecord = {
@@ -57,6 +59,7 @@ const demoState: LearningStateRecord = {
   sessionHandoffs: [],
   contentProgress: [],
   contentEngagementEvents: [],
+  readerVocabularyItems: [],
 };
 
 export const learningStateRepository = {
@@ -124,6 +127,7 @@ function normalizeState(state: Partial<LearningStateRecord>, user?: Authenticate
     sessionHandoffs: state.sessionHandoffs ?? [],
     contentProgress: state.contentProgress ?? [],
     contentEngagementEvents: state.contentEngagementEvents ?? [],
+    readerVocabularyItems: state.readerVocabularyItems ?? [],
   };
 }
 
