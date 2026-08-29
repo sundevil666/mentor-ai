@@ -6,7 +6,7 @@
   "routes": [
     {
       "src": "^/api/reader/books-synchronize$",
-      "dest": "/api/books"
+      "dest": "/api/synchronization?action=books"
     },
     {
       "src": "^/app-update\\.json$",

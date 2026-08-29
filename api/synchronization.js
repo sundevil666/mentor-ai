@@ -8,8 +8,19 @@ module.exports = async (request, response) => {
       return;
     }
 
-    const { learningStateService } = await import('../apps/api/src/services/learning-state.service.js');
     const body = await readJsonBody(request);
+    if (request.query?.action === 'books') {
+      if (!user) {
+        sendJson(response, 401, { message: 'Google sign-in is required for cloud book synchronization.' });
+        return;
+      }
+      const books = Array.isArray(body?.books) ? body.books : [];
+      const service = await import('../apps/api/src/services/personal-reading-books.service.js');
+      sendJson(response, 200, await service.synchronizePersonalReadingBooks(books, user));
+      return;
+    }
+
+    const { learningStateService } = await import('../apps/api/src/services/learning-state.service.js');
     if (Array.isArray(body?.progress)) {
       sendJson(response, 200, await learningStateService.mergeContentProgress(body.progress, user));
       return;
