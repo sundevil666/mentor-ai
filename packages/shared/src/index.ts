@@ -366,6 +366,7 @@ export interface ReaderTextLookup {
   text: string;
   translation: string;
   phonetic?: string;
+  translationError?: string;
   sourceLanguage: 'en';
   targetLanguage: 'ru';
 }

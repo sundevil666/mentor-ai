@@ -8,7 +8,17 @@ export async function lookupReaderText(rawText: unknown): Promise<ReaderTextLook
   const text = normalizeLookupText(rawText);
   if (!text) throw new Error('Select an English word or phrase first.');
   if (text.length > 500) throw new Error('Select no more than 500 characters.');
-  if (!config.googleTranslateApiKey) throw new Error('Google translation is not configured.');
+  const phonetic = isSingleWord(text) ? await lookupPhonetic(text) : undefined;
+  if (!config.googleTranslateApiKey) {
+    return {
+      text,
+      translation: '',
+      phonetic,
+      translationError: 'Translation is unavailable because Google Cloud Translation is not configured on the server.',
+      sourceLanguage: 'en',
+      targetLanguage: 'ru',
+    };
+  }
 
   const response = await fetch(`${googleTranslateUrl}?key=${encodeURIComponent(config.googleTranslateApiKey)}`, {
     method: 'POST',
@@ -23,7 +33,7 @@ export async function lookupReaderText(rawText: unknown): Promise<ReaderTextLook
   return {
     text,
     translation,
-    phonetic: isSingleWord(text) ? await lookupPhonetic(text) : undefined,
+    phonetic,
     sourceLanguage: 'en',
     targetLanguage: 'ru',
   };
@@ -39,7 +49,9 @@ function isSingleWord(text: string) {
 
 async function lookupPhonetic(word: string): Promise<string | undefined> {
   try {
-    const response = await fetch(`${dictionaryUrl}/${encodeURIComponent(word.toLowerCase())}`);
+    const response = await fetch(`${dictionaryUrl}/${encodeURIComponent(word.toLowerCase())}`, {
+      signal: AbortSignal.timeout(2_500),
+    });
     if (!response.ok) return undefined;
     const entries = await response.json() as Array<{ phonetic?: string; phonetics?: Array<{ text?: string }> }>;
     return entries[0]?.phonetic || entries[0]?.phonetics?.find((item) => item.text)?.text || undefined;

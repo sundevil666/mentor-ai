@@ -8,7 +8,7 @@ export const translateReaderText: RequestHandler = async (req, res, _next) => {
     res.json({ data: await lookupReaderText(req.body?.text) });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Translation is unavailable right now.';
-    const status = message === 'Google translation is not configured.' ? 503 : message.startsWith('Select ') ? 400 : 502;
+    const status = message.startsWith('Select ') ? 400 : 502;
     res.status(status).json({ data: { message } });
   }
 };

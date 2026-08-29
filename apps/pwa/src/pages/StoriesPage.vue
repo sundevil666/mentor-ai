@@ -164,7 +164,12 @@
               :data-book-chapter-index="pageIndex"
             >
               <h2 class="personal-reader__part">{{ formatBookPartLabel(pageIndex, getChapterTitle(page.chapterId)) }}</h2>
-              <p v-for="(paragraph, paragraphIndex) in splitBookParagraphs(page.text)" :key="paragraphIndex">{{ paragraph }}</p>
+              <p v-for="(paragraph, paragraphIndex) in splitBookParagraphs(page.text)" :key="paragraphIndex">
+                <template v-for="(token, tokenIndex) in tokenizeReaderParagraph(paragraph)" :key="tokenIndex">
+                  <span v-if="token.isWord" class="personal-reader__word" :data-reader-word="token.text">{{ token.text }}</span>
+                  <template v-else>{{ token.text }}</template>
+                </template>
+              </p>
             </section>
           </article>
           <span class="personal-reader__end-spacer" aria-hidden="true" />
@@ -196,11 +201,14 @@
             </div>
             <p v-if="selectedReaderText" class="personal-reader__lookup-text">{{ selectedReaderText }}</p>
             <p v-if="readerLookup?.phonetic" class="personal-reader__lookup-phonetic">{{ readerLookup.phonetic }}</p>
+            <p v-else-if="readerLookup && readerLookupKind === 'word'" class="personal-reader__lookup-phonetic">Transcription not found.</p>
+            <p v-else-if="readerLookup" class="personal-reader__lookup-phonetic">IPA transcription is available for single words.</p>
             <div v-if="readerLookupLoading" class="personal-reader__lookup-loading">
               <q-spinner color="primary" size="24px" />
               <span>Translating…</span>
             </div>
-            <p v-else-if="readerLookup" class="personal-reader__lookup-translation">{{ readerLookup.translation }}</p>
+            <p v-else-if="readerLookup?.translation" class="personal-reader__lookup-translation">{{ readerLookup.translation }}</p>
+            <p v-else-if="readerLookup?.translationError" class="personal-reader__lookup-error">{{ readerLookup.translationError }}</p>
             <p v-else-if="readerLookupError" class="personal-reader__lookup-error">{{ readerLookupError }}</p>
             <p v-else class="personal-reader__lookup-hint">Tap a word, or press and hold to select a phrase.</p>
           </section>
@@ -469,13 +477,20 @@ function getChapterTitle(chapterId?: string) {
 function splitBookParagraphs(text: string) {
   return text.split(/\n{2,}/).filter(Boolean);
 }
+function tokenizeReaderParagraph(text: string): Array<{ text: string; isWord: boolean }> {
+  return text.split(/([\p{L}]+(?:[-'’][\p{L}]+)*)/gu).filter(Boolean).map((token) => ({
+    text: token,
+    isWord: /^[\p{L}]+(?:[-'’][\p{L}]+)*$/u.test(token),
+  }));
+}
 function handleReaderTextTap(event: MouseEvent) {
   const selection = window.getSelection();
   if (selection && !selection.isCollapsed && isReaderSelection(selection)) {
     queueReaderSelectionLookup();
     return;
   }
-  const word = getWordAtPoint(event.clientX, event.clientY);
+  const targetWord = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-reader-word]')?.dataset.readerWord : undefined;
+  const word = targetWord ?? getWordAtPoint(event.clientX, event.clientY);
   if (word) void selectReaderText(word, true);
 }
 function handleReaderSelectionChange() {
@@ -535,6 +550,7 @@ async function selectReaderText(rawText: string, speakImmediately: boolean) {
     const lookup = await fetchReaderTextLookup(text);
     if (requestId !== readerLookupRequestId) return;
     readerLookup.value = lookup;
+    if (!lookup.translation) return;
     await recordReaderVocabularyLookup({
       studentId: appStore.studentId,
       bookId: selectedBook.value.id,
