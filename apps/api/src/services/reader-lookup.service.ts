@@ -8,6 +8,7 @@ import {
 
 const googleTranslateUrl = 'https://translation.googleapis.com/language/translate/v2';
 const dictionaryUrl = 'https://api.dictionaryapi.dev/api/v2/entries/en';
+const datamuseUrl = 'https://api.datamuse.com/words';
 
 export async function lookupReaderText(rawText: unknown): Promise<ReaderTextLookup> {
   const text = normalizeLookupText(rawText);
@@ -66,13 +67,40 @@ function isSingleWord(text: string) {
 }
 
 async function lookupPhonetic(word: string): Promise<string | undefined> {
+  const normalizedWord = word.toLowerCase();
+  const [dictionaryPhonetic, datamusePhonetic] = await Promise.all([
+    lookupDictionaryPhonetic(normalizedWord),
+    lookupDatamusePhonetic(normalizedWord),
+  ]);
+  return dictionaryPhonetic || datamusePhonetic;
+}
+
+async function lookupDictionaryPhonetic(word: string): Promise<string | undefined> {
   try {
-    const response = await fetch(`${dictionaryUrl}/${encodeURIComponent(word.toLowerCase())}`, {
-      signal: AbortSignal.timeout(2_500),
+    const response = await fetch(`${dictionaryUrl}/${encodeURIComponent(word)}`, {
+      signal: AbortSignal.timeout(4_000),
     });
     if (!response.ok) return undefined;
     const entries = await response.json() as Array<{ phonetic?: string; phonetics?: Array<{ text?: string }> }>;
-    return entries[0]?.phonetic || entries[0]?.phonetics?.find((item) => item.text)?.text || undefined;
+    for (const entry of entries) {
+      const phonetic = entry.phonetic || entry.phonetics?.find((item) => item.text)?.text;
+      if (phonetic) return phonetic;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+async function lookupDatamusePhonetic(word: string): Promise<string | undefined> {
+  try {
+    const query = new URLSearchParams({ sp: word, md: 'r', ipa: '1', max: '1' });
+    const response = await fetch(`${datamuseUrl}?${query}`, { signal: AbortSignal.timeout(4_000) });
+    if (!response.ok) return undefined;
+    const entries = await response.json() as Array<{ word?: string; tags?: string[] }>;
+    const entry = entries.find((item) => item.word?.toLowerCase() === word);
+    const pronunciation = entry?.tags?.find((tag) => tag.startsWith('ipa_pron:'))?.slice(9).trim();
+    return pronunciation ? `/${pronunciation.replace(/^\/+|\/+$/g, '')}/` : undefined;
   } catch {
     return undefined;
   }

@@ -1922,28 +1922,37 @@ body.body--book-reading-mode .mobile-start-dock {
 .personal-reader__lookup-heading strong,
 .personal-reader__lookup-phonetic {
   color: var(--app-muted-strong);
-  font-size: 0.78rem;
+  font-size: 0.78em;
   font-weight: 800;
 }
 
 .personal-reader__lookup-text {
-  color: var(--app-text-strong);
+  background: color-mix(in srgb, var(--category-accent) 12%, transparent);
+  border-radius: 8px;
+  color: var(--category-accent);
   font-family: Georgia, 'Times New Roman', serif;
-  font-size: 1rem;
-  font-weight: 800;
+  font-size: 1.08em;
+  font-weight: 900;
+  line-height: 1.25;
+  padding: 6px 8px;
 }
 
 .personal-reader__lookup-translation {
+  background: var(--app-surface);
+  border-left: 4px solid var(--category-accent);
+  border-radius: 8px;
   color: var(--app-text-strong);
-  font-size: 0.9rem;
-  line-height: 1.45;
+  font-size: 0.96em;
+  font-weight: 800;
+  line-height: 1.35;
+  padding: 8px 10px;
 }
 
 .personal-reader__lookup-hint,
 .personal-reader__lookup-loading,
 .personal-reader__lookup-error {
   color: var(--app-muted-strong);
-  font-size: 0.78rem;
+  font-size: 0.78em;
   line-height: 1.4;
 }
 

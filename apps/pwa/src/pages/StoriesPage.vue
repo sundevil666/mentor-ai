@@ -207,7 +207,12 @@
             </div>
           </div>
 
-          <section class="personal-reader__lookup" aria-live="polite" aria-label="Selected text helper">
+          <section
+            class="personal-reader__lookup"
+            aria-live="polite"
+            aria-label="Selected text helper"
+            :style="{ fontSize: `${readerFontSize}px` }"
+          >
             <div v-if="selectedReaderText" class="personal-reader__lookup-heading">
               <strong>{{ readerLookupKind === 'word' ? 'Word' : 'Phrase' }}</strong>
               <q-btn aria-label="Play selected text" color="primary" icon="volume_up" round size="sm" unelevated @click="speakReaderText(selectedReaderText)" />
@@ -218,8 +223,6 @@
               <q-spinner color="primary" size="16px" />
               <span>Loading transcription…</span>
             </div>
-            <p v-else-if="readerLookup && readerLookupKind === 'word'" class="personal-reader__lookup-phonetic">Transcription not found.</p>
-            <p v-else-if="readerLookup" class="personal-reader__lookup-phonetic">IPA transcription is available for single words.</p>
             <div v-if="readerLookupLoading" class="personal-reader__lookup-loading">
               <q-spinner color="primary" size="24px" />
               <span>Translating…</span>

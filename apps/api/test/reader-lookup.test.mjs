@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { lookupReaderText, normalizeLookupText } from '../dist/services/reader-lookup.service.js';
+import { lookupReaderPhonetic, lookupReaderText, normalizeLookupText } from '../dist/services/reader-lookup.service.js';
 import {
   countTranslationCharacters,
   createTranslationUsage,
@@ -20,6 +20,22 @@ describe('reader text lookup', () => {
 
   it('rejects oversized selections before making a translation request', async () => {
     await assert.rejects(() => lookupReaderText('a'.repeat(501)), /no more than 500 characters/);
+  });
+
+  it('falls back to Datamuse IPA when the primary dictionary is unavailable', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('dictionaryapi.dev')) return new Response(null, { status: 503 });
+      return new Response(JSON.stringify([{ word: 'gripping', tags: ['adj', 'ipa_pron:grˈɪpɪŋ'] }]), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    };
+    try {
+      assert.deepEqual(await lookupReaderPhonetic('gripping'), { text: 'gripping', phonetic: '/grˈɪpɪŋ/' });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 
