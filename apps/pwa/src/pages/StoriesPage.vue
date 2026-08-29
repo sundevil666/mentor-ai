@@ -459,6 +459,7 @@ type RenderedReaderToken = { text: string; isWord: boolean; wordIndex?: number }
 const readingSpeechStatus = ref<ReadingSpeechStatus>('idle');
 const readingSpeechLevel = ref(0);
 const readingSpeechMessage = ref('Tap the microphone to request access and start listening.');
+const readingSpeechPermissionBlocked = ref(false);
 const spokenReaderWordIndexes = ref(new Set<number>());
 const readingSpeechAcceptedWords = ref(0);
 const readingSpeechSpokenWords = ref(0);
@@ -573,6 +574,7 @@ const readingSpeechMatchPercent = computed(() => readingSpeechSpokenWords.value 
 const readingSpeechHasSignal = computed(() => readingSpeechLevel.value >= 0.035);
 const readingSpeechActionLabel = computed(() => {
   if (readingSpeechActive.value) return 'Stop microphone';
+  if (readingSpeechPermissionBlocked.value) return 'How to allow microphone';
   if (readingSpeechStatus.value === 'error') return 'Try microphone again';
   return 'Turn microphone on';
 });
@@ -949,6 +951,10 @@ async function toggleReadingSpeech() {
     readingSpeechMessage.value = 'Your highlighted words are kept. Tap Start listening when you are ready.';
     return;
   }
+  if (readingSpeechPermissionBlocked.value) {
+    showMicrophoneAccessHelp();
+    return;
+  }
   readingSpeechFinalWords.value = [];
   readingSpeechInterimWords.value = [];
   await startReadingSpeech();
@@ -961,6 +967,7 @@ async function startReadingSpeech() {
     return;
   }
   readingSpeechStatus.value = 'requesting';
+  readingSpeechPermissionBlocked.value = false;
   readingSpeechMessage.value = 'Use the device prompt to allow microphone access.';
   try {
     readingSpeechStream = await navigator.mediaDevices.getUserMedia({
@@ -982,8 +989,9 @@ async function startReadingSpeech() {
       },
       onError: (message) => {
         stopReadingSpeech('error');
-        readingSpeechMessage.value = /not-allowed|permission|denied/i.test(message)
-          ? 'Permission was denied. Allow microphone access in this app or browser settings, then try again.'
+        readingSpeechPermissionBlocked.value = /not-allowed|permission|denied/i.test(message);
+        readingSpeechMessage.value = readingSpeechPermissionBlocked.value
+          ? 'Access is blocked. Tap How to allow microphone for the tablet settings.'
           : `Speech recognition stopped: ${message}`;
         Notify.create({ type: 'negative', icon: 'mic', message: readingSpeechMessage.value, timeout: 6_000 });
       },
@@ -992,11 +1000,29 @@ async function startReadingSpeech() {
     readingSpeechMessage.value = 'Read naturally. Matching words are highlighted as you speak.';
   } catch (error) {
     stopReadingSpeech('error');
-    readingSpeechMessage.value = isMicrophonePermissionError(error)
-      ? 'Permission was denied. Allow microphone access in this app or browser settings, then try again.'
+    readingSpeechPermissionBlocked.value = isMicrophonePermissionError(error);
+    readingSpeechMessage.value = readingSpeechPermissionBlocked.value
+      ? 'Access is blocked. Tap How to allow microphone for the tablet settings.'
       : 'The microphone could not be started on this device.';
     Notify.create({ type: 'negative', icon: 'mic', message: readingSpeechMessage.value, timeout: 6_000 });
   }
+}
+function showMicrophoneAccessHelp() {
+  const appleTablet = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const message = appleTablet
+    ? '<ol><li>In Safari, open Mentor AI.</li><li>Tap the Page Menu beside the address bar, then More.</li><li>Open Website Settings and set Microphone to Allow.</li><li>If it is still blocked, open iPad Settings → Privacy & Security → Microphone and Speech Recognition, then allow Safari or Mentor AI.</li><li>Return here and tap the button below.</li></ol>'
+    : '<ol><li>Open this site’s permissions in your browser.</li><li>Set Microphone to Allow.</li><li>Return here and tap the button below.</li></ol>';
+  Dialog.create({
+    title: appleTablet ? 'Allow microphone on iPad' : 'Allow microphone access',
+    message,
+    html: true,
+    cancel: { label: 'Close', flat: true, noCaps: true },
+    ok: { label: 'I allowed it — try again', color: 'primary', noCaps: true },
+  }).onOk(() => {
+    readingSpeechPermissionBlocked.value = false;
+    void startReadingSpeech();
+  });
 }
 function isMicrophonePermissionError(error: unknown) {
   return error instanceof DOMException
