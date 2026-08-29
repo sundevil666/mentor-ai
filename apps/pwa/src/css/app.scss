@@ -1789,6 +1789,17 @@ body.body--book-reading-mode .mobile-start-dock {
   width: 100%;
 }
 
+.personal-reader__sidebar-progress {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.personal-reader__sidebar-progress > div {
+  display: flex;
+  justify-content: space-between;
+}
+
 .personal-reader__font-controls {
   display: grid;
   gap: 10px;

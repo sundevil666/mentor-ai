@@ -156,11 +156,6 @@
           <span>{{ selectedBookPages.length }} {{ selectedBookPages.length === 1 ? 'page' : 'pages' }}</span>
         </div>
         <div ref="readerContent" class="personal-reader__content" @scroll.passive="handleBookScroll">
-          <div v-if="readingMode" class="personal-reader__progress" aria-label="Reading progress">
-            <span>Page {{ currentBookPageIndex + 1 }}</span>
-            <q-linear-progress rounded size="8px" :value="(currentBookPageIndex + 1) / selectedBookPages.length" color="primary" track-color="grey-3" />
-            <span>{{ selectedBookPages.length }} {{ selectedBookPages.length === 1 ? 'page' : 'pages' }}</span>
-          </div>
           <article class="personal-reader__paper" :style="{ fontSize: `${readerFontSize}px` }">
             <p class="personal-reader__part">{{ currentBookPartLabel }}</p>
             <p v-for="(paragraph, index) in currentBookParagraphs" :key="index">{{ paragraph }}</p>
@@ -168,6 +163,14 @@
         </div>
 
         <aside v-if="readingMode" class="personal-reader__sidebar" aria-label="Reading controls">
+          <div class="personal-reader__progress personal-reader__sidebar-progress" aria-label="Reading progress">
+            <div>
+              <span>Page {{ currentBookPageIndex + 1 }}</span>
+              <span>{{ selectedBookPages.length }} {{ selectedBookPages.length === 1 ? 'page' : 'pages' }}</span>
+            </div>
+            <q-linear-progress rounded size="8px" :value="(currentBookPageIndex + 1) / selectedBookPages.length" color="primary" track-color="grey-3" />
+          </div>
+
           <q-btn class="personal-reader__exit" color="primary" icon="close_fullscreen" label="Exit reading" no-caps outline @click="setReadingMode(false)" />
 
           <div class="personal-reader__font-controls" aria-label="Text size">
