@@ -452,7 +452,7 @@ type ReadingSpeechStatus = 'idle' | 'requesting' | 'listening' | 'noise' | 'paus
 type RenderedReaderToken = { text: string; isWord: boolean; wordIndex?: number };
 const readingSpeechStatus = ref<ReadingSpeechStatus>('idle');
 const readingSpeechLevel = ref(0);
-const readingSpeechMessage = ref('Tap once to allow the microphone. After that, listening starts with reading mode.');
+const readingSpeechMessage = ref('Tap the microphone to request access and start listening.');
 const spokenReaderWordIndexes = ref(new Set<number>());
 const readingSpeechAcceptedWords = ref(0);
 const readingSpeechSpokenWords = ref(0);
@@ -705,7 +705,6 @@ async function openBook(bookId: string) {
   await nextTick();
   await repaginateReader(readBookProgress(loaded.book.id, loaded.pages.length));
   startReaderPagination();
-  if (readingMode.value && localStorage.getItem(readingSpeechEnabledKey) === '1') void startReadingSpeech(false);
 }
 function closeBook() {
   persistBookProgress();
@@ -921,7 +920,6 @@ function goToReaderMarker() {
   persistBookProgress();
   marker.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
 }
-const readingSpeechEnabledKey = 'mentor-ai:reading-speech-enabled';
 async function toggleReadingSpeech() {
   if (readingSpeechActive.value) {
     stopReadingSpeech('paused');
@@ -930,24 +928,22 @@ async function toggleReadingSpeech() {
   }
   readingSpeechFinalWords.value = [];
   readingSpeechInterimWords.value = [];
-  await startReadingSpeech(true);
+  await startReadingSpeech();
 }
-async function startReadingSpeech(userRequested: boolean) {
+async function startReadingSpeech() {
   if (readingSpeechRecognition || readingSpeechStream || !readingMode.value) return;
   if (!isSpeechRecognitionAvailable() || !navigator.mediaDevices?.getUserMedia) {
     readingSpeechStatus.value = 'error';
     readingSpeechMessage.value = 'Live speech recognition is not supported by this browser.';
     return;
   }
-  if (!userRequested && localStorage.getItem(readingSpeechEnabledKey) !== '1') return;
   readingSpeechStatus.value = 'requesting';
-  readingSpeechMessage.value = 'Allow microphone access so Mentor AI can follow the words you read.';
+  readingSpeechMessage.value = 'Use the device prompt to allow microphone access.';
   try {
     readingSpeechStream = await navigator.mediaDevices.getUserMedia({
       audio: { autoGainControl: true, echoCancellation: true, noiseSuppression: true },
       video: false,
     });
-    localStorage.setItem(readingSpeechEnabledKey, '1');
     startReadingSpeechMeter(readingSpeechStream);
     readingSpeechAnchor = getVisibleReaderWordAnchor();
     readingSpeechRecognition = startContinuousSpeechRecognition({
@@ -1047,8 +1043,7 @@ function setReadingMode(value: boolean) {
   applyReadingMode(value);
   saveBookReaderSettings();
   void repaginateReader({ progressRatio });
-  if (value) void startReadingSpeech(true);
-  else stopReadingSpeech('idle');
+  if (!value) stopReadingSpeech('idle');
 }
 function applyReadingMode(value: boolean) {
   readingMode.value = value;
