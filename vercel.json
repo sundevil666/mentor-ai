@@ -5,6 +5,10 @@
   "framework": null,
   "routes": [
     {
+      "src": "^/api/reader/books-synchronize$",
+      "dest": "/api/books"
+    },
+    {
       "src": "^/app-update\\.json$",
       "headers": {
         "Cache-Control": "no-store, max-age=0"
