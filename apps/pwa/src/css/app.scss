@@ -1766,7 +1766,7 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
 
 .personal-reader__paper {
   background: var(--app-surface);
-  border: 1px solid var(--app-border);
+  border: 1px solid var(--app-border-strong);
   border-radius: var(--app-radius-lg);
   box-shadow: 0 14px 34px rgba(17, 24, 39, 0.08);
   box-sizing: border-box;
@@ -1778,7 +1778,7 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   height: 100%;
   line-height: 1.82;
   overflow: visible;
-  padding: 0;
+  padding: 15px;
   width: 100%;
   -webkit-user-select: text;
   user-select: text;
@@ -2794,10 +2794,6 @@ body.body--dark .personal-reader__lookup-error {
     gap: 8px 14px;
   }
 
-  .personal-reader__paper {
-    padding: 22px 18px;
-  }
-
   .personal-reader__toolbar {
     grid-template-columns: 1fr auto;
   }
@@ -2813,10 +2809,6 @@ body.body--dark .personal-reader__lookup-error {
 
   .personal-reader--focus .personal-reader__content {
     padding: 15px;
-  }
-
-  .personal-reader--focus .personal-reader__paper {
-    padding: 18px 14px;
   }
 
   .personal-reader__sidebar {
