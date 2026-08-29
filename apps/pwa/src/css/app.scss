@@ -1977,6 +1977,11 @@ body.body--dark .personal-reader--focus {
   --reader-focus-background: #121311;
 }
 
+body.body--dark .personal-reader__paper {
+  border-color: #34362f;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
+}
+
 .personal-reader__sidebar {
   background: var(--app-surface);
   border-left: 1px solid var(--app-border);
@@ -1988,6 +1993,13 @@ body.body--dark .personal-reader--focus {
   min-height: 0;
   overflow-y: auto;
   padding: max(18px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) 16px;
+}
+
+body.body--dark .personal-reader__sidebar {
+  background: #181b18;
+  border-left-color: #343a34;
+  box-shadow: -10px 0 28px rgba(0, 0, 0, 0.28);
+  color: #d9d4c9;
 }
 
 .personal-reader__exit {
@@ -2292,6 +2304,17 @@ body.body--dark .personal-reader--focus {
   max-height: min(36dvh, 320px);
   overflow-y: auto;
   padding: 12px;
+}
+
+body.body--dark .personal-reader__lookup {
+  background: #202720;
+  border-color: #3e5945;
+  color: #d9d4c9;
+}
+
+body.body--dark .personal-reader__lookup-text {
+  background: #293b2d;
+  color: #b8d8bf;
 }
 
 .personal-reader__lookup p {
