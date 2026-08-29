@@ -1,7 +1,7 @@
 <template>
-  <q-page class="videos-page category-theme--stories" :class="{ 'videos-page--detail': selectedStory || selectedBook }">
-    <section class="videos-shell" :class="{ 'videos-shell--detail': selectedStory || selectedBook }">
-      <header class="videos-header">
+  <q-page class="videos-page category-theme--stories" :class="{ 'videos-page--detail': selectedStory || selectedBook, 'videos-page--book-detail': selectedBook }">
+    <section class="videos-shell" :class="{ 'videos-shell--detail': selectedStory || selectedBook, 'videos-shell--book-detail': selectedBook }">
+      <header class="videos-header" :class="{ 'videos-header--book-detail': selectedBook }">
         <q-btn v-if="selectedStory || selectedBook" aria-label="Back to library" color="primary" flat icon="arrow_back" round @click="closeDetail" />
         <div>
           <p>{{ activeTab === 'audio' ? 'English audio library' : 'Your private English library' }}</p>
@@ -135,14 +135,14 @@
         </div>
       </section>
 
-      <section v-else-if="selectedBook && currentBookPage" class="personal-reader" aria-label="Book reader">
+      <section v-else-if="selectedBook && currentBookPage" ref="personalReader" class="personal-reader" aria-label="Book reader">
         <div class="personal-reader__toolbar">
           <q-select
             dense
             emit-value
             map-options
             outlined
-            label="Part"
+            label="Chapter / part"
             :model-value="currentBookPageIndex"
             :options="bookPageOptions"
             @update:model-value="goToBookPage"
@@ -151,12 +151,12 @@
         </div>
         <q-linear-progress rounded size="8px" :value="(currentBookPageIndex + 1) / selectedBookPages.length" color="primary" track-color="grey-3" />
         <article class="personal-reader__paper">
-          <p class="personal-reader__part">{{ currentBookChapter?.title ?? `Part ${currentBookPageIndex + 1}` }}</p>
+          <p class="personal-reader__part">{{ currentBookPartLabel }}</p>
           <p v-for="(paragraph, index) in currentBookParagraphs" :key="index">{{ paragraph }}</p>
         </article>
         <nav class="personal-reader__navigation" aria-label="Book navigation">
-          <q-btn icon="arrow_back" label="Previous" no-caps outline :disable="currentBookPageIndex === 0" @click="goToBookPage(currentBookPageIndex - 1)" />
-          <q-btn color="primary" :icon-right="currentBookPageIndex < selectedBookPages.length - 1 ? 'arrow_forward' : 'check'" :label="currentBookPageIndex < selectedBookPages.length - 1 ? 'Next' : 'Finished'" no-caps unelevated @click="goToBookPage(Math.min(selectedBookPages.length - 1, currentBookPageIndex + 1))" />
+          <q-btn aria-label="Previous part" class="personal-reader__previous" color="primary" icon="arrow_back" round unelevated :disable="currentBookPageIndex === 0" @click="goToBookPage(currentBookPageIndex - 1)" />
+          <q-btn aria-label="Next part" class="personal-reader__next" color="primary" icon="arrow_forward" round unelevated :disable="currentBookPageIndex >= selectedBookPages.length - 1" @click="goToBookPage(currentBookPageIndex + 1)" />
         </nav>
       </section>
 
@@ -215,6 +215,7 @@ const selectedBook = ref<PersonalBook | null>(null);
 const selectedBookChapters = ref<ReadingChapter[]>([]);
 const selectedBookPages = ref<ReadingPage[]>([]);
 const currentBookPageIndex = ref(0);
+const personalReader = ref<HTMLElement | null>(null);
 const personalBooks = ref<PersonalBook[]>([]);
 const bookFileInput = ref<HTMLInputElement | null>(null);
 const pendingBookFile = ref<File | null>(null);
@@ -237,8 +238,9 @@ const offlineSummary = computed(() => `${storyLibrary.length} stories · ${forma
 const currentBookPage = computed(() => selectedBookPages.value[currentBookPageIndex.value] ?? null);
 const currentBookChapter = computed(() => selectedBookChapters.value.find((chapter) => chapter.id === currentBookPage.value?.chapterId) ?? null);
 const currentBookParagraphs = computed(() => currentBookPage.value?.text.split(/\n{2,}/).filter(Boolean) ?? []);
+const currentBookPartLabel = computed(() => formatBookPartLabel(currentBookPageIndex.value, currentBookChapter.value?.title));
 const bookPageOptions = computed(() => selectedBookPages.value.map((page, index) => ({
-  label: selectedBookChapters.value.find((chapter) => chapter.id === page.chapterId)?.title ?? `Part ${index + 1}`,
+  label: formatBookPartLabel(index, selectedBookChapters.value.find((chapter) => chapter.id === page.chapterId)?.title),
   value: index,
 })));
 
@@ -336,7 +338,12 @@ function goToBookPage(pageIndex: number | null) {
   if (pageIndex === null || !Number.isInteger(pageIndex)) return;
   currentBookPageIndex.value = Math.max(0, Math.min(selectedBookPages.value.length - 1, pageIndex));
   persistBookProgress();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  void nextTick(() => personalReader.value?.scrollTo({ top: 0, behavior: 'smooth' }));
+}
+function formatBookPartLabel(index: number, title?: string) {
+  const normalizedTitle = title?.replace(/\s+/g, ' ').trim();
+  const genericTitle = normalizedTitle && !/^(chapter|part)\s+\d+$/i.test(normalizedTitle) ? normalizedTitle : 'Part';
+  return `${index + 1}. ${genericTitle}`;
 }
 function persistBookProgress() {
   const book = selectedBook.value;
