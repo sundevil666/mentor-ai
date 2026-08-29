@@ -1721,10 +1721,11 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   scroll-behavior: smooth;
 }
 
-body.body--dark .personal-reader {
-  --reader-paper-background: #20211e;
-  --reader-paper-text: #d9d4c9;
-  --reader-paper-muted: #aaa397;
+body.body--dark .personal-reader,
+html.mentor-theme-dark .personal-reader {
+  --reader-paper-background: #29271f;
+  --reader-paper-text: #ded7c8;
+  --reader-paper-muted: #b2aa9b;
 }
 
 .personal-reader__toolbar {
@@ -1974,7 +1975,7 @@ body.body--book-reading-mode .mobile-start-dock {
 }
 
 body.body--dark .personal-reader--focus {
-  --reader-focus-background: #121311;
+  --reader-focus-background: #171713;
 }
 
 body.body--dark .personal-reader__paper {
@@ -1996,8 +1997,8 @@ body.body--dark .personal-reader__paper {
 }
 
 body.body--dark .personal-reader__sidebar {
-  background: #181b18;
-  border-left-color: #343a34;
+  background: #1e201c;
+  border-left-color: #3b3b34;
   box-shadow: -10px 0 28px rgba(0, 0, 0, 0.28);
   color: #d9d4c9;
 }
@@ -2307,9 +2308,9 @@ body.body--dark .personal-reader__sidebar {
 }
 
 body.body--dark .personal-reader__lookup {
-  background: #202720;
-  border-color: #3e5945;
-  color: #d9d4c9;
+  background: #292d26;
+  border-color: #4a5b48;
+  color: #ded7c8;
 }
 
 body.body--dark .personal-reader__lookup-text {

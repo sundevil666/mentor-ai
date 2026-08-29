@@ -493,7 +493,7 @@ onMounted(async () => {
   document.addEventListener('visibilitychange', handleOfflineLessonVisibility);
   offlineLessonUpdateTimer = window.setInterval(() => { if (navigator.onLine) void checkOfflineLessons(false); }, 60 * 60 * 1000);
   isDarkTheme.value = readSavedTheme();
-  Dark.set(isDarkTheme.value);
+  applyTheme(isDarkTheme.value);
   await loadAuthConfiguration();
 
   if (!appStore.isHydrated) {
@@ -610,8 +610,13 @@ async function installPwa() {
 
 function toggleTheme() {
   isDarkTheme.value = !isDarkTheme.value;
-  Dark.set(isDarkTheme.value);
+  applyTheme(isDarkTheme.value);
   saveThemePreference(isDarkTheme.value ? 'dark' : 'light');
+}
+
+function applyTheme(useDarkTheme: boolean) {
+  Dark.set(useDarkTheme);
+  document.documentElement.classList.toggle('mentor-theme-dark', useDarkTheme);
 }
 
 async function loadAuthConfiguration() {

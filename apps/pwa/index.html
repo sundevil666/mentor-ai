@@ -14,6 +14,13 @@
     <link rel="alternate icon" href="/icons/icon-192x192.png" type="image/png" />
     <link rel="apple-touch-icon" href="/icons/apple-icon-180x180.png" />
     <script>
+      (function applyStartupTheme() {
+        var savedTheme = document.cookie.match(/(?:^|;\s*)mentor_ai_theme=([^;]*)/);
+        var theme = savedTheme ? decodeURIComponent(savedTheme[1]) : '';
+        var useDarkTheme = theme === 'dark' || (theme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('mentor-theme-dark', useDarkTheme);
+      })();
+
       // The app targets Safari 14, but Vue/Quasar and application code can call
       // newer built-ins that syntax transpilation does not provide.
       if (!Array.prototype.at) {
