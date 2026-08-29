@@ -7,6 +7,7 @@ import type {
   LearningContext,
   LearningSessionHandoff,
   LearningEvent,
+  PersonalReadingBookArchive,
   Recommendation,
   ReaderTextLookup,
   ReaderVocabularyItem,
@@ -107,6 +108,16 @@ export async function synchronizeReaderVocabulary(items: ReaderVocabularyItem[])
   });
   if (!response.ok) throw new Error('Reader vocabulary synchronization failed.');
   return ((await response.json()) as ApiResponse<ReaderVocabularyItem[]>).data;
+}
+
+export async function synchronizePersonalReadingBooks(books: PersonalReadingBookArchive[]): Promise<PersonalReadingBookArchive[]> {
+  const response = await fetch(`${apiBaseUrl}/api/reader/books-synchronize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ books }),
+  });
+  if (!response.ok) throw new Error('Book synchronization failed.');
+  return ((await response.json()) as ApiResponse<PersonalReadingBookArchive[]>).data;
 }
 
 export async function fetchCurrentLesson(context: LearningContext, forceRefresh = false): Promise<GeneratedLesson> {

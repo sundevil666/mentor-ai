@@ -291,8 +291,9 @@ import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineStory } fr
 import { deleteOfflineStory, formatStoryDuration, formatStorySize, getCachedStoryUrls, saveStoryOffline, storyLibrary, type LibraryStory } from 'src/services/story-library';
 import { useAppStore } from 'src/stores/app-store';
 import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
-import { deletePersonalBook, importPersonalBook, listPersonalBooks, loadPersonalBook, markPersonalBookOpened, type PersonalBook } from 'src/services/personal-book-library';
-import { fetchReaderPhonetic, fetchReaderTextLookup, synchronizeReaderVocabulary } from 'src/services/api-client';
+import { deletePersonalBook, importPersonalBook, listPersonalBookArchives, listPersonalBooks, loadPersonalBook, markPersonalBookOpened, mergePersonalBookArchives, type PersonalBook } from 'src/services/personal-book-library';
+import { fetchReaderPhonetic, fetchReaderTextLookup, synchronizePersonalReadingBooks, synchronizeReaderVocabulary } from 'src/services/api-client';
+import { getAuthToken } from 'src/services/auth';
 import { findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice } from 'src/services/speech-synthesis';
 
@@ -362,6 +363,7 @@ const bookPageOptions = computed(() => selectedBookPages.value.map((page, index)
 onMounted(async () => {
   configurePlaybackAudioSession();
   personalBooks.value = await listPersonalBooks();
+  await syncPersonalBooks().catch(() => undefined);
   cachedUrls.value = await getCachedStoryUrls();
   engagementSummaries.value = await loadContentEngagementSummaries('audio');
   document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -426,14 +428,30 @@ async function confirmBookImport() {
   try {
     const book = await importPersonalBook(file);
     personalBooks.value = await listPersonalBooks();
+    const signedIn = Boolean(getAuthToken());
+    const cloudSynced = signedIn && await syncPersonalBooks().then(() => true).catch(() => false);
     cancelBookImport();
-    Notify.create({ type: 'positive', message: `${book.title} is ready to read offline.` });
+    Notify.create({
+      type: cloudSynced || !signedIn ? 'positive' : 'warning',
+      message: cloudSynced
+        ? `${book.title} is ready offline and on your other signed-in devices.`
+        : signedIn
+          ? `${book.title} is ready offline. Cloud sync will retry when the connection is available.`
+          : `${book.title} is ready to read offline. Sign in with Google to sync it to other devices.`,
+    });
     await openBook(book.id);
   } catch (error) {
     Notify.create({ type: 'negative', message: error instanceof Error ? error.message : 'Could not import this book.' });
   } finally {
     importingBook.value = false;
   }
+}
+
+async function syncPersonalBooks() {
+  if (!getAuthToken()) return;
+  const cloudBooks = await synchronizePersonalReadingBooks(await listPersonalBookArchives());
+  await mergePersonalBookArchives(cloudBooks);
+  personalBooks.value = await listPersonalBooks();
 }
 async function openBook(bookId: string) {
   const loaded = await loadPersonalBook(bookId);

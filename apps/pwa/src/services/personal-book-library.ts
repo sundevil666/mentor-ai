@@ -1,14 +1,9 @@
-import type { ReadingBook, ReadingChapter, ReadingImportSource, ReadingPage } from '@mentor-ai/shared';
+import type { PersonalReadingBook, PersonalReadingBookArchive, ReadingChapter, ReadingImportSource, ReadingPage } from '@mentor-ai/shared';
 import { strFromU8, unzipSync } from 'fflate';
 
 export type PersonalBookFormat = 'epub' | 'txt';
 
-export interface PersonalBook extends ReadingBook {
-  fileName: string;
-  format: PersonalBookFormat;
-  rightsConfirmed: true;
-  lastOpenedAt?: string;
-}
+export type PersonalBook = PersonalReadingBook;
 
 export interface ImportedPersonalBook {
   source: ReadingImportSource;
@@ -132,6 +127,21 @@ export async function listPersonalBooks(): Promise<PersonalBook[]> {
     .sort((left, right) => (right.lastOpenedAt ?? right.importedAt).localeCompare(left.lastOpenedAt ?? left.importedAt));
 }
 
+export async function listPersonalBookArchives(): Promise<PersonalReadingBookArchive[]> {
+  const books = await listPersonalBooks();
+  const archives = await Promise.all(books.map((book) => loadPersonalBook(book.id)));
+  return archives.filter((archive): archive is PersonalReadingBookArchive => archive !== null);
+}
+
+export async function mergePersonalBookArchives(archives: PersonalReadingBookArchive[]): Promise<void> {
+  for (const archive of archives) {
+    if (!archive?.book?.id || archive.book.rightsConfirmed !== true) continue;
+    const local = await loadPersonalBook(archive.book.id);
+    if (local && local.book.updatedAt > archive.book.updatedAt) continue;
+    await saveImportedBook(archive);
+  }
+}
+
 export async function loadPersonalBook(bookId: string): Promise<{ book: PersonalBook; chapters: ReadingChapter[]; pages: ReadingPage[] } | null> {
   const db = await getMentorDb();
   const book = await db.get('reading-books', bookId) as PersonalBook | undefined;
@@ -165,7 +175,7 @@ export async function deletePersonalBook(bookId: string): Promise<void> {
   await transaction.done;
 }
 
-async function saveImportedBook(imported: ImportedPersonalBook): Promise<void> {
+async function saveImportedBook(imported: ImportedPersonalBook | PersonalReadingBookArchive): Promise<void> {
   const db = await getMentorDb();
   const transaction = db.transaction(['reading-sources', 'reading-books', 'reading-chapters', 'reading-pages'], 'readwrite');
   await Promise.all([

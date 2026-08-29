@@ -327,6 +327,20 @@ export interface ReadingPage {
   wordCount: number;
 }
 
+export interface PersonalReadingBook extends ReadingBook {
+  fileName: string;
+  format: 'epub' | 'txt';
+  rightsConfirmed: true;
+  lastOpenedAt?: string;
+}
+
+export interface PersonalReadingBookArchive {
+  source: ReadingImportSource;
+  book: PersonalReadingBook;
+  chapters: ReadingChapter[];
+  pages: ReadingPage[];
+}
+
 export interface ReadingAttempt {
   id: string;
   studentId: string;

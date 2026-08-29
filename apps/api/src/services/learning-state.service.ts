@@ -9,6 +9,7 @@ import {
   type ContentEngagementEvent,
   type LearningContext,
   type LearningEvent,
+  type PersonalReadingBookArchive,
   type ReaderVocabularyItem,
   type SpeechResult,
   type SyncStatus,
@@ -150,6 +151,22 @@ export const learningStateService = {
     };
     await learningStateRepository.write({ ...state, studentModel, readerVocabularyItems }, user);
     return readerVocabularyItems.filter((item) => item.studentId === state.student.id);
+  },
+
+  async mergePersonalReadingBooks(incoming: PersonalReadingBookArchive[], user?: AuthenticatedUser) {
+    const state = await learningStateRepository.read(user);
+    const merged = new Map(state.personalReadingBooks.map((archive) => [archive.book.id, archive]));
+    for (const candidate of incoming.slice(0, 50)) {
+      const safe = sanitizePersonalReadingBook(candidate);
+      if (!safe) continue;
+      const current = merged.get(safe.book.id);
+      if (!current || safe.book.updatedAt >= current.book.updatedAt) merged.set(safe.book.id, safe);
+    }
+    const personalReadingBooks = [...merged.values()]
+      .sort((left, right) => right.book.updatedAt.localeCompare(left.book.updatedAt))
+      .slice(0, 50);
+    await learningStateRepository.write({ ...state, personalReadingBooks }, user);
+    return personalReadingBooks;
   },
 
   async upsertSessionHandoff(handoff: LearningSessionHandoff, user?: AuthenticatedUser) {
@@ -692,6 +709,25 @@ function sanitizeReaderVocabularyItem(item: ReaderVocabularyItem, studentId: str
     firstLookedUpAt: item.firstLookedUpAt,
     lastLookedUpAt: item.lastLookedUpAt,
   };
+}
+
+function sanitizePersonalReadingBook(archive: PersonalReadingBookArchive): PersonalReadingBookArchive | undefined {
+  if (!archive?.book?.id || !archive.source?.id || !Array.isArray(archive.chapters) || !Array.isArray(archive.pages)) return undefined;
+  const book = archive.book;
+  if (
+    (book.format !== 'epub' && book.format !== 'txt') ||
+    book.rightsConfirmed !== true ||
+    book.language !== 'en' ||
+    !Number.isFinite(Date.parse(book.importedAt)) ||
+    !Number.isFinite(Date.parse(book.updatedAt)) ||
+    archive.pages.length > 10_000 ||
+    archive.chapters.length > 10_000
+  ) return undefined;
+  const pages = archive.pages.filter((page) => page.bookId === book.id && typeof page.text === 'string');
+  const chapters = archive.chapters.filter((chapter) => chapter.bookId === book.id);
+  const textSize = pages.reduce((sum, page) => sum + page.text.length, 0);
+  if (pages.length !== archive.pages.length || chapters.length !== archive.chapters.length || textSize > 30 * 1024 * 1024) return undefined;
+  return JSON.parse(JSON.stringify({ source: archive.source, book, chapters, pages })) as PersonalReadingBookArchive;
 }
 
 export function mergeProgress(current: ContentProgress, incoming: ContentProgress): ContentProgress {

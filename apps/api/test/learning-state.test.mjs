@@ -322,4 +322,34 @@ describe('learning state service', () => {
     assert.equal(state.studentModel.knownWeaknesses.some((signal) => signal.evidenceIds.includes(item.id)), true);
     assert.equal(state.studentModel.reviewPriorities.some((priority) => priority.target === 'gripping'), true);
   });
+
+  it('keeps an imported book available for another device on the same account', async () => {
+    const id = `cloud-book-${Date.now()}`;
+    const timestamp = '2026-08-29T12:00:00.000Z';
+    const archive = {
+      source: { id: `${id}:source`, type: 'manual', provider: 'student-device', importedAt: timestamp },
+      book: {
+        id,
+        title: 'Cloud book',
+        level: 'unknown',
+        language: 'en',
+        sourceId: `${id}:source`,
+        pageCount: 1,
+        chapterCount: 1,
+        wordCount: 4,
+        importedAt: timestamp,
+        updatedAt: timestamp,
+        fileName: 'cloud-book.txt',
+        format: 'txt',
+        rightsConfirmed: true,
+      },
+      chapters: [{ id: `${id}:chapter:1`, bookId: id, title: 'Part 1', order: 0, pageIds: [`${id}:page:1`] }],
+      pages: [{ id: `${id}:page:1`, bookId: id, chapterId: `${id}:chapter:1`, pageNumber: 1, text: 'Read on another device.', wordCount: 4 }],
+    };
+
+    await learningStateService.mergePersonalReadingBooks([archive]);
+    const downloaded = await learningStateService.mergePersonalReadingBooks([]);
+
+    assert.equal(downloaded.find((candidate) => candidate.book.id === id)?.pages[0]?.text, 'Read on another device.');
+  });
 });
