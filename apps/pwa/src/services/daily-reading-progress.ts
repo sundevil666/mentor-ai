@@ -1,10 +1,7 @@
-import type { ReadingPage } from '@mentor-ai/shared';
-
 export const dailyReadingGoalWords = 2_500;
 
 export interface DailyBookReadingProgress {
-  baselineWordPosition: number;
-  furthestWordPosition: number;
+  spokenWordIndexes: number[];
 }
 
 export interface DailyReadingProgress {
@@ -19,37 +16,38 @@ export function localReadingDate(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-export function countReadingWords(pages: Pick<ReadingPage, 'text'>[]): number {
-  return pages.reduce((total, page) => total + (page.text.match(/[\p{L}]+(?:[-'’][\p{L}]+)*/gu)?.length ?? 0), 0);
-}
-
 export function createDailyReadingProgress(date = localReadingDate()): DailyReadingProgress {
   return { date, books: {} };
 }
 
-export function recordDailyReadingPosition(
+export function recordDailySpokenWords(
   progress: DailyReadingProgress,
   bookId: string,
-  wordPosition: number,
+  wordIndexes: readonly number[],
 ): DailyReadingProgress {
-  const position = Math.max(0, Math.round(wordPosition));
   const previous = progress.books[bookId];
+  const uniqueIndexes = new Set(previous?.spokenWordIndexes ?? []);
+  wordIndexes.forEach((wordIndex) => {
+    if (Number.isInteger(wordIndex) && wordIndex >= 0) uniqueIndexes.add(wordIndex);
+  });
   return {
     ...progress,
     books: {
       ...progress.books,
-      [bookId]: previous
-        ? { ...previous, furthestWordPosition: Math.max(previous.furthestWordPosition, position) }
-        : { baselineWordPosition: position, furthestWordPosition: position },
+      [bookId]: { spokenWordIndexes: Array.from(uniqueIndexes).sort((left, right) => left - right) },
     },
   };
 }
 
 export function dailyWordsRead(progress: DailyReadingProgress): number {
   return Object.values(progress.books).reduce(
-    (total, book) => total + Math.max(0, book.furthestWordPosition - book.baselineWordPosition),
+    (total, book) => total + new Set(book.spokenWordIndexes ?? []).size,
     0,
   );
+}
+
+export function spokenWordsForBook(progress: DailyReadingProgress, bookId: string): number[] {
+  return [...new Set(progress.books[bookId]?.spokenWordIndexes ?? [])].filter((wordIndex) => Number.isInteger(wordIndex) && wordIndex >= 0);
 }
 
 export function readingGoalMessage(wordsRead: number, goalWords = dailyReadingGoalWords): string {

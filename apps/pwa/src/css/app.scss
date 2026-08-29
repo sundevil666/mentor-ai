@@ -3037,7 +3037,8 @@ body.body--dark .personal-reader__lookup-error {
   }
 
   .personal-reader__daily-goal small {
-    display: none;
+    display: block;
+    font-size: .62rem;
   }
 
   .personal-reader__speech-coach {
