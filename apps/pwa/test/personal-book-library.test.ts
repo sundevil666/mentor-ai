@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { strToU8, zipSync } from 'fflate';
-import { buildEpubBook, buildPlainTextBook, createFallbackPersonalBookSource, resolveArchivePath, splitPlainTextIntoChapters } from '../src/services/personal-book-library.js';
+import { buildEpubBook, buildPlainTextBook, createFallbackPersonalBookSource, normalizePersonalBookArchive, resolveArchivePath, splitPlainTextIntoChapters } from '../src/services/personal-book-library.js';
 
 describe('personal book library', () => {
   it('splits large plain text at paragraph boundaries', () => {
@@ -20,7 +20,26 @@ describe('personal book library', () => {
     assert.equal(imported.book.rightsConfirmed, true);
     assert.equal(imported.book.chapterCount, 1);
     assert.equal(imported.book.wordCount, 4);
-    assert.equal(imported.pages[0]?.text, 'First paragraph.\n\nSecond paragraph.');
+    assert.equal(imported.pages[0]?.text, 'First paragraph.\nSecond paragraph.');
+  });
+
+  it('collapses repeated line and paragraph breaks for new imports', () => {
+    const imported = buildPlainTextBook('First.\r\n\r\n\r\n   Second.\n\nThird.', 'spacing.txt');
+    assert.equal(imported.pages[0]?.text, 'First.\nSecond.\nThird.');
+  });
+
+  it('normalizes pages from books saved by an older app version', () => {
+    const imported = buildPlainTextBook('First.\nSecond.', 'legacy.txt');
+    const legacy = {
+      ...imported,
+      book: { ...imported.book, wordCount: 99, updatedAt: '2026-01-01T00:00:00.000Z' },
+      pages: [{ ...imported.pages[0]!, text: 'First.\n\n\nSecond.', wordCount: 99 }],
+    };
+    const normalized = normalizePersonalBookArchive(legacy);
+    assert.equal(normalized.pages[0]?.text, 'First.\nSecond.');
+    assert.equal(normalized.pages[0]?.wordCount, 2);
+    assert.equal(normalized.book.wordCount, 2);
+    assert.notEqual(normalized.book.updatedAt, legacy.book.updatedAt);
   });
 
   it('reconstructs source metadata for books imported by an older app version', () => {

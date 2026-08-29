@@ -41,7 +41,7 @@ export function buildPlainTextBook(text: string, fileName: string): ImportedPers
 }
 
 export function splitPlainTextIntoChapters(text: string, targetWords = 1_200): Array<{ title: string; text: string }> {
-  const paragraphs = normalizeText(text).split(/\n{2,}/).filter(Boolean);
+  const paragraphs = normalizeText(text).split('\n').filter(Boolean);
   const sections: Array<{ title: string; text: string }> = [];
   let current: string[] = [];
   let wordCount = 0;
@@ -49,7 +49,7 @@ export function splitPlainTextIntoChapters(text: string, targetWords = 1_200): A
   for (const paragraph of paragraphs) {
     const paragraphWords = countWords(paragraph);
     if (current.length > 0 && wordCount + paragraphWords > targetWords) {
-      sections.push({ title: `Part ${sections.length + 1}`, text: current.join('\n\n') });
+      sections.push({ title: `Part ${sections.length + 1}`, text: current.join('\n') });
       current = [];
       wordCount = 0;
     }
@@ -57,7 +57,7 @@ export function splitPlainTextIntoChapters(text: string, targetWords = 1_200): A
     wordCount += paragraphWords;
   }
 
-  if (current.length > 0) sections.push({ title: `Part ${sections.length + 1}`, text: current.join('\n\n') });
+  if (current.length > 0) sections.push({ title: `Part ${sections.length + 1}`, text: current.join('\n') });
   return sections;
 }
 
@@ -121,6 +121,8 @@ export function buildEpubBook(bytes: Uint8Array, fileName: string): ImportedPers
 
 export async function listPersonalBooks(): Promise<PersonalBook[]> {
   const db = await getMentorDb();
+  const storedBooks = await db.getAll('reading-books') as PersonalBook[];
+  await Promise.all(storedBooks.map((book) => loadPersonalBook(book.id)));
   const books = await db.getAll('reading-books') as PersonalBook[];
   return books
     .filter((book) => book && (book.format === 'epub' || book.format === 'txt'))
@@ -164,7 +166,10 @@ export async function loadPersonalBook(bookId: string): Promise<PersonalReadingB
   const pages = (await db.getAll('reading-pages') as ReadingPage[])
     .filter((page) => page.bookId === bookId)
     .sort((left, right) => left.pageNumber - right.pageNumber);
-  return { source, book, chapters, pages };
+  const stored = { source, book, chapters, pages };
+  const normalized = normalizePersonalBookArchive(stored);
+  if (normalized !== stored) await saveImportedBook(normalized);
+  return normalized;
 }
 
 export async function markPersonalBookOpened(book: PersonalBook): Promise<void> {
@@ -188,13 +193,14 @@ export async function deletePersonalBook(bookId: string): Promise<void> {
 }
 
 async function saveImportedBook(imported: ImportedPersonalBook | PersonalReadingBookArchive): Promise<void> {
+  const normalized = normalizePersonalBookArchive(imported);
   const db = await getMentorDb();
   const transaction = db.transaction(['reading-sources', 'reading-books', 'reading-chapters', 'reading-pages'], 'readwrite');
   await Promise.all([
-    transaction.objectStore('reading-sources').put(imported.source),
-    transaction.objectStore('reading-books').put(imported.book),
-    ...imported.chapters.map((chapter) => transaction.objectStore('reading-chapters').put(chapter)),
-    ...imported.pages.map((page) => transaction.objectStore('reading-pages').put(page)),
+    transaction.objectStore('reading-sources').put(normalized.source),
+    transaction.objectStore('reading-books').put(normalized.book),
+    ...normalized.chapters.map((chapter) => transaction.objectStore('reading-chapters').put(chapter)),
+    ...normalized.pages.map((page) => transaction.objectStore('reading-pages').put(page)),
   ]);
   await transaction.done;
 }
@@ -247,8 +253,26 @@ function normalizeText(value: string): string {
     .replace(/\r\n?/g, '\n')
     .replace(/[\t\f\v ]+/g, ' ')
     .replace(/ *\n */g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\n{2,}/g, '\n')
     .trim();
+}
+
+export function normalizePersonalBookArchive(archive: PersonalReadingBookArchive): PersonalReadingBookArchive {
+  let changed = false;
+  const pages = archive.pages.map((page) => {
+    const text = normalizeText(page.text);
+    const wordCount = countWords(text);
+    if (text === page.text && wordCount === page.wordCount) return page;
+    changed = true;
+    return { ...page, text, wordCount };
+  });
+  const wordCount = pages.reduce((sum, page) => sum + page.wordCount, 0);
+  if (!changed && wordCount === archive.book.wordCount) return archive;
+  return {
+    ...archive,
+    book: { ...archive.book, wordCount, updatedAt: new Date().toISOString() },
+    pages,
+  };
 }
 
 function countWords(value: string): number {

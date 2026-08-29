@@ -565,7 +565,7 @@ function getChapterTitle(chapterId?: string) {
   return selectedBookChapters.value.find((chapter) => chapter.id === chapterId)?.title;
 }
 function splitBookParagraphs(text: string) {
-  return text.split(/\n{2,}/).filter(Boolean);
+  return text.split('\n').filter(Boolean);
 }
 function tokenizeReaderParagraph(text: string): Array<{ text: string; isWord: boolean }> {
   return text.split(/([\p{L}]+(?:[-'’][\p{L}]+)*)/gu).filter(Boolean).map((token) => ({
