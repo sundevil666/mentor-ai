@@ -1647,12 +1647,13 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
 
 .videos-shell--detail .personal-reader {
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .personal-reader {
   display: grid;
   gap: 14px;
+  grid-template-rows: auto auto minmax(0, 1fr);
   padding: 0 2px 30px;
   scroll-behavior: smooth;
 }
@@ -1675,6 +1676,9 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   display: grid;
   gap: 14px;
   min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 30px;
 }
 
 .personal-reader__progress {
@@ -1748,6 +1752,7 @@ body.body--book-reading-mode .mobile-start-dock {
   background: var(--app-background);
   gap: 0;
   grid-template-columns: minmax(0, 1fr) 230px;
+  grid-template-rows: minmax(0, 1fr);
   inset: 0;
   padding: 0;
   position: fixed;

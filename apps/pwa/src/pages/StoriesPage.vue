@@ -135,7 +135,7 @@
         </div>
       </section>
 
-      <section v-else-if="selectedBook && currentBookPage" ref="personalReader" class="personal-reader" :class="{ 'personal-reader--focus': readingMode }" aria-label="Book reader" @scroll.passive="handleBookScroll">
+      <section v-else-if="selectedBook && currentBookPage" class="personal-reader" :class="{ 'personal-reader--focus': readingMode }" aria-label="Book reader">
         <div v-if="!readingMode" class="personal-reader__toolbar">
           <q-btn color="primary" icon="fullscreen" label="Reading mode" no-caps outline @click="setReadingMode(true)" />
           <q-select
@@ -150,8 +150,13 @@
           />
           <span>{{ currentBookPageIndex + 1 }} / {{ selectedBookPages.length }}</span>
         </div>
+        <div v-if="!readingMode" class="personal-reader__progress" aria-label="Reading progress">
+          <span>Page {{ currentBookPageIndex + 1 }}</span>
+          <q-linear-progress rounded size="8px" :value="(currentBookPageIndex + 1) / selectedBookPages.length" color="primary" track-color="grey-3" />
+          <span>{{ selectedBookPages.length }} {{ selectedBookPages.length === 1 ? 'page' : 'pages' }}</span>
+        </div>
         <div ref="readerContent" class="personal-reader__content" @scroll.passive="handleBookScroll">
-          <div class="personal-reader__progress" aria-label="Reading progress">
+          <div v-if="readingMode" class="personal-reader__progress" aria-label="Reading progress">
             <span>Page {{ currentBookPageIndex + 1 }}</span>
             <q-linear-progress rounded size="8px" :value="(currentBookPageIndex + 1) / selectedBookPages.length" color="primary" track-color="grey-3" />
             <span>{{ selectedBookPages.length }} {{ selectedBookPages.length === 1 ? 'page' : 'pages' }}</span>
@@ -253,7 +258,6 @@ const selectedBook = ref<PersonalBook | null>(null);
 const selectedBookChapters = ref<ReadingChapter[]>([]);
 const selectedBookPages = ref<ReadingPage[]>([]);
 const currentBookPageIndex = ref(0);
-const personalReader = ref<HTMLElement | null>(null);
 const readerContent = ref<HTMLElement | null>(null);
 const minReaderFontSize = 14;
 const maxReaderFontSize = 32;
@@ -459,7 +463,7 @@ function readBookProgress(bookId: string, pageCount: number): { currentPageIndex
     return { currentPageIndex: 0, furthestPageIndex: -1, scrollTopByPage: {} };
   }
 }
-function getReaderScroller() { return readingMode.value ? readerContent.value : personalReader.value; }
+function getReaderScroller() { return readerContent.value; }
 function restoreBookScrollPosition() {
   const book = selectedBook.value;
   if (!book) return;
