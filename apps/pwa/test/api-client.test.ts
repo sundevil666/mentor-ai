@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-import { synchronizeLearningEvidence, upsertSessionHandoff } from '../src/services/api-client.js';
+import { saveReadingTranscript, synchronizeLearningEvidence, upsertSessionHandoff } from '../src/services/api-client.js';
 
 describe('PWA API client', () => {
   beforeEach(() => {
@@ -67,6 +67,25 @@ describe('PWA API client', () => {
     assert.equal(calls[0]?.init?.method, 'PUT');
     assert.equal(JSON.parse(String(calls[0]?.init?.body)).id, handoff.id);
     assert.equal(saved.id, handoff.id);
+  });
+
+  it('uploads recognized text without microphone audio', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const chunk = {
+      id: 'reading-transcript-1', studentId: 'demo-student', bookId: 'book-1', pageIndex: 2,
+      text: 'I am reading aloud.', capturedAt: '2026-08-29T12:00:00.000Z', recognitionEngine: 'device-whisper' as const,
+    };
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url: String(url), init });
+      return jsonResponse(chunk);
+    };
+
+    await saveReadingTranscript(chunk);
+
+    assert.equal(calls[0]?.url, 'http://localhost:4000/api/reader/reading-transcripts');
+    assert.equal(calls[0]?.init?.method, 'POST');
+    assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), chunk);
+    assert.equal(String(calls[0]?.init?.body).includes('audio'), false);
   });
 
   it('throws on failed synchronization responses', async () => {

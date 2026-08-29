@@ -11,6 +11,7 @@ import {
   type LearningEvent,
   type PersonalReadingBookArchive,
   type ReaderVocabularyItem,
+  type ReadingTranscriptChunk,
   type SpeechResult,
   type SyncStatus,
   type StudentModel,
@@ -167,6 +168,18 @@ export const learningStateService = {
       .slice(0, 50);
     await learningStateRepository.write({ ...state, personalReadingBooks }, user);
     return personalReadingBooks;
+  },
+
+  async saveReadingTranscriptChunk(candidate: ReadingTranscriptChunk, user?: AuthenticatedUser) {
+    const state = await learningStateRepository.read(user);
+    const safe = sanitizeReadingTranscriptChunk(candidate, state.student.id);
+    if (!safe) throw new Error('Invalid reading transcript.');
+    const readingTranscriptChunks = [
+      ...state.readingTranscriptChunks.filter((chunk) => chunk.id !== safe.id),
+      safe,
+    ].sort((left, right) => left.capturedAt.localeCompare(right.capturedAt)).slice(-2_000);
+    await learningStateRepository.write({ ...state, readingTranscriptChunks }, user);
+    return safe;
   },
 
   async upsertSessionHandoff(handoff: LearningSessionHandoff, user?: AuthenticatedUser) {
@@ -708,6 +721,29 @@ function sanitizeReaderVocabularyItem(item: ReaderVocabularyItem, studentId: str
     lookupCount: Math.max(1, Math.min(10_000, Math.floor(item.lookupCount || 1))),
     firstLookedUpAt: item.firstLookedUpAt,
     lastLookedUpAt: item.lastLookedUpAt,
+  };
+}
+
+function sanitizeReadingTranscriptChunk(item: ReadingTranscriptChunk, studentId: string): ReadingTranscriptChunk | undefined {
+  const text = typeof item.text === 'string' ? item.text.replace(/\s+/g, ' ').trim().slice(0, 2_000) : '';
+  if (
+    item.studentId !== studentId ||
+    !item.id ||
+    !item.bookId ||
+    !text ||
+    !Number.isInteger(item.pageIndex) ||
+    item.pageIndex < 0 ||
+    !Number.isFinite(Date.parse(item.capturedAt)) ||
+    (item.recognitionEngine !== 'device-whisper' && item.recognitionEngine !== 'browser')
+  ) return undefined;
+  return {
+    id: item.id.slice(0, 180),
+    studentId,
+    bookId: item.bookId.slice(0, 160),
+    pageIndex: item.pageIndex,
+    text,
+    capturedAt: item.capturedAt,
+    recognitionEngine: item.recognitionEngine,
   };
 }
 

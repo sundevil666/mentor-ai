@@ -11,6 +11,7 @@ import type {
   Recommendation,
   ReaderTextLookup,
   ReaderVocabularyItem,
+  ReadingTranscriptChunk,
   SpeechResult,
   StatisticsSnapshot,
   Student,
@@ -210,6 +211,16 @@ export async function synchronizeContentEngagement(
   });
   if (!response.ok) throw new Error('Content engagement synchronization failed.');
   return ((await response.json()) as ApiResponse<ContentEngagementEvent[]>).data;
+}
+
+export async function saveReadingTranscript(chunk: ReadingTranscriptChunk): Promise<ReadingTranscriptChunk> {
+  const response = await fetch(`${apiBaseUrl}/api/reader/reading-transcripts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(chunk),
+  });
+  if (!response.ok) throw new Error('Reading transcript could not be saved.');
+  return ((await response.json()) as ApiResponse<ReadingTranscriptChunk>).data;
 }
 
 export async function synchronizeLearningEvidence(

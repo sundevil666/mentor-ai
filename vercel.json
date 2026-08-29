@@ -17,6 +17,10 @@
       "dest": "/api/synchronization?action=books"
     },
     {
+      "src": "^/api/reader/reading-transcripts$",
+      "dest": "/api/synchronization?action=reading-transcript"
+    },
+    {
       "src": "^/app-update\\.json$",
       "headers": {
         "Cache-Control": "no-store, max-age=0"

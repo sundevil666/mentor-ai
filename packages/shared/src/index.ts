@@ -341,6 +341,16 @@ export interface PersonalReadingBookArchive {
   pages: ReadingPage[];
 }
 
+export interface ReadingTranscriptChunk {
+  id: string;
+  studentId: string;
+  bookId: string;
+  pageIndex: number;
+  text: string;
+  capturedAt: string;
+  recognitionEngine: 'device-whisper' | 'browser';
+}
+
 export interface ReadingAttempt {
   id: string;
   studentId: string;

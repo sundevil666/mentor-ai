@@ -261,6 +261,26 @@ describe('learning state service', () => {
     assert.equal(handoffs.some((item) => item.id === handoff.id && item.sourceDevice === 'mobile'), true);
   });
 
+  it('stores only a bounded normalized reading transcript chunk', async () => {
+    const saved = await learningStateService.saveReadingTranscriptChunk({
+      id: `reading-transcript-${Date.now()}`,
+      studentId: 'demo-student',
+      bookId: 'book-1',
+      pageIndex: 3,
+      text: '  I   am reading aloud.  ',
+      capturedAt: '2026-08-29T12:00:00.000Z',
+      recognitionEngine: 'device-whisper',
+    });
+
+    assert.equal(saved.text, 'I am reading aloud.');
+    assert.equal(saved.recognitionEngine, 'device-whisper');
+    await assert.rejects(() => learningStateService.saveReadingTranscriptChunk({
+      ...saved,
+      id: `${saved.id}-wrong-user`,
+      studentId: 'another-student',
+    }), /Invalid reading transcript/);
+  });
+
   it('keeps the furthest processed progress when a newer device reports less', async () => {
     const base = {
       id: 'video:conflict-test', studentId: 'demo-student', category: 'video', contentId: 'conflict-test',

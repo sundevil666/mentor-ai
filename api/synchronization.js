@@ -19,6 +19,15 @@ module.exports = async (request, response) => {
       sendJson(response, 200, await service.synchronizePersonalReadingBooks(books, user));
       return;
     }
+    if (request.query?.action === 'reading-transcript') {
+      if (!user) {
+        sendJson(response, 401, { message: 'Google sign-in is required to save reading transcripts.' });
+        return;
+      }
+      const service = await import('../apps/api/src/services/reading-transcripts.service.js');
+      sendJson(response, 200, await service.storeReadingTranscript(body, user));
+      return;
+    }
 
     const { learningStateService } = await import('../apps/api/src/services/learning-state.service.js');
     if (Array.isArray(body?.progress)) {

@@ -1,8 +1,9 @@
 import type { RequestHandler } from 'express';
 import { lookupReaderPhonetic, lookupReaderText } from '../services/reader-lookup.service.js';
-import type { PersonalReadingBookArchive, ReaderVocabularyItem } from '@mentor-ai/shared';
+import type { PersonalReadingBookArchive, ReaderVocabularyItem, ReadingTranscriptChunk } from '@mentor-ai/shared';
 import { learningStateService } from '../services/learning-state.service.js';
 import { getTranslationUsage, TranslationLimitError } from '../services/translation-usage.service.js';
+import { storeReadingTranscript } from '../services/reading-transcripts.service.js';
 
 export const translateReaderText: RequestHandler = async (req, res, _next) => {
   try {
@@ -43,6 +44,17 @@ export const synchronizePersonalReadingBooks: RequestHandler = async (req, res, 
   try {
     const books = Array.isArray(req.body?.books) ? req.body.books as PersonalReadingBookArchive[] : [];
     res.json({ data: await learningStateService.mergePersonalReadingBooks(books, req.authUser) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const saveReadingTranscript: RequestHandler = async (req, res, next) => {
+  try {
+    const data = req.authUser
+      ? await storeReadingTranscript(req.body as ReadingTranscriptChunk, req.authUser)
+      : await learningStateService.saveReadingTranscriptChunk(req.body as ReadingTranscriptChunk, req.authUser);
+    res.json({ data });
   } catch (error) {
     next(error);
   }

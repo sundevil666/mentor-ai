@@ -247,7 +247,7 @@
                   <strong>{{ readingSpeechTitle }}</strong>
                   <p>{{ readingSpeechMessage }}</p>
                   <p>Matching words are highlighted while you read. Background sounds and phrases that do not match the nearby book text are ignored. You can reread any sentence.</p>
-                  <small>Mentor AI does not save microphone audio.</small>
+                  <small>Audio stays on this device. Only recognized text is saved for your learning analysis.</small>
                 </q-card>
               </q-popup-proxy>
             </q-btn>
@@ -276,7 +276,7 @@
                 :class="{ 'personal-reader__heard-word--interim': readingSpeechLastWord.interim }"
               >{{ readingSpeechLastWord.text }}</strong>
               <span v-else class="personal-reader__heard-words-empty">{{ readingSpeechActive ? 'Listening…' : '—' }}</span>
-              <small>This recognized word is used for your reading analysis. Audio is not saved.</small>
+              <small>Recognition runs on this device. Audio is not uploaded; recognized text is saved for analysis.</small>
             </div>
             <div v-if="readingSpeechAcceptedWords" class="personal-reader__speech-stats">
               <strong>{{ readingSpeechMatchPercent }}%</strong>
@@ -416,13 +416,14 @@ import { useAppStore } from 'src/stores/app-store';
 import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 import { deletePersonalBook, importPersonalBook, listPersonalBookArchives, listPersonalBooks, loadPersonalBook, markPersonalBookOpened, mergePersonalBookArchives, type PersonalBook } from 'src/services/personal-book-library';
 import { personalBookSyncControl } from 'src/services/personal-book-sync-control';
-import { fetchReaderPhonetic, fetchReaderTextLookup, synchronizePersonalReadingBooks, synchronizeReaderVocabulary } from 'src/services/api-client';
+import { fetchReaderPhonetic, fetchReaderTextLookup, saveReadingTranscript, synchronizePersonalReadingBooks, synchronizeReaderVocabulary } from 'src/services/api-client';
 import { getAuthToken } from 'src/services/auth';
 import { findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice } from 'src/services/speech-synthesis';
 import { createDailyReadingProgress, dailyReadingGoalWords, dailyWordsRead, localReadingDate, readingGoalMessage, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { alignReadingSpeech, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
+import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
 
 const appStore = useAppStore();
@@ -468,6 +469,7 @@ const readingSpeechFinalWords = ref<string[]>([]);
 const readingSpeechInterimWords = ref<string[]>([]);
 let readingSpeechAnchor = 0;
 let readingSpeechRecognition: ContinuousSpeechRecognition | null = null;
+let localReadingTranscriber: LocalReadingTranscriber | null = null;
 let readingSpeechStream: MediaStream | null = null;
 let readingSpeechAudioContext: AudioContext | null = null;
 let readingSpeechAnimationFrame = 0;
@@ -962,7 +964,8 @@ async function toggleReadingSpeech() {
 }
 async function startReadingSpeech() {
   if (readingSpeechRecognition || readingSpeechStream || !readingMode.value) return;
-  if (!isSpeechRecognitionAvailable() || !navigator.mediaDevices?.getUserMedia) {
+  const useLocalRecognition = isIosStandalone();
+  if (!navigator.mediaDevices?.getUserMedia || (useLocalRecognition && typeof MediaRecorder === 'undefined') || (!useLocalRecognition && !isSpeechRecognitionAvailable())) {
     readingSpeechStatus.value = 'error';
     readingSpeechMessage.value = 'Live speech recognition is not supported by this browser.';
     return;
@@ -978,12 +981,26 @@ async function startReadingSpeech() {
     });
     void startReadingSpeechMeter(readingSpeechStream);
     readingSpeechAnchor = getVisibleReaderWordAnchor();
-    readingSpeechRecognition = startContinuousSpeechRecognition({
+    if (useLocalRecognition) {
+      localReadingTranscriber = startLocalReadingTranscriber(readingSpeechStream, {
+        onTranscript: (transcript) => handleReadingSpeechTranscript(transcript, 'device-whisper'),
+        onProgress: (message) => {
+          readingSpeechStatus.value = 'requesting';
+          readingSpeechMessage.value = message;
+        },
+        onError: (message) => {
+          stopReadingSpeech('error');
+          readingSpeechMessage.value = `Offline speech recognition stopped: ${message}`;
+        },
+      });
+      readingSpeechStatus.value = 'listening';
+      readingSpeechMessage.value = 'Listening locally. The first recognition may take longer while the offline model is prepared.';
+    } else readingSpeechRecognition = startContinuousSpeechRecognition({
       lang: 'en-US',
       onInterim: (transcript) => {
         readingSpeechInterimWords.value = tokenizeReadingSpeech(transcript);
       },
-      onFinal: handleReadingSpeechTranscript,
+      onFinal: (transcript) => handleReadingSpeechTranscript(transcript, 'browser'),
       onListeningChange: (listening) => {
         if (!readingSpeechRecognition && !listening) return;
         readingSpeechStatus.value = listening ? 'listening' : 'requesting';
@@ -1001,8 +1018,10 @@ async function startReadingSpeech() {
         Notify.create({ type: 'negative', icon: 'mic', message: readingSpeechMessage.value, timeout: 6_000 });
       },
     });
-    readingSpeechStatus.value = 'listening';
-    readingSpeechMessage.value = 'Read naturally. Matching words are highlighted as you speak.';
+    if (!useLocalRecognition) {
+      readingSpeechStatus.value = 'listening';
+      readingSpeechMessage.value = 'Read naturally. Matching words are highlighted as you speak.';
+    }
   } catch (error) {
     stopReadingSpeech('error');
     readingSpeechCaptureUnavailable.value = isMicrophoneCaptureUnavailable(error);
@@ -1046,10 +1065,23 @@ function isMicrophonePermissionError(error: unknown) {
     ? error.name === 'NotAllowedError' || error.name === 'SecurityError'
     : error instanceof Error && /denied|allowed|permission/i.test(error.message);
 }
-function handleReadingSpeechTranscript(transcript: string) {
+function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'device-whisper' | 'browser' = 'browser') {
   const heardWords = tokenizeReadingSpeech(transcript);
+  if (!heardWords.length) return;
   readingSpeechFinalWords.value = heardWords.slice(-1);
   readingSpeechInterimWords.value = [];
+  const book = selectedBook.value;
+  if (book) void saveReadingTranscript({
+    id: `reading-transcript-${crypto.randomUUID()}`,
+    studentId: appStore.studentId,
+    bookId: book.id,
+    pageIndex: currentBookPageIndex.value,
+    text: transcript,
+    capturedAt: new Date().toISOString(),
+    recognitionEngine,
+  }).catch(() => {
+    Notify.create({ type: 'warning', message: 'Words were recognized, but could not be saved for analysis.', timeout: 3_000 });
+  });
   const spokenCount = heardWords.length;
   if (spokenCount < 3) return;
   const match = alignReadingSpeech(readerReferenceWords.value, transcript, readingSpeechAnchor);
@@ -1102,6 +1134,8 @@ async function startReadingSpeechMeter(stream: MediaStream) {
 function stopReadingSpeech(status: ReadingSpeechStatus) {
   readingSpeechRecognition?.stop();
   readingSpeechRecognition = null;
+  localReadingTranscriber?.stop();
+  localReadingTranscriber = null;
   readingSpeechInterimWords.value = [];
   readingSpeechStream?.getTracks().forEach((track) => track.stop());
   readingSpeechStream = null;
