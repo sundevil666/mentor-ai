@@ -133,6 +133,16 @@ export async function listPersonalBookArchives(): Promise<PersonalReadingBookArc
   return archives.filter((archive): archive is PersonalReadingBookArchive => archive !== null);
 }
 
+export function createFallbackPersonalBookSource(book: PersonalBook): ReadingImportSource {
+  return {
+    id: book.sourceId,
+    type: 'manual',
+    provider: 'student-device',
+    importedAt: book.importedAt,
+    licenseNote: 'Student confirmed a lawful private copy.',
+  };
+}
+
 export async function mergePersonalBookArchives(archives: PersonalReadingBookArchive[]): Promise<void> {
   for (const archive of archives) {
     if (!archive?.book?.id || archive.book.rightsConfirmed !== true) continue;
@@ -142,17 +152,19 @@ export async function mergePersonalBookArchives(archives: PersonalReadingBookArc
   }
 }
 
-export async function loadPersonalBook(bookId: string): Promise<{ book: PersonalBook; chapters: ReadingChapter[]; pages: ReadingPage[] } | null> {
+export async function loadPersonalBook(bookId: string): Promise<PersonalReadingBookArchive | null> {
   const db = await getMentorDb();
   const book = await db.get('reading-books', bookId) as PersonalBook | undefined;
   if (!book) return null;
+  const storedSource = await db.get('reading-sources', book.sourceId) as ReadingImportSource | undefined;
+  const source = storedSource ?? createFallbackPersonalBookSource(book);
   const chapters = (await db.getAll('reading-chapters') as ReadingChapter[])
     .filter((chapter) => chapter.bookId === bookId)
     .sort((left, right) => left.order - right.order);
   const pages = (await db.getAll('reading-pages') as ReadingPage[])
     .filter((page) => page.bookId === bookId)
     .sort((left, right) => left.pageNumber - right.pageNumber);
-  return { book, chapters, pages };
+  return { source, book, chapters, pages };
 }
 
 export async function markPersonalBookOpened(book: PersonalBook): Promise<void> {

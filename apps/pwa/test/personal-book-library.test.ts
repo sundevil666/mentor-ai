@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { strToU8, zipSync } from 'fflate';
-import { buildEpubBook, buildPlainTextBook, resolveArchivePath, splitPlainTextIntoChapters } from '../src/services/personal-book-library.js';
+import { buildEpubBook, buildPlainTextBook, createFallbackPersonalBookSource, resolveArchivePath, splitPlainTextIntoChapters } from '../src/services/personal-book-library.js';
 
 describe('personal book library', () => {
   it('splits large plain text at paragraph boundaries', () => {
@@ -21,6 +21,17 @@ describe('personal book library', () => {
     assert.equal(imported.book.chapterCount, 1);
     assert.equal(imported.book.wordCount, 4);
     assert.equal(imported.pages[0]?.text, 'First paragraph.\n\nSecond paragraph.');
+  });
+
+  it('reconstructs source metadata for books imported by an older app version', () => {
+    const imported = buildPlainTextBook('A legacy local book.', 'legacy.txt');
+    assert.deepEqual(createFallbackPersonalBookSource(imported.book), {
+      id: imported.book.sourceId,
+      type: 'manual',
+      provider: 'student-device',
+      importedAt: imported.book.importedAt,
+      licenseNote: 'Student confirmed a lawful private copy.',
+    });
   });
 
   it('resolves EPUB package paths without escaping the archive', () => {
