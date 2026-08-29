@@ -1799,6 +1799,43 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   color: color-mix(in srgb, var(--app-text-strong) 82%, var(--q-positive));
 }
 
+.personal-reader__word--selected {
+  background: #f6d982;
+  box-shadow: 0 0 0 3px rgba(212, 159, 31, 0.2);
+  color: #30250e;
+}
+
+.personal-reader__word--marker {
+  background: color-mix(in srgb, var(--q-primary) 16%, transparent);
+  box-shadow: inset 0 -3px 0 var(--q-primary);
+  color: inherit;
+  position: relative;
+}
+
+.personal-reader__word--marker::before {
+  color: var(--q-primary);
+  content: '●';
+  font-size: 0.48em;
+  left: 50%;
+  line-height: 1;
+  position: absolute;
+  top: -0.8em;
+  transform: translateX(-50%);
+}
+
+.personal-reader__word--selected.personal-reader__word--marker {
+  background: #f6d982;
+  box-shadow: 0 0 0 3px rgba(212, 159, 31, 0.2), inset 0 -3px 0 var(--q-primary);
+  color: #30250e;
+}
+
+body.body--dark .personal-reader__word--selected,
+body.body--dark .personal-reader__word--selected.personal-reader__word--marker {
+  background: #8b6a23;
+  box-shadow: 0 0 0 3px rgba(224, 184, 83, 0.18), inset 0 -3px 0 var(--q-primary);
+  color: #fff8e8;
+}
+
 @media (hover: hover) and (pointer: fine) {
   .personal-reader__word {
     border-radius: 3px;
@@ -1810,6 +1847,19 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
     background: var(--category-soft);
     box-shadow: 0 0 0 2px var(--category-soft);
     color: var(--category-accent);
+  }
+
+  .personal-reader__word--selected:hover,
+  .personal-reader__word--selected.personal-reader__word--marker:hover {
+    background: #f6d982;
+    box-shadow: 0 0 0 3px rgba(212, 159, 31, 0.2), inset 0 -3px 0 var(--q-primary);
+    color: #30250e;
+  }
+
+  body.body--dark .personal-reader__word--selected:hover,
+  body.body--dark .personal-reader__word--selected.personal-reader__word--marker:hover {
+    background: #8b6a23;
+    color: #fff8e8;
   }
 
   .personal-reader__word--loading,
@@ -2200,6 +2250,16 @@ body.body--dark .personal-reader--focus {
   display: flex;
   gap: 8px;
   justify-content: space-between;
+}
+
+.personal-reader__lookup-heading > div {
+  display: flex;
+  gap: 8px;
+}
+
+.personal-reader__marker-return {
+  margin-top: 8px;
+  width: 100%;
 }
 
 .personal-reader__lookup-loading--phonetic {

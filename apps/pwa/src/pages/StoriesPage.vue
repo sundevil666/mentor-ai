@@ -175,6 +175,8 @@
                     class="personal-reader__word"
                     :class="{
                       'personal-reader__word--loading': readerLookupLoading && token.text.toLocaleLowerCase('en') === selectedReaderText.toLocaleLowerCase('en'),
+                      'personal-reader__word--selected': token.wordIndex === selectedReaderWordIndex,
+                      'personal-reader__word--marker': token.wordIndex === readerMarkerWordIndex,
                       'personal-reader__word--spoken': token.wordIndex !== undefined && spokenReaderWordIndexes.has(token.wordIndex),
                     }"
                     :data-reader-word="token.text"
@@ -283,7 +285,19 @@
           >
             <div v-if="selectedReaderText" class="personal-reader__lookup-heading">
               <strong>{{ readerLookupKind === 'word' ? 'Word' : 'Phrase' }}</strong>
-              <q-btn aria-label="Play selected text" color="primary" icon="volume_up" round size="sm" unelevated @click="speakReaderText(selectedReaderText)" />
+              <div>
+                <q-btn
+                  v-if="selectedReaderWordIndex !== null"
+                  :aria-label="selectedReaderWordIndex === readerMarkerWordIndex ? 'Remove reading marker' : 'Mark this reading place'"
+                  :color="selectedReaderWordIndex === readerMarkerWordIndex ? 'positive' : 'primary'"
+                  :icon="selectedReaderWordIndex === readerMarkerWordIndex ? 'bookmark' : 'bookmark_add'"
+                  round
+                  size="sm"
+                  :outline="selectedReaderWordIndex !== readerMarkerWordIndex"
+                  @click="toggleReaderMarker"
+                />
+                <q-btn aria-label="Play selected text" color="primary" icon="volume_up" round size="sm" unelevated @click="speakReaderText(selectedReaderText)" />
+              </div>
             </div>
             <p v-if="selectedReaderText" class="personal-reader__lookup-text">{{ selectedReaderText }}</p>
             <p v-if="readerPhonetic" class="personal-reader__lookup-phonetic">{{ readerPhonetic }}</p>
@@ -299,6 +313,16 @@
             <p v-else-if="readerLookup?.translationError" class="personal-reader__lookup-error">{{ readerLookup.translationError }}</p>
             <p v-else-if="readerLookupError" class="personal-reader__lookup-error">{{ readerLookupError }}</p>
             <p v-else class="personal-reader__lookup-hint">Tap a word, or press and hold to select a phrase.</p>
+            <q-btn
+              v-if="readerMarkerWordIndex !== null && readerMarkerWordIndex !== selectedReaderWordIndex"
+              class="personal-reader__marker-return"
+              color="primary"
+              icon="bookmark"
+              label="Return to my marker"
+              no-caps
+              outline
+              @click="goToReaderMarker"
+            />
           </section>
 
           <div class="personal-reader__sidebar-navigation">
@@ -399,6 +423,8 @@ const readerPageCount = ref(1);
 const readerPageStride = ref(1);
 const chapterPageIndexes = ref<number[]>([]);
 const selectedReaderText = ref('');
+const selectedReaderWordIndex = ref<number | null>(null);
+const readerMarkerWordIndex = ref<number | null>(null);
 const readerLookup = ref<ReaderTextLookup | null>(null);
 const readerLookupLoading = ref(false);
 const readerPhonetic = ref<string | undefined>();
@@ -652,6 +678,7 @@ async function openBook(bookId: string) {
   readerPageStride.value = 1;
   chapterPageIndexes.value = loaded.pages.map(() => 0);
   restoreDailySpokenWords(loaded.book.id);
+  readerMarkerWordIndex.value = readReaderMarker(loaded.book.id);
   const readerSettings = readBookReaderSettings(loaded.book.id);
   readerFontSize.value = readerSettings.fontSize;
   await markPersonalBookOpened(loaded.book);
@@ -674,6 +701,8 @@ function closeBook() {
   readerPageStride.value = 1;
   chapterPageIndexes.value = [];
   spokenReaderWordIndexes.value = new Set();
+  selectedReaderWordIndex.value = null;
+  readerMarkerWordIndex.value = null;
   readingSpeechAcceptedWords.value = 0;
   readingSpeechSpokenWords.value = 0;
   clearReaderLookup();
@@ -717,9 +746,11 @@ function handleReaderTextTap(event: MouseEvent) {
     queueReaderSelectionLookup();
     return;
   }
-  const targetWord = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-reader-word]')?.dataset.readerWord : undefined;
+  const target = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-reader-word]') : null;
+  const targetWord = target?.dataset.readerWord;
+  const targetWordIndex = Number(target?.dataset.readerWordIndex);
   const word = targetWord ?? getWordAtPoint(event.clientX, event.clientY);
-  if (word) void selectReaderText(word, true);
+  if (word) void selectReaderText(word, true, Number.isInteger(targetWordIndex) ? targetWordIndex : null);
 }
 function handleReaderSelectionChange() {
   const selection = window.getSelection();
@@ -731,7 +762,7 @@ function queueReaderSelectionLookup() {
   readerSelectionTimer = window.setTimeout(() => {
     const selection = window.getSelection();
     const text = selection && isReaderSelection(selection) ? normalizeReaderSelection(selection.toString()) : '';
-    if (text) void selectReaderText(text, false);
+    if (text) void selectReaderText(text, false, null);
   }, 450);
 }
 function isReaderSelection(selection: Selection) {
@@ -765,10 +796,11 @@ function getWordAtPoint(x: number, y: number) {
 function normalizeReaderSelection(value: string) {
   return value.replace(/\s+/g, ' ').trim().slice(0, 500);
 }
-async function selectReaderText(rawText: string, speakImmediately: boolean) {
+async function selectReaderText(rawText: string, speakImmediately: boolean, wordIndex: number | null) {
   const text = normalizeReaderSelection(rawText);
   if (!text || !selectedBook.value) return;
   selectedReaderText.value = text;
+  selectedReaderWordIndex.value = wordIndex;
   readerLookup.value = null;
   readerPhonetic.value = undefined;
   readerLookupError.value = '';
@@ -831,11 +863,45 @@ async function speakReaderText(text: string) {
 function clearReaderLookup() {
   readerLookupRequestId += 1;
   selectedReaderText.value = '';
+  selectedReaderWordIndex.value = null;
   readerLookup.value = null;
   readerLookupLoading.value = false;
   readerPhonetic.value = undefined;
   readerPhoneticLoading.value = false;
   readerLookupError.value = '';
+}
+function readerMarkerKey(bookId: string) { return `mentor-ai:personal-book-marker:${bookId}`; }
+function readReaderMarker(bookId: string): number | null {
+  if (typeof localStorage === 'undefined') return null;
+  const stored = localStorage.getItem(readerMarkerKey(bookId));
+  if (stored === null) return null;
+  const value = Number(stored);
+  return Number.isInteger(value) && value >= 0 ? value : null;
+}
+function toggleReaderMarker() {
+  const book = selectedBook.value;
+  const wordIndex = selectedReaderWordIndex.value;
+  if (!book || wordIndex === null || typeof localStorage === 'undefined') return;
+  if (readerMarkerWordIndex.value === wordIndex) {
+    readerMarkerWordIndex.value = null;
+    localStorage.removeItem(readerMarkerKey(book.id));
+    Notify.create({ message: 'Reading marker removed.', icon: 'bookmark_remove' });
+    return;
+  }
+  readerMarkerWordIndex.value = wordIndex;
+  localStorage.setItem(readerMarkerKey(book.id), String(wordIndex));
+  Notify.create({ type: 'positive', message: 'Your reading place is marked.', icon: 'bookmark' });
+}
+function goToReaderMarker() {
+  const markerIndex = readerMarkerWordIndex.value;
+  const paper = readerPaper.value;
+  if (markerIndex === null || !paper) return;
+  const marker = paper.querySelector<HTMLElement>(`[data-reader-word-index="${markerIndex}"]`);
+  if (!marker) return;
+  currentBookPageIndex.value = Math.max(0, Math.min(readerPageCount.value - 1, Math.floor((marker.offsetLeft + 1) / readerPageStride.value)));
+  scrollToReaderPage();
+  persistBookProgress();
+  marker.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
 }
 const readingSpeechEnabledKey = 'mentor-ai:reading-speech-enabled';
 async function toggleReadingSpeech() {
@@ -1164,6 +1230,7 @@ async function removeBook(book: PersonalBook) {
     await deletePersonalBook(book.id);
     localStorage.removeItem(bookProgressKey(book.id));
     localStorage.removeItem(bookReaderSettingsKey(book.id));
+    localStorage.removeItem(readerMarkerKey(book.id));
     personalBooks.value = await listPersonalBooks();
     Notify.create({ type: 'positive', message: `${book.title} was removed from this device.` });
   } catch {
