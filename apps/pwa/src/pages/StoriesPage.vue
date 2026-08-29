@@ -189,14 +189,6 @@
         </div>
 
         <aside v-if="readingMode" class="personal-reader__sidebar" aria-label="Reading controls">
-          <div class="personal-reader__progress personal-reader__sidebar-progress" aria-label="Reading progress">
-            <div>
-              <span>Page {{ currentBookPageIndex + 1 }}</span>
-              <span>{{ readerPageCount }} {{ readerPageCount === 1 ? 'page' : 'pages' }}</span>
-            </div>
-            <q-linear-progress rounded size="8px" :value="(currentBookPageIndex + 1) / readerPageCount" color="primary" track-color="grey-3" />
-          </div>
-
           <div class="personal-reader__sidebar-actions">
             <q-btn class="personal-reader__exit" color="primary" icon="close_fullscreen" label="Exit reading" no-caps outline @click="setReadingMode(false)" />
             <q-btn aria-label="Reading settings" icon="more_vert" outline round>
@@ -320,11 +312,14 @@
               :options="bookPageOptions"
               @update:model-value="goToBookChapter"
             />
-            <span>{{ currentBookPageIndex + 1 }} / {{ readerPageCount }}</span>
-            <nav aria-label="Book navigation">
-              <q-btn aria-label="Previous part" color="primary" icon="arrow_back" round unelevated :disable="currentBookPageIndex === 0" @click="goToBookPage(currentBookPageIndex - 1)" />
-              <q-btn aria-label="Next part" color="primary" icon="arrow_forward" round unelevated :disable="currentBookPageIndex >= readerPageCount - 1" @click="goToBookPage(currentBookPageIndex + 1)" />
+            <nav class="personal-reader__sidebar-page-row" aria-label="Book navigation">
+              <q-btn aria-label="Previous part" color="primary" dense icon="arrow_back" round size="sm" unelevated :disable="currentBookPageIndex === 0" @click="goToBookPage(currentBookPageIndex - 1)" />
+              <span :aria-label="`Current page ${currentBookPageIndex + 1}`">{{ currentBookPageIndex + 1 }}</span>
+              <span class="personal-reader__sidebar-page-spacer" aria-hidden="true" />
+              <span :aria-label="`${readerPageCount} pages total`">{{ readerPageCount }}</span>
+              <q-btn aria-label="Next part" color="primary" dense icon="arrow_forward" round size="sm" unelevated :disable="currentBookPageIndex >= readerPageCount - 1" @click="goToBookPage(currentBookPageIndex + 1)" />
             </nav>
+            <q-linear-progress aria-label="Reading progress" rounded size="6px" :value="(currentBookPageIndex + 1) / readerPageCount" color="primary" track-color="grey-3" />
           </div>
         </aside>
 

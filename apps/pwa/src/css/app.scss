@@ -1920,17 +1920,6 @@ body.body--book-reading-mode .mobile-start-dock {
   padding: 16px;
 }
 
-.personal-reader__sidebar-progress {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.personal-reader__sidebar-progress > div {
-  display: flex;
-  justify-content: space-between;
-}
-
 .personal-reader__font-controls,
 .personal-reader__sidebar-size-controls {
   align-items: center;
@@ -2241,13 +2230,19 @@ body.body--dark .personal-reader__lookup-error {
   margin-top: auto;
 }
 
-.personal-reader__sidebar-navigation > span {
-  text-align: center;
+.personal-reader__sidebar-page-row {
+  align-items: center;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: auto auto minmax(8px, 1fr) auto auto;
 }
 
-.personal-reader__sidebar-navigation nav {
-  display: flex;
-  justify-content: space-between;
+.personal-reader__sidebar-page-row > span:not(.personal-reader__sidebar-page-spacer) {
+  color: var(--app-text-strong);
+  font-size: 0.82em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .personal-reader__sidebar .q-btn__content {
