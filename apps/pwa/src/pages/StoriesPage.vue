@@ -233,24 +233,6 @@
           </section>
 
           <section class="personal-reader__speech-coach" :class="`personal-reader__speech-coach--${readingSpeechStatus}`" aria-live="polite" aria-label="Reading pronunciation coach">
-            <q-btn
-              class="personal-reader__speech-help"
-              aria-label="What does voice tracking do?"
-              color="primary"
-              flat
-              icon="help_outline"
-              round
-              size="sm"
-            >
-              <q-popup-proxy anchor="center left" self="center right" :offset="[10, 0]">
-                <q-card class="personal-reader__speech-help-card">
-                  <strong>{{ readingSpeechTitle }}</strong>
-                  <p>{{ readingSpeechMessage }}</p>
-                  <p>Matching words are highlighted while you read. Background sounds and phrases that do not match the nearby book text are ignored. You can reread any sentence.</p>
-                  <small>Audio stays on this device. Only recognized text is saved for your learning analysis.</small>
-                </q-card>
-              </q-popup-proxy>
-            </q-btn>
             <button
               class="personal-reader__speech-orb"
               :style="{ '--reader-speech-level': String(Math.max(0.08, readingSpeechLevel)) }"
@@ -263,10 +245,7 @@
             </button>
             <div class="personal-reader__microphone-status" :class="`personal-reader__microphone-status--${readingMicrophoneIndicator.tone}`" role="status">
               <span class="personal-reader__microphone-status-dot" aria-hidden="true" />
-              <div>
-                <strong>{{ readingMicrophoneIndicator.title }}</strong>
-                <span>{{ readingMicrophoneIndicator.detail }}</span>
-              </div>
+              <strong>{{ readingMicrophoneIndicator.title }}</strong>
             </div>
             <div class="personal-reader__heard-words" aria-live="polite" aria-label="Words heard by the microphone">
               <span class="personal-reader__heard-words-label">Last word heard</span>
@@ -276,22 +255,28 @@
                 :class="{ 'personal-reader__heard-word--interim': readingSpeechLastWord.interim }"
               >{{ readingSpeechLastWord.text }}</strong>
               <span v-else class="personal-reader__heard-words-empty">{{ readingSpeechActive ? 'Listening…' : '—' }}</span>
-              <small>Recognition runs on this device. Audio is not uploaded; recognized text is saved for analysis.</small>
             </div>
-            <div v-if="readingSpeechAcceptedWords" class="personal-reader__speech-stats">
-              <strong>{{ readingSpeechMatchPercent }}%</strong>
-              <span>{{ readingSpeechAcceptedWords }} words</span>
+            <div class="personal-reader__speech-actions">
+              <q-btn
+                :aria-label="readingSpeechActive ? 'Stop microphone' : 'Start microphone'"
+                :icon="readingSpeechActive ? 'stop' : 'mic'"
+                :label="readingSpeechActionLabel"
+                :color="readingSpeechStatus === 'error' ? 'negative' : readingSpeechActive ? 'positive' : 'primary'"
+                dense
+                no-caps
+                outline
+                @click="toggleReadingSpeech"
+              />
+              <q-btn
+                v-if="readingSpeechPermissionBlocked || readingSpeechCaptureUnavailable"
+                aria-label="Microphone access help"
+                color="negative"
+                flat
+                icon="settings"
+                round
+                @click="showMicrophoneAccessHelp"
+              />
             </div>
-            <q-btn
-              :aria-label="readingSpeechActive ? 'Stop microphone' : 'Start microphone'"
-              :icon="readingSpeechActive ? 'stop' : 'mic'"
-              :label="readingSpeechActionLabel"
-              :color="readingSpeechStatus === 'error' ? 'negative' : readingSpeechActive ? 'positive' : 'primary'"
-              dense
-              no-caps
-              outline
-              @click="toggleReadingSpeech"
-            />
           </section>
 
           <section
@@ -573,27 +558,22 @@ const readingSpeechLastWord = computed(() => {
   const finalWord = readingSpeechFinalWords.value.at(-1);
   return finalWord ? { text: finalWord, interim: false } : null;
 });
-const readingSpeechMatchPercent = computed(() => readingSpeechSpokenWords.value > 0 ? Math.round(readingSpeechAcceptedWords.value / readingSpeechSpokenWords.value * 100) : 0);
 const readingSpeechHasSignal = computed(() => readingSpeechLevel.value >= 0.035);
 const readingSpeechActionLabel = computed(() => {
   if (readingSpeechActive.value) return 'Stop microphone';
-  if (readingSpeechPermissionBlocked.value || readingSpeechCaptureUnavailable.value) return 'Fix microphone access';
-  if (readingSpeechStatus.value === 'error') return 'Try microphone again';
+  if (readingSpeechStatus.value === 'error') return 'Retry microphone';
   return 'Turn microphone on';
 });
 const readingMicrophoneIndicator = computed(() => {
-  if (readingSpeechStatus.value === 'requesting') return { tone: 'requesting', title: 'REQUESTING ACCESS', detail: 'Confirm the microphone request on this device.' };
+  if (readingSpeechStatus.value === 'requesting') return { tone: 'requesting', title: 'REQUESTING MICROPHONE' };
   if (readingSpeechStatus.value === 'listening' || readingSpeechStatus.value === 'noise') {
     return readingSpeechHasSignal.value
-      ? { tone: 'hearing', title: 'SOUND DETECTED', detail: 'The microphone hears you. Recognized words are used for analysis.' }
-      : { tone: 'listening', title: 'MICROPHONE ON — LISTENING', detail: 'Start reading aloud. The sound indicator will react to your voice.' };
+      ? { tone: 'hearing', title: 'HEARING YOU' }
+      : { tone: 'listening', title: 'MICROPHONE ON' };
   }
-  if (readingSpeechStatus.value === 'error') return { tone: 'error', title: 'MICROPHONE ACCESS BLOCKED', detail: readingSpeechMessage.value };
-  return { tone: 'off', title: 'MICROPHONE OFF', detail: 'Tap Turn microphone on to request access.' };
+  if (readingSpeechStatus.value === 'error') return { tone: 'error', title: 'MICROPHONE BLOCKED' };
+  return { tone: 'off', title: 'MICROPHONE OFF' };
 });
-const readingSpeechTitle = computed(() => ({
-  idle: 'Pronunciation coach', requesting: 'Enabling microphone…', listening: 'Listening to your reading', noise: 'Waiting for the book text', paused: 'Voice tracking paused', error: 'Microphone unavailable',
-})[readingSpeechStatus.value]);
 
 onMounted(async () => {
   configurePlaybackAudioSession();
@@ -954,17 +934,18 @@ async function toggleReadingSpeech() {
     readingSpeechMessage.value = 'Your highlighted words are kept. Tap Start listening when you are ready.';
     return;
   }
-  if (readingSpeechPermissionBlocked.value || readingSpeechCaptureUnavailable.value) {
-    showMicrophoneAccessHelp();
-    return;
-  }
+  readingSpeechPermissionBlocked.value = false;
+  readingSpeechCaptureUnavailable.value = false;
   readingSpeechFinalWords.value = [];
   readingSpeechInterimWords.value = [];
   await startReadingSpeech();
 }
 async function startReadingSpeech() {
   if (readingSpeechRecognition || readingSpeechStream || !readingMode.value) return;
-  const useLocalRecognition = isIosStandalone();
+  const appleTablet = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const useLocalRecognition = isIosStandalone()
+    || (appleTablet && window.matchMedia('(display-mode: standalone)').matches);
   if (!navigator.mediaDevices?.getUserMedia || (useLocalRecognition && typeof MediaRecorder === 'undefined') || (!useLocalRecognition && !isSpeechRecognitionAvailable())) {
     readingSpeechStatus.value = 'error';
     readingSpeechMessage.value = 'Live speech recognition is not supported by this browser.';
@@ -975,10 +956,7 @@ async function startReadingSpeech() {
   readingSpeechCaptureUnavailable.value = false;
   readingSpeechMessage.value = 'Use the device prompt to allow microphone access.';
   try {
-    readingSpeechStream = await navigator.mediaDevices.getUserMedia({
-      audio: { autoGainControl: true, echoCancellation: true, noiseSuppression: true },
-      video: false,
-    });
+    readingSpeechStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     void startReadingSpeechMeter(readingSpeechStream);
     readingSpeechAnchor = getVisibleReaderWordAnchor();
     if (useLocalRecognition) {
@@ -1040,7 +1018,7 @@ function showMicrophoneAccessHelp() {
   const installedPwa = window.matchMedia('(display-mode: standalone)').matches
     || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
   const message = appleTablet && installedPwa
-    ? '<ol><li>Fully close the Mentor AI PWA from the iPad app switcher.</li><li>Open the same Mentor AI website in Safari.</li><li>Tap Page Menu beside the address bar → More → Website Settings → Microphone → Allow.</li><li>In iPad Settings → Apps → Safari → Microphone, choose Ask or Allow.</li><li>If Safari appears under Settings → Privacy & Security → Speech Recognition, enable it.</li><li>Reopen the Mentor AI PWA and try the microphone again.</li></ol>'
+    ? '<ol><li>Fully close the Mentor AI PWA from the iPad app switcher.</li><li>Open the same Mentor AI website in Safari.</li><li>Tap Page Menu beside the address bar → More → Website Settings → Microphone → Allow.</li><li>In iPad Settings → Apps → Safari → Microphone, choose Ask or Allow.</li><li>Reopen the Mentor AI PWA and tap Retry microphone.</li></ol>'
     : appleTablet
       ? '<ol><li>In Safari, open Mentor AI.</li><li>Tap the Page Menu beside the address bar, then More.</li><li>Open Website Settings and set Microphone to Allow.</li><li>If it is still blocked, open iPad Settings → Privacy & Security → Microphone and Speech Recognition, then allow Safari.</li><li>Return here and tap the button below.</li></ol>'
     : '<ol><li>Open this site’s permissions in your browser.</li><li>Set Microphone to Allow.</li><li>Return here and tap the button below.</li></ol>';

@@ -2113,9 +2113,9 @@ body.body--dark .personal-reader__sidebar {
   border: 1px solid var(--category-border);
   border-radius: var(--app-radius-lg);
   display: grid;
-  gap: 10px;
+  gap: 7px;
   justify-items: center;
-  padding: 14px 12px;
+  padding: 9px;
   position: relative;
   text-align: center;
 }
@@ -2170,12 +2170,6 @@ body.body--dark .personal-reader__sidebar {
   border-radius: 50%;
   height: 12px;
   width: 12px;
-}
-
-.personal-reader__microphone-status > div {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
 }
 
 .personal-reader__microphone-status strong {
@@ -2279,8 +2273,8 @@ body.body--dark .personal-reader__sidebar {
   border: 1px dashed color-mix(in srgb, var(--category-accent) 40%, var(--app-border));
   border-radius: var(--app-radius-md);
   display: grid;
-  gap: 7px;
-  height: 112px;
+  gap: 5px;
+  height: 72px;
   padding: 9px;
   text-align: left;
   width: 100%;
@@ -2315,11 +2309,7 @@ body.body--dark .personal-reader__sidebar {
   text-align: center;
 }
 
-.personal-reader__heard-words small {
-  color: var(--app-muted-strong);
-  font-size: .62em;
-  line-height: 1.25;
-}
+.personal-reader__speech-actions { display: flex; gap: 4px; justify-content: center; width: 100%; }
 
 .personal-reader__speech-stats span {
   color: var(--app-muted-strong);
