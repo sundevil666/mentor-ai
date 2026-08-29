@@ -197,22 +197,29 @@
             <q-linear-progress rounded size="8px" :value="(currentBookPageIndex + 1) / readerPageCount" color="primary" track-color="grey-3" />
           </div>
 
-          <q-btn class="personal-reader__exit" color="primary" icon="close_fullscreen" label="Exit reading" no-caps outline @click="setReadingMode(false)" />
+          <div class="personal-reader__sidebar-actions">
+            <q-btn class="personal-reader__exit" color="primary" icon="close_fullscreen" label="Exit reading" no-caps outline @click="setReadingMode(false)" />
+            <q-btn aria-label="Reading settings" icon="more_vert" outline round>
+              <q-menu anchor="bottom right" self="top right">
+                <div class="personal-reader__settings-menu">
+                  <div class="personal-reader__font-controls" aria-label="Text size">
+                    <span>Text {{ readerFontSize }} px</span>
+                    <div>
+                      <q-btn aria-label="Decrease text size" icon="text_decrease" outline round :disable="readerFontSize <= minReaderFontSize" @click="changeReaderFontSize(-1)" />
+                      <q-btn aria-label="Increase text size" color="primary" icon="text_increase" round unelevated :disable="readerFontSize >= maxReaderFontSize" @click="changeReaderFontSize(1)" />
+                    </div>
+                  </div>
 
-          <div class="personal-reader__font-controls" aria-label="Text size">
-            <span>Text {{ readerFontSize }} px</span>
-            <div>
-              <q-btn aria-label="Decrease text size" icon="text_decrease" outline round :disable="readerFontSize <= minReaderFontSize" @click="changeReaderFontSize(-1)" />
-              <q-btn aria-label="Increase text size" color="primary" icon="text_increase" round unelevated :disable="readerFontSize >= maxReaderFontSize" @click="changeReaderFontSize(1)" />
-            </div>
-          </div>
-
-          <div class="personal-reader__sidebar-size-controls" aria-label="Sidebar size">
-            <span>Panel {{ readerSidebarScalePercent }}%</span>
-            <div>
-              <q-btn aria-label="Decrease sidebar size" icon="zoom_out" outline round :disable="readerSidebarScale <= minReaderSidebarScale" @click="changeReaderSidebarScale(-1)" />
-              <q-btn aria-label="Increase sidebar size" color="primary" icon="zoom_in" round unelevated :disable="readerSidebarScale >= maxReaderSidebarScale" @click="changeReaderSidebarScale(1)" />
-            </div>
+                  <div class="personal-reader__sidebar-size-controls" aria-label="Sidebar size">
+                    <span>Panel {{ readerSidebarScalePercent }}%</span>
+                    <div>
+                      <q-btn aria-label="Decrease sidebar size" icon="zoom_out" outline round :disable="readerSidebarScale <= minReaderSidebarScale" @click="changeReaderSidebarScale(-1)" />
+                      <q-btn aria-label="Increase sidebar size" color="primary" icon="zoom_in" round unelevated :disable="readerSidebarScale >= maxReaderSidebarScale" @click="changeReaderSidebarScale(1)" />
+                    </div>
+                  </div>
+                </div>
+              </q-menu>
+            </q-btn>
           </div>
 
           <section class="personal-reader__daily-goal" :class="`personal-reader__daily-goal--${dailyReadingGoalState}`" aria-label="Today's reading goal">

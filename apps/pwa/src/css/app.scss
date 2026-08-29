@@ -1904,7 +1904,20 @@ body.body--book-reading-mode .mobile-start-dock {
 
 .personal-reader__exit {
   min-height: 44px;
-  width: 100%;
+}
+
+.personal-reader__sidebar-actions {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.personal-reader__settings-menu {
+  display: grid;
+  gap: 14px;
+  min-width: 240px;
+  padding: 16px;
 }
 
 .personal-reader__sidebar-progress {
@@ -3081,14 +3094,14 @@ body.body--dark .personal-reader__lookup-error {
     padding-inline: 6px;
   }
 
-  .personal-reader__font-controls > div .q-btn,
-  .personal-reader__sidebar-size-controls > div .q-btn {
+  .personal-reader__sidebar .personal-reader__font-controls > div .q-btn,
+  .personal-reader__sidebar .personal-reader__sidebar-size-controls > div .q-btn {
     min-height: 36px;
     min-width: 36px;
   }
 
-  .personal-reader__font-controls > div,
-  .personal-reader__sidebar-size-controls > div {
+  .personal-reader__sidebar .personal-reader__font-controls > div,
+  .personal-reader__sidebar .personal-reader__sidebar-size-controls > div {
     gap: 4px;
   }
 
