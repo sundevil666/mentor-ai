@@ -1,5 +1,34 @@
 <template>
   <router-view />
+  <transition name="update-available-overlay">
+    <div
+      v-if="appStore.availableAppUpdate && !appStore.isAppUpdateInstalling"
+      class="app-update-available-overlay"
+      aria-hidden="true"
+    />
+  </transition>
+  <transition name="update-button">
+    <q-btn
+      v-if="!appStore.isAppUpdateInstalling"
+      class="app-update-floating-button"
+      :aria-label="appUpdateButtonTooltip"
+      :color="appStore.availableAppUpdate ? 'amber-8' : 'primary'"
+      :icon="appStore.availableAppUpdate ? 'system_update_alt' : 'system_update'"
+      :label="appStore.availableAppUpdate ? 'Update' : undefined"
+      :round="!appStore.availableAppUpdate"
+      :unelevated="!appStore.availableAppUpdate"
+      no-caps
+      @click="handleUpdateButtonClick"
+    >
+      <q-badge
+        v-if="appStore.availableAppUpdate"
+        color="red-7"
+        floating
+        rounded
+      />
+      <q-tooltip>{{ appUpdateButtonTooltip }}</q-tooltip>
+    </q-btn>
+  </transition>
   <transition name="update-overlay">
     <div
       v-if="appStore.isAppUpdateInstalling"
@@ -47,7 +76,7 @@
 
 <script setup lang="ts">
 import { Notify } from 'quasar';
-import { onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   activatePendingServiceWorkerUpdate,
@@ -67,6 +96,10 @@ const router = useRouter();
 let stopUpdatePolling: (() => void) | undefined;
 let isReloadingForUpdate = false;
 let remoteSyncPollingTimer: number | undefined;
+
+const appUpdateButtonTooltip = computed(() => appStore.availableAppUpdate
+  ? `Update ${appStore.availableAppUpdate.version} is ready. Click to install.`
+  : 'Check for a Mentor AI update.');
 
 onMounted(async () => {
   window.addEventListener('mentor-ai:update-available', handleUpdateAvailable);
@@ -124,6 +157,20 @@ function handleInstallUpdateRequest() {
   if (update) {
     void installUpdate(update.version);
   }
+}
+
+function handleUpdateButtonClick() {
+  if (!navigator.onLine) {
+    Notify.create({ type: 'warning', icon: 'wifi_off', message: 'Internet is required to update Mentor AI' });
+    return;
+  }
+
+  if (appStore.availableAppUpdate) {
+    handleInstallUpdateRequest();
+    return;
+  }
+
+  void handleManualUpdateCheck();
 }
 
 async function handleManualUpdateCheck() {
@@ -270,6 +317,35 @@ async function refreshRemoteProgress(showNotification: boolean) {
 </script>
 
 <style scoped>
+.app-update-available-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(15, 23, 42, 0.64);
+  backdrop-filter: blur(3px);
+  touch-action: none;
+}
+
+.app-update-floating-button {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 72px);
+  right: max(16px, env(safe-area-inset-right));
+  z-index: 9001;
+  min-width: 52px;
+  min-height: 52px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.3);
+}
+
+.app-update-floating-button.q-btn--rectangle {
+  min-width: 132px;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  border-radius: 18px;
+  color: #111827;
+  font-size: 16px;
+  font-weight: 800;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.38);
+}
+
 .app-update-overlay {
   position: fixed;
   inset: 0;
@@ -358,6 +434,15 @@ async function refreshRemoteProgress(showNotification: boolean) {
 .update-overlay-leave-active { transition: opacity 180ms ease; }
 .update-overlay-enter-from,
 .update-overlay-leave-to { opacity: 0; }
+
+.update-available-overlay-enter-active,
+.update-available-overlay-leave-active,
+.update-button-enter-active,
+.update-button-leave-active { transition: opacity 180ms ease, transform 180ms ease; }
+.update-available-overlay-enter-from,
+.update-available-overlay-leave-to { opacity: 0; }
+.update-button-enter-from,
+.update-button-leave-to { opacity: 0; transform: translateY(-8px); }
 
 @keyframes update-glow {
   0%, 100% { opacity: 0.7; transform: scale(0.94); }

@@ -130,7 +130,6 @@ body .q-menu {
   padding-top: env(safe-area-inset-top);
 }
 
-.app-header .app-update-button,
 .app-header .lesson-update-button,
 .app-header .sync-status-button,
 .app-header .update-log-button {
@@ -1740,6 +1739,17 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
     box-shadow: 0 0 0 2px var(--category-soft);
     color: var(--category-accent);
   }
+
+  .personal-reader__word--loading,
+  .personal-reader__word--loading:hover {
+    animation: reader-word-loading 800ms ease-in-out infinite alternate;
+    cursor: progress;
+  }
+}
+
+@keyframes reader-word-loading {
+  from { background: var(--category-soft); box-shadow: 0 0 0 2px var(--category-soft); }
+  to { background: var(--category-border); box-shadow: 0 0 0 3px var(--category-border); }
 }
 
 .personal-reader__part {
@@ -1874,6 +1884,10 @@ body.body--book-reading-mode .mobile-start-dock {
   display: flex;
   gap: 8px;
   justify-content: space-between;
+}
+
+.personal-reader__lookup-loading--phonetic {
+  justify-content: flex-start;
 }
 
 .personal-reader__lookup-heading strong,

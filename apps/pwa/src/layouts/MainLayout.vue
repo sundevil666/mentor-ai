@@ -17,24 +17,6 @@
           <q-tooltip>{{ levelTrend.tooltip }}</q-tooltip>
         </span>
         <q-btn
-          class="app-update-button"
-          :aria-label="appUpdateTooltip"
-          :color="appStore.availableAppUpdate ? 'amber-7' : undefined"
-          :disable="appStore.isAppUpdateInstalling"
-          flat
-          :icon="appStore.isAppUpdateInstalling ? 'sync' : 'system_update_alt'"
-          round
-          @click="installAvailableUpdate"
-        >
-          <q-badge
-            v-if="appStore.availableAppUpdate && !appStore.isAppUpdateInstalling"
-            color="red-7"
-            floating
-            rounded
-          />
-          <q-tooltip>{{ appUpdateTooltip }}</q-tooltip>
-        </q-btn>
-        <q-btn
           class="lesson-update-button"
           :aria-label="lessonUpdateTooltip"
           :color="offlineLessonState.status === 'error' ? 'negative' : offlineLessonState.status === 'ready' ? 'positive' : undefined"
@@ -364,17 +346,6 @@ const installHelpSteps = computed(() => {
     { icon: 'check_circle', text: 'Confirm the installation.' },
   ];
 });
-const appUpdateTooltip = computed(() => {
-  if (appStore.isAppUpdateInstalling) {
-    return 'Saving progress and installing the update.';
-  }
-
-  if (appStore.availableAppUpdate) {
-    return `Update ${appStore.availableAppUpdate.version} is ready. Click to install.`;
-  }
-
-  return 'Mentor AI is up to date.';
-});
 const lessonUpdateIcon = computed(() => offlineLessonState.value.status === 'error'
   ? 'cloud_off'
   : offlineLessonState.value.status === 'ready' ? 'offline_pin' : 'download_for_offline');
@@ -533,14 +504,6 @@ function markRead(id: string) {
 
 function markAllRead() {
   void appStore.markAllUpdateNotificationsRead();
-}
-
-function installAvailableUpdate() {
-  if (!navigator.onLine) {
-    Notify.create({ type: 'warning', icon: 'wifi_off', message: 'Internet is required to check for an app update' });
-    return;
-  }
-  window.dispatchEvent(new CustomEvent(appStore.availableAppUpdate ? 'mentor-ai:install-update' : 'mentor-ai:check-update'));
 }
 
 function handleOfflineLessonReconnect() { void checkOfflineLessons(false); }
