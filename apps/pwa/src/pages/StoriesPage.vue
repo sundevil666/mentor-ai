@@ -261,6 +261,17 @@
               <span v-for="bar in 7" :key="bar" :style="{ '--speech-bar': String(bar) }" />
               <q-icon :name="readingSpeechActive ? 'mic' : readingSpeechStatus === 'error' ? 'mic_off' : 'play_arrow'" />
             </button>
+            <div class="personal-reader__heard-words" aria-live="polite" aria-label="Words heard by the microphone">
+              <span class="personal-reader__heard-words-label">Microphone heard</span>
+              <div v-if="readingSpeechVisibleWords.length" class="personal-reader__heard-words-list">
+                <span
+                  v-for="(word, index) in readingSpeechVisibleWords"
+                  :key="`${word.text}-${index}`"
+                  :class="{ 'personal-reader__heard-word--interim': word.interim }"
+                >{{ word.text }}</span>
+              </div>
+              <span v-else class="personal-reader__heard-words-empty">Words will appear here as you read.</span>
+            </div>
             <div v-if="readingSpeechAcceptedWords" class="personal-reader__speech-stats">
               <strong>{{ readingSpeechMatchPercent }}%</strong>
               <span>{{ readingSpeechAcceptedWords }} words</span>
@@ -445,6 +456,8 @@ const readingSpeechMessage = ref('Tap once to allow the microphone. After that, 
 const spokenReaderWordIndexes = ref(new Set<number>());
 const readingSpeechAcceptedWords = ref(0);
 const readingSpeechSpokenWords = ref(0);
+const readingSpeechFinalWords = ref<string[]>([]);
+const readingSpeechInterimWords = ref<string[]>([]);
 let readingSpeechAnchor = 0;
 let readingSpeechRecognition: ContinuousSpeechRecognition | null = null;
 let readingSpeechStream: MediaStream | null = null;
@@ -544,6 +557,11 @@ const renderedBookPages = computed(() => {
 });
 const readerReferenceWords = computed(() => renderedBookPages.value.flatMap((page) => page.paragraphs.flatMap((paragraph) => paragraph.filter((token) => token.isWord).map((token) => token.text))));
 const readingSpeechActive = computed(() => readingSpeechStatus.value === 'listening' || readingSpeechStatus.value === 'noise' || readingSpeechStatus.value === 'requesting');
+const maxVisibleSpeechWords = 24;
+const readingSpeechVisibleWords = computed(() => [
+  ...readingSpeechFinalWords.value.map((text) => ({ text, interim: false })),
+  ...readingSpeechInterimWords.value.map((text) => ({ text, interim: true })),
+].slice(-maxVisibleSpeechWords));
 const readingSpeechMatchPercent = computed(() => readingSpeechSpokenWords.value > 0 ? Math.round(readingSpeechAcceptedWords.value / readingSpeechSpokenWords.value * 100) : 0);
 const readingSpeechTitle = computed(() => ({
   idle: 'Pronunciation coach', requesting: 'Enabling microphone…', listening: 'Listening to your reading', noise: 'Waiting for the book text', paused: 'Voice tracking paused', error: 'Microphone unavailable',
@@ -910,6 +928,8 @@ async function toggleReadingSpeech() {
     readingSpeechMessage.value = 'Your highlighted words are kept. Tap Start listening when you are ready.';
     return;
   }
+  readingSpeechFinalWords.value = [];
+  readingSpeechInterimWords.value = [];
   await startReadingSpeech(true);
 }
 async function startReadingSpeech(userRequested: boolean) {
@@ -932,6 +952,9 @@ async function startReadingSpeech(userRequested: boolean) {
     readingSpeechAnchor = getVisibleReaderWordAnchor();
     readingSpeechRecognition = startContinuousSpeechRecognition({
       lang: 'en-US',
+      onInterim: (transcript) => {
+        readingSpeechInterimWords.value = tokenizeReadingSpeech(transcript);
+      },
       onFinal: handleReadingSpeechTranscript,
       onListeningChange: (listening) => {
         if (!readingSpeechRecognition && !listening) return;
@@ -955,7 +978,10 @@ async function startReadingSpeech(userRequested: boolean) {
   }
 }
 function handleReadingSpeechTranscript(transcript: string) {
-  const spokenCount = tokenizeReadingSpeech(transcript).length;
+  const heardWords = tokenizeReadingSpeech(transcript);
+  readingSpeechFinalWords.value = [...readingSpeechFinalWords.value, ...heardWords].slice(-maxVisibleSpeechWords);
+  readingSpeechInterimWords.value = [];
+  const spokenCount = heardWords.length;
   if (spokenCount < 3) return;
   const match = alignReadingSpeech(readerReferenceWords.value, transcript, readingSpeechAnchor);
   if (!match.accepted) {
@@ -1006,6 +1032,7 @@ function startReadingSpeechMeter(stream: MediaStream) {
 function stopReadingSpeech(status: ReadingSpeechStatus) {
   readingSpeechRecognition?.stop();
   readingSpeechRecognition = null;
+  readingSpeechInterimWords.value = [];
   readingSpeechStream?.getTracks().forEach((track) => track.stop());
   readingSpeechStream = null;
   cancelAnimationFrame(readingSpeechAnimationFrame);
