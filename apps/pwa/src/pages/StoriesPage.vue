@@ -162,19 +162,23 @@
         <div ref="readerContent" class="personal-reader__content">
           <article ref="readerPaper" class="personal-reader__paper" :style="{ fontSize: `${readerFontSize}px` }" @click="handleReaderTextTap">
             <section
-              v-for="(page, pageIndex) in selectedBookPages"
+              v-for="(page, pageIndex) in renderedBookPages"
               :key="page.id"
               class="personal-reader__chapter"
               :data-book-chapter-index="pageIndex"
             >
               <h2 class="personal-reader__part">{{ formatBookPartLabel(pageIndex, getChapterTitle(page.chapterId)) }}</h2>
-              <p v-for="(paragraph, paragraphIndex) in splitBookParagraphs(page.text)" :key="paragraphIndex">
-                <template v-for="(token, tokenIndex) in tokenizeReaderParagraph(paragraph)" :key="tokenIndex">
+              <p v-for="(paragraph, paragraphIndex) in page.paragraphs" :key="paragraphIndex">
+                <template v-for="(token, tokenIndex) in paragraph" :key="tokenIndex">
                   <span
                     v-if="token.isWord"
                     class="personal-reader__word"
-                    :class="{ 'personal-reader__word--loading': readerLookupLoading && token.text.toLocaleLowerCase('en') === selectedReaderText.toLocaleLowerCase('en') }"
+                    :class="{
+                      'personal-reader__word--loading': readerLookupLoading && token.text.toLocaleLowerCase('en') === selectedReaderText.toLocaleLowerCase('en'),
+                      'personal-reader__word--spoken': token.wordIndex !== undefined && spokenReaderWordIndexes.has(token.wordIndex),
+                    }"
                     :data-reader-word="token.text"
+                    :data-reader-word-index="token.wordIndex"
                   >{{ token.text }}</span>
                   <template v-else>{{ token.text }}</template>
                 </template>
@@ -225,6 +229,38 @@
             />
             <p>{{ dailyReadingGoalMessage }}</p>
             <small>About 30 min at a calm learning pace</small>
+          </section>
+
+          <section class="personal-reader__speech-coach" :class="`personal-reader__speech-coach--${readingSpeechStatus}`" aria-live="polite" aria-label="Reading pronunciation coach">
+            <button
+              class="personal-reader__speech-orb"
+              :style="{ '--reader-speech-level': String(Math.max(0.08, readingSpeechLevel)) }"
+              :aria-label="readingSpeechActive ? 'Pause voice tracking' : 'Start voice tracking'"
+              type="button"
+              @click="toggleReadingSpeech"
+            >
+              <span v-for="bar in 7" :key="bar" :style="{ '--speech-bar': String(bar) }" />
+              <q-icon :name="readingSpeechActive ? 'mic' : readingSpeechStatus === 'error' ? 'mic_off' : 'play_arrow'" />
+            </button>
+            <div class="personal-reader__speech-copy">
+              <strong>{{ readingSpeechTitle }}</strong>
+              <span>{{ readingSpeechMessage }}</span>
+            </div>
+            <div v-if="readingSpeechAcceptedWords" class="personal-reader__speech-stats">
+              <strong>{{ readingSpeechMatchPercent }}%</strong>
+              <span>{{ readingSpeechAcceptedWords }} words heard</span>
+            </div>
+            <q-btn
+              :aria-label="readingSpeechActive ? 'Pause reading coach' : 'Start reading coach'"
+              :icon="readingSpeechActive ? 'pause' : 'mic'"
+              :label="readingSpeechActive ? 'Pause' : 'Start listening'"
+              color="primary"
+              dense
+              no-caps
+              outline
+              @click="toggleReadingSpeech"
+            />
+            <small>Background sounds and phrases that do not match this page are ignored. You can reread any sentence.</small>
           </section>
 
           <section
@@ -329,6 +365,8 @@ import { getAuthToken } from 'src/services/auth';
 import { findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice } from 'src/services/speech-synthesis';
 import { countReadingWords, createDailyReadingProgress, dailyReadingGoalWords, dailyWordsRead, localReadingDate, readingGoalMessage, recordDailyReadingPosition, type DailyReadingProgress } from 'src/services/daily-reading-progress';
+import { alignReadingSpeech, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
+import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 
 const appStore = useAppStore();
 type StoryLibraryTab = 'audio' | 'books';
@@ -357,6 +395,19 @@ const readingMode = ref(false);
 const minReaderSidebarScale = 0;
 const maxReaderSidebarScale = 4;
 const readerSidebarScale = ref(readReaderSidebarScale());
+type ReadingSpeechStatus = 'idle' | 'requesting' | 'listening' | 'noise' | 'paused' | 'error';
+type RenderedReaderToken = { text: string; isWord: boolean; wordIndex?: number };
+const readingSpeechStatus = ref<ReadingSpeechStatus>('idle');
+const readingSpeechLevel = ref(0);
+const readingSpeechMessage = ref('Tap once to allow the microphone. After that, listening starts with reading mode.');
+const spokenReaderWordIndexes = ref(new Set<number>());
+const readingSpeechAcceptedWords = ref(0);
+const readingSpeechSpokenWords = ref(0);
+let readingSpeechAnchor = 0;
+let readingSpeechRecognition: ContinuousSpeechRecognition | null = null;
+let readingSpeechStream: MediaStream | null = null;
+let readingSpeechAudioContext: AudioContext | null = null;
+let readingSpeechAnimationFrame = 0;
 const dailyReadingProgress = ref<DailyReadingProgress>(readDailyReadingProgress());
 const personalBooks = ref<PersonalBook[]>([]);
 const bookSyncing = ref(false);
@@ -439,6 +490,21 @@ const readerSidebarStyle = computed(() => ({
   '--reader-sidebar-mobile-width': `${158 + readerSidebarScale.value * 16}px`,
   '--reader-sidebar-font-size': `${16 + readerSidebarScale.value * 1.5}px`,
 }));
+const renderedBookPages = computed(() => {
+  let wordIndex = 0;
+  return selectedBookPages.value.map((page) => ({
+    ...page,
+    paragraphs: splitBookParagraphs(page.text).map((paragraph) => tokenizeReaderParagraph(paragraph).map<RenderedReaderToken>((token) => (
+      token.isWord ? { ...token, wordIndex: wordIndex++ } : token
+    ))),
+  }));
+});
+const readerReferenceWords = computed(() => renderedBookPages.value.flatMap((page) => page.paragraphs.flatMap((paragraph) => paragraph.filter((token) => token.isWord).map((token) => token.text))));
+const readingSpeechActive = computed(() => readingSpeechStatus.value === 'listening' || readingSpeechStatus.value === 'noise' || readingSpeechStatus.value === 'requesting');
+const readingSpeechMatchPercent = computed(() => readingSpeechSpokenWords.value > 0 ? Math.round(readingSpeechAcceptedWords.value / readingSpeechSpokenWords.value * 100) : 0);
+const readingSpeechTitle = computed(() => ({
+  idle: 'Pronunciation coach', requesting: 'Enabling microphone…', listening: 'Listening to your reading', noise: 'Waiting for the book text', paused: 'Voice tracking paused', error: 'Microphone unavailable',
+})[readingSpeechStatus.value]);
 
 onMounted(async () => {
   configurePlaybackAudioSession();
@@ -469,6 +535,7 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleReaderKeydown);
   document.removeEventListener('selectionchange', handleReaderSelectionChange);
   window.clearTimeout(readerSelectionTimer);
+  stopReadingSpeech('idle');
 });
 
 async function openStory(id: string) {
@@ -576,6 +643,7 @@ async function openBook(bookId: string) {
   await repaginateReader(readBookProgress(loaded.book.id, loaded.pages.length));
   recordCurrentDailyReadingPosition();
   startReaderPagination();
+  if (readingMode.value && localStorage.getItem(readingSpeechEnabledKey) === '1') void startReadingSpeech(false);
 }
 function closeBook() {
   persistBookProgress();
@@ -589,6 +657,7 @@ function closeBook() {
   readerPageStride.value = 1;
   chapterPageIndexes.value = [];
   clearReaderLookup();
+  stopReadingSpeech('idle');
 }
 function goToBookPage(pageIndex: number | null) {
   if (pageIndex === null || !Number.isInteger(pageIndex)) return;
@@ -597,6 +666,7 @@ function goToBookPage(pageIndex: number | null) {
   scrollToReaderPage();
   persistBookProgress();
   recordCurrentDailyReadingPosition();
+  readingSpeechAnchor = getVisibleReaderWordAnchor();
 }
 function formatBookPartLabel(index: number, title?: string) {
   const normalizedTitle = title?.replace(/\s+/g, ' ').trim();
@@ -741,11 +811,124 @@ function clearReaderLookup() {
   readerPhoneticLoading.value = false;
   readerLookupError.value = '';
 }
+const readingSpeechEnabledKey = 'mentor-ai:reading-speech-enabled';
+async function toggleReadingSpeech() {
+  if (readingSpeechActive.value) {
+    stopReadingSpeech('paused');
+    readingSpeechMessage.value = 'Your highlighted words are kept. Tap Start listening when you are ready.';
+    return;
+  }
+  await startReadingSpeech(true);
+}
+async function startReadingSpeech(userRequested: boolean) {
+  if (readingSpeechRecognition || readingSpeechStream || !readingMode.value) return;
+  if (!isSpeechRecognitionAvailable() || !navigator.mediaDevices?.getUserMedia) {
+    readingSpeechStatus.value = 'error';
+    readingSpeechMessage.value = 'Live speech recognition is not supported by this browser.';
+    return;
+  }
+  if (!userRequested && localStorage.getItem(readingSpeechEnabledKey) !== '1') return;
+  readingSpeechStatus.value = 'requesting';
+  readingSpeechMessage.value = 'Allow microphone access so Mentor AI can follow the words you read.';
+  try {
+    readingSpeechStream = await navigator.mediaDevices.getUserMedia({
+      audio: { autoGainControl: true, echoCancellation: true, noiseSuppression: true },
+      video: false,
+    });
+    localStorage.setItem(readingSpeechEnabledKey, '1');
+    startReadingSpeechMeter(readingSpeechStream);
+    readingSpeechAnchor = getVisibleReaderWordAnchor();
+    readingSpeechRecognition = startContinuousSpeechRecognition({
+      lang: 'en-US',
+      onFinal: handleReadingSpeechTranscript,
+      onListeningChange: (listening) => {
+        if (!readingSpeechRecognition && !listening) return;
+        readingSpeechStatus.value = listening ? 'listening' : 'requesting';
+        readingSpeechMessage.value = listening ? 'Read naturally. Matching words are highlighted as you speak.' : 'Reconnecting voice recognition…';
+      },
+      onError: (message) => {
+        if (/not-allowed|permission|denied/i.test(message)) {
+          stopReadingSpeech('error');
+          readingSpeechMessage.value = 'Microphone permission is blocked. Allow it in the browser settings and try again.';
+        }
+      },
+    });
+    readingSpeechStatus.value = 'listening';
+    readingSpeechMessage.value = 'Read naturally. Matching words are highlighted as you speak.';
+  } catch (error) {
+    stopReadingSpeech('error');
+    readingSpeechMessage.value = error instanceof Error && /denied|allowed|permission/i.test(error.message)
+      ? 'Microphone permission was not granted. Tap Start listening to try again.'
+      : 'The microphone could not be started on this device.';
+  }
+}
+function handleReadingSpeechTranscript(transcript: string) {
+  const spokenCount = tokenizeReadingSpeech(transcript).length;
+  if (spokenCount < 3) return;
+  const match = alignReadingSpeech(readerReferenceWords.value, transcript, readingSpeechAnchor);
+  if (!match.accepted) {
+    readingSpeechStatus.value = 'noise';
+    readingSpeechMessage.value = 'I heard sound, but it did not match the nearby book text. Keep reading.';
+    return;
+  }
+  readingSpeechAnchor = match.anchorIndex;
+  readingSpeechAcceptedWords.value += match.matchedWordIndexes.length;
+  readingSpeechSpokenWords.value += spokenCount;
+  const nextSpoken = new Set(spokenReaderWordIndexes.value);
+  match.matchedWordIndexes.forEach((wordIndex) => nextSpoken.add(wordIndex));
+  spokenReaderWordIndexes.value = nextSpoken;
+  readingSpeechStatus.value = 'listening';
+  readingSpeechMessage.value = match.coverage >= 0.8
+    ? 'Great match — keep reading.'
+    : 'Following you. A few words were unclear or skipped.';
+}
+function getVisibleReaderWordAnchor() {
+  const viewport = readerContent.value;
+  if (!viewport) return readingSpeechAnchor;
+  const viewportBounds = viewport.getBoundingClientRect();
+  const visibleWord = Array.from(viewport.querySelectorAll<HTMLElement>('[data-reader-word-index]')).find((word) => {
+    const bounds = word.getBoundingClientRect();
+    return bounds.right > viewportBounds.left && bounds.left < viewportBounds.right && bounds.bottom > viewportBounds.top && bounds.top < viewportBounds.bottom;
+  });
+  const wordIndex = Number(visibleWord?.dataset.readerWordIndex);
+  return Number.isInteger(wordIndex) ? wordIndex : readingSpeechAnchor;
+}
+function startReadingSpeechMeter(stream: MediaStream) {
+  const AudioContextConstructor = window.AudioContext;
+  if (!AudioContextConstructor) return;
+  readingSpeechAudioContext = new AudioContextConstructor();
+  const analyser = readingSpeechAudioContext.createAnalyser();
+  analyser.fftSize = 256;
+  analyser.smoothingTimeConstant = 0.76;
+  readingSpeechAudioContext.createMediaStreamSource(stream).connect(analyser);
+  const samples = new Uint8Array(analyser.frequencyBinCount);
+  const update = () => {
+    analyser.getByteFrequencyData(samples);
+    const average = samples.reduce((sum, value) => sum + value, 0) / Math.max(1, samples.length);
+    readingSpeechLevel.value = Math.min(1, average / 72);
+    readingSpeechAnimationFrame = requestAnimationFrame(update);
+  };
+  update();
+}
+function stopReadingSpeech(status: ReadingSpeechStatus) {
+  readingSpeechRecognition?.stop();
+  readingSpeechRecognition = null;
+  readingSpeechStream?.getTracks().forEach((track) => track.stop());
+  readingSpeechStream = null;
+  cancelAnimationFrame(readingSpeechAnimationFrame);
+  readingSpeechAnimationFrame = 0;
+  void readingSpeechAudioContext?.close();
+  readingSpeechAudioContext = null;
+  readingSpeechLevel.value = 0;
+  readingSpeechStatus.value = status;
+}
 function setReadingMode(value: boolean) {
   const progressRatio = getCurrentReaderProgressRatio();
   applyReadingMode(value);
   saveBookReaderSettings();
   void repaginateReader({ progressRatio });
+  if (value) void startReadingSpeech(true);
+  else stopReadingSpeech('idle');
 }
 function applyReadingMode(value: boolean) {
   readingMode.value = value;

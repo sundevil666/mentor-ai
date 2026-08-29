@@ -23,6 +23,7 @@ type SpeechRecognitionErrorEventLike = Event & {
 };
 
 type SpeechRecognitionResultEventLike = Event & {
+  resultIndex?: number;
   results: {
     length: number;
     [index: number]: {
@@ -34,6 +35,18 @@ type SpeechRecognitionResultEventLike = Event & {
       };
     };
   };
+};
+
+export type ContinuousSpeechRecognition = {
+  stop: () => void;
+};
+
+type ContinuousSpeechRecognitionOptions = {
+  lang?: string;
+  onInterim?: (transcript: string) => void;
+  onFinal: (transcript: string, confidence: number) => void;
+  onError?: (message: string) => void;
+  onListeningChange?: (listening: boolean) => void;
 };
 
 declare global {
@@ -55,6 +68,67 @@ export function isSpeechRecognitionAvailable(): boolean {
 export function stopSpeechRecognition() {
   activeRecognition?.stop();
   activeRecognition = null;
+}
+
+export function startContinuousSpeechRecognition(options: ContinuousSpeechRecognitionOptions): ContinuousSpeechRecognition {
+  const SpeechRecognition = getSpeechRecognitionConstructor();
+  if (!SpeechRecognition) throw new Error('Speech recognition is not available in this browser.');
+  stopSpeechRecognition();
+  let shouldRun = true;
+  let recognition: SpeechRecognitionLike | null = null;
+  let restartTimer: number | undefined;
+
+  const start = () => {
+    if (!shouldRun) return;
+    recognition = new SpeechRecognition();
+    activeRecognition = recognition;
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = options.lang ?? 'en-US';
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event) => {
+      const startIndex = Math.max(0, event.resultIndex ?? 0);
+      const interim: string[] = [];
+      for (let index = startIndex; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        const alternative = result?.[0];
+        const transcript = alternative?.transcript.replace(/\s+/g, ' ').trim();
+        if (!transcript) continue;
+        if (result?.isFinal) options.onFinal(transcript, alternative.confidence || 0);
+        else interim.push(transcript);
+      }
+      options.onInterim?.(interim.join(' '));
+    };
+    recognition.onerror = (event) => {
+      const error = event.error ?? 'Speech recognition failed.';
+      if (error !== 'no-speech' && error !== 'aborted') options.onError?.(error);
+    };
+    recognition.onend = () => {
+      options.onListeningChange?.(false);
+      if (activeRecognition === recognition) activeRecognition = null;
+      if (shouldRun) restartTimer = window.setTimeout(start, 300);
+    };
+    try {
+      recognition.start();
+      options.onListeningChange?.(true);
+    } catch (error) {
+      options.onError?.(error instanceof Error ? error.message : 'Speech recognition failed.');
+      restartTimer = window.setTimeout(start, 700);
+    }
+  };
+
+  start();
+  return {
+    stop() {
+      shouldRun = false;
+      if (restartTimer !== undefined) window.clearTimeout(restartTimer);
+      const current = recognition;
+      recognition = null;
+      if (activeRecognition === current) activeRecognition = null;
+      current?.abort();
+      options.onListeningChange?.(false);
+    },
+  };
 }
 
 export function recognizeSpeechOnce(

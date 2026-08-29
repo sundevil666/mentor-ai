@@ -18,6 +18,7 @@
     "src/services/offline-library.ts",
     "src/services/offline-lesson-updates.ts",
     "src/services/personal-book-library.ts",
+    "src/services/reading-speech-tracker.ts",
     "src/services/speech-recognition.ts",
     "src/services/speech-synthesis.ts",
     "src/services/storage-retention.ts",
