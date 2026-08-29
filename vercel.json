@@ -5,6 +5,14 @@
   "framework": null,
   "routes": [
     {
+      "src": "^/api/health$",
+      "dest": "/api/configuration?health=1"
+    },
+    {
+      "src": "^/api/reader/(lookup|usage)$",
+      "dest": "/api/reader?action=$1"
+    },
+    {
       "src": "^/api/reader/books-synchronize$",
       "dest": "/api/synchronization?action=books"
     },

@@ -2,14 +2,23 @@ import type { RequestHandler } from 'express';
 import { lookupReaderPhonetic, lookupReaderText } from '../services/reader-lookup.service.js';
 import type { PersonalReadingBookArchive, ReaderVocabularyItem } from '@mentor-ai/shared';
 import { learningStateService } from '../services/learning-state.service.js';
+import { getTranslationUsage, TranslationLimitError } from '../services/translation-usage.service.js';
 
 export const translateReaderText: RequestHandler = async (req, res, _next) => {
   try {
     res.json({ data: await lookupReaderText(req.body?.text) });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Translation is unavailable right now.';
-    const status = message.startsWith('Select ') ? 400 : 502;
+    const status = error instanceof TranslationLimitError ? 429 : message.startsWith('Select ') ? 400 : 502;
     res.status(status).json({ data: { message } });
+  }
+};
+
+export const getReaderTranslationUsage: RequestHandler = async (_req, res, next) => {
+  try {
+    res.json({ data: await getTranslationUsage() });
+  } catch (error) {
+    next(error);
   }
 };
 

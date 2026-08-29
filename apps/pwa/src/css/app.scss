@@ -283,6 +283,35 @@ body .q-menu {
   min-width: 220px;
 }
 
+.translation-usage {
+  min-width: 270px;
+  padding: 14px 16px;
+}
+
+.translation-usage__heading,
+.translation-usage__caption {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.translation-usage__heading {
+  font-size: 0.95rem;
+  margin-bottom: 8px;
+}
+
+.translation-usage__caption,
+.translation-usage__warning {
+  color: var(--app-muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  margin-top: 7px;
+}
+
+.translation-usage__warning {
+  color: var(--q-negative);
+}
+
 .app-page-container {
   background: var(--app-bg);
   min-height: 100vh;

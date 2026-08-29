@@ -1,5 +1,10 @@
 import type { ReaderTextLookup } from '@mentor-ai/shared';
 import { config } from '../config/env.js';
+import {
+  countTranslationCharacters,
+  releaseTranslationCharacters,
+  reserveTranslationCharacters,
+} from './translation-usage.service.js';
 
 const googleTranslateUrl = 'https://translation.googleapis.com/language/translate/v2';
 const dictionaryUrl = 'https://api.dictionaryapi.dev/api/v2/entries/en';
@@ -18,15 +23,25 @@ export async function lookupReaderText(rawText: unknown): Promise<ReaderTextLook
     };
   }
 
-  const response = await fetch(`${googleTranslateUrl}?key=${encodeURIComponent(config.googleTranslateApiKey)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    body: JSON.stringify({ q: text, source: 'en', target: 'ru', format: 'text' }),
-  });
-  if (!response.ok) throw new Error('Google translation request failed.');
-  const body = await response.json() as { data?: { translations?: Array<{ translatedText?: string }> } };
-  const translation = decodeHtml(body.data?.translations?.[0]?.translatedText ?? '').trim();
-  if (!translation) throw new Error('Google returned an empty translation.');
+  const characterCount = countTranslationCharacters(text);
+  await reserveTranslationCharacters(characterCount);
+
+  let translation = '';
+  try {
+    const response = await fetch(`${googleTranslateUrl}?key=${encodeURIComponent(config.googleTranslateApiKey)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({ q: text, source: 'en', target: 'ru', format: 'text' }),
+    });
+    if (!response.ok) throw new Error('Google translation request failed.');
+    const body = await response.json() as { data?: { translations?: Array<{ translatedText?: string }> } };
+    translation = decodeHtml(body.data?.translations?.[0]?.translatedText ?? '').trim();
+    if (!translation) throw new Error('Google returned an empty translation.');
+  } catch (error) {
+    await releaseTranslationCharacters(characterCount);
+    if (error instanceof Error && error.message === 'Google returned an empty translation.') throw error;
+    throw new Error('Google translation request failed.');
+  }
 
   return {
     text,

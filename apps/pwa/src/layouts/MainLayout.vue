@@ -157,6 +157,33 @@
                 <q-item-section>Sign out</q-item-section>
               </q-item>
               <q-separator />
+              <div class="translation-usage" aria-label="Google translation monthly usage">
+                <div class="translation-usage__heading">
+                  <span>Google translation</span>
+                  <strong>{{ translationUsagePercent }}%</strong>
+                </div>
+                <q-linear-progress
+                  rounded
+                  size="9px"
+                  :value="translationUsageRatio"
+                  :color="translationUsageColor"
+                  track-color="grey-4"
+                />
+                <div class="translation-usage__caption">
+                  <template v-if="translationUsage">
+                    {{ formatCharacterCount(translationUsage.usedCharacters) }} of
+                    {{ formatCharacterCount(translationUsage.limitCharacters) }} characters this month
+                  </template>
+                  <template v-else>Usage is temporarily unavailable</template>
+                </div>
+                <div v-if="translationUsage?.exhausted" class="translation-usage__warning">
+                  Free limit reached. Translation returns next month.
+                </div>
+                <div v-else-if="translationUsage && !translationUsage.configured" class="translation-usage__warning">
+                  Google translation is not configured yet.
+                </div>
+              </div>
+              <q-separator />
               <q-item clickable @click="toggleTheme">
                 <q-item-section avatar>
                   <q-icon :name="isDarkTheme ? 'light_mode' : 'dark_mode'" />
@@ -245,7 +272,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ConceptLevel, StudentModel } from '@mentor-ai/shared';
+import type { ConceptLevel, StudentModel, TranslationUsage } from '@mentor-ai/shared';
 import { Dark, Notify } from 'quasar';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import {
@@ -256,6 +283,7 @@ import {
 } from 'vue-router';
 import { useAppStore } from 'src/stores/app-store';
 import { fetchAuthConfiguration, signInWithGoogleCredential } from 'src/services/auth';
+import { fetchTranslationUsage } from 'src/services/api-client';
 import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
 import { formatDisplayDate } from 'src/services/date-format';
 import { cleanupExpiredOfflineLessons } from 'src/services/offline-library';
@@ -302,9 +330,17 @@ const deferredInstallPrompt = ref<BeforeInstallPromptEvent | null>(null);
 const isPwaInstalled = ref(false);
 const showInstallHelp = ref(false);
 const offlineLessonState = ref<OfflineLessonUpdateState>(getOfflineLessonUpdateState());
+const translationUsage = ref<TranslationUsage | null>(null);
 let unsubscribeOfflineLessonUpdates: (() => void) | undefined;
 let offlineLessonUpdateTimer: number | undefined;
 const showInstallButton = computed(() => !isPwaInstalled.value);
+const translationUsageRatio = computed(() => Math.min(1, (translationUsage.value?.percentUsed ?? 0) / 100));
+const translationUsagePercent = computed(() => Math.round(translationUsage.value?.percentUsed ?? 0));
+const translationUsageColor = computed(() => {
+  if ((translationUsage.value?.percentUsed ?? 0) >= 90) return 'negative';
+  if ((translationUsage.value?.percentUsed ?? 0) >= 75) return 'warning';
+  return 'primary';
+});
 const installButtonIcon = computed(() =>
   deferredInstallPrompt.value ? 'install_mobile' : 'add_to_home_screen',
 );
@@ -437,6 +473,7 @@ onMounted(async () => {
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   window.addEventListener('appinstalled', handleAppInstalled);
   window.addEventListener('online', handleOfflineLessonReconnect);
+  window.addEventListener('translation-usage-updated', loadTranslationUsage);
   document.addEventListener('visibilitychange', handleOfflineLessonVisibility);
   offlineLessonUpdateTimer = window.setInterval(() => { if (navigator.onLine) void checkOfflineLessons(false); }, 60 * 60 * 1000);
   isDarkTheme.value = readSavedTheme();
@@ -447,12 +484,14 @@ onMounted(async () => {
     await appStore.hydrate();
   }
   if (appStore.isOnline) void checkOfflineLessons(false);
+  if (appStore.isOnline) void loadTranslationUsage();
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   window.removeEventListener('appinstalled', handleAppInstalled);
   window.removeEventListener('online', handleOfflineLessonReconnect);
+  window.removeEventListener('translation-usage-updated', loadTranslationUsage);
   document.removeEventListener('visibilitychange', handleOfflineLessonVisibility);
   if (offlineLessonUpdateTimer) window.clearInterval(offlineLessonUpdateTimer);
   unsubscribeOfflineLessonUpdates?.();
@@ -507,6 +546,17 @@ function markAllRead() {
 }
 
 function handleOfflineLessonReconnect() { void checkOfflineLessons(false); }
+async function loadTranslationUsage() {
+  try {
+    translationUsage.value = await fetchTranslationUsage();
+  } catch {
+    translationUsage.value = null;
+  }
+}
+
+function formatCharacterCount(value: number) {
+  return new Intl.NumberFormat('en-US').format(value);
+}
 function handleOfflineLessonVisibility() {
   if (document.visibilityState === 'visible' && navigator.onLine) void checkOfflineLessons(false);
 }

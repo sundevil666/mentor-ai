@@ -385,6 +385,16 @@ export interface ReaderTextLookup {
   targetLanguage: 'ru';
 }
 
+export interface TranslationUsage {
+  period: string;
+  usedCharacters: number;
+  limitCharacters: number;
+  remainingCharacters: number;
+  percentUsed: number;
+  configured: boolean;
+  exhausted: boolean;
+}
+
 export interface ReaderVocabularyItem {
   id: string;
   studentId: string;

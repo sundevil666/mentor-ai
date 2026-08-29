@@ -16,6 +16,7 @@ import type {
   Student,
   StudentModel,
   SynchronizationAcknowledgement,
+  TranslationUsage,
 } from '@mentor-ai/shared';
 import { getAuthToken } from './auth.js';
 
@@ -83,10 +84,21 @@ export async function fetchReaderTextLookup(text: string): Promise<ReaderTextLoo
     body: JSON.stringify({ text }),
   });
   if (!response.ok) {
+    if (response.status === 429 && typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('translation-usage-updated'));
+    }
     const body = await response.json().catch(() => null) as { data?: { message?: string }; error?: { message?: string } } | null;
     throw new Error(body?.error?.message ?? body?.data?.message ?? 'Translation is unavailable right now.');
   }
-  return ((await response.json()) as ApiResponse<ReaderTextLookup>).data;
+  const result = ((await response.json()) as ApiResponse<ReaderTextLookup>).data;
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('translation-usage-updated'));
+  return result;
+}
+
+export async function fetchTranslationUsage(): Promise<TranslationUsage> {
+  const response = await fetch(`${apiBaseUrl}/api/reader/usage`, { headers: authHeaders() });
+  if (!response.ok) throw new Error('Translation usage request failed.');
+  return ((await response.json()) as ApiResponse<TranslationUsage>).data;
 }
 
 export async function fetchReaderPhonetic(text: string): Promise<string | undefined> {
