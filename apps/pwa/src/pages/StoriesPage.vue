@@ -1,12 +1,32 @@
 <template>
   <q-page class="videos-page category-theme--stories" :class="{ 'videos-page--detail': selectedStory || selectedBook, 'videos-page--book-detail': selectedBook, 'videos-page--reading-mode': readingMode }">
     <section class="videos-shell" :class="{ 'videos-shell--detail': selectedStory || selectedBook, 'videos-shell--book-detail': selectedBook }">
-      <header v-if="!readingMode" class="videos-header" :class="{ 'videos-header--book-detail': selectedBook }">
+      <header
+        v-if="!readingMode"
+        class="videos-header"
+        :class="{
+          'videos-header--book-detail': selectedBook,
+          'videos-header--books': activeTab === 'books' && !selectedBook,
+        }"
+      >
         <q-btn v-if="selectedStory || selectedBook" aria-label="Back to library" color="primary" flat icon="arrow_back" round @click="closeDetail" />
         <div>
           <p>{{ activeTab === 'audio' ? 'English audio library' : 'Your private English library' }}</p>
           <h1>{{ selectedStory?.title ?? selectedBook?.title ?? 'Stories & Books' }}</h1>
         </div>
+        <q-btn
+          v-if="activeTab === 'books' && !selectedBook"
+          class="personal-books__sync-button"
+          :aria-label="bookSyncStatus"
+          :disable="!getAuthToken()"
+          :icon="bookSyncIcon"
+          :label="bookSyncCompactLabel"
+          :loading="bookSyncing"
+          no-caps
+          rounded
+          unelevated
+          @click="retryPersonalBookSync"
+        />
       </header>
 
       <q-tabs
@@ -113,14 +133,6 @@
 
       <section v-else-if="!selectedBook && activeTab === 'books'" class="personal-books" aria-label="My books">
         <input ref="bookFileInput" class="personal-books__file-input" type="file" accept=".epub,.txt,application/epub+zip,text/plain" @change="handleBookFileSelection">
-
-        <q-banner dense rounded :class="bookSyncError ? 'bg-red-1 text-negative' : 'bg-blue-1 text-primary'">
-          <template #avatar><q-icon :name="bookSyncError ? 'cloud_off' : 'cloud_done'" /></template>
-          {{ bookSyncStatus }}
-          <template #action>
-            <q-btn flat no-caps :disable="!getAuthToken()" :loading="bookSyncing" label="Sync now" @click="retryPersonalBookSync" />
-          </template>
-        </q-banner>
 
         <div v-if="personalBooks.length" class="personal-book-list">
           <div
@@ -367,6 +379,14 @@ const bookSyncStatus = computed(() => {
   if (bookSyncError.value) return `Cloud sync failed: ${bookSyncError.value}`;
   if (cloudBookCount.value !== null) return `${cloudBookCount.value} book${cloudBookCount.value === 1 ? '' : 's'} in your Google account cloud library.`;
   return 'Cloud library is ready to synchronize.';
+});
+const bookSyncIcon = computed(() => bookSyncError.value ? 'cloud_off' : bookSyncing.value ? 'sync' : cloudBookCount.value === null ? 'cloud_sync' : 'cloud_done');
+const bookSyncCompactLabel = computed(() => {
+  if (!getAuthToken()) return 'Sign in';
+  if (bookSyncing.value) return 'Syncing…';
+  if (bookSyncError.value) return 'Not synced';
+  if (cloudBookCount.value === null) return 'Sync books';
+  return `${cloudBookCount.value} synced`;
 });
 const currentBookChapterIndex = computed(() => {
   let activeIndex = 0;

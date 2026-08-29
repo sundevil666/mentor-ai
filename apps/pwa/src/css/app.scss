@@ -1536,6 +1536,39 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   align-items: center;
   display: flex;
   gap: 10px;
+  position: relative;
+}
+
+.personal-books__sync-button {
+  background: #fff !important;
+  border: 1px solid rgba(57, 117, 80, 0.22);
+  box-shadow: 0 6px 18px rgba(17, 24, 39, 0.12);
+  color: #397550 !important;
+  left: 50%;
+  max-width: min(180px, 46vw);
+  min-height: 36px;
+  padding: 0 12px;
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.videos-header--books {
+  padding-bottom: 44px;
+}
+
+.personal-books__sync-button .q-btn__content {
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.personal-books__sync-button .block {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .videos-header h1 {
@@ -2738,6 +2771,12 @@ body.body--dark .personal-reader__lookup-error {
     font-size: 1.3rem;
     line-height: 1.15;
     margin: 0;
+  }
+
+  .personal-books__sync-button {
+    max-width: 42vw;
+    min-height: 34px;
+    padding: 0 9px;
   }
 
   .video-card__meta {
