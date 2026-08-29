@@ -1,15 +1,29 @@
 <template>
-  <q-page class="videos-page category-theme--stories" :class="{ 'videos-page--detail': selectedStory }">
-    <section class="videos-shell" :class="{ 'videos-shell--detail': selectedStory }">
+  <q-page class="videos-page category-theme--stories" :class="{ 'videos-page--detail': selectedStory || selectedBook }">
+    <section class="videos-shell" :class="{ 'videos-shell--detail': selectedStory || selectedBook }">
       <header class="videos-header">
-        <q-btn v-if="selectedStory" aria-label="Back to story list" color="primary" flat icon="arrow_back" round @click="closeStory" />
+        <q-btn v-if="selectedStory || selectedBook" aria-label="Back to library" color="primary" flat icon="arrow_back" round @click="closeDetail" />
         <div>
-          <p>English audio library</p>
-          <h1>{{ selectedStory?.title ?? 'Stories & Tales' }}</h1>
+          <p>{{ activeTab === 'audio' ? 'English audio library' : 'Your private English library' }}</p>
+          <h1>{{ selectedStory?.title ?? selectedBook?.title ?? 'Stories & Books' }}</h1>
         </div>
       </header>
 
-      <section v-if="!selectedStory" class="video-library" aria-label="Audio stories library">
+      <q-tabs
+        v-if="!selectedStory && !selectedBook"
+        v-model="activeTab"
+        class="story-library-tabs"
+        active-color="primary"
+        align="justify"
+        indicator-color="primary"
+        no-caps
+        @update:model-value="saveActiveTab"
+      >
+        <q-tab icon="headphones" label="Audio" name="audio" />
+        <q-tab icon="menu_book" :label="`Books (${personalBooks.length})`" name="books" />
+      </q-tabs>
+
+      <section v-if="!selectedStory && !selectedBook && activeTab === 'audio'" class="video-library" aria-label="Audio stories library">
         <article
           v-for="story in storyLibrary"
           :key="story.id"
@@ -34,7 +48,7 @@
         </article>
       </section>
 
-      <section v-else class="video-detail video-detail--subtitles-hidden">
+      <section v-else-if="selectedStory" class="video-detail video-detail--subtitles-hidden">
         <div class="audio-program-card__art"><q-icon name="auto_stories" size="82px" /></div>
         <audio
           ref="audioElement"
@@ -97,15 +111,112 @@
         </div>
       </section>
 
-      <p v-if="!selectedStory" class="video-storage-note">{{ offlineSummary }} Every public-domain recording is bundled with the app in 30–40 minute listening parts.</p>
+      <section v-else-if="!selectedBook && activeTab === 'books'" class="personal-books" aria-label="My books">
+        <div class="personal-books__intro">
+          <div>
+            <p class="personal-books__eyebrow">My Books</p>
+            <h2>Your books stay private</h2>
+            <p>Import a DRM-free EPUB or UTF-8 TXT file. It is stored offline on this device.</p>
+          </div>
+          <q-btn color="primary" icon="upload_file" label="Import book" no-caps unelevated :loading="importingBook" @click="chooseBookFile" />
+          <input ref="bookFileInput" class="personal-books__file-input" type="file" accept=".epub,.txt,application/epub+zip,text/plain" @change="handleBookFileSelection">
+        </div>
+
+        <q-banner class="personal-books__sync-note" rounded>
+          <template #avatar><q-icon color="primary" name="devices" /></template>
+          Books and reading positions are saved on this device now. Private cross-device book upload is the next synchronization stage.
+        </q-banner>
+
+        <div v-if="personalBooks.length" class="personal-books__grid">
+          <article
+            v-for="book in personalBooks"
+            :key="book.id"
+            class="personal-book-card"
+            role="link"
+            tabindex="0"
+            @click="openBook(book.id)"
+            @keydown.enter="openBook(book.id)"
+            @keydown.space.prevent="openBook(book.id)"
+          >
+            <div class="personal-book-card__cover"><q-icon name="menu_book" size="48px" /></div>
+            <div class="personal-book-card__body">
+              <div class="personal-book-card__heading">
+                <div>
+                  <h2>{{ book.title }}</h2>
+                  <p>{{ book.author || 'Unknown author' }}</p>
+                </div>
+                <q-btn aria-label="Delete book" color="negative" flat icon="delete_outline" round @click.stop="confirmDeleteBook(book)" />
+              </div>
+              <div class="video-card__meta">
+                <span><q-icon name="description" /> {{ book.format.toUpperCase() }}</span>
+                <span><q-icon name="format_list_numbered" /> {{ book.chapterCount }} {{ book.chapterCount === 1 ? 'part' : 'parts' }}</span>
+                <span><q-icon name="notes" /> {{ formatWordCount(book.wordCount) }}</span>
+              </div>
+              <q-linear-progress class="personal-book-card__progress" rounded size="8px" :value="bookProgress(book).ratio" color="primary" track-color="grey-3" />
+              <p class="personal-book-card__progress-label">{{ bookProgress(book).label }}</p>
+            </div>
+          </article>
+        </div>
+
+        <div v-else class="personal-books__empty">
+          <q-icon name="library_books" size="64px" />
+          <h2>No books yet</h2>
+          <p>Import your first EPUB or TXT book to read it offline.</p>
+          <q-btn color="primary" icon="upload_file" label="Choose a book" no-caps outline @click="chooseBookFile" />
+        </div>
+      </section>
+
+      <section v-else-if="selectedBook && currentBookPage" class="personal-reader" aria-label="Book reader">
+        <div class="personal-reader__toolbar">
+          <q-select
+            dense
+            emit-value
+            map-options
+            outlined
+            label="Part"
+            :model-value="currentBookPageIndex"
+            :options="bookPageOptions"
+            @update:model-value="goToBookPage"
+          />
+          <span>{{ currentBookPageIndex + 1 }} / {{ selectedBookPages.length }}</span>
+        </div>
+        <q-linear-progress rounded size="8px" :value="(currentBookPageIndex + 1) / selectedBookPages.length" color="primary" track-color="grey-3" />
+        <article class="personal-reader__paper">
+          <p class="personal-reader__part">{{ currentBookChapter?.title ?? `Part ${currentBookPageIndex + 1}` }}</p>
+          <p v-for="(paragraph, index) in currentBookParagraphs" :key="index">{{ paragraph }}</p>
+        </article>
+        <nav class="personal-reader__navigation" aria-label="Book navigation">
+          <q-btn icon="arrow_back" label="Previous" no-caps outline :disable="currentBookPageIndex === 0" @click="goToBookPage(currentBookPageIndex - 1)" />
+          <q-btn color="primary" :icon-right="currentBookPageIndex < selectedBookPages.length - 1 ? 'arrow_forward' : 'check'" :label="currentBookPageIndex < selectedBookPages.length - 1 ? 'Next' : 'Finished'" no-caps unelevated @click="goToBookPage(Math.min(selectedBookPages.length - 1, currentBookPageIndex + 1))" />
+        </nav>
+      </section>
+
+      <p v-if="!selectedStory && !selectedBook && activeTab === 'audio'" class="video-storage-note">{{ offlineSummary }} Every public-domain recording is bundled with the app in 30–40 minute listening parts.</p>
     </section>
 
+    <q-dialog v-model="showImportConfirmation" persistent>
+      <q-card class="personal-book-import-dialog">
+        <q-card-section>
+          <div class="text-h6">Import this book?</div>
+          <p class="q-mb-none">{{ pendingBookFile?.name }}</p>
+        </q-card-section>
+        <q-card-section class="q-pt-none">
+          <q-checkbox v-model="rightsConfirmed" label="I have a lawful copy and will use it privately." />
+          <p class="text-caption q-mb-none">Mentor AI does not remove DRM or share imported books with other accounts.</p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" no-caps @click="cancelBookImport" />
+          <q-btn color="primary" label="Import" no-caps unelevated :disable="!rightsConfirmed" :loading="importingBook" @click="confirmBookImport" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup lang="ts">
-import { Notify } from 'quasar';
+import { Dialog, Notify } from 'quasar';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import type { ReadingChapter, ReadingPage } from '@mentor-ai/shared';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import { loadContentEngagementSummaries, recordContentEngagement, syncContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
 import { loadContentProgress, saveContentProgress, syncAllContentProgress } from 'src/services/content-progress';
@@ -113,9 +224,23 @@ import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineStory } fr
 import { deleteOfflineStory, formatStoryDuration, formatStorySize, getCachedStoryUrls, saveStoryOffline, storyLibrary, type LibraryStory } from 'src/services/story-library';
 import { useAppStore } from 'src/stores/app-store';
 import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
+import { deletePersonalBook, importPersonalBook, listPersonalBooks, loadPersonalBook, markPersonalBookOpened, type PersonalBook } from 'src/services/personal-book-library';
 
 const appStore = useAppStore();
+type StoryLibraryTab = 'audio' | 'books';
+const activeTabKey = 'mentor-ai:stories-library-tab';
+const activeTab = ref<StoryLibraryTab>(readActiveTab());
 const selectedStoryId = ref<string | null>(null);
+const selectedBook = ref<PersonalBook | null>(null);
+const selectedBookChapters = ref<ReadingChapter[]>([]);
+const selectedBookPages = ref<ReadingPage[]>([]);
+const currentBookPageIndex = ref(0);
+const personalBooks = ref<PersonalBook[]>([]);
+const bookFileInput = ref<HTMLInputElement | null>(null);
+const pendingBookFile = ref<File | null>(null);
+const showImportConfirmation = ref(false);
+const rightsConfirmed = ref(false);
+const importingBook = ref(false);
 const audioElement = ref<HTMLAudioElement | null>(null);
 const cachedUrls = ref(new Set<string>());
 const engagementSummaries = ref(new Map<string, ContentEngagementSummary>());
@@ -129,17 +254,29 @@ let lastProgressSave = 0;
 const playbackRates = [0.75, 1, 1.25, 1.5];
 const selectedStory = computed(() => storyLibrary.find((story) => story.id === selectedStoryId.value) ?? null);
 const offlineSummary = computed(() => `${storyLibrary.length} stories · ${formatStoryDuration(storyLibrary.reduce((sum, story) => sum + story.durationSeconds, 0))} total listening.`);
+const currentBookPage = computed(() => selectedBookPages.value[currentBookPageIndex.value] ?? null);
+const currentBookChapter = computed(() => selectedBookChapters.value.find((chapter) => chapter.id === currentBookPage.value?.chapterId) ?? null);
+const currentBookParagraphs = computed(() => currentBookPage.value?.text.split(/\n{2,}/).filter(Boolean) ?? []);
+const bookPageOptions = computed(() => selectedBookPages.value.map((page, index) => ({
+  label: selectedBookChapters.value.find((chapter) => chapter.id === page.chapterId)?.title ?? `Part ${index + 1}`,
+  value: index,
+})));
 
 onMounted(async () => {
   configurePlaybackAudioSession();
+  personalBooks.value = await listPersonalBooks();
   cachedUrls.value = await getCachedStoryUrls();
   engagementSummaries.value = await loadContentEngagementSummaries('audio');
   document.addEventListener('visibilitychange', handleVisibilityChange);
   const requestedStoryId = new URLSearchParams(window.location.search).get('story');
-  if (requestedStoryId && storyLibrary.some((story) => story.id === requestedStoryId)) await openStory(requestedStoryId);
+  if (requestedStoryId && storyLibrary.some((story) => story.id === requestedStoryId)) {
+    activeTab.value = 'audio';
+    await openStory(requestedStoryId);
+  }
 });
 onUnmounted(() => {
   persistProgress();
+  persistBookProgress();
   clearMediaSession();
   document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
@@ -152,6 +289,127 @@ async function openStory(id: string) {
   configureMediaSession();
 }
 function closeStory() { persistProgress(); audioElement.value?.pause(); selectedStoryId.value = null; clearMediaSession(); }
+function closeDetail() {
+  if (selectedStory.value) closeStory();
+  if (selectedBook.value) closeBook();
+}
+function saveActiveTab(value: string | number) {
+  if (value === 'audio' || value === 'books') localStorage.setItem(activeTabKey, value);
+}
+function readActiveTab(): StoryLibraryTab {
+  if (typeof localStorage === 'undefined') return 'audio';
+  return localStorage.getItem(activeTabKey) === 'books' ? 'books' : 'audio';
+}
+function chooseBookFile() { bookFileInput.value?.click(); }
+function handleBookFileSelection(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0] ?? null;
+  input.value = '';
+  if (!file) return;
+  pendingBookFile.value = file;
+  rightsConfirmed.value = false;
+  showImportConfirmation.value = true;
+}
+function cancelBookImport() {
+  showImportConfirmation.value = false;
+  pendingBookFile.value = null;
+  rightsConfirmed.value = false;
+}
+async function confirmBookImport() {
+  const file = pendingBookFile.value;
+  if (!file || !rightsConfirmed.value) return;
+  importingBook.value = true;
+  try {
+    const book = await importPersonalBook(file);
+    personalBooks.value = await listPersonalBooks();
+    cancelBookImport();
+    Notify.create({ type: 'positive', message: `${book.title} is ready to read offline.` });
+    await openBook(book.id);
+  } catch (error) {
+    Notify.create({ type: 'negative', message: error instanceof Error ? error.message : 'Could not import this book.' });
+  } finally {
+    importingBook.value = false;
+  }
+}
+async function openBook(bookId: string) {
+  const loaded = await loadPersonalBook(bookId);
+  if (!loaded || loaded.pages.length === 0) {
+    Notify.create({ type: 'negative', message: 'This book has no readable pages.' });
+    return;
+  }
+  selectedBook.value = loaded.book;
+  selectedBookChapters.value = loaded.chapters;
+  selectedBookPages.value = loaded.pages;
+  currentBookPageIndex.value = readBookProgress(loaded.book.id, loaded.pages.length).currentPageIndex;
+  await markPersonalBookOpened(loaded.book);
+  personalBooks.value = await listPersonalBooks();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function closeBook() {
+  persistBookProgress();
+  selectedBook.value = null;
+  selectedBookChapters.value = [];
+  selectedBookPages.value = [];
+  currentBookPageIndex.value = 0;
+}
+function goToBookPage(pageIndex: number | null) {
+  if (pageIndex === null || !Number.isInteger(pageIndex)) return;
+  currentBookPageIndex.value = Math.max(0, Math.min(selectedBookPages.value.length - 1, pageIndex));
+  persistBookProgress();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function persistBookProgress() {
+  const book = selectedBook.value;
+  if (!book || typeof localStorage === 'undefined') return;
+  const previous = readBookProgress(book.id, selectedBookPages.value.length);
+  localStorage.setItem(bookProgressKey(book.id), JSON.stringify({
+    currentPageIndex: currentBookPageIndex.value,
+    furthestPageIndex: Math.max(previous.furthestPageIndex, currentBookPageIndex.value),
+    updatedAt: new Date().toISOString(),
+  }));
+}
+function bookProgress(book: PersonalBook) {
+  const progress = readBookProgress(book.id, book.pageCount);
+  const completedParts = book.pageCount ? Math.min(book.pageCount, progress.furthestPageIndex + 1) : 0;
+  return {
+    ratio: book.pageCount ? completedParts / book.pageCount : 0,
+    label: completedParts ? `${completedParts} of ${book.pageCount} parts reached` : 'Not started',
+  };
+}
+function bookProgressKey(bookId: string) { return `mentor-ai:personal-book-progress:${bookId}`; }
+function readBookProgress(bookId: string, pageCount: number): { currentPageIndex: number; furthestPageIndex: number } {
+  if (typeof localStorage === 'undefined') return { currentPageIndex: 0, furthestPageIndex: -1 };
+  try {
+    const parsed = JSON.parse(localStorage.getItem(bookProgressKey(bookId)) ?? 'null') as { currentPageIndex?: number; furthestPageIndex?: number } | null;
+    const maxIndex = Math.max(0, pageCount - 1);
+    return {
+      currentPageIndex: Math.max(0, Math.min(maxIndex, Number(parsed?.currentPageIndex) || 0)),
+      furthestPageIndex: Math.max(-1, Math.min(maxIndex, Number.isFinite(parsed?.furthestPageIndex) ? Number(parsed?.furthestPageIndex) : -1)),
+    };
+  } catch {
+    return { currentPageIndex: 0, furthestPageIndex: -1 };
+  }
+}
+function confirmDeleteBook(book: PersonalBook) {
+  Dialog.create({
+    title: 'Delete this book?',
+    message: `${book.title} and its local reading text will be removed from this device.`,
+    cancel: true,
+    persistent: true,
+    ok: { label: 'Delete', color: 'negative', noCaps: true },
+  }).onOk(() => { void removeBook(book); });
+}
+async function removeBook(book: PersonalBook) {
+  try {
+    await deletePersonalBook(book.id);
+    localStorage.removeItem(bookProgressKey(book.id));
+    personalBooks.value = await listPersonalBooks();
+    Notify.create({ type: 'positive', message: `${book.title} was removed from this device.` });
+  } catch {
+    Notify.create({ type: 'negative', message: 'Could not delete this book.' });
+  }
+}
+function formatWordCount(value: number) { return `${new Intl.NumberFormat('en').format(value)} words`; }
 function openStoryInSafari() {
   const story = selectedStory.value;
   if (!story) return;
