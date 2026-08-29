@@ -232,6 +232,24 @@
           </section>
 
           <section class="personal-reader__speech-coach" :class="`personal-reader__speech-coach--${readingSpeechStatus}`" aria-live="polite" aria-label="Reading pronunciation coach">
+            <q-btn
+              class="personal-reader__speech-help"
+              aria-label="What does voice tracking do?"
+              color="primary"
+              flat
+              icon="help_outline"
+              round
+              size="sm"
+            >
+              <q-popup-proxy anchor="center left" self="center right" :offset="[10, 0]">
+                <q-card class="personal-reader__speech-help-card">
+                  <strong>{{ readingSpeechTitle }}</strong>
+                  <p>{{ readingSpeechMessage }}</p>
+                  <p>Matching words are highlighted while you read. Background sounds and phrases that do not match the nearby book text are ignored. You can reread any sentence.</p>
+                  <small>Mentor AI does not save microphone audio.</small>
+                </q-card>
+              </q-popup-proxy>
+            </q-btn>
             <button
               class="personal-reader__speech-orb"
               :style="{ '--reader-speech-level': String(Math.max(0.08, readingSpeechLevel)) }"
@@ -242,25 +260,20 @@
               <span v-for="bar in 7" :key="bar" :style="{ '--speech-bar': String(bar) }" />
               <q-icon :name="readingSpeechActive ? 'mic' : readingSpeechStatus === 'error' ? 'mic_off' : 'play_arrow'" />
             </button>
-            <div class="personal-reader__speech-copy">
-              <strong>{{ readingSpeechTitle }}</strong>
-              <span>{{ readingSpeechMessage }}</span>
-            </div>
             <div v-if="readingSpeechAcceptedWords" class="personal-reader__speech-stats">
               <strong>{{ readingSpeechMatchPercent }}%</strong>
-              <span>{{ readingSpeechAcceptedWords }} words heard</span>
+              <span>{{ readingSpeechAcceptedWords }} words</span>
             </div>
             <q-btn
               :aria-label="readingSpeechActive ? 'Pause reading coach' : 'Start reading coach'"
               :icon="readingSpeechActive ? 'pause' : 'mic'"
-              :label="readingSpeechActive ? 'Pause' : 'Start listening'"
+              :label="readingSpeechActive ? 'Microphone is listening' : 'Allow microphone'"
               color="primary"
               dense
               no-caps
               outline
               @click="toggleReadingSpeech"
             />
-            <small>Background sounds and phrases that do not match this page are ignored. You can reread any sentence.</small>
           </section>
 
           <section

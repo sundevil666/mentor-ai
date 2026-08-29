@@ -2006,7 +2006,28 @@ body.body--book-reading-mode .mobile-start-dock {
   gap: 10px;
   justify-items: center;
   padding: 14px 12px;
+  position: relative;
   text-align: center;
+}
+
+.personal-reader__speech-help {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+}
+
+.personal-reader__speech-help-card {
+  display: grid;
+  gap: 8px;
+  max-width: min(300px, calc(100vw - 32px));
+  padding: 14px;
+}
+
+.personal-reader__speech-help-card p,
+.personal-reader__speech-help-card small {
+  color: var(--app-muted-strong);
+  line-height: 1.4;
+  margin: 0;
 }
 
 .personal-reader__speech-coach--listening {
@@ -2075,19 +2096,11 @@ body.body--book-reading-mode .mobile-start-dock {
   z-index: 1;
 }
 
-.personal-reader__speech-copy {
-  display: grid;
-  gap: 3px;
-}
-
-.personal-reader__speech-copy strong,
 .personal-reader__speech-stats strong {
   color: var(--app-text-strong);
 }
 
-.personal-reader__speech-copy span,
-.personal-reader__speech-stats span,
-.personal-reader__speech-coach small {
+.personal-reader__speech-stats span {
   color: var(--app-muted-strong);
   font-size: .7rem;
   line-height: 1.3;
@@ -3037,15 +3050,6 @@ body.body--dark .personal-reader__lookup-error {
     width: 58px;
   }
 
-  .personal-reader__speech-copy strong {
-    font-size: .76rem;
-  }
-
-  .personal-reader__speech-copy span,
-  .personal-reader__speech-coach > small {
-    display: none;
-  }
-
   .personal-reader__speech-stats {
     display: grid;
     gap: 0;
@@ -3055,8 +3059,12 @@ body.body--dark .personal-reader__lookup-error {
     font-size: 1rem;
   }
 
-  .personal-reader__speech-coach .q-btn .q-btn__content > span:not(.q-icon) {
-    display: none;
+  .personal-reader__speech-coach > .q-btn:not(.personal-reader__speech-help) {
+    font-size: .68rem;
+    line-height: 1.05;
+    min-height: 38px;
+    padding-inline: 5px;
+    white-space: normal;
   }
 
   .personal-reader__exit {
