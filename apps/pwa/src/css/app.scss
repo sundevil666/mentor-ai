@@ -1858,7 +1858,7 @@ body.body--book-reading-mode .mobile-start-dock {
 .personal-reader--focus {
   background: var(--app-background);
   gap: 0;
-  grid-template-columns: minmax(0, 1fr) 230px;
+  grid-template-columns: minmax(0, 1fr) min(var(--reader-sidebar-width, 230px), 42vw);
   grid-template-rows: minmax(0, 1fr);
   inset: 0;
   padding: 0;
@@ -1883,6 +1883,7 @@ body.body--book-reading-mode .mobile-start-dock {
   border-left: 1px solid var(--app-border);
   box-shadow: -10px 0 28px rgba(17, 24, 39, 0.08);
   display: flex;
+  font-size: var(--reader-sidebar-font-size, 16px);
   flex-direction: column;
   gap: 18px;
   min-height: 0;
@@ -1905,23 +1906,47 @@ body.body--book-reading-mode .mobile-start-dock {
   justify-content: space-between;
 }
 
-.personal-reader__font-controls {
+.personal-reader__font-controls,
+.personal-reader__sidebar-size-controls {
   display: grid;
   gap: 10px;
 }
 
 .personal-reader__font-controls > span,
+.personal-reader__sidebar-size-controls > span,
 .personal-reader__sidebar-navigation > span {
   color: var(--app-muted-strong);
   font-size: 0.8rem;
   font-weight: 800;
 }
 
-.personal-reader__font-controls > div {
+.personal-reader__font-controls > div,
+.personal-reader__sidebar-size-controls > div {
   display: flex;
   gap: 10px;
   justify-content: space-between;
 }
+
+.personal-reader__sidebar .q-btn,
+.personal-reader__sidebar .q-field {
+  font-size: 1em;
+}
+
+.personal-reader__sidebar .personal-reader__font-controls > span,
+.personal-reader__sidebar .personal-reader__sidebar-size-controls > span,
+.personal-reader__sidebar .personal-reader__sidebar-navigation > span {
+  font-size: 0.8em;
+}
+
+.personal-reader__sidebar .personal-reader__daily-goal-heading span { font-size: 0.72em; }
+.personal-reader__sidebar .personal-reader__daily-goal-heading strong { font-size: 1em; }
+.personal-reader__sidebar .personal-reader__daily-goal p { font-size: 0.8em; }
+.personal-reader__sidebar .personal-reader__daily-goal small { font-size: 0.68em; }
+.personal-reader__sidebar .personal-reader__speech-copy strong { font-size: 1em; }
+.personal-reader__sidebar .personal-reader__speech-copy span,
+.personal-reader__sidebar .personal-reader__speech-stats span,
+.personal-reader__sidebar .personal-reader__speech-coach small { font-size: 0.7em; }
+.personal-reader__sidebar .personal-reader__speech-stats strong { font-size: 1.25em; }
 
 .personal-reader__daily-goal {
   background: color-mix(in srgb, var(--category-accent) 8%, var(--app-surface));
@@ -2854,7 +2879,7 @@ body.body--dark .personal-reader__lookup-error {
   }
 
   .personal-reader--focus {
-    grid-template-columns: minmax(0, 1fr) 158px;
+    grid-template-columns: minmax(0, 1fr) min(var(--reader-sidebar-mobile-width, 158px), 58vw);
   }
 
   .personal-reader--focus .personal-reader__content {
@@ -2884,7 +2909,8 @@ body.body--dark .personal-reader__lookup-error {
     padding-inline: 6px;
   }
 
-  .personal-reader__font-controls > div .q-btn {
+  .personal-reader__font-controls > div .q-btn,
+  .personal-reader__sidebar-size-controls > div .q-btn {
     min-height: 42px;
     min-width: 42px;
   }

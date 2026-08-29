@@ -139,7 +139,7 @@
         </div>
       </section>
 
-      <section v-else-if="selectedBook && selectedBookPages.length" class="personal-reader" :class="{ 'personal-reader--focus': readingMode }" aria-label="Book reader">
+      <section v-else-if="selectedBook && selectedBookPages.length" class="personal-reader" :class="{ 'personal-reader--focus': readingMode }" :style="readerSidebarStyle" aria-label="Book reader">
         <div v-if="!readingMode" class="personal-reader__toolbar">
           <q-btn color="primary" icon="fullscreen" label="Reading mode" no-caps outline @click="setReadingMode(true)" />
           <q-select
@@ -200,6 +200,14 @@
             <div>
               <q-btn aria-label="Decrease text size" icon="text_decrease" outline round :disable="readerFontSize <= minReaderFontSize" @click="changeReaderFontSize(-1)" />
               <q-btn aria-label="Increase text size" color="primary" icon="text_increase" round unelevated :disable="readerFontSize >= maxReaderFontSize" @click="changeReaderFontSize(1)" />
+            </div>
+          </div>
+
+          <div class="personal-reader__sidebar-size-controls" aria-label="Sidebar size">
+            <span>Sidebar {{ readerSidebarScalePercent }}%</span>
+            <div>
+              <q-btn aria-label="Decrease sidebar size" icon="zoom_out" outline round :disable="readerSidebarScale <= minReaderSidebarScale" @click="changeReaderSidebarScale(-1)" />
+              <q-btn aria-label="Increase sidebar size" color="primary" icon="zoom_in" round unelevated :disable="readerSidebarScale >= maxReaderSidebarScale" @click="changeReaderSidebarScale(1)" />
             </div>
           </div>
 
@@ -346,6 +354,9 @@ const minReaderFontSize = 14;
 const maxReaderFontSize = 32;
 const readerFontSize = ref(20);
 const readingMode = ref(false);
+const minReaderSidebarScale = 0;
+const maxReaderSidebarScale = 4;
+const readerSidebarScale = ref(readReaderSidebarScale());
 const dailyReadingProgress = ref<DailyReadingProgress>(readDailyReadingProgress());
 const personalBooks = ref<PersonalBook[]>([]);
 const bookSyncing = ref(false);
@@ -422,6 +433,12 @@ const dailyReadingWords = computed(() => dailyWordsRead(dailyReadingProgress.val
 const dailyReadingProgressRatio = computed(() => Math.min(1, dailyReadingWords.value / dailyReadingGoalWords));
 const dailyReadingGoalState = computed(() => dailyReadingWords.value >= dailyReadingGoalWords * 1.5 ? 'exceeded' : dailyReadingWords.value >= dailyReadingGoalWords ? 'complete' : 'building');
 const dailyReadingGoalMessage = computed(() => readingGoalMessage(dailyReadingWords.value));
+const readerSidebarScalePercent = computed(() => 100 + readerSidebarScale.value * 10);
+const readerSidebarStyle = computed(() => ({
+  '--reader-sidebar-width': `${230 + readerSidebarScale.value * 30}px`,
+  '--reader-sidebar-mobile-width': `${158 + readerSidebarScale.value * 16}px`,
+  '--reader-sidebar-font-size': `${16 + readerSidebarScale.value * 1.5}px`,
+}));
 
 onMounted(async () => {
   configurePlaybackAudioSession();
@@ -739,6 +756,18 @@ function changeReaderFontSize(change: -1 | 1) {
   const progressRatio = getCurrentReaderProgressRatio();
   readerFontSize.value = Math.max(minReaderFontSize, Math.min(maxReaderFontSize, readerFontSize.value + change));
   saveBookReaderSettings();
+  void repaginateReader({ progressRatio });
+}
+const readerSidebarScaleKey = 'mentor-ai:personal-reader-sidebar-scale';
+function readReaderSidebarScale() {
+  if (typeof localStorage === 'undefined') return minReaderSidebarScale;
+  const value = Number(localStorage.getItem(readerSidebarScaleKey));
+  return Number.isInteger(value) ? Math.max(minReaderSidebarScale, Math.min(maxReaderSidebarScale, value)) : minReaderSidebarScale;
+}
+function changeReaderSidebarScale(change: -1 | 1) {
+  readerSidebarScale.value = Math.max(minReaderSidebarScale, Math.min(maxReaderSidebarScale, readerSidebarScale.value + change));
+  if (typeof localStorage !== 'undefined') localStorage.setItem(readerSidebarScaleKey, String(readerSidebarScale.value));
+  const progressRatio = getCurrentReaderProgressRatio();
   void repaginateReader({ progressRatio });
 }
 function bookReaderSettingsKey(bookId: string) { return `mentor-ai:personal-book-reader-settings:${bookId}`; }
