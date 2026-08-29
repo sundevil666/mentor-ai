@@ -208,7 +208,7 @@
           </div>
 
           <div class="personal-reader__sidebar-size-controls" aria-label="Sidebar size">
-            <span>Sidebar {{ readerSidebarScalePercent }}%</span>
+            <span>Panel {{ readerSidebarScalePercent }}%</span>
             <div>
               <q-btn aria-label="Decrease sidebar size" icon="zoom_out" outline round :disable="readerSidebarScale <= minReaderSidebarScale" @click="changeReaderSidebarScale(-1)" />
               <q-btn aria-label="Increase sidebar size" color="primary" icon="zoom_in" round unelevated :disable="readerSidebarScale >= maxReaderSidebarScale" @click="changeReaderSidebarScale(1)" />
@@ -217,7 +217,7 @@
 
           <section class="personal-reader__daily-goal" :class="`personal-reader__daily-goal--${dailyReadingGoalState}`" aria-label="Today's reading goal">
             <div class="personal-reader__daily-goal-heading">
-              <span>Today’s reading</span>
+              <span>Today</span>
               <strong>{{ dailyReadingWords.toLocaleString('en') }} / {{ dailyReadingGoalWords.toLocaleString('en') }}</strong>
             </div>
             <q-linear-progress
@@ -267,7 +267,7 @@
             <q-btn
               :aria-label="readingSpeechActive ? 'Pause reading coach' : 'Start reading coach'"
               :icon="readingSpeechActive ? 'pause' : 'mic'"
-              :label="readingSpeechActive ? 'Microphone is listening' : 'Allow microphone'"
+              :label="readingSpeechActive ? 'Listening' : 'Start microphone'"
               color="primary"
               dense
               no-caps

@@ -1920,8 +1920,10 @@ body.body--book-reading-mode .mobile-start-dock {
 
 .personal-reader__font-controls,
 .personal-reader__sidebar-size-controls {
-  display: grid;
+  align-items: center;
+  display: flex;
   gap: 10px;
+  justify-content: space-between;
 }
 
 .personal-reader__font-controls > span,
@@ -1930,13 +1932,14 @@ body.body--book-reading-mode .mobile-start-dock {
   color: var(--app-muted-strong);
   font-size: 0.8rem;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .personal-reader__font-controls > div,
 .personal-reader__sidebar-size-controls > div {
   display: flex;
   gap: 10px;
-  justify-content: space-between;
+  flex: 0 0 auto;
 }
 
 .personal-reader__sidebar .q-btn,
@@ -1976,8 +1979,10 @@ body.body--book-reading-mode .mobile-start-dock {
 }
 
 .personal-reader__daily-goal-heading {
-  display: grid;
-  gap: 2px;
+  align-items: baseline;
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
 }
 
 .personal-reader__daily-goal-heading span {
@@ -1985,11 +1990,13 @@ body.body--book-reading-mode .mobile-start-dock {
   font-size: 0.72rem;
   font-weight: 800;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .personal-reader__daily-goal-heading strong {
   color: var(--app-text-strong);
   font-size: 1rem;
+  white-space: nowrap;
 }
 
 .personal-reader__daily-goal p,
@@ -2110,6 +2117,7 @@ body.body--book-reading-mode .mobile-start-dock {
   align-items: baseline;
   display: flex;
   gap: 6px;
+  white-space: nowrap;
 }
 
 .personal-reader__speech-stats strong {
@@ -2227,6 +2235,11 @@ body.body--dark .personal-reader__lookup-error {
 .personal-reader__sidebar-navigation nav {
   display: flex;
   justify-content: space-between;
+}
+
+.personal-reader__sidebar .q-btn__content {
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .videos-header span,
@@ -3051,11 +3064,6 @@ body.body--dark .personal-reader__lookup-error {
     width: 58px;
   }
 
-  .personal-reader__speech-stats {
-    display: grid;
-    gap: 0;
-  }
-
   .personal-reader__speech-stats strong {
     font-size: 1rem;
   }
@@ -3065,7 +3073,7 @@ body.body--dark .personal-reader__lookup-error {
     line-height: 1.05;
     min-height: 38px;
     padding-inline: 5px;
-    white-space: normal;
+    white-space: nowrap;
   }
 
   .personal-reader__exit {
@@ -3075,8 +3083,13 @@ body.body--dark .personal-reader__lookup-error {
 
   .personal-reader__font-controls > div .q-btn,
   .personal-reader__sidebar-size-controls > div .q-btn {
-    min-height: 42px;
-    min-width: 42px;
+    min-height: 36px;
+    min-width: 36px;
+  }
+
+  .personal-reader__font-controls > div,
+  .personal-reader__sidebar-size-controls > div {
+    gap: 4px;
   }
 
   .personal-reader__navigation .q-btn {
