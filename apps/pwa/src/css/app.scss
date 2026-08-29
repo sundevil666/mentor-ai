@@ -1923,6 +1923,56 @@ body.body--book-reading-mode .mobile-start-dock {
   justify-content: space-between;
 }
 
+.personal-reader__daily-goal {
+  background: color-mix(in srgb, var(--category-accent) 8%, var(--app-surface));
+  border: 1px solid var(--category-border);
+  border-radius: var(--app-radius-md);
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.personal-reader__daily-goal--complete,
+.personal-reader__daily-goal--exceeded {
+  background: color-mix(in srgb, var(--q-positive) 10%, var(--app-surface));
+  border-color: color-mix(in srgb, var(--q-positive) 45%, var(--app-border));
+}
+
+.personal-reader__daily-goal-heading {
+  display: grid;
+  gap: 2px;
+}
+
+.personal-reader__daily-goal-heading span {
+  color: var(--app-muted-strong);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.personal-reader__daily-goal-heading strong {
+  color: var(--app-text-strong);
+  font-size: 1rem;
+}
+
+.personal-reader__daily-goal p,
+.personal-reader__daily-goal small {
+  margin: 0;
+}
+
+.personal-reader__daily-goal p {
+  color: var(--app-text-strong);
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.personal-reader__daily-goal small {
+  color: var(--app-muted-strong);
+  font-size: 0.68rem;
+  line-height: 1.25;
+}
+
 .personal-reader__lookup {
   background: var(--category-soft);
   border: 1px solid var(--category-border);
@@ -2814,6 +2864,19 @@ body.body--dark .personal-reader__lookup-error {
   .personal-reader__sidebar {
     gap: 12px;
     padding: max(10px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) 8px;
+  }
+
+  .personal-reader__daily-goal {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .personal-reader__daily-goal-heading strong {
+    font-size: 0.82rem;
+  }
+
+  .personal-reader__daily-goal small {
+    display: none;
   }
 
   .personal-reader__exit {
