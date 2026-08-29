@@ -151,7 +151,11 @@
           <span>{{ currentBookPageIndex + 1 }} / {{ selectedBookPages.length }}</span>
         </div>
         <div ref="readerContent" class="personal-reader__content" @scroll.passive="handleBookScroll">
-          <q-linear-progress rounded size="8px" :value="(currentBookPageIndex + 1) / selectedBookPages.length" color="primary" track-color="grey-3" />
+          <div class="personal-reader__progress" aria-label="Reading progress">
+            <span>Page {{ currentBookPageIndex + 1 }}</span>
+            <q-linear-progress rounded size="8px" :value="(currentBookPageIndex + 1) / selectedBookPages.length" color="primary" track-color="grey-3" />
+            <span>{{ selectedBookPages.length }} {{ selectedBookPages.length === 1 ? 'page' : 'pages' }}</span>
+          </div>
           <article class="personal-reader__paper" :style="{ fontSize: `${readerFontSize}px` }">
             <p class="personal-reader__part">{{ currentBookPartLabel }}</p>
             <p v-for="(paragraph, index) in currentBookParagraphs" :key="index">{{ paragraph }}</p>

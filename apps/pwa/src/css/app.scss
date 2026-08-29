@@ -1677,6 +1677,21 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   min-height: 0;
 }
 
+.personal-reader__progress {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(80px, 1fr) auto;
+}
+
+.personal-reader__progress span {
+  color: var(--app-muted-strong);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .personal-reader__paper {
   background: var(--app-surface);
   border: 1px solid var(--app-border);
