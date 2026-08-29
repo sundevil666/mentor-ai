@@ -9,19 +9,16 @@
   </transition>
   <transition name="update-button">
     <q-btn
-      v-if="!appStore.isAppUpdateInstalling"
+      v-if="appStore.availableAppUpdate && !appStore.isAppUpdateInstalling"
       class="app-update-floating-button"
       :aria-label="appUpdateButtonTooltip"
-      :color="appStore.availableAppUpdate ? 'amber-8' : 'primary'"
-      :icon="appStore.availableAppUpdate ? 'system_update_alt' : 'system_update'"
-      :label="appStore.availableAppUpdate ? 'Update' : undefined"
-      :round="!appStore.availableAppUpdate"
-      :unelevated="!appStore.availableAppUpdate"
+      color="amber-8"
+      icon="system_update_alt"
+      label="Update"
       no-caps
       @click="handleUpdateButtonClick"
     >
       <q-badge
-        v-if="appStore.availableAppUpdate"
         color="red-7"
         floating
         rounded
@@ -167,10 +164,7 @@ function handleUpdateButtonClick() {
 
   if (appStore.availableAppUpdate) {
     handleInstallUpdateRequest();
-    return;
   }
-
-  void handleManualUpdateCheck();
 }
 
 async function handleManualUpdateCheck() {
