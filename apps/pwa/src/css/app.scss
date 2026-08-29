@@ -1673,12 +1673,20 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
 }
 
 .personal-reader__content {
-  display: grid;
-  gap: 14px;
+  box-sizing: border-box;
   min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-bottom: 30px;
+  overflow: hidden;
+  padding: 0 clamp(22px, 6vw, 54px) 30px;
+  position: relative;
+}
+
+.personal-reader__end-spacer {
+  height: 1px;
+  left: var(--reader-paper-scroll-width, 100%);
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  width: var(--reader-end-gutter, 0);
 }
 
 .personal-reader__progress {
@@ -1701,11 +1709,17 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-lg);
   box-shadow: 0 14px 34px rgba(17, 24, 39, 0.08);
+  box-sizing: border-box;
+  column-fill: auto;
+  column-gap: var(--reader-column-gap, 0);
+  column-width: var(--reader-column-width, auto);
   color: var(--app-text-strong);
   font-family: Georgia, 'Times New Roman', serif;
-  font-size: clamp(1.08rem, 2.6vw, 1.25rem);
+  height: 100%;
   line-height: 1.82;
-  padding: clamp(22px, 6vw, 54px);
+  overflow: visible;
+  padding: 0;
+  width: 100%;
 }
 
 .personal-reader__paper p {
@@ -1713,10 +1727,16 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
 }
 
 .personal-reader__part {
+  break-after: avoid-column;
   color: var(--category-accent);
   font-family: inherit;
   font-size: 1.28em;
   font-weight: 800;
+  margin-top: 0;
+}
+
+.personal-reader__chapter {
+  display: flow-root;
 }
 
 .personal-reader__navigation {
@@ -1760,8 +1780,6 @@ body.body--book-reading-mode .mobile-start-dock {
 }
 
 .personal-reader--focus .personal-reader__content {
-  overflow-y: auto;
-  overscroll-behavior: contain;
   padding: 12px 16px 32px;
 }
 
@@ -1769,7 +1787,7 @@ body.body--book-reading-mode .mobile-start-dock {
   border-radius: 0;
   box-shadow: none;
   box-sizing: border-box;
-  min-height: calc(100dvh - 34px);
+  height: 100%;
   width: 100%;
 }
 

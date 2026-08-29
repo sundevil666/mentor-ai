@@ -135,7 +135,7 @@
         </div>
       </section>
 
-      <section v-else-if="selectedBook && currentBookPage" class="personal-reader" :class="{ 'personal-reader--focus': readingMode }" aria-label="Book reader">
+      <section v-else-if="selectedBook && selectedBookPages.length" class="personal-reader" :class="{ 'personal-reader--focus': readingMode }" aria-label="Book reader">
         <div v-if="!readingMode" class="personal-reader__toolbar">
           <q-btn color="primary" icon="fullscreen" label="Reading mode" no-caps outline @click="setReadingMode(true)" />
           <q-select
@@ -144,31 +144,39 @@
             map-options
             outlined
             label="Chapter / part"
-            :model-value="currentBookPageIndex"
+            :model-value="currentBookChapterPageIndex"
             :options="bookPageOptions"
             @update:model-value="goToBookPage"
           />
-          <span>{{ currentBookPageIndex + 1 }} / {{ selectedBookPages.length }}</span>
+          <span>{{ currentBookPageIndex + 1 }} / {{ readerPageCount }}</span>
         </div>
         <div v-if="!readingMode" class="personal-reader__progress" aria-label="Reading progress">
           <span>Page {{ currentBookPageIndex + 1 }}</span>
-          <q-linear-progress rounded size="8px" :value="(currentBookPageIndex + 1) / selectedBookPages.length" color="primary" track-color="grey-3" />
-          <span>{{ selectedBookPages.length }} {{ selectedBookPages.length === 1 ? 'page' : 'pages' }}</span>
+          <q-linear-progress rounded size="8px" :value="(currentBookPageIndex + 1) / readerPageCount" color="primary" track-color="grey-3" />
+          <span>{{ readerPageCount }} {{ readerPageCount === 1 ? 'page' : 'pages' }}</span>
         </div>
-        <div ref="readerContent" class="personal-reader__content" @scroll.passive="handleBookScroll">
-          <article class="personal-reader__paper" :style="{ fontSize: `${readerFontSize}px` }">
-            <p class="personal-reader__part">{{ currentBookPartLabel }}</p>
-            <p v-for="(paragraph, index) in currentBookParagraphs" :key="index">{{ paragraph }}</p>
+        <div ref="readerContent" class="personal-reader__content">
+          <article ref="readerPaper" class="personal-reader__paper" :style="{ fontSize: `${readerFontSize}px` }">
+            <section
+              v-for="(page, pageIndex) in selectedBookPages"
+              :key="page.id"
+              class="personal-reader__chapter"
+              :data-book-chapter-index="pageIndex"
+            >
+              <h2 class="personal-reader__part">{{ formatBookPartLabel(pageIndex, getChapterTitle(page.chapterId)) }}</h2>
+              <p v-for="(paragraph, paragraphIndex) in splitBookParagraphs(page.text)" :key="paragraphIndex">{{ paragraph }}</p>
+            </section>
           </article>
+          <span class="personal-reader__end-spacer" aria-hidden="true" />
         </div>
 
         <aside v-if="readingMode" class="personal-reader__sidebar" aria-label="Reading controls">
           <div class="personal-reader__progress personal-reader__sidebar-progress" aria-label="Reading progress">
             <div>
               <span>Page {{ currentBookPageIndex + 1 }}</span>
-              <span>{{ selectedBookPages.length }} {{ selectedBookPages.length === 1 ? 'page' : 'pages' }}</span>
+              <span>{{ readerPageCount }} {{ readerPageCount === 1 ? 'page' : 'pages' }}</span>
             </div>
-            <q-linear-progress rounded size="8px" :value="(currentBookPageIndex + 1) / selectedBookPages.length" color="primary" track-color="grey-3" />
+            <q-linear-progress rounded size="8px" :value="(currentBookPageIndex + 1) / readerPageCount" color="primary" track-color="grey-3" />
           </div>
 
           <q-btn class="personal-reader__exit" color="primary" icon="close_fullscreen" label="Exit reading" no-caps outline @click="setReadingMode(false)" />
@@ -188,21 +196,21 @@
               map-options
               outlined
               label="Chapter / part"
-              :model-value="currentBookPageIndex"
+              :model-value="currentBookChapterPageIndex"
               :options="bookPageOptions"
               @update:model-value="goToBookPage"
             />
-            <span>{{ currentBookPageIndex + 1 }} / {{ selectedBookPages.length }}</span>
+            <span>{{ currentBookPageIndex + 1 }} / {{ readerPageCount }}</span>
             <nav aria-label="Book navigation">
               <q-btn aria-label="Previous part" color="primary" icon="arrow_back" round unelevated :disable="currentBookPageIndex === 0" @click="goToBookPage(currentBookPageIndex - 1)" />
-              <q-btn aria-label="Next part" color="primary" icon="arrow_forward" round unelevated :disable="currentBookPageIndex >= selectedBookPages.length - 1" @click="goToBookPage(currentBookPageIndex + 1)" />
+              <q-btn aria-label="Next part" color="primary" icon="arrow_forward" round unelevated :disable="currentBookPageIndex >= readerPageCount - 1" @click="goToBookPage(currentBookPageIndex + 1)" />
             </nav>
           </div>
         </aside>
 
         <nav v-else class="personal-reader__navigation" aria-label="Book navigation">
           <q-btn aria-label="Previous part" class="personal-reader__previous" color="primary" icon="arrow_back" round unelevated :disable="currentBookPageIndex === 0" @click="goToBookPage(currentBookPageIndex - 1)" />
-          <q-btn aria-label="Next part" class="personal-reader__next" color="primary" icon="arrow_forward" round unelevated :disable="currentBookPageIndex >= selectedBookPages.length - 1" @click="goToBookPage(currentBookPageIndex + 1)" />
+          <q-btn aria-label="Next part" class="personal-reader__next" color="primary" icon="arrow_forward" round unelevated :disable="currentBookPageIndex >= readerPageCount - 1" @click="goToBookPage(currentBookPageIndex + 1)" />
         </nav>
       </section>
 
@@ -262,6 +270,10 @@ const selectedBookChapters = ref<ReadingChapter[]>([]);
 const selectedBookPages = ref<ReadingPage[]>([]);
 const currentBookPageIndex = ref(0);
 const readerContent = ref<HTMLElement | null>(null);
+const readerPaper = ref<HTMLElement | null>(null);
+const readerPageCount = ref(1);
+const readerPageStride = ref(1);
+const chapterPageIndexes = ref<number[]>([]);
 const minReaderFontSize = 14;
 const maxReaderFontSize = 32;
 const readerFontSize = ref(20);
@@ -282,17 +294,24 @@ const repeat = ref(false);
 const playbackRate = ref(1);
 const busy = ref(false);
 let lastProgressSave = 0;
-let lastBookScrollSave = 0;
+let readerResizeObserver: ResizeObserver | null = null;
+let readerResizeFrame = 0;
+let lastReaderViewportWidth = 0;
+let lastReaderViewportHeight = 0;
 const playbackRates = [0.75, 1, 1.25, 1.5];
 const selectedStory = computed(() => storyLibrary.find((story) => story.id === selectedStoryId.value) ?? null);
 const offlineSummary = computed(() => `${storyLibrary.length} stories · ${formatStoryDuration(storyLibrary.reduce((sum, story) => sum + story.durationSeconds, 0))} total listening.`);
-const currentBookPage = computed(() => selectedBookPages.value[currentBookPageIndex.value] ?? null);
-const currentBookChapter = computed(() => selectedBookChapters.value.find((chapter) => chapter.id === currentBookPage.value?.chapterId) ?? null);
-const currentBookParagraphs = computed(() => currentBookPage.value?.text.split(/\n{2,}/).filter(Boolean) ?? []);
-const currentBookPartLabel = computed(() => formatBookPartLabel(currentBookPageIndex.value, currentBookChapter.value?.title));
+const currentBookChapterIndex = computed(() => {
+  let activeIndex = 0;
+  chapterPageIndexes.value.forEach((pageIndex, chapterIndex) => {
+    if (pageIndex <= currentBookPageIndex.value) activeIndex = chapterIndex;
+  });
+  return activeIndex;
+});
+const currentBookChapterPageIndex = computed(() => chapterPageIndexes.value[currentBookChapterIndex.value] ?? 0);
 const bookPageOptions = computed(() => selectedBookPages.value.map((page, index) => ({
   label: formatBookPartLabel(index, selectedBookChapters.value.find((chapter) => chapter.id === page.chapterId)?.title),
-  value: index,
+  value: chapterPageIndexes.value[index] ?? 0,
 })));
 
 onMounted(async () => {
@@ -312,6 +331,7 @@ onUnmounted(() => {
   persistProgress();
   persistBookProgress();
   applyReadingMode(false);
+  stopReaderPagination();
   clearMediaSession();
   document.removeEventListener('visibilitychange', handleVisibilityChange);
   document.removeEventListener('keydown', handleReaderKeydown);
@@ -376,39 +396,54 @@ async function openBook(bookId: string) {
   selectedBook.value = loaded.book;
   selectedBookChapters.value = loaded.chapters;
   selectedBookPages.value = loaded.pages;
-  currentBookPageIndex.value = readBookProgress(loaded.book.id, loaded.pages.length).currentPageIndex;
+  currentBookPageIndex.value = 0;
+  readerPageCount.value = 1;
+  readerPageStride.value = 1;
+  chapterPageIndexes.value = loaded.pages.map(() => 0);
   const readerSettings = readBookReaderSettings(loaded.book.id);
   readerFontSize.value = readerSettings.fontSize;
   await markPersonalBookOpened(loaded.book);
   personalBooks.value = await listPersonalBooks();
   applyReadingMode(readerSettings.readingMode);
-  void nextTick(restoreBookScrollPosition);
+  await nextTick();
+  await repaginateReader(readBookProgress(loaded.book.id, loaded.pages.length));
+  startReaderPagination();
 }
 function closeBook() {
   persistBookProgress();
+  stopReaderPagination();
   applyReadingMode(false);
   selectedBook.value = null;
   selectedBookChapters.value = [];
   selectedBookPages.value = [];
   currentBookPageIndex.value = 0;
+  readerPageCount.value = 1;
+  readerPageStride.value = 1;
+  chapterPageIndexes.value = [];
 }
 function goToBookPage(pageIndex: number | null) {
   if (pageIndex === null || !Number.isInteger(pageIndex)) return;
   persistBookProgress();
-  currentBookPageIndex.value = Math.max(0, Math.min(selectedBookPages.value.length - 1, pageIndex));
-  persistBookProgress(false);
-  void nextTick(restoreBookScrollPosition);
+  currentBookPageIndex.value = Math.max(0, Math.min(readerPageCount.value - 1, pageIndex));
+  scrollToReaderPage();
+  persistBookProgress();
 }
 function formatBookPartLabel(index: number, title?: string) {
   const normalizedTitle = title?.replace(/\s+/g, ' ').trim();
   const genericTitle = normalizedTitle && !/^(chapter|part)\s+\d+$/i.test(normalizedTitle) ? normalizedTitle : 'Part';
   return `${index + 1}. ${genericTitle}`;
 }
+function getChapterTitle(chapterId?: string) {
+  return selectedBookChapters.value.find((chapter) => chapter.id === chapterId)?.title;
+}
+function splitBookParagraphs(text: string) {
+  return text.split(/\n{2,}/).filter(Boolean);
+}
 function setReadingMode(value: boolean) {
-  const scrollTop = getReaderScroller()?.scrollTop ?? 0;
+  const progressRatio = getCurrentReaderProgressRatio();
   applyReadingMode(value);
   saveBookReaderSettings();
-  void nextTick(() => getReaderScroller()?.scrollTo({ top: scrollTop }));
+  void repaginateReader({ progressRatio });
 }
 function applyReadingMode(value: boolean) {
   readingMode.value = value;
@@ -416,8 +451,10 @@ function applyReadingMode(value: boolean) {
   document.body.classList.toggle('body--book-reading-mode', value);
 }
 function changeReaderFontSize(change: -1 | 1) {
+  const progressRatio = getCurrentReaderProgressRatio();
   readerFontSize.value = Math.max(minReaderFontSize, Math.min(maxReaderFontSize, readerFontSize.value + change));
   saveBookReaderSettings();
+  void repaginateReader({ progressRatio });
 }
 function bookReaderSettingsKey(bookId: string) { return `mentor-ai:personal-book-reader-settings:${bookId}`; }
 function readBookReaderSettings(bookId: string): { readingMode: boolean; fontSize: number } {
@@ -437,47 +474,113 @@ function saveBookReaderSettings() {
 }
 function handleReaderKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape' && readingMode.value) setReadingMode(false);
+  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+  if (event.key === 'ArrowLeft') goToBookPage(currentBookPageIndex.value - 1);
+  if (event.key === 'ArrowRight') goToBookPage(currentBookPageIndex.value + 1);
 }
-function persistBookProgress(includeScroll = true) {
+function persistBookProgress() {
   const book = selectedBook.value;
   if (!book || typeof localStorage === 'undefined') return;
   const previous = readBookProgress(book.id, selectedBookPages.value.length);
-  const scrollTopByPage = { ...previous.scrollTopByPage };
-  if (includeScroll) scrollTopByPage[String(currentBookPageIndex.value)] = Math.max(0, Math.round(getReaderScroller()?.scrollTop ?? 0));
+  const progressRatio = getCurrentReaderProgressRatio();
   localStorage.setItem(bookProgressKey(book.id), JSON.stringify({
+    version: 2,
     currentPageIndex: currentBookPageIndex.value,
-    furthestPageIndex: Math.max(previous.furthestPageIndex, currentBookPageIndex.value),
-    scrollTopByPage,
+    pageCountAtSave: readerPageCount.value,
+    progressRatio,
+    furthestProgressRatio: Math.max(previous.furthestProgressRatio ?? 0, progressRatio),
+    chapterId: selectedBookPages.value[currentBookChapterIndex.value]?.chapterId,
     updatedAt: new Date().toISOString(),
   }));
 }
 function bookProgressKey(bookId: string) { return `mentor-ai:personal-book-progress:${bookId}`; }
-function readBookProgress(bookId: string, pageCount: number): { currentPageIndex: number; furthestPageIndex: number; scrollTopByPage: Record<string, number> } {
-  if (typeof localStorage === 'undefined') return { currentPageIndex: 0, furthestPageIndex: -1, scrollTopByPage: {} };
+interface BookReaderProgress {
+  progressRatio?: number;
+  furthestProgressRatio?: number;
+  legacyChapterIndex?: number;
+}
+function readBookProgress(bookId: string, chapterCount: number): BookReaderProgress {
+  if (typeof localStorage === 'undefined') return { progressRatio: 0, furthestProgressRatio: 0 };
   try {
-    const parsed = JSON.parse(localStorage.getItem(bookProgressKey(bookId)) ?? 'null') as { currentPageIndex?: number; furthestPageIndex?: number; scrollTopByPage?: Record<string, number> } | null;
-    const maxIndex = Math.max(0, pageCount - 1);
+    const parsed = JSON.parse(localStorage.getItem(bookProgressKey(bookId)) ?? 'null') as { version?: number; currentPageIndex?: number; progressRatio?: number; furthestProgressRatio?: number } | null;
+    if (parsed?.version === 2) {
+      return {
+        progressRatio: clampProgressRatio(parsed.progressRatio),
+        furthestProgressRatio: clampProgressRatio(parsed.furthestProgressRatio),
+      };
+    }
     return {
-      currentPageIndex: Math.max(0, Math.min(maxIndex, Number(parsed?.currentPageIndex) || 0)),
-      furthestPageIndex: Math.max(-1, Math.min(maxIndex, Number.isFinite(parsed?.furthestPageIndex) ? Number(parsed?.furthestPageIndex) : -1)),
-      scrollTopByPage: parsed?.scrollTopByPage && typeof parsed.scrollTopByPage === 'object' ? parsed.scrollTopByPage : {},
+      furthestProgressRatio: 0,
+      legacyChapterIndex: Math.max(0, Math.min(Math.max(0, chapterCount - 1), Number(parsed?.currentPageIndex) || 0)),
     };
   } catch {
-    return { currentPageIndex: 0, furthestPageIndex: -1, scrollTopByPage: {} };
+    return { progressRatio: 0, furthestProgressRatio: 0 };
   }
 }
-function getReaderScroller() { return readerContent.value; }
-function restoreBookScrollPosition() {
-  const book = selectedBook.value;
-  if (!book) return;
-  const progress = readBookProgress(book.id, selectedBookPages.value.length);
-  const scrollTop = Number(progress.scrollTopByPage[String(currentBookPageIndex.value)]) || 0;
-  getReaderScroller()?.scrollTo({ top: Math.max(0, scrollTop) });
+function clampProgressRatio(value: unknown) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? Math.max(0, Math.min(1, numericValue)) : 0;
 }
-function handleBookScroll() {
-  if (Date.now() - lastBookScrollSave < 1_000) return;
-  lastBookScrollSave = Date.now();
+function getCurrentReaderProgressRatio() {
+  return readerPageCount.value <= 1 ? 0 : currentBookPageIndex.value / (readerPageCount.value - 1);
+}
+function startReaderPagination() {
+  stopReaderPagination();
+  if (typeof ResizeObserver === 'undefined' || !readerContent.value) return;
+  lastReaderViewportWidth = Math.round(readerContent.value.getBoundingClientRect().width);
+  lastReaderViewportHeight = Math.round(readerContent.value.getBoundingClientRect().height);
+  readerResizeObserver = new ResizeObserver(([entry]) => {
+    const width = Math.round(entry?.contentRect.width ?? 0);
+    const height = Math.round(entry?.contentRect.height ?? 0);
+    if (width === lastReaderViewportWidth && height === lastReaderViewportHeight) return;
+    lastReaderViewportWidth = width;
+    lastReaderViewportHeight = height;
+    cancelAnimationFrame(readerResizeFrame);
+    const progressRatio = getCurrentReaderProgressRatio();
+    readerResizeFrame = requestAnimationFrame(() => { void repaginateReader({ progressRatio }); });
+  });
+  readerResizeObserver.observe(readerContent.value);
+}
+function stopReaderPagination() {
+  readerResizeObserver?.disconnect();
+  readerResizeObserver = null;
+  cancelAnimationFrame(readerResizeFrame);
+  lastReaderViewportWidth = 0;
+  lastReaderViewportHeight = 0;
+}
+async function repaginateReader(position: BookReaderProgress = { progressRatio: getCurrentReaderProgressRatio(), furthestProgressRatio: 0 }) {
+  await nextTick();
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  const viewport = readerContent.value;
+  const paper = readerPaper.value;
+  if (!viewport || !paper || viewport.clientWidth <= 0) return;
+  const pageWidth = viewport.clientWidth;
+  const viewportStyle = getComputedStyle(viewport);
+  const horizontalGutter = Number.parseFloat(viewportStyle.paddingLeft) + Number.parseFloat(viewportStyle.paddingRight);
+  const columnWidth = Math.max(120, pageWidth - horizontalGutter);
+  paper.style.setProperty('--reader-column-width', `${columnWidth}px`);
+  paper.style.setProperty('--reader-column-gap', `${horizontalGutter}px`);
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  readerPageCount.value = Math.max(1, Math.ceil((paper.scrollWidth + horizontalGutter - 1) / pageWidth));
+  readerPageStride.value = (paper.scrollWidth + horizontalGutter) / readerPageCount.value;
+  viewport.style.setProperty('--reader-paper-scroll-width', `${paper.scrollWidth}px`);
+  viewport.style.setProperty('--reader-end-gutter', `${horizontalGutter + Math.max(0, pageWidth - readerPageStride.value)}px`);
+  chapterPageIndexes.value = selectedBookPages.value.map((_, chapterIndex) => {
+    const chapter = paper.querySelector<HTMLElement>(`[data-book-chapter-index="${chapterIndex}"]`);
+    return Math.max(0, Math.min(readerPageCount.value - 1, Math.floor(((chapter?.offsetLeft ?? 0) + 1) / readerPageStride.value)));
+  });
+  if (position.legacyChapterIndex !== undefined) {
+    currentBookPageIndex.value = chapterPageIndexes.value[position.legacyChapterIndex] ?? 0;
+  } else {
+    currentBookPageIndex.value = Math.round(clampProgressRatio(position.progressRatio) * Math.max(0, readerPageCount.value - 1));
+  }
+  scrollToReaderPage(false);
   persistBookProgress();
+}
+function scrollToReaderPage(smooth = true) {
+  const viewport = readerContent.value;
+  if (!viewport) return;
+  viewport.scrollTo({ left: currentBookPageIndex.value * readerPageStride.value, top: 0, behavior: smooth ? 'smooth' : 'auto' });
 }
 function confirmDeleteBook(book: PersonalBook) {
   Dialog.create({
