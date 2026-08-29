@@ -259,8 +259,15 @@
               @click="toggleReadingSpeech"
             >
               <span v-for="bar in 7" :key="bar" :style="{ '--speech-bar': String(bar) }" />
-              <q-icon :name="readingSpeechActive ? 'mic' : readingSpeechStatus === 'error' ? 'mic_off' : 'play_arrow'" />
+              <q-icon :name="readingSpeechActive ? 'mic' : 'play_arrow'" />
             </button>
+            <div class="personal-reader__microphone-status" :class="`personal-reader__microphone-status--${readingMicrophoneIndicator.tone}`" role="status">
+              <span class="personal-reader__microphone-status-dot" aria-hidden="true" />
+              <div>
+                <strong>{{ readingMicrophoneIndicator.title }}</strong>
+                <span>{{ readingMicrophoneIndicator.detail }}</span>
+              </div>
+            </div>
             <div class="personal-reader__heard-words" aria-live="polite" aria-label="Words heard by the microphone">
               <span class="personal-reader__heard-words-label">Microphone heard</span>
               <div v-if="readingSpeechVisibleWords.length" class="personal-reader__heard-words-list">
@@ -270,17 +277,18 @@
                   :class="{ 'personal-reader__heard-word--interim': word.interim }"
                 >{{ word.text }}</span>
               </div>
-              <span v-else class="personal-reader__heard-words-empty">Words will appear here as you read.</span>
+              <span v-else class="personal-reader__heard-words-empty">{{ readingSpeechActive ? 'Listening now. Speak and recognized words will appear here.' : 'Turn on the microphone, then read aloud.' }}</span>
+              <small>These recognized words are used for your reading analysis. Audio is not saved.</small>
             </div>
             <div v-if="readingSpeechAcceptedWords" class="personal-reader__speech-stats">
               <strong>{{ readingSpeechMatchPercent }}%</strong>
               <span>{{ readingSpeechAcceptedWords }} words</span>
             </div>
             <q-btn
-              :aria-label="readingSpeechActive ? 'Pause reading coach' : 'Start reading coach'"
-              :icon="readingSpeechActive ? 'pause' : 'mic'"
-              :label="readingSpeechActive ? 'Listening' : 'Start microphone'"
-              color="primary"
+              :aria-label="readingSpeechActive ? 'Stop microphone' : 'Start microphone'"
+              :icon="readingSpeechActive ? 'stop' : 'mic'"
+              :label="readingSpeechActionLabel"
+              :color="readingSpeechStatus === 'error' ? 'negative' : readingSpeechActive ? 'positive' : 'primary'"
               dense
               no-caps
               outline
@@ -563,6 +571,22 @@ const readingSpeechVisibleWords = computed(() => [
   ...readingSpeechInterimWords.value.map((text) => ({ text, interim: true })),
 ].slice(-maxVisibleSpeechWords));
 const readingSpeechMatchPercent = computed(() => readingSpeechSpokenWords.value > 0 ? Math.round(readingSpeechAcceptedWords.value / readingSpeechSpokenWords.value * 100) : 0);
+const readingSpeechHasSignal = computed(() => readingSpeechLevel.value >= 0.035);
+const readingSpeechActionLabel = computed(() => {
+  if (readingSpeechActive.value) return 'Stop microphone';
+  if (readingSpeechStatus.value === 'error') return 'Try microphone again';
+  return 'Turn microphone on';
+});
+const readingMicrophoneIndicator = computed(() => {
+  if (readingSpeechStatus.value === 'requesting') return { tone: 'requesting', title: 'REQUESTING ACCESS', detail: 'Confirm the microphone request on this device.' };
+  if (readingSpeechStatus.value === 'listening' || readingSpeechStatus.value === 'noise') {
+    return readingSpeechHasSignal.value
+      ? { tone: 'hearing', title: 'SOUND DETECTED', detail: 'The microphone hears you. Recognized words are used for analysis.' }
+      : { tone: 'listening', title: 'MICROPHONE ON — LISTENING', detail: 'Start reading aloud. The sound indicator will react to your voice.' };
+  }
+  if (readingSpeechStatus.value === 'error') return { tone: 'error', title: 'MICROPHONE ACCESS BLOCKED', detail: readingSpeechMessage.value };
+  return { tone: 'off', title: 'MICROPHONE OFF', detail: 'Tap Turn microphone on to request access.' };
+});
 const readingSpeechTitle = computed(() => ({
   idle: 'Pronunciation coach', requesting: 'Enabling microphone…', listening: 'Listening to your reading', noise: 'Waiting for the book text', paused: 'Voice tracking paused', error: 'Microphone unavailable',
 })[readingSpeechStatus.value]);
@@ -944,7 +968,7 @@ async function startReadingSpeech() {
       audio: { autoGainControl: true, echoCancellation: true, noiseSuppression: true },
       video: false,
     });
-    startReadingSpeechMeter(readingSpeechStream);
+    void startReadingSpeechMeter(readingSpeechStream);
     readingSpeechAnchor = getVisibleReaderWordAnchor();
     readingSpeechRecognition = startContinuousSpeechRecognition({
       lang: 'en-US',
@@ -958,20 +982,27 @@ async function startReadingSpeech() {
         readingSpeechMessage.value = listening ? 'Read naturally. Matching words are highlighted as you speak.' : 'Reconnecting voice recognition…';
       },
       onError: (message) => {
-        if (/not-allowed|permission|denied/i.test(message)) {
-          stopReadingSpeech('error');
-          readingSpeechMessage.value = 'Microphone permission is blocked. Allow it in the browser settings and try again.';
-        }
+        stopReadingSpeech('error');
+        readingSpeechMessage.value = /not-allowed|permission|denied/i.test(message)
+          ? 'Permission was denied. Allow microphone access in this app or browser settings, then try again.'
+          : `Speech recognition stopped: ${message}`;
+        Notify.create({ type: 'negative', icon: 'mic', message: readingSpeechMessage.value, timeout: 6_000 });
       },
     });
     readingSpeechStatus.value = 'listening';
     readingSpeechMessage.value = 'Read naturally. Matching words are highlighted as you speak.';
   } catch (error) {
     stopReadingSpeech('error');
-    readingSpeechMessage.value = error instanceof Error && /denied|allowed|permission/i.test(error.message)
-      ? 'Microphone permission was not granted. Tap Start listening to try again.'
+    readingSpeechMessage.value = isMicrophonePermissionError(error)
+      ? 'Permission was denied. Allow microphone access in this app or browser settings, then try again.'
       : 'The microphone could not be started on this device.';
+    Notify.create({ type: 'negative', icon: 'mic', message: readingSpeechMessage.value, timeout: 6_000 });
   }
+}
+function isMicrophonePermissionError(error: unknown) {
+  return error instanceof DOMException
+    ? error.name === 'NotAllowedError' || error.name === 'SecurityError'
+    : error instanceof Error && /denied|allowed|permission/i.test(error.message);
 }
 function handleReadingSpeechTranscript(transcript: string) {
   const heardWords = tokenizeReadingSpeech(transcript);
@@ -1008,10 +1039,11 @@ function getVisibleReaderWordAnchor() {
   const wordIndex = Number(visibleWord?.dataset.readerWordIndex);
   return Number.isInteger(wordIndex) ? wordIndex : readingSpeechAnchor;
 }
-function startReadingSpeechMeter(stream: MediaStream) {
+async function startReadingSpeechMeter(stream: MediaStream) {
   const AudioContextConstructor = window.AudioContext;
   if (!AudioContextConstructor) return;
   readingSpeechAudioContext = new AudioContextConstructor();
+  await readingSpeechAudioContext.resume().catch(() => undefined);
   const analyser = readingSpeechAudioContext.createAnalyser();
   analyser.fftSize = 256;
   analyser.smoothingTimeConstant = 0.76;
