@@ -1774,7 +1774,7 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   column-gap: var(--reader-column-gap, 0);
   column-width: var(--reader-column-width, auto);
   color: var(--app-text-strong);
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, Georgia, serif;
   height: 100%;
   line-height: 1.82;
   overflow: visible;
@@ -1867,7 +1867,11 @@ body.body--book-reading-mode .mobile-start-dock {
 }
 
 .personal-reader--focus {
-  background: var(--app-background);
+  --reader-focus-background: #d8d0c2;
+  --reader-paper-background: #f5f0e6;
+  --reader-paper-text: #302d29;
+  --reader-paper-muted: #675f55;
+  background: var(--reader-focus-background);
   gap: 0;
   grid-template-columns: minmax(0, 1fr) min(var(--reader-sidebar-width, 230px), 42vw);
   grid-template-rows: minmax(0, 1fr);
@@ -1878,15 +1882,45 @@ body.body--book-reading-mode .mobile-start-dock {
 }
 
 .personal-reader--focus .personal-reader__content {
-  padding: 15px;
+  background: var(--reader-focus-background);
+  padding: clamp(8px, 1.8vw, 22px);
 }
 
 .personal-reader--focus .personal-reader__paper {
-  border-radius: 0;
-  box-shadow: none;
+  background: var(--reader-paper-background);
+  border: 0;
+  border-radius: 4px;
+  box-shadow: 0 12px 36px rgba(55, 45, 32, 0.12);
   box-sizing: border-box;
+  color: var(--reader-paper-text);
   height: 100%;
+  letter-spacing: 0.006em;
+  line-height: 1.78;
+  padding: clamp(22px, 4vw, 58px);
+  text-rendering: optimizeLegibility;
   width: 100%;
+}
+
+.personal-reader--focus .personal-reader__paper p {
+  margin-bottom: 1.08em;
+}
+
+.personal-reader--focus .personal-reader__part {
+  color: var(--reader-paper-muted);
+  font-size: 1.22em;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.personal-reader--focus .personal-reader__word--spoken {
+  color: var(--reader-paper-text);
+}
+
+body.body--dark .personal-reader--focus {
+  --reader-focus-background: #121311;
+  --reader-paper-background: #1d1e1b;
+  --reader-paper-text: #d8d3c8;
+  --reader-paper-muted: #aaa396;
 }
 
 .personal-reader__sidebar {
@@ -3040,7 +3074,14 @@ body.body--dark .personal-reader__lookup-error {
   }
 
   .personal-reader--focus .personal-reader__content {
-    padding: 15px;
+    padding: 6px;
+  }
+
+  .personal-reader--focus .personal-reader__paper {
+    border-radius: 2px;
+    letter-spacing: 0;
+    line-height: 1.72;
+    padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
   }
 
   .personal-reader__sidebar {
