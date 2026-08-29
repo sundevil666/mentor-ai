@@ -2,6 +2,21 @@
   <q-layout view="hHh lpR fFf">
     <q-header bordered class="app-header">
       <q-toolbar>
+        <div class="app-header__center">
+          <q-btn
+            v-if="personalBookSyncControl.visible"
+            class="personal-books__sync-button"
+            :aria-label="personalBookSyncControl.status"
+            :disable="personalBookSyncControl.disabled"
+            :icon="personalBookSyncControl.icon"
+            :label="personalBookSyncControl.label"
+            :loading="personalBookSyncControl.loading"
+            no-caps
+            rounded
+            unelevated
+            @click="personalBookSyncControl.trigger?.()"
+          />
+        </div>
         <q-btn
           class="network-status-button"
           :aria-label="appStore.isOnline ? 'Online' : 'Offline'"
@@ -275,6 +290,7 @@
 import type { ConceptLevel, StudentModel, TranslationUsage } from '@mentor-ai/shared';
 import { Dark, Notify } from 'quasar';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { personalBookSyncControl } from 'src/services/personal-book-sync-control';
 import {
   onBeforeRouteUpdate,
   useRoute,

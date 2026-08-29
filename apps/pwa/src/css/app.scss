@@ -128,6 +128,15 @@ body .q-menu {
 
 .app-header .q-toolbar {
   padding-top: env(safe-area-inset-top);
+  position: relative;
+}
+
+.app-header__center {
+  left: 50%;
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 7px);
+  transform: translateX(-50%);
+  z-index: 2;
 }
 
 .app-header .lesson-update-button,
@@ -1536,7 +1545,6 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   align-items: center;
   display: flex;
   gap: 10px;
-  position: relative;
 }
 
 .personal-books__sync-button {
@@ -1544,19 +1552,10 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   border: 1px solid rgba(57, 117, 80, 0.22);
   box-shadow: 0 6px 18px rgba(17, 24, 39, 0.12);
   color: #397550 !important;
-  left: 50%;
-  max-width: min(180px, 46vw);
+  max-width: min(180px, 38vw);
   min-height: 36px;
   padding: 0 12px;
-  position: absolute;
-  bottom: 0;
-  transform: translateX(-50%);
   white-space: nowrap;
-  z-index: 2;
-}
-
-.videos-header--books {
-  padding-bottom: 44px;
 }
 
 .personal-books__sync-button .q-btn__content {
@@ -2458,6 +2457,17 @@ body.body--dark .personal-reader__lookup-error {
   .app-header .q-btn.q-btn--round {
     padding: 0;
     width: 44px;
+  }
+
+  .app-header:has(.personal-books__sync-button) .header-level-trend {
+    display: none;
+  }
+
+  .app-header .personal-books__sync-button {
+    height: 36px;
+    min-height: 36px;
+    min-width: 0;
+    padding: 0 7px;
   }
 
   .app-header .update-log-button {

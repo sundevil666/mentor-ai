@@ -4,29 +4,13 @@
       <header
         v-if="!readingMode"
         class="videos-header"
-        :class="{
-          'videos-header--book-detail': selectedBook,
-          'videos-header--books': activeTab === 'books' && !selectedBook,
-        }"
+        :class="{ 'videos-header--book-detail': selectedBook }"
       >
         <q-btn v-if="selectedStory || selectedBook" aria-label="Back to library" color="primary" flat icon="arrow_back" round @click="closeDetail" />
         <div>
           <p>{{ activeTab === 'audio' ? 'English audio library' : 'Your private English library' }}</p>
           <h1>{{ selectedStory?.title ?? selectedBook?.title ?? 'Stories & Books' }}</h1>
         </div>
-        <q-btn
-          v-if="activeTab === 'books' && !selectedBook"
-          class="personal-books__sync-button"
-          :aria-label="bookSyncStatus"
-          :disable="!getAuthToken()"
-          :icon="bookSyncIcon"
-          :label="bookSyncCompactLabel"
-          :loading="bookSyncing"
-          no-caps
-          rounded
-          unelevated
-          @click="retryPersonalBookSync"
-        />
       </header>
 
       <q-tabs
@@ -305,7 +289,7 @@
 
 <script setup lang="ts">
 import { Dialog, Notify } from 'quasar';
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { ReaderTextLookup, ReadingChapter, ReadingPage } from '@mentor-ai/shared';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import { loadContentEngagementSummaries, recordContentEngagement, syncContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
@@ -315,6 +299,7 @@ import { deleteOfflineStory, formatStoryDuration, formatStorySize, getCachedStor
 import { useAppStore } from 'src/stores/app-store';
 import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 import { deletePersonalBook, importPersonalBook, listPersonalBookArchives, listPersonalBooks, loadPersonalBook, markPersonalBookOpened, mergePersonalBookArchives, type PersonalBook } from 'src/services/personal-book-library';
+import { personalBookSyncControl } from 'src/services/personal-book-sync-control';
 import { fetchReaderPhonetic, fetchReaderTextLookup, synchronizePersonalReadingBooks, synchronizeReaderVocabulary } from 'src/services/api-client';
 import { getAuthToken } from 'src/services/auth';
 import { findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
@@ -388,6 +373,19 @@ const bookSyncCompactLabel = computed(() => {
   if (cloudBookCount.value === null) return 'Sync books';
   return `${cloudBookCount.value} synced`;
 });
+watch(
+  [activeTab, selectedBook, bookSyncStatus, bookSyncIcon, bookSyncCompactLabel, bookSyncing],
+  () => {
+    personalBookSyncControl.visible = activeTab.value === 'books' && !selectedBook.value;
+    personalBookSyncControl.disabled = !getAuthToken();
+    personalBookSyncControl.icon = bookSyncIcon.value;
+    personalBookSyncControl.label = bookSyncCompactLabel.value;
+    personalBookSyncControl.loading = bookSyncing.value;
+    personalBookSyncControl.status = bookSyncStatus.value;
+    personalBookSyncControl.trigger = retryPersonalBookSync;
+  },
+  { immediate: true },
+);
 const currentBookChapterIndex = computed(() => {
   let activeIndex = 0;
   chapterPageIndexes.value.forEach((pageIndex, chapterIndex) => {
@@ -419,6 +417,8 @@ onMounted(async () => {
   }
 });
 onUnmounted(() => {
+  personalBookSyncControl.visible = false;
+  personalBookSyncControl.trigger = null;
   persistProgress();
   persistBookProgress();
   applyReadingMode(false);
