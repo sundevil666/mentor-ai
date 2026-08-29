@@ -1661,7 +1661,7 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   align-items: center;
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 .personal-reader__toolbar span {
@@ -1669,6 +1669,12 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   font-size: 0.85rem;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.personal-reader__content {
+  display: grid;
+  gap: 14px;
+  min-height: 0;
 }
 
 .personal-reader__paper {
@@ -1712,6 +1718,88 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
 
 .personal-reader__next {
   right: max(18px, calc((100vw - 920px) / 2));
+}
+
+body.body--book-reading-mode {
+  overflow: hidden;
+}
+
+body.body--book-reading-mode .app-header,
+body.body--book-reading-mode .mobile-start-dock {
+  display: none;
+}
+
+.personal-reader--focus {
+  background: var(--app-background);
+  gap: 0;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  inset: 0;
+  padding: 0;
+  position: fixed;
+  z-index: 3000;
+}
+
+.personal-reader--focus .personal-reader__content {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 16px 32px;
+}
+
+.personal-reader--focus .personal-reader__paper {
+  border-radius: 0;
+  box-shadow: none;
+  box-sizing: border-box;
+  min-height: calc(100dvh - 34px);
+  width: 100%;
+}
+
+.personal-reader__sidebar {
+  background: var(--app-surface);
+  border-left: 1px solid var(--app-border);
+  box-shadow: -10px 0 28px rgba(17, 24, 39, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 0;
+  padding: max(18px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) 16px;
+}
+
+.personal-reader__exit {
+  min-height: 44px;
+  width: 100%;
+}
+
+.personal-reader__font-controls {
+  display: grid;
+  gap: 10px;
+}
+
+.personal-reader__font-controls > span,
+.personal-reader__sidebar-navigation > span {
+  color: var(--app-muted-strong);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.personal-reader__font-controls > div {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.personal-reader__sidebar-navigation {
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.personal-reader__sidebar-navigation > span {
+  text-align: center;
+}
+
+.personal-reader__sidebar-navigation nav {
+  display: flex;
+  justify-content: space-between;
 }
 
 .videos-header span,
@@ -2475,6 +2563,42 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
 
   .personal-reader__paper {
     padding: 22px 18px;
+  }
+
+  .personal-reader__toolbar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .personal-reader__toolbar > .q-btn {
+    grid-column: 1 / -1;
+    min-height: 46px;
+  }
+
+  .personal-reader--focus {
+    grid-template-columns: minmax(0, 1fr) 158px;
+  }
+
+  .personal-reader--focus .personal-reader__content {
+    padding: 6px 6px 20px;
+  }
+
+  .personal-reader--focus .personal-reader__paper {
+    padding: 18px 14px;
+  }
+
+  .personal-reader__sidebar {
+    gap: 12px;
+    padding: max(10px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) 8px;
+  }
+
+  .personal-reader__exit {
+    font-size: 0.75rem;
+    padding-inline: 6px;
+  }
+
+  .personal-reader__font-controls > div .q-btn {
+    min-height: 42px;
+    min-width: 42px;
   }
 
   .personal-reader__navigation .q-btn {

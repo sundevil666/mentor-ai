@@ -12,7 +12,7 @@ This document is the product and engineering contract for the feature. Future im
 
 The first local reading slice is available inside **Stories & Books**. The existing Stories navigation destination contains persistent **Audio** and **Books** tabs so the main application menu does not grow.
 
-The current Books tab supports private DRM-free EPUB and UTF-8 TXT import, lawful-copy confirmation, local IndexedDB storage, a list of imported books, chapter or part navigation, local deletion, offline reading, and device-local reading progress. It enforces compressed and extracted file size limits and does not upload imported text.
+The current Books tab supports private DRM-free EPUB and UTF-8 TXT import, lawful-copy confirmation, local IndexedDB storage, a list of imported books, chapter or part navigation, local deletion, offline reading, and device-local reading progress. It enforces compressed and extracted file size limits and does not upload imported text. The reader also provides a persistent full-screen Reading Mode with a right control sidebar, per-book text size, chapter selection, navigation, and restored vertical position for every part.
 
 Private cross-device book files, synchronized reading progress, reading-aloud capture, AI Teacher analysis, and generated exercises remain later delivery phases. The interface must describe these boundaries accurately until each phase is implemented and verified.
 
