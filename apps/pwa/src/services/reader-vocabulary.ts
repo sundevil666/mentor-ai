@@ -36,3 +36,17 @@ export async function listReaderVocabulary(studentId: string): Promise<ReaderVoc
     .filter((item) => item.studentId === studentId && item.normalizedText)
     .sort((left, right) => right.lastLookedUpAt.localeCompare(left.lastLookedUpAt));
 }
+
+export async function findReaderVocabularyLookup(studentId: string, text: string): Promise<ReaderTextLookup | null> {
+  const normalizedText = text.toLocaleLowerCase('en').replace(/\s+/g, ' ').trim();
+  const db = await mentorDb;
+  const item = await db.get('vocabulary-practice-items', `reader-vocabulary:${studentId}:${normalizedText}`) as ReaderVocabularyItem | undefined;
+  if (!item?.translation) return null;
+  return {
+    text,
+    translation: item.translation,
+    phonetic: item.phonetic,
+    sourceLanguage: 'en',
+    targetLanguage: 'ru',
+  };
+}

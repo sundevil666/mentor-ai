@@ -8,12 +8,10 @@ export async function lookupReaderText(rawText: unknown): Promise<ReaderTextLook
   const text = normalizeLookupText(rawText);
   if (!text) throw new Error('Select an English word or phrase first.');
   if (text.length > 500) throw new Error('Select no more than 500 characters.');
-  const phonetic = isSingleWord(text) ? await lookupPhonetic(text) : undefined;
   if (!config.googleTranslateApiKey) {
     return {
       text,
       translation: '',
-      phonetic,
       translationError: 'Translation is unavailable because Google Cloud Translation is not configured on the server.',
       sourceLanguage: 'en',
       targetLanguage: 'ru',
@@ -33,10 +31,15 @@ export async function lookupReaderText(rawText: unknown): Promise<ReaderTextLook
   return {
     text,
     translation,
-    phonetic,
     sourceLanguage: 'en',
     targetLanguage: 'ru',
   };
+}
+
+export async function lookupReaderPhonetic(rawText: unknown): Promise<{ text: string; phonetic?: string }> {
+  const text = normalizeLookupText(rawText);
+  if (!text || !isSingleWord(text)) return { text };
+  return { text, phonetic: await lookupPhonetic(text) };
 }
 
 export function normalizeLookupText(value: unknown): string {

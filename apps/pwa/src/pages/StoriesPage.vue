@@ -166,7 +166,12 @@
               <h2 class="personal-reader__part">{{ formatBookPartLabel(pageIndex, getChapterTitle(page.chapterId)) }}</h2>
               <p v-for="(paragraph, paragraphIndex) in splitBookParagraphs(page.text)" :key="paragraphIndex">
                 <template v-for="(token, tokenIndex) in tokenizeReaderParagraph(paragraph)" :key="tokenIndex">
-                  <span v-if="token.isWord" class="personal-reader__word" :data-reader-word="token.text">{{ token.text }}</span>
+                  <span
+                    v-if="token.isWord"
+                    class="personal-reader__word"
+                    :class="{ 'personal-reader__word--loading': readerLookupLoading && token.text.toLocaleLowerCase('en') === selectedReaderText.toLocaleLowerCase('en') }"
+                    :data-reader-word="token.text"
+                  >{{ token.text }}</span>
                   <template v-else>{{ token.text }}</template>
                 </template>
               </p>
@@ -200,7 +205,11 @@
               <q-btn aria-label="Play selected text" color="primary" icon="volume_up" round size="sm" unelevated @click="speakReaderText(selectedReaderText)" />
             </div>
             <p v-if="selectedReaderText" class="personal-reader__lookup-text">{{ selectedReaderText }}</p>
-            <p v-if="readerLookup?.phonetic" class="personal-reader__lookup-phonetic">{{ readerLookup.phonetic }}</p>
+            <p v-if="readerPhonetic" class="personal-reader__lookup-phonetic">{{ readerPhonetic }}</p>
+            <div v-else-if="readerPhoneticLoading && readerLookupKind === 'word'" class="personal-reader__lookup-loading personal-reader__lookup-loading--phonetic">
+              <q-spinner color="primary" size="16px" />
+              <span>Loading transcription…</span>
+            </div>
             <p v-else-if="readerLookup && readerLookupKind === 'word'" class="personal-reader__lookup-phonetic">Transcription not found.</p>
             <p v-else-if="readerLookup" class="personal-reader__lookup-phonetic">IPA transcription is available for single words.</p>
             <div v-if="readerLookupLoading" class="personal-reader__lookup-loading">
@@ -283,8 +292,8 @@ import { deleteOfflineStory, formatStoryDuration, formatStorySize, getCachedStor
 import { useAppStore } from 'src/stores/app-store';
 import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 import { deletePersonalBook, importPersonalBook, listPersonalBooks, loadPersonalBook, markPersonalBookOpened, type PersonalBook } from 'src/services/personal-book-library';
-import { fetchReaderTextLookup, synchronizeReaderVocabulary } from 'src/services/api-client';
-import { listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
+import { fetchReaderPhonetic, fetchReaderTextLookup, synchronizeReaderVocabulary } from 'src/services/api-client';
+import { findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice } from 'src/services/speech-synthesis';
 
 const appStore = useAppStore();
@@ -304,6 +313,8 @@ const chapterPageIndexes = ref<number[]>([]);
 const selectedReaderText = ref('');
 const readerLookup = ref<ReaderTextLookup | null>(null);
 const readerLookupLoading = ref(false);
+const readerPhonetic = ref<string | undefined>();
+const readerPhoneticLoading = ref(false);
 const readerLookupError = ref('');
 const minReaderFontSize = 14;
 const maxReaderFontSize = 32;
@@ -542,27 +553,52 @@ async function selectReaderText(rawText: string, speakImmediately: boolean) {
   if (!text || !selectedBook.value) return;
   selectedReaderText.value = text;
   readerLookup.value = null;
+  readerPhonetic.value = undefined;
   readerLookupError.value = '';
   readerLookupLoading.value = true;
+  readerPhoneticLoading.value = !/\s/.test(text);
   const requestId = ++readerLookupRequestId;
   if (speakImmediately) void speakReaderText(text);
+  const cachedLookup = await findReaderVocabularyLookup(appStore.studentId, text).catch(() => null);
+  if (requestId !== readerLookupRequestId) return;
+  if (cachedLookup) {
+    readerLookup.value = cachedLookup;
+    readerPhonetic.value = cachedLookup.phonetic;
+    readerLookupLoading.value = false;
+    if (!cachedLookup.phonetic && !/\s/.test(text)) void loadReaderPhonetic(text, requestId);
+    await saveReaderLookup(cachedLookup, requestId);
+    return;
+  }
+  if (!/\s/.test(text)) void loadReaderPhonetic(text, requestId);
   try {
     const lookup = await fetchReaderTextLookup(text);
     if (requestId !== readerLookupRequestId) return;
     readerLookup.value = lookup;
-    if (!lookup.translation) return;
-    await recordReaderVocabularyLookup({
-      studentId: appStore.studentId,
-      bookId: selectedBook.value.id,
-      chapterId: selectedBookPages.value[currentBookChapterIndex.value]?.chapterId,
-      lookup,
-    });
-    void syncReaderVocabulary();
+    if (lookup.translation) await saveReaderLookup(lookup, requestId);
   } catch (error) {
     if (requestId === readerLookupRequestId) readerLookupError.value = error instanceof Error ? error.message : 'Translation is unavailable right now.';
   } finally {
     if (requestId === readerLookupRequestId) readerLookupLoading.value = false;
   }
+}
+async function loadReaderPhonetic(text: string, requestId: number) {
+  try {
+    const phonetic = await fetchReaderPhonetic(text);
+    if (requestId === readerLookupRequestId) readerPhonetic.value = phonetic;
+  } finally {
+    if (requestId === readerLookupRequestId) readerPhoneticLoading.value = false;
+  }
+}
+async function saveReaderLookup(lookup: ReaderTextLookup, requestId: number) {
+  const book = selectedBook.value;
+  if (!book || requestId !== readerLookupRequestId) return;
+  await recordReaderVocabularyLookup({
+    studentId: appStore.studentId,
+    bookId: book.id,
+    chapterId: selectedBookPages.value[currentBookChapterIndex.value]?.chapterId,
+    lookup: { ...lookup, phonetic: readerPhonetic.value ?? lookup.phonetic },
+  });
+  void syncReaderVocabulary();
 }
 async function syncReaderVocabulary() {
   try {
@@ -580,6 +616,8 @@ function clearReaderLookup() {
   selectedReaderText.value = '';
   readerLookup.value = null;
   readerLookupLoading.value = false;
+  readerPhonetic.value = undefined;
+  readerPhoneticLoading.value = false;
   readerLookupError.value = '';
 }
 function setReadingMode(value: boolean) {

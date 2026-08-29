@@ -88,6 +88,17 @@ export async function fetchReaderTextLookup(text: string): Promise<ReaderTextLoo
   return ((await response.json()) as ApiResponse<ReaderTextLookup>).data;
 }
 
+export async function fetchReaderPhonetic(text: string): Promise<string | undefined> {
+  const response = await fetch(`${apiBaseUrl}/api/reader/phonetic`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ text }),
+  });
+  if (!response.ok) return undefined;
+  const body = (await response.json()) as ApiResponse<{ text: string; phonetic?: string }>;
+  return body.data.phonetic;
+}
+
 export async function synchronizeReaderVocabulary(items: ReaderVocabularyItem[]): Promise<ReaderVocabularyItem[]> {
   const response = await fetch(`${apiBaseUrl}/api/reader/vocabulary-synchronize`, {
     method: 'POST',

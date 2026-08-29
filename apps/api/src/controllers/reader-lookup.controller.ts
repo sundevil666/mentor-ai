@@ -1,5 +1,5 @@
 import type { RequestHandler } from 'express';
-import { lookupReaderText } from '../services/reader-lookup.service.js';
+import { lookupReaderPhonetic, lookupReaderText } from '../services/reader-lookup.service.js';
 import type { ReaderVocabularyItem } from '@mentor-ai/shared';
 import { learningStateService } from '../services/learning-state.service.js';
 
@@ -10,6 +10,14 @@ export const translateReaderText: RequestHandler = async (req, res, _next) => {
     const message = error instanceof Error ? error.message : 'Translation is unavailable right now.';
     const status = message.startsWith('Select ') ? 400 : 502;
     res.status(status).json({ data: { message } });
+  }
+};
+
+export const getReaderPhonetic: RequestHandler = async (req, res, next) => {
+  try {
+    res.json({ data: await lookupReaderPhonetic(req.body?.text) });
+  } catch (error) {
+    next(error);
   }
 };
 
