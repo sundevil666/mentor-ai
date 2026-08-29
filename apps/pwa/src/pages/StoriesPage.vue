@@ -276,17 +276,6 @@
                 round
                 @click="showMicrophoneAccessHelp"
               />
-              <q-btn
-                v-if="readingSpeechStatus === 'error' && isAppleStandaloneReader()"
-                aria-label="Open this reader in Safari"
-                color="primary"
-                icon="open_in_new"
-                label="Open in Safari"
-                dense
-                no-caps
-                unelevated
-                @click="openReaderInSafari"
-              />
             </div>
           </section>
 
@@ -597,16 +586,9 @@ onMounted(async () => {
   document.addEventListener('keydown', handleReaderKeydown);
   document.addEventListener('selectionchange', handleReaderSelectionChange);
   const requestedStoryId = new URLSearchParams(window.location.search).get('story');
-  const requestedBookId = new URLSearchParams(window.location.search).get('book');
   if (requestedStoryId && storyLibrary.some((story) => story.id === requestedStoryId)) {
     activeTab.value = 'audio';
     await openStory(requestedStoryId);
-  } else if (requestedBookId && personalBooks.value.some((book) => book.id === requestedBookId)) {
-    activeTab.value = 'books';
-    await openBook(requestedBookId);
-    const requestedPage = Number(new URLSearchParams(window.location.search).get('page'));
-    if (Number.isInteger(requestedPage) && requestedPage >= 0) goToBookPage(requestedPage);
-    if (new URLSearchParams(window.location.search).get('microphone') === 'safari') setReadingMode(true);
   }
 });
 onUnmounted(() => {
@@ -1028,24 +1010,6 @@ async function startReadingSpeech() {
         ? 'Access is blocked. Tap Fix microphone access for the PWA settings.'
       : 'The microphone could not be started on this device.';
     Notify.create({ type: 'negative', icon: 'mic', message: readingSpeechMessage.value, timeout: 6_000 });
-  }
-}
-function isAppleStandaloneReader() {
-  const appleTablet = /iPad|iPhone|iPod/.test(navigator.userAgent)
-    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  return appleTablet && (
-    window.matchMedia('(display-mode: standalone)').matches
-    || Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
-  );
-}
-function openReaderInSafari() {
-  const url = new URL(window.location.href);
-  url.searchParams.set('microphone', 'safari');
-  if (selectedBook.value) url.searchParams.set('book', selectedBook.value.id);
-  url.searchParams.set('page', String(currentBookPageIndex.value));
-  const safariWindow = window.open(url.toString(), '_blank', 'noopener,noreferrer');
-  if (!safariWindow) {
-    Notify.create({ type: 'warning', message: 'Open this same page in Safari to use the microphone.', timeout: 5_000 });
   }
 }
 function showMicrophoneAccessHelp() {
