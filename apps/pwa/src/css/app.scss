@@ -2276,6 +2276,19 @@ body.body--dark .personal-reader__sidebar {
   margin: 0;
 }
 
+.personal-reader__annual-pace {
+  border-top: 1px solid var(--category-border);
+  display: grid;
+  gap: 4px;
+  margin-top: 2px;
+  padding-top: 8px;
+}
+
+.personal-reader__annual-pace--ahead small {
+  color: var(--q-positive);
+  font-weight: 700;
+}
+
 .personal-reader__speech-coach {
   align-items: center;
   background: color-mix(in srgb, var(--category-accent) 7%, var(--app-surface));

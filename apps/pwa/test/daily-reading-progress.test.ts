@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  annualReadingPace,
   createDailyReadingProgress,
   dailyReadingGoalWords,
   dailyReadingTargetWords,
@@ -40,8 +41,8 @@ describe('daily reading progress', () => {
     const progress = {
       ...createDailyReadingProgress('2026-08-29'),
       history: [
-        { date: '2026-08-27', wordsRead: 1_200 },
-        { date: '2026-08-28', wordsRead: 2_800 },
+        { date: '2026-08-27', wordsRead: 1_200, targetWords: 3_000 },
+        { date: '2026-08-28', wordsRead: 2_800, targetWords: 3_000 },
       ],
     };
     assert.equal(dailyReadingTargetWords(progress), 3_000);
@@ -55,9 +56,9 @@ describe('daily reading progress', () => {
     const progress = {
       ...createDailyReadingProgress('2026-08-30'),
       history: [
-        { date: '2026-08-27', wordsRead: 3_600 },
-        { date: '2026-08-28', wordsRead: 4_100 },
-        { date: '2026-08-29', wordsRead: 3_800 },
+        { date: '2026-08-27', wordsRead: 3_600, targetWords: 3_000 },
+        { date: '2026-08-28', wordsRead: 4_100, targetWords: 3_600 },
+        { date: '2026-08-29', wordsRead: 3_800, targetWords: 3_900 },
       ],
     };
     assert.equal(dailyReadingTargetWords(progress), 3_800);
@@ -72,6 +73,37 @@ describe('daily reading progress', () => {
 
     assert.equal(nextDay.date, '2026-08-30');
     assert.equal(dailyWordsRead(nextDay), 0);
-    assert.deepEqual(nextDay.history, [{ date: '2026-08-29', wordsRead: 3 }]);
+    assert.deepEqual(nextDay.history, [{ date: '2026-08-29', wordsRead: 3, targetWords: 3_000 }]);
+  });
+
+  it('keeps an absolute yearly pace while the daily counter resets', () => {
+    let progress = createDailyReadingProgress('2026-08-28');
+    progress = recordDailyReadWords(progress, 'book-a', Array.from({ length: 4_000 }, (_, index) => index));
+    progress = prepareDailyReadingProgress(progress, '2026-08-29');
+    progress = recordDailyReadWords(progress, 'book-b', Array.from({ length: 3_500 }, (_, index) => index));
+
+    assert.deepEqual(annualReadingPace(progress), {
+      actualWords: 7_500,
+      balanceWords: 500,
+      expectedWords: 7_000,
+      trackedDays: 2,
+    });
+  });
+
+  it('includes missed calendar days in the yearly pace', () => {
+    let progress = createDailyReadingProgress('2026-08-28');
+    progress = recordDailyReadWords(progress, 'book-a', Array.from({ length: 4_000 }, (_, index) => index));
+    progress = prepareDailyReadingProgress(progress, '2026-08-30');
+
+    assert.deepEqual(progress.history, [
+      { date: '2026-08-28', wordsRead: 4_000, targetWords: 3_000 },
+      { date: '2026-08-29', wordsRead: 0, targetWords: 4_000 },
+    ]);
+    assert.deepEqual(annualReadingPace(progress), {
+      actualWords: 4_000,
+      balanceWords: -7_000,
+      expectedWords: 11_000,
+      trackedDays: 3,
+    });
   });
 });
