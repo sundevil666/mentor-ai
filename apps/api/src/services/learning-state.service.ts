@@ -1,4 +1,5 @@
 import {
+  type ApplicationTelemetryEvent,
   createRecommendationFromModel,
   generateLessonFromPlan,
   summarizeResults,
@@ -109,6 +110,20 @@ export const learningStateService = {
     const contentEngagementEvents = [...merged.values()].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
     await learningStateRepository.write({ ...state, contentEngagementEvents }, user);
     return contentEngagementEvents.filter((event) => event.studentId === state.student.id);
+  },
+
+  async mergeApplicationTelemetryEvents(incoming: ApplicationTelemetryEvent[], user?: AuthenticatedUser) {
+    const state = await learningStateRepository.read(user);
+    const merged = new Map(state.applicationTelemetryEvents.map((event) => [event.id, event]));
+    for (const candidate of incoming) {
+      const safe = sanitizeApplicationTelemetryEvent(candidate, state.student.id);
+      if (safe && !merged.has(safe.id)) merged.set(safe.id, safe);
+    }
+    const applicationTelemetryEvents = [...merged.values()]
+      .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
+      .slice(-10_000);
+    await learningStateRepository.write({ ...state, applicationTelemetryEvents }, user);
+    return applicationTelemetryEvents;
   },
 
   async mergeReaderVocabularyItems(incoming: ReaderVocabularyItem[], user?: AuthenticatedUser) {
@@ -680,6 +695,37 @@ function sanitizeContentEngagementEvent(
     feedback: event.type === 'feedback-selected' ? event.feedback : undefined,
     sourceDeviceId: event.sourceDeviceId.slice(0, 160),
     createdAt: event.createdAt,
+  };
+}
+
+function sanitizeApplicationTelemetryEvent(
+  event: ApplicationTelemetryEvent,
+  studentId: string,
+): ApplicationTelemetryEvent | undefined {
+  const allowedTypes = new Set(['app-opened', 'route-viewed', 'online', 'offline', 'runtime-error', 'unhandled-rejection']);
+  const allowedSeverities = new Set(['info', 'warning', 'error', 'critical']);
+  if (
+    event.studentId !== studentId ||
+    !event.id ||
+    !event.sessionId ||
+    !event.sourceDeviceId ||
+    !event.appVersion ||
+    !allowedTypes.has(event.type) ||
+    !allowedSeverities.has(event.severity) ||
+    !Number.isFinite(Date.parse(event.occurredAt))
+  ) return undefined;
+
+  return {
+    id: event.id.slice(0, 160),
+    studentId,
+    sessionId: event.sessionId.slice(0, 160),
+    sourceDeviceId: event.sourceDeviceId.slice(0, 160),
+    type: event.type,
+    severity: event.severity,
+    route: event.route?.slice(0, 160),
+    errorCode: event.errorCode?.slice(0, 160),
+    appVersion: event.appVersion.slice(0, 80),
+    occurredAt: event.occurredAt,
   };
 }
 

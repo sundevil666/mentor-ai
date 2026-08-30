@@ -1,5 +1,6 @@
 import type {
   ApiResponse,
+  ApplicationTelemetryEvent,
   ContentProgress,
   ContentEngagementEvent,
   ExerciseResult,
@@ -211,6 +212,18 @@ export async function synchronizeContentEngagement(
   });
   if (!response.ok) throw new Error('Content engagement synchronization failed.');
   return ((await response.json()) as ApiResponse<ContentEngagementEvent[]>).data;
+}
+
+export async function synchronizeApplicationTelemetry(
+  telemetryEvents: ApplicationTelemetryEvent[],
+): Promise<ApplicationTelemetryEvent[]> {
+  const response = await fetch(`${apiBaseUrl}/api/application-telemetry-synchronize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ telemetryEvents }),
+  });
+  if (!response.ok) throw new Error('Application telemetry synchronization failed.');
+  return ((await response.json()) as ApiResponse<ApplicationTelemetryEvent[]>).data;
 }
 
 export async function saveReadingTranscript(chunk: ReadingTranscriptChunk): Promise<ReadingTranscriptChunk> {

@@ -141,8 +141,42 @@ body .q-menu {
 
 .app-header .lesson-update-button,
 .app-header .sync-status-button,
+.app-header .analysis-status-button,
 .app-header .update-log-button {
   order: 1;
+}
+
+.analysis-menu {
+  width: min(420px, calc(100vw - 24px));
+}
+
+.analysis-center {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.analysis-center__heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.analysis-center__heading div {
+  display: grid;
+  gap: 2px;
+}
+
+.analysis-center__heading span,
+.analysis-center__metrics {
+  color: var(--app-muted);
+  font-size: 0.78rem;
+}
+
+.analysis-center__metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .app-header .network-status-button {

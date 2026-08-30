@@ -4,6 +4,30 @@ import { describe, it } from 'node:test';
 import { learningStateService } from '../dist/services/learning-state.service.js';
 
 describe('learning state service', () => {
+  it('deduplicates valid application telemetry and rejects another student data', async () => {
+    const stamp = Date.now();
+    const valid = {
+      id: `telemetry-valid-${stamp}`,
+      studentId: 'demo-student',
+      sessionId: `session-${stamp}`,
+      sourceDeviceId: 'device-test',
+      type: 'runtime-error',
+      severity: 'error',
+      errorCode: 'MediaError',
+      appVersion: 'test',
+      occurredAt: new Date(stamp).toISOString(),
+    };
+    const invalid = { ...valid, id: `telemetry-invalid-${stamp}`, studentId: 'another-student' };
+
+    const first = await learningStateService.mergeApplicationTelemetryEvents([valid, invalid]);
+    const second = await learningStateService.mergeApplicationTelemetryEvents([valid]);
+
+    assert.equal(first.some((event) => event.id === valid.id), true);
+    assert.equal(first.some((event) => event.id === invalid.id), false);
+    assert.equal(second.filter((event) => event.id === valid.id).length, 1);
+    assert.equal(second.find((event) => event.id === valid.id)?.errorCode, 'MediaError');
+  });
+
   it('returns student state and generates a current lesson', async () => {
     const studentState = await learningStateService.getStudentState();
     const lesson = await learningStateService.getCurrentLesson();

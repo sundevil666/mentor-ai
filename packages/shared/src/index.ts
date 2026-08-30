@@ -540,6 +540,31 @@ export interface ContentEngagementEvent {
   createdAt: string;
 }
 
+export type ApplicationTelemetryEventType =
+  | 'app-opened'
+  | 'route-viewed'
+  | 'online'
+  | 'offline'
+  | 'runtime-error'
+  | 'unhandled-rejection';
+
+export type ApplicationTelemetrySeverity = 'info' | 'warning' | 'error' | 'critical';
+
+/** Privacy-safe operational evidence. It is deliberately separate from learning
+ * evidence so a browser, network, or device failure cannot lower skill scores. */
+export interface ApplicationTelemetryEvent {
+  id: string;
+  studentId: string;
+  sessionId: string;
+  sourceDeviceId: string;
+  type: ApplicationTelemetryEventType;
+  severity: ApplicationTelemetrySeverity;
+  route?: string;
+  errorCode?: string;
+  appVersion: string;
+  occurredAt: string;
+}
+
 export interface StatisticsSnapshot {
   id: string;
   studentId: string;

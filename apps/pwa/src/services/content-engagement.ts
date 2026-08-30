@@ -47,6 +47,11 @@ export async function loadContentEngagementSummaries(category: ContentProgressCa
   return summarizeContentEngagement(events.filter((event) => event.category === category));
 }
 
+export async function loadAllContentEngagement() {
+  const db = await mentorDb;
+  return db.getAll('content-engagement') as Promise<ContentEngagementEvent[]>;
+}
+
 export async function syncContentEngagement() {
   if (!navigator.onLine) return;
   const db = await mentorDb;

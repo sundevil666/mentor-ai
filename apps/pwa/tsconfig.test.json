@@ -9,6 +9,7 @@
   },
   "include": [
     "src/services/activity-suggestion.ts",
+    "src/services/analysis-readiness.ts",
     "src/services/app-update.ts",
     "src/services/content-engagement-summary.ts",
     "src/services/content-engagement-retention.ts",

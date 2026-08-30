@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
   createRecommendationFromModel,
+  type ApplicationTelemetryEvent,
   demoStudent,
   initialStudentModel,
   type GeneratedLesson,
@@ -43,6 +44,7 @@ interface LearningStateRecord {
   sessionHandoffs: LearningSessionHandoff[];
   contentProgress: ContentProgress[];
   contentEngagementEvents: ContentEngagementEvent[];
+  applicationTelemetryEvents: ApplicationTelemetryEvent[];
   readerVocabularyItems: ReaderVocabularyItem[];
   personalReadingBooks: PersonalReadingBookArchive[];
   readingTranscriptChunks: ReadingTranscriptChunk[];
@@ -63,6 +65,7 @@ const demoState: LearningStateRecord = {
   sessionHandoffs: [],
   contentProgress: [],
   contentEngagementEvents: [],
+  applicationTelemetryEvents: [],
   readerVocabularyItems: [],
   personalReadingBooks: [],
   readingTranscriptChunks: [],
@@ -133,6 +136,7 @@ function normalizeState(state: Partial<LearningStateRecord>, user?: Authenticate
     sessionHandoffs: state.sessionHandoffs ?? [],
     contentProgress: state.contentProgress ?? [],
     contentEngagementEvents: state.contentEngagementEvents ?? [],
+    applicationTelemetryEvents: state.applicationTelemetryEvents ?? [],
     readerVocabularyItems: state.readerVocabularyItems ?? [],
     personalReadingBooks: state.personalReadingBooks ?? [],
     readingTranscriptChunks: state.readingTranscriptChunks ?? [],

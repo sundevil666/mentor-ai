@@ -8,6 +8,7 @@ import {
   listContentProgress,
   mergeContentProgress,
   mergeContentEngagementEvents,
+  mergeApplicationTelemetryEvents,
   synchronizeLearningEvents,
   upsertSessionHandoff,
 } from '../controllers/learning-state.controller.js';
@@ -26,5 +27,6 @@ learningStateRouter.put('/session-handoffs', upsertSessionHandoff);
 learningStateRouter.get('/content-progress', listContentProgress);
 learningStateRouter.post('/content-progress-synchronize', mergeContentProgress);
 learningStateRouter.post('/content-engagement-synchronize', mergeContentEngagementEvents);
+learningStateRouter.post('/application-telemetry-synchronize', mergeApplicationTelemetryEvents);
 learningStateRouter.get('/configuration', getConfiguration);
 learningStateRouter.post('/synchronization', synchronizeLearningEvents);

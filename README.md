@@ -14,6 +14,10 @@ The product and engineering contract for private book import, cross-device readi
 reading-aloud analysis, and AI Teacher mentoring is documented in
 [`docs/19-personal-book-reading-mentor.md`](docs/19-personal-book-reading-mentor.md).
 
+The evidence-first contract for improving both teaching quality and application
+reliability is documented in
+[`docs/20-learning-and-application-observability.md`](docs/20-learning-and-application-observability.md).
+
 ## Current PWA Scope
 
 The PWA can run a complete practical learning session without the API:
