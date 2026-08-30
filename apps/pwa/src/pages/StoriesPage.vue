@@ -239,7 +239,7 @@
           <section class="personal-reader__daily-goal" :class="`personal-reader__daily-goal--${dailyReadingGoalState}`" aria-label="Today's reading goal">
             <div class="personal-reader__daily-goal-heading">
               <span>Today</span>
-              <strong>{{ dailyReadingWords.toLocaleString('en') }} / {{ dailyReadingGoalWords.toLocaleString('en') }}</strong>
+              <strong>{{ dailyReadingWords.toLocaleString('en') }} / {{ dailyReadingTarget.toLocaleString('en') }}</strong>
             </div>
             <q-linear-progress
               rounded
@@ -249,7 +249,8 @@
               track-color="grey-3"
             />
             <p>{{ dailyReadingGoalMessage }}</p>
-            <small>{{ dailyReadingWordsRemaining.toLocaleString('en') }} words left today · voice-confirmed only</small>
+            <small>{{ dailyReadingWordsRemaining.toLocaleString('en') }} words left today · counted from completed pages</small>
+            <small v-if="dailyReadingTarget > dailyReadingGoalWords">Your recent average is raising the level above the 3,000-word base.</small>
           </section>
 
           <section class="personal-reader__speech-coach" :class="`personal-reader__speech-coach--${readingSpeechStatus}`" aria-live="polite" aria-label="Reading pronunciation coach">
@@ -420,7 +421,7 @@ import { fetchReaderPhonetic, fetchReaderTextLookup, saveReadingTranscript, sync
 import { getAuthToken } from 'src/services/auth';
 import { findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
-import { createDailyReadingProgress, dailyReadingGoalWords, dailyWordsRead, localReadingDate, readingGoalMessage, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
+import { createDailyReadingProgress, dailyReadingGoalWords, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, readingGoalMessage, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { alignReadingSpeech, confirmTabletReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
@@ -557,10 +558,11 @@ const bookPageOptions = computed(() => selectedBookPages.value.map((page, index)
   value: chapterPageIndexes.value[index] ?? 0,
 })));
 const dailyReadingWords = computed(() => dailyWordsRead(dailyReadingProgress.value));
-const dailyReadingWordsRemaining = computed(() => Math.max(0, dailyReadingGoalWords - dailyReadingWords.value));
-const dailyReadingProgressRatio = computed(() => Math.min(1, dailyReadingWords.value / dailyReadingGoalWords));
-const dailyReadingGoalState = computed(() => dailyReadingWords.value >= dailyReadingGoalWords * 1.5 ? 'exceeded' : dailyReadingWords.value >= dailyReadingGoalWords ? 'complete' : 'building');
-const dailyReadingGoalMessage = computed(() => readingGoalMessage(dailyReadingWords.value));
+const dailyReadingTarget = computed(() => dailyReadingTargetWords(dailyReadingProgress.value));
+const dailyReadingWordsRemaining = computed(() => Math.max(0, dailyReadingTarget.value - dailyReadingWords.value));
+const dailyReadingProgressRatio = computed(() => Math.min(1, dailyReadingWords.value / dailyReadingTarget.value));
+const dailyReadingGoalState = computed(() => dailyReadingWords.value >= dailyReadingTarget.value * 1.5 ? 'exceeded' : dailyReadingWords.value >= dailyReadingTarget.value ? 'complete' : 'building');
+const dailyReadingGoalMessage = computed(() => readingGoalMessage(dailyReadingWords.value, dailyReadingTarget.value));
 const readerSidebarScalePercent = computed(() => 100 + readerSidebarScale.value * 10);
 const readerSidebarStyle = computed(() => ({
   '--reader-sidebar-width': `${230 + readerSidebarScale.value * 30}px`,
@@ -777,8 +779,10 @@ function closeBook() {
 }
 function goToBookPage(pageIndex: number | null) {
   if (pageIndex === null || !Number.isInteger(pageIndex)) return;
+  const destinationPageIndex = Math.max(0, Math.min(readerPageCount.value - 1, pageIndex));
+  if (destinationPageIndex > currentBookPageIndex.value) recordCompletedReaderPage(currentBookPageIndex.value);
   persistBookProgress();
-  currentBookPageIndex.value = Math.max(0, Math.min(readerPageCount.value - 1, pageIndex));
+  currentBookPageIndex.value = destinationPageIndex;
   scrollToReaderPage();
   persistBookProgress();
   readingSpeechAnchor = getVisibleReaderWordAnchor();
@@ -1470,14 +1474,18 @@ function readDailyReadingProgress(): DailyReadingProgress {
   if (typeof localStorage === 'undefined') return createDailyReadingProgress(today);
   try {
     const parsed = JSON.parse(localStorage.getItem(dailyReadingProgressKey) ?? 'null') as DailyReadingProgress | null;
-    if (parsed?.date === today && parsed.books && typeof parsed.books === 'object') return parsed;
+    if (parsed?.date && parsed.books && typeof parsed.books === 'object') {
+      const prepared = prepareDailyReadingProgress(parsed, today);
+      localStorage.setItem(dailyReadingProgressKey, JSON.stringify(prepared));
+      return prepared;
+    }
   } catch {
     // A damaged daily counter safely starts again for the current day.
   }
   return createDailyReadingProgress(today);
 }
 function restoreDailySpokenWords(bookId: string) {
-  if (dailyReadingProgress.value.date !== localReadingDate()) dailyReadingProgress.value = createDailyReadingProgress();
+  dailyReadingProgress.value = prepareDailyReadingProgress(dailyReadingProgress.value);
   spokenReaderWordIndexes.value = new Set(spokenWordsForBook(dailyReadingProgress.value, bookId));
   readingSpeechAcceptedWords.value = 0;
   readingSpeechSpokenWords.value = 0;
@@ -1512,10 +1520,21 @@ async function persistSpokenReadingProgress(furthestWordIndex: number) {
 function recordDailySpokenMatch(wordIndexes: readonly number[]) {
   const book = selectedBook.value;
   if (!book || typeof localStorage === 'undefined') return;
-  if (dailyReadingProgress.value.date !== localReadingDate()) {
-    dailyReadingProgress.value = createDailyReadingProgress();
-  }
+  dailyReadingProgress.value = prepareDailyReadingProgress(dailyReadingProgress.value);
   dailyReadingProgress.value = recordDailySpokenWords(dailyReadingProgress.value, book.id, wordIndexes);
+  localStorage.setItem(dailyReadingProgressKey, JSON.stringify(dailyReadingProgress.value));
+}
+function recordCompletedReaderPage(pageIndex: number) {
+  const book = selectedBook.value;
+  const paper = readerPaper.value;
+  if (!book || !paper || readerPageStride.value <= 0 || typeof localStorage === 'undefined') return;
+  const wordIndexes = Array.from(paper.querySelectorAll<HTMLElement>('[data-reader-word-index]'))
+    .filter((word) => Math.floor((word.offsetLeft + 1) / readerPageStride.value) === pageIndex)
+    .map((word) => Number(word.dataset.readerWordIndex))
+    .filter((wordIndex) => Number.isInteger(wordIndex) && wordIndex >= 0);
+  if (!wordIndexes.length) return;
+  dailyReadingProgress.value = prepareDailyReadingProgress(dailyReadingProgress.value);
+  dailyReadingProgress.value = recordDailyReadWords(dailyReadingProgress.value, book.id, wordIndexes);
   localStorage.setItem(dailyReadingProgressKey, JSON.stringify(dailyReadingProgress.value));
 }
 interface BookReaderProgress {

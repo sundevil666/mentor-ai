@@ -1,12 +1,20 @@
-export const dailyReadingGoalWords = 2_500;
+export const dailyReadingGoalWords = 3_000;
+const readingAverageDays = 7;
 
 export interface DailyBookReadingProgress {
   spokenWordIndexes: number[];
+  readWordIndexes: number[];
+}
+
+export interface DailyReadingHistoryEntry {
+  date: string;
+  wordsRead: number;
 }
 
 export interface DailyReadingProgress {
   date: string;
   books: Record<string, DailyBookReadingProgress>;
+  history: DailyReadingHistoryEntry[];
 }
 
 export function localReadingDate(date = new Date()): string {
@@ -17,7 +25,13 @@ export function localReadingDate(date = new Date()): string {
 }
 
 export function createDailyReadingProgress(date = localReadingDate()): DailyReadingProgress {
-  return { date, books: {} };
+  return { date, books: {}, history: [] };
+}
+
+function validWordIndexes(indexes: readonly number[] | undefined): number[] {
+  return [...new Set(indexes ?? [])]
+    .filter((wordIndex) => Number.isInteger(wordIndex) && wordIndex >= 0)
+    .sort((left, right) => left - right);
 }
 
 export function recordDailySpokenWords(
@@ -26,7 +40,7 @@ export function recordDailySpokenWords(
   wordIndexes: readonly number[],
 ): DailyReadingProgress {
   const previous = progress.books[bookId];
-  const uniqueIndexes = new Set(previous?.spokenWordIndexes ?? []);
+  const uniqueIndexes = new Set(validWordIndexes(previous?.spokenWordIndexes));
   wordIndexes.forEach((wordIndex) => {
     if (Number.isInteger(wordIndex) && wordIndex >= 0) uniqueIndexes.add(wordIndex);
   });
@@ -34,20 +48,70 @@ export function recordDailySpokenWords(
     ...progress,
     books: {
       ...progress.books,
-      [bookId]: { spokenWordIndexes: Array.from(uniqueIndexes).sort((left, right) => left - right) },
+      [bookId]: {
+        readWordIndexes: validWordIndexes(previous?.readWordIndexes),
+        spokenWordIndexes: Array.from(uniqueIndexes).sort((left, right) => left - right),
+      },
+    },
+  };
+}
+
+export function recordDailyReadWords(
+  progress: DailyReadingProgress,
+  bookId: string,
+  wordIndexes: readonly number[],
+): DailyReadingProgress {
+  const previous = progress.books[bookId];
+  const uniqueIndexes = new Set(validWordIndexes(previous?.readWordIndexes));
+  validWordIndexes(wordIndexes).forEach((wordIndex) => uniqueIndexes.add(wordIndex));
+  return {
+    ...progress,
+    books: {
+      ...progress.books,
+      [bookId]: {
+        readWordIndexes: Array.from(uniqueIndexes).sort((left, right) => left - right),
+        spokenWordIndexes: validWordIndexes(previous?.spokenWordIndexes),
+      },
     },
   };
 }
 
 export function dailyWordsRead(progress: DailyReadingProgress): number {
   return Object.values(progress.books).reduce(
-    (total, book) => total + new Set(book.spokenWordIndexes ?? []).size,
+    (total, book) => total + validWordIndexes(book.readWordIndexes).length,
     0,
   );
 }
 
 export function spokenWordsForBook(progress: DailyReadingProgress, bookId: string): number[] {
-  return [...new Set(progress.books[bookId]?.spokenWordIndexes ?? [])].filter((wordIndex) => Number.isInteger(wordIndex) && wordIndex >= 0);
+  return validWordIndexes(progress.books[bookId]?.spokenWordIndexes);
+}
+
+export function prepareDailyReadingProgress(
+  progress: DailyReadingProgress | null | undefined,
+  date = localReadingDate(),
+): DailyReadingProgress {
+  if (!progress) return createDailyReadingProgress(date);
+  const history = Array.isArray(progress.history) ? progress.history.filter((entry) => (
+    typeof entry?.date === 'string'
+      && Number.isFinite(entry.wordsRead)
+      && entry.wordsRead >= 0
+  )) : [];
+  if (progress.date === date) return { ...progress, history };
+  const previousWordsRead = dailyWordsRead(progress);
+  const archived = previousWordsRead > 0
+    ? [...history.filter((entry) => entry.date !== progress.date), { date: progress.date, wordsRead: previousWordsRead }]
+    : history;
+  return { date, books: {}, history: archived.slice(-readingAverageDays) };
+}
+
+export function dailyReadingTargetWords(progress: DailyReadingProgress): number {
+  const recent = (progress.history ?? [])
+    .filter((entry) => Number.isFinite(entry.wordsRead) && entry.wordsRead > 0)
+    .slice(-readingAverageDays);
+  if (!recent.length) return dailyReadingGoalWords;
+  const average = recent.reduce((total, entry) => total + entry.wordsRead, 0) / recent.length;
+  return Math.max(dailyReadingGoalWords, Math.round(average / 100) * 100);
 }
 
 export function readingGoalMessage(wordsRead: number, goalWords = dailyReadingGoalWords): string {
