@@ -140,11 +140,13 @@ body .q-menu {
 }
 
 .app-version-badge {
+  appearance: none;
   align-items: center;
   background: color-mix(in srgb, var(--app-primary) 10%, var(--app-surface));
   border: 1px solid color-mix(in srgb, var(--app-primary) 28%, transparent);
   border-radius: 999px;
   color: var(--app-primary);
+  cursor: pointer;
   display: inline-flex;
   flex: 0 0 auto;
   font-size: 0.72rem;
@@ -156,6 +158,15 @@ body .q-menu {
   order: 0;
   padding: 0 9px;
   white-space: nowrap;
+}
+
+.app-version-badge:focus-visible {
+  outline: 2px solid var(--app-primary);
+  outline-offset: 2px;
+}
+
+.app-version-badge:active {
+  transform: translateY(1px);
 }
 
 .app-version-badge__compact {

@@ -2,11 +2,16 @@
   <q-layout view="hHh lpR fFf">
     <q-header bordered class="app-header">
       <q-toolbar>
-        <span class="app-version-badge" :aria-label="`Mentor AI version ${appVersion}`">
+        <button
+          class="app-version-badge"
+          type="button"
+          :aria-label="`Copy Mentor AI version ${appVersion}`"
+          @click="copyAppVersion"
+        >
           <span class="app-version-badge__wide">{{ appVersionWideLabel }}</span>
           <span class="app-version-badge__compact">{{ appVersionCompactLabel }}</span>
-          <q-tooltip>Mentor AI version {{ appVersion }}</q-tooltip>
-        </span>
+          <q-tooltip>Copy Mentor AI version {{ appVersion }}</q-tooltip>
+        </button>
         <div class="app-header__center">
           <q-btn
             v-if="personalBookSyncControl.visible"
@@ -392,6 +397,29 @@ const appVersionWideLabel = appBuildVersion
 const appVersionCompactLabel = appBuildVersion
   ? `v${appBuildVersion.slice(0, 7)}`
   : `v${appReleaseVersion}`;
+
+async function copyAppVersion() {
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(appVersion);
+    copied = true;
+  } catch {
+    const textarea = document.createElement('textarea');
+    textarea.value = appVersion;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    copied = document.execCommand('copy');
+    textarea.remove();
+  }
+
+  Notify.create({
+    type: copied ? 'positive' : 'negative',
+    icon: copied ? 'content_copy' : 'error_outline',
+    message: copied ? `Version ${appVersion} copied.` : 'Could not copy the app version.',
+  });
+}
 const isDarkTheme = ref(false);
 const googleClientId = ref<string | null>(null);
 const googleSignInButton = ref<HTMLElement | null>(null);
