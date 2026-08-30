@@ -1839,19 +1839,19 @@ html.mentor-theme-dark .personal-reader {
 
 .personal-reader__speech-frame-base {
   background:
-    linear-gradient(to bottom, rgba(41, 214, 179, .48), rgba(58, 229, 197, .16) 42%, transparent 100%) top / 100% 46px no-repeat,
-    linear-gradient(to top, rgba(41, 214, 179, .48), rgba(58, 229, 197, .16) 42%, transparent 100%) bottom / 100% 46px no-repeat,
-    linear-gradient(to right, rgba(41, 214, 179, .48), rgba(58, 229, 197, .16) 42%, transparent 100%) left / 46px 100% no-repeat,
-    linear-gradient(to left, rgba(41, 214, 179, .48), rgba(58, 229, 197, .16) 42%, transparent 100%) right / 46px 100% no-repeat;
+    linear-gradient(to bottom, rgba(41, 214, 179, .42), rgba(58, 229, 197, .1) 36%, transparent 100%) top / 100% 24px no-repeat,
+    linear-gradient(to top, rgba(41, 214, 179, .42), rgba(58, 229, 197, .1) 36%, transparent 100%) bottom / 100% 24px no-repeat,
+    linear-gradient(to right, rgba(41, 214, 179, .42), rgba(58, 229, 197, .1) 36%, transparent 100%) left / 24px 100% no-repeat,
+    linear-gradient(to left, rgba(41, 214, 179, .42), rgba(58, 229, 197, .1) 36%, transparent 100%) right / 24px 100% no-repeat;
   animation: reader-listening-frame 3.6s ease-in-out infinite alternate;
 }
 
 .personal-reader__speech-frame-wave {
   background:
-    linear-gradient(to bottom, rgba(98, 242, 210, .34), transparent 100%) top / 100% 32px no-repeat,
-    linear-gradient(to top, rgba(98, 242, 210, .34), transparent 100%) bottom / 100% 32px no-repeat,
-    linear-gradient(to right, rgba(98, 242, 210, .34), transparent 100%) left / 32px 100% no-repeat,
-    linear-gradient(to left, rgba(98, 242, 210, .34), transparent 100%) right / 32px 100% no-repeat;
+    linear-gradient(to bottom, rgba(98, 242, 210, .28), transparent 100%) top / 100% 16px no-repeat,
+    linear-gradient(to top, rgba(98, 242, 210, .28), transparent 100%) bottom / 100% 16px no-repeat,
+    linear-gradient(to right, rgba(98, 242, 210, .28), transparent 100%) left / 16px 100% no-repeat,
+    linear-gradient(to left, rgba(98, 242, 210, .28), transparent 100%) right / 16px 100% no-repeat;
   opacity: .42;
   transition: opacity 420ms ease;
 }
