@@ -491,7 +491,9 @@ onMounted(async () => {
   window.addEventListener('online', handleOfflineLessonReconnect);
   window.addEventListener('translation-usage-updated', loadTranslationUsage);
   document.addEventListener('visibilitychange', handleOfflineLessonVisibility);
-  offlineLessonUpdateTimer = window.setInterval(() => { if (navigator.onLine) void checkOfflineLessons(false); }, 60 * 60 * 1000);
+  offlineLessonUpdateTimer = window.setInterval(() => {
+    if (document.visibilityState === 'visible' && navigator.onLine) void checkOfflineLessons(false);
+  }, 60 * 60 * 1000);
   isDarkTheme.value = readSavedTheme();
   applyTheme(isDarkTheme.value);
   await loadAuthConfiguration();

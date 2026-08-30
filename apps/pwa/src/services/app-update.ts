@@ -42,7 +42,7 @@ export function startAppUpdatePolling(onUpdate: (result: AppUpdateCheckResult) =
   runUpdateCheck();
 
   intervalId = window.setInterval(() => {
-    runUpdateCheck();
+    if (document.visibilityState === 'visible' && navigator.onLine) runUpdateCheck();
   }, checkIntervalMs);
 
   const checkWhenActive = () => {

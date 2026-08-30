@@ -915,7 +915,10 @@ async function syncReaderVocabulary() {
   }
 }
 async function speakReaderText(text: string) {
-  const played = await speakWithPreferredVoice(text, { mediaTitle: `Book: ${selectedBook.value?.title ?? 'selected text'}` });
+  const played = await speakWithPreferredVoice(text, {
+    mediaTitle: `Book: ${selectedBook.value?.title ?? 'selected text'}`,
+    temporary: true,
+  });
   if (!played) Notify.create({ type: 'warning', message: 'Pronunciation is unavailable right now.' });
 }
 function clearReaderLookup() {

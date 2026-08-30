@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { applySpeechRepeat, parseSpeechSegments, preserveDialogueSpeakerLabels, splitSpeechTextIntoSentences } from '../src/services/speech-synthesis.js';
+import {
+  applySpeechRepeat,
+  parseSpeechSegments,
+  preserveDialogueSpeakerLabels,
+  selectSpeechCacheUrlsToDelete,
+  speechCacheMaxAgeMs,
+  speechCacheMaxEntries,
+  splitSpeechTextIntoSentences,
+} from '../src/services/speech-synthesis.js';
 
 describe('speech synthesis voices', () => {
   it('uses Mia for ordinary text', () => {
@@ -46,5 +54,17 @@ describe('speech synthesis voices', () => {
     applySpeechRepeat(audio, true);
 
     assert.equal(audio.loop, true);
+  });
+
+  it('expires old speech and keeps only the newest cache entries', () => {
+    const now = Date.parse('2026-08-30T12:00:00.000Z');
+    const entries = [
+      { url: 'old', createdAt: new Date(now - speechCacheMaxAgeMs).toISOString() },
+      ...Array.from({ length: speechCacheMaxEntries + 1 }, (_, index) => ({
+        url: `fresh-${index}`,
+        createdAt: new Date(now - (speechCacheMaxEntries - index) * 1_000).toISOString(),
+      })),
+    ];
+    assert.deepEqual(selectSpeechCacheUrlsToDelete(entries, now), ['old', 'fresh-0']);
   });
 });

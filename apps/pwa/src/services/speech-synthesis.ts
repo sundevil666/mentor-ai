@@ -16,7 +16,12 @@ export interface SpeechPlaybackHandlers {
   mediaTitle?: string;
   voice?: SpeechVoiceProfile;
   repeat?: boolean;
+  temporary?: boolean;
 }
+
+export const speechCacheMaxEntries = 160;
+export const speechCacheMaxAgeMs = 30 * 86_400_000;
+export const speechMemoryMaxEntries = 12;
 
 let activeAudio: HTMLAudioElement | null = null;
 let activeAudioUrl: string | null = null;
@@ -25,6 +30,7 @@ let modelStatus: SpeechModelStatus = 'idle';
 let modelProgress = 0;
 const statusListeners = new Set<() => void>();
 const generatedSpeechCache = new Map<string, Promise<Blob>>();
+let lastSpeechCacheCleanupAt = 0;
 
 export function isSpeechSynthesisAvailable() {
   return (
@@ -60,6 +66,10 @@ export async function speakWithPreferredVoice(
   try {
     const voice = handlers.voice ?? 'mia';
     const generated = await generateSpeech(trimmedText, voice);
+
+    if (handlers.temporary) {
+      await deleteGeneratedSpeech(trimmedText, voice);
+    }
 
     if (requestId !== activeRequestId) {
       return false;
@@ -242,10 +252,12 @@ function generateSpeech(text: string, voice: SpeechVoiceProfile = 'mia') {
     throw toError(error);
   });
   generatedSpeechCache.set(key, generation);
+  trimGeneratedSpeechMemoryCache();
   return generation;
 }
 
 async function generateAndCacheSpeech(segments: SpeechSegment[]) {
+  await cleanupSpeechCache();
   const cacheRequest = await createSpeechCacheRequest(segments);
 
   if (cacheRequest && 'caches' in window) {
@@ -273,12 +285,56 @@ async function generateAndCacheSpeech(segments: SpeechSegment[]) {
   if (cacheRequest && 'caches' in window) {
     await (await caches.open(SPEECH_CACHE_NAME)).put(
       cacheRequest,
-      new Response(audio, { headers: { 'Content-Type': 'audio/mpeg' } }),
+      new Response(audio, { headers: {
+        'Content-Type': 'audio/mpeg',
+        'X-Mentor-Cache-Created-At': new Date().toISOString(),
+      } }),
     );
   }
 
   setModelStatus('ready', 100);
   return audio;
+}
+
+export async function deleteGeneratedSpeech(text: string, voice: SpeechVoiceProfile = 'mia') {
+  const segments = parseSpeechSegments(text.trim(), voice);
+  generatedSpeechCache.delete(JSON.stringify(segments));
+  if (typeof window === 'undefined' || !('caches' in window)) return;
+  const request = await createSpeechCacheRequest(segments);
+  if (request) await (await caches.open(SPEECH_CACHE_NAME)).delete(request);
+}
+
+export function selectSpeechCacheUrlsToDelete(
+  entries: Array<{ url: string; createdAt?: string }>,
+  now = Date.now(),
+) {
+  const fresh = entries.filter((entry) => {
+    const createdAt = Date.parse(entry.createdAt ?? '');
+    return Number.isFinite(createdAt) && now - createdAt < speechCacheMaxAgeMs;
+  });
+  const retained = new Set(fresh.slice(-speechCacheMaxEntries).map((entry) => entry.url));
+  return entries.filter((entry) => !retained.has(entry.url)).map((entry) => entry.url);
+}
+
+async function cleanupSpeechCache(now = Date.now()) {
+  if (typeof window === 'undefined' || !('caches' in window) || now - lastSpeechCacheCleanupAt < 86_400_000) return;
+  lastSpeechCacheCleanupAt = now;
+  const cache = await caches.open(SPEECH_CACHE_NAME);
+  const requests = await cache.keys();
+  const entries = await Promise.all(requests.map(async (request) => ({
+    url: request.url,
+    createdAt: (await cache.match(request))?.headers.get('X-Mentor-Cache-Created-At') ?? undefined,
+  })));
+  const obsolete = new Set(selectSpeechCacheUrlsToDelete(entries, now));
+  await Promise.all(requests.filter((request) => obsolete.has(request.url)).map((request) => cache.delete(request)));
+}
+
+function trimGeneratedSpeechMemoryCache() {
+  while (generatedSpeechCache.size > speechMemoryMaxEntries) {
+    const oldestKey = generatedSpeechCache.keys().next().value as string | undefined;
+    if (!oldestKey) break;
+    generatedSpeechCache.delete(oldestKey);
+  }
 }
 
 async function createSpeechCacheRequest(segments: SpeechSegment[]) {

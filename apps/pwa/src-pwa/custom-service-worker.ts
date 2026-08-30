@@ -6,6 +6,7 @@ import {
 } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
 import { NetworkFirst } from 'workbox-strategies';
+import { ExpirationPlugin } from 'workbox-expiration';
 import { createCachedMediaResponse } from '../src/services/media-range-response';
 
 declare const self: ServiceWorkerGlobalScope & typeof globalThis;
@@ -42,6 +43,12 @@ registerRoute(
   ({ url }) => url.pathname.startsWith('/api/'),
   new NetworkFirst({
     cacheName: 'mentor-ai-api',
+    networkTimeoutSeconds: 8,
+    plugins: [new ExpirationPlugin({
+      maxEntries: 60,
+      maxAgeSeconds: 24 * 60 * 60,
+      purgeOnQuotaError: true,
+    })],
   }),
 );
 

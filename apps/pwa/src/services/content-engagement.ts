@@ -6,6 +6,7 @@ import type {
 } from '@mentor-ai/shared';
 import { synchronizeContentEngagement } from './api-client.js';
 import { mentorDb } from './indexed-db.js';
+import { selectContentEngagementToPrune } from './content-engagement-retention.js';
 
 const deviceKey = 'mentor-ai-device-id';
 
@@ -34,6 +35,7 @@ export async function recordContentEngagement(input: {
   };
   const db = await mentorDb;
   await db.put('content-engagement', event);
+  await pruneContentEngagement();
   window.dispatchEvent(new CustomEvent('mentor-content-engagement', { detail: input.contentId }));
   if (navigator.onLine) void syncContentEngagement().catch(() => undefined);
   return event;
@@ -52,6 +54,15 @@ export async function syncContentEngagement() {
   if (!local.length) return;
   const merged = await synchronizeContentEngagement(local);
   for (const event of merged) await db.put('content-engagement', event);
+  await pruneContentEngagement();
+}
+
+async function pruneContentEngagement() {
+  const db = await mentorDb;
+  const events = await db.getAll('content-engagement') as ContentEngagementEvent[];
+  for (const event of selectContentEngagementToPrune(events)) {
+    await db.delete('content-engagement', event.id);
+  }
 }
 
 function getDeviceId() {

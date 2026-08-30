@@ -260,7 +260,7 @@ function removeUpdateReloadParameters() {
 function startRemoteSyncPolling() {
   void refreshRemoteProgress(false);
   remoteSyncPollingTimer = window.setInterval(() => {
-    void refreshRemoteProgress(true);
+    if (document.visibilityState === 'visible' && navigator.onLine) void refreshRemoteProgress(true);
   }, 30000);
 }
 

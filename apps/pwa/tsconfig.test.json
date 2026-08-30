@@ -11,6 +11,7 @@
     "src/services/activity-suggestion.ts",
     "src/services/app-update.ts",
     "src/services/content-engagement-summary.ts",
+    "src/services/content-engagement-retention.ts",
     "src/services/daily-reading-progress.ts",
     "src/services/api-client.ts",
     "src/services/auth.ts",
