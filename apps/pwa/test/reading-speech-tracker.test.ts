@@ -65,6 +65,15 @@ describe('reading speech tracking', () => {
     assert.equal(alignReadingSpeech(tabletReference, noisyTranscript, 0, { minCoverage: 0.4 }).accepted, true);
   });
 
+  it('accepts a high-confidence tablet phrase spread by omitted book words', () => {
+    const tabletReference = tokenizeReadingSpeech('start I a b finish c d the e f last g h bites i j of k l my m n sandwich o p just q r as s t Camila u v finishes w x hers today');
+    const result = alignReadingSpeech(tabletReference, 'I finish the last bites of my sandwich just as Camila finishes hers', 1, { minCoverage: 0.4 });
+
+    assert.equal(result.coverage, 1);
+    assert.equal(result.accepted, true);
+    assert.deepEqual(result.matchedWordIndexes, [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34, 37]);
+  });
+
   it('trims a repeated-word match that jumps into an unread tablet sentence', () => {
     const bounded = boundTabletReadingProgress([15956, 15957, 15958, 15959, 15960, 15961, 15962, 15977], 15955, 9);
     assert.deepEqual(bounded, [15956, 15957, 15958, 15959, 15960, 15961, 15962]);

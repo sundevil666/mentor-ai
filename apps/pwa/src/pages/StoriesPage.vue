@@ -1203,7 +1203,6 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
   const furthestMatchedWord = confirmedLastWord;
   if (furthestMatchedWord > readingSpeechFurthestWordIndex) {
     readingSpeechFurthestWordIndex = furthestMatchedWord;
-    for (let wordIndex = 0; wordIndex <= furthestMatchedWord; wordIndex += 1) nextSpoken.add(wordIndex);
     void persistSpokenReadingProgress(furthestMatchedWord);
   }
   spokenReaderWordIndexes.value = nextSpoken;
@@ -1389,9 +1388,9 @@ async function restoreSpokenReadingProgress(bookId: string) {
   const furthestWordIndex = Math.max(-1, Math.floor(progress?.furthestPosition ?? 0) - 1);
   readingSpeechFurthestWordIndex = furthestWordIndex;
   if (furthestWordIndex < 0) return;
-  const restored = new Set(spokenReaderWordIndexes.value);
-  for (let wordIndex = 0; wordIndex <= furthestWordIndex; wordIndex += 1) restored.add(wordIndex);
-  spokenReaderWordIndexes.value = restored;
+  // The furthest position is useful for resuming, but it cannot prove that
+  // every preceding word was spoken. Exact voice-confirmed indexes are restored
+  // separately by restoreDailySpokenWords and are the only highlighted words.
   readingSpeechAnchor = furthestWordIndex + 1;
 }
 async function persistSpokenReadingProgress(furthestWordIndex: number) {

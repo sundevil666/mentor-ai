@@ -58,7 +58,18 @@ export function alignReadingSpeech(referenceWords: readonly string[], transcript
   const matchedCount = matchedWordIndexes.length;
   const coverage = matchedCount / spokenWords.length;
   const matchSpan = matchedCount > 1 ? matchedWordIndexes[matchedCount - 1]! - matchedWordIndexes[0]! + 1 : Number.POSITIVE_INFINITY;
-  const accepted = matchedCount >= 3 && coverage >= (options.minCoverage ?? 0.58) && matchSpan <= spokenWords.length * 2 + 8;
+  const ordinarySpan = matchSpan <= spokenWords.length * 2 + 8;
+  // Tablet Whisper often recognizes the right phrase while omitting names or
+  // merging several words. Keep the ordinary guard for weak matches, but let a
+  // longer, high-confidence phrase survive so the nearby-word bound can remove
+  // backward/forward outliers before anything is highlighted.
+  const highConfidenceTabletSpan = options.minCoverage !== undefined
+    && matchedCount >= 6
+    && coverage >= 0.65
+    && matchSpan <= spokenWords.length * 4 + 12;
+  const accepted = matchedCount >= 3
+    && coverage >= (options.minCoverage ?? 0.58)
+    && (ordinarySpan || highConfidenceTabletSpan);
   if (!accepted) return { ...rejected(anchorIndex), coverage };
   return {
     accepted: true,
