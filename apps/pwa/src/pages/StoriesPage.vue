@@ -254,7 +254,7 @@
                 class="personal-reader__heard-word"
                 :class="{ 'personal-reader__heard-word--interim': readingSpeechLastWord.interim }"
               >{{ readingSpeechLastWord.text }}</strong>
-              <span v-else class="personal-reader__heard-words-empty">{{ readingSpeechActive ? 'Listening…' : '—' }}</span>
+              <span v-else class="personal-reader__heard-words-empty">{{ readingSpeechPlaceholder }}</span>
             </div>
             <div class="personal-reader__speech-actions">
               <q-btn
@@ -558,6 +558,10 @@ const readingSpeechLastWord = computed(() => {
   const finalWord = readingSpeechFinalWords.value.at(-1);
   return finalWord ? { text: finalWord, interim: false } : null;
 });
+const readingSpeechPlaceholder = computed(() => {
+  if (readingSpeechStatus.value === 'requesting') return readingSpeechMessage.value;
+  return readingSpeechActive.value ? 'Listening…' : '—';
+});
 const readingSpeechHasSignal = computed(() => readingSpeechLevel.value >= 0.035);
 const readingSpeechActionLabel = computed(() => {
   if (readingSpeechActive.value) return 'Stop microphone';
@@ -565,7 +569,10 @@ const readingSpeechActionLabel = computed(() => {
   return 'Turn microphone on';
 });
 const readingMicrophoneIndicator = computed(() => {
-  if (readingSpeechStatus.value === 'requesting') return { tone: 'requesting', title: 'REQUESTING MICROPHONE' };
+  if (readingSpeechStatus.value === 'requesting') return {
+    tone: 'requesting',
+    title: readingSpeechMessage.value.startsWith('Loading') ? 'LOADING SPEECH MODEL' : 'REQUESTING MICROPHONE',
+  };
   if (readingSpeechStatus.value === 'listening' || readingSpeechStatus.value === 'noise') {
     return readingSpeechHasSignal.value
       ? { tone: 'hearing', title: 'HEARING YOU' }
@@ -962,6 +969,10 @@ async function startReadingSpeech() {
       if (typeof MediaRecorder === 'undefined') throw new Error('MediaRecorder is unavailable after microphone permission was granted.');
       localReadingTranscriber = startLocalReadingTranscriber(readingSpeechStream, {
         onTranscript: (transcript) => handleReadingSpeechTranscript(transcript, 'device-whisper'),
+        onReady: () => {
+          readingSpeechStatus.value = 'listening';
+          readingSpeechMessage.value = 'Read aloud. Recognition is ready.';
+        },
         onProgress: (message) => {
           readingSpeechStatus.value = 'requesting';
           readingSpeechMessage.value = message;
@@ -971,8 +982,8 @@ async function startReadingSpeech() {
           readingSpeechMessage.value = `Offline speech recognition stopped: ${message}`;
         },
       });
-      readingSpeechStatus.value = 'listening';
-      readingSpeechMessage.value = 'Listening locally. The first recognition may take longer while the offline model is prepared.';
+      readingSpeechStatus.value = 'requesting';
+      readingSpeechMessage.value = 'Loading speech model…';
     } else {
       if (!isSpeechRecognitionAvailable()) throw new Error('SpeechRecognition is unavailable after microphone permission was granted.');
       readingSpeechRecognition = startContinuousSpeechRecognition({

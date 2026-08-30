@@ -1,5 +1,6 @@
 type LocalTranscriberOptions = {
   onTranscript: (text: string) => void;
+  onReady: () => void;
   onProgress: (message: string) => void;
   onError: (message: string) => void;
 };
@@ -17,9 +18,13 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
 
   worker.onmessage = (event: MessageEvent<{ type: string; id?: number; text?: string; progress?: number; message?: string }>) => {
     if (event.data.type === 'result' && event.data.text) options.onTranscript(event.data.text);
+    if (event.data.type === 'ready') {
+      options.onReady();
+      recordChunk();
+    }
     if (event.data.type === 'progress') {
       const progress = Number.isFinite(event.data.progress) ? ` ${Math.round(event.data.progress ?? 0)}%` : '';
-      options.onProgress(`Preparing offline speech recognition${progress}…`);
+      options.onProgress(`Loading speech model${progress}`);
     }
     if (event.data.type === 'error') options.onError(event.data.message ?? 'Offline speech recognition failed.');
   };
@@ -39,8 +44,6 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
     recorder.start();
     timer = window.setTimeout(() => recorder?.state === 'recording' && recorder.stop(), chunkDurationMs);
   };
-  recordChunk();
-
   return {
     stop() {
       stopped = true;
