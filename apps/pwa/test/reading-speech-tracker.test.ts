@@ -117,9 +117,13 @@ describe('tablet reading audio preparation', () => {
     const originalWindow = globalThis.window;
     let workerCount = 0;
     let initializationCount = 0;
+    const fakeWorkers: FakeWorker[] = [];
     class FakeWorker {
       onmessage: ((event: MessageEvent<{ type: string }>) => void) | null = null;
-      constructor() { workerCount += 1; }
+      constructor() {
+        workerCount += 1;
+        fakeWorkers.push(this);
+      }
       postMessage(message: { type?: string }) {
         if (message.type !== 'init') return;
         initializationCount += 1;
@@ -133,8 +137,9 @@ describe('tablet reading audio preparation', () => {
     });
     const stream = { active: false } as MediaStream;
     let readyCount = 0;
+    let transcriptCount = 0;
     const options = {
-      onTranscript: () => undefined,
+      onTranscript: () => { transcriptCount += 1; },
       onReady: () => { readyCount += 1; },
       onProgress: () => undefined,
       onError: (message: string) => assert.fail(message),
@@ -149,6 +154,8 @@ describe('tablet reading audio preparation', () => {
       assert.equal(workerCount, 1);
       assert.equal(initializationCount, 1);
       assert.equal(readyCount, 2);
+      fakeWorkers[0]!.onmessage?.({ data: { type: 'result', id: 1, text: 'final partial words' } } as unknown as MessageEvent<{ type: string }>);
+      assert.equal(transcriptCount, 1);
     } finally {
       Object.assign(globalThis, { Worker: originalWorker, window: originalWindow });
     }

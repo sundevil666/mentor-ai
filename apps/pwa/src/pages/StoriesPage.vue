@@ -1059,7 +1059,14 @@ async function startReadingSpeech() {
     if (useLocalRecognition) {
       if (typeof MediaRecorder === 'undefined') throw new Error('MediaRecorder is unavailable after microphone permission was granted.');
       localReadingTranscriber = startLocalReadingTranscriber(readingSpeechStream, {
-        onTranscript: (transcript) => handleReadingSpeechTranscript(transcript, 'device-whisper'),
+        onTranscript: (transcript) => {
+          const arrivedAfterPause = !readingSpeechStream;
+          handleReadingSpeechTranscript(transcript, 'device-whisper');
+          if (arrivedAfterPause) {
+            readingSpeechStatus.value = 'paused';
+            readingSpeechMessage.value = 'The final words were recognized and highlighted. Tap Start listening when you are ready.';
+          }
+        },
         onDebug: (message) => appendReadingSpeechDebug(message),
         onReady: () => {
           appendReadingSpeechDebug('Offline model ready. Start reading aloud.');

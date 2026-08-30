@@ -32,13 +32,21 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
       sharedWorkerReady = true;
       sharedWorkerInitializing = false;
     }
-    if (stopped) return;
+    if (event.data.type === 'error' && event.data.id === undefined) {
+      sharedWorkerInitializing = false;
+      sharedWorkerReady = false;
+      sharedWorker = null;
+      worker.terminate();
+    }
     if (event.data.id !== undefined && event.data.id < firstSessionRequestId) return;
     if (event.data.type === 'debug' && event.data.message) options.onDebug?.(event.data.message);
     if (event.data.type === 'result') {
       options.onDebug?.(`Worker result #${event.data.id ?? '?'}: ${event.data.text ? 'text received' : 'empty text'}.`);
       if (event.data.text) options.onTranscript(event.data.text);
     }
+    // A result from the final partial chunk is intentionally delivered after
+    // Pause. Other lifecycle callbacks must not restart or alter the session.
+    if (stopped) return;
     if (event.data.type === 'ready') {
       options.onReady();
       recordChunk();
@@ -48,12 +56,6 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
       options.onProgress(`Loading speech model${progress}`);
     }
     if (event.data.type === 'error') {
-      if (event.data.id === undefined) {
-        sharedWorkerInitializing = false;
-        sharedWorkerReady = false;
-        sharedWorker = null;
-        worker.terminate();
-      }
       options.onError(event.data.message ?? 'Offline speech recognition failed.');
     }
   };
@@ -76,18 +78,24 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
     options.onDebug?.(`Recording ${(chunkDurationMs / 1_000).toFixed(1)}s audio chunk (${recorder.mimeType || 'default format'}).`);
     recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
     recorder.onstop = () => {
-      if (!stopped && chunks.length) void decodeAudio(new Blob(chunks, { type: recorder?.mimeType })).then((decodedAudio) => {
+      if (chunks.length) {
+        // Reserve the id before asynchronous decoding so a quick restart can
+        // identify and ignore this previous session's late result.
         const id = ++sharedRequestId;
-        const normalized = normalizeReadingAudio(decodedAudio);
-        options.onDebug?.(`Audio chunk #${id} decoded (${(normalized.audio.length / 16_000).toFixed(2)}s); RMS=${normalized.rms.toFixed(4)}, peak=${normalized.peak.toFixed(3)}, gain=${normalized.gain.toFixed(1)}x.`);
-        if (!normalized.usable) {
-          options.onDebug?.(`Audio chunk #${id} is too quiet for reliable recognition; skipped.`);
-          return;
-        }
-        options.onDebug?.(`Sending normalized audio chunk #${id} to worker.`);
-        worker.postMessage({ id, audio: normalized.audio }, [normalized.audio.buffer]);
-      }).catch((error) => options.onError(error instanceof Error ? error.message : String(error)));
-      else if (!stopped) options.onDebug?.('Audio chunk was empty.');
+        void decodeAudio(new Blob(chunks, { type: recorder?.mimeType })).then((decodedAudio) => {
+          const normalized = normalizeReadingAudio(decodedAudio);
+          options.onDebug?.(`Audio chunk #${id} decoded (${(normalized.audio.length / 16_000).toFixed(2)}s); RMS=${normalized.rms.toFixed(4)}, peak=${normalized.peak.toFixed(3)}, gain=${normalized.gain.toFixed(1)}x.`);
+          if (!normalized.usable) {
+            options.onDebug?.(`Audio chunk #${id} is too quiet for reliable recognition; skipped.`);
+            return;
+          }
+          options.onDebug?.(`Sending normalized audio chunk #${id} to worker.`);
+          worker.postMessage({ id, audio: normalized.audio }, [normalized.audio.buffer]);
+        }).catch((error) => {
+          if (!stopped) options.onError(error instanceof Error ? error.message : String(error));
+          else options.onDebug?.(`Final audio chunk could not be decoded: ${error instanceof Error ? error.message : String(error)}.`);
+        });
+      } else options.onDebug?.('Audio chunk was empty.');
       if (!stopped) recordChunk();
     };
     recorder.start();
