@@ -1832,64 +1832,53 @@ html.mentor-theme-dark .personal-reader {
 
 .personal-reader__speech-frame-base,
 .personal-reader__speech-frame-wave {
-  border-radius: 8px;
-  inset: 3px;
+  inset: 0;
   pointer-events: none;
   position: absolute;
 }
 
 .personal-reader__speech-frame-base {
   background:
-    linear-gradient(90deg, #29d6b3, #62f2d2 45%, #24bfa5) top / 100% 4px no-repeat,
-    linear-gradient(270deg, #29d6b3, #62f2d2 45%, #24bfa5) bottom / 100% 4px no-repeat,
-    linear-gradient(180deg, #29d6b3, #62f2d2 45%, #24bfa5) left / 4px 100% no-repeat,
-    linear-gradient(0deg, #29d6b3, #62f2d2 45%, #24bfa5) right / 4px 100% no-repeat;
-  box-shadow: inset 0 0 18px rgba(41, 214, 179, .34);
-  animation: reader-listening-frame 1.8s ease-in-out infinite alternate;
+    linear-gradient(to bottom, rgba(41, 214, 179, .48), rgba(58, 229, 197, .16) 42%, transparent 100%) top / 100% 46px no-repeat,
+    linear-gradient(to top, rgba(41, 214, 179, .48), rgba(58, 229, 197, .16) 42%, transparent 100%) bottom / 100% 46px no-repeat,
+    linear-gradient(to right, rgba(41, 214, 179, .48), rgba(58, 229, 197, .16) 42%, transparent 100%) left / 46px 100% no-repeat,
+    linear-gradient(to left, rgba(41, 214, 179, .48), rgba(58, 229, 197, .16) 42%, transparent 100%) right / 46px 100% no-repeat;
+  animation: reader-listening-frame 3.6s ease-in-out infinite alternate;
 }
 
 .personal-reader__speech-frame-wave {
-  border: var(--reader-speech-border, 3px) solid rgba(79, 238, 205, .92);
-  box-shadow:
-    0 0 var(--reader-speech-glow, 10px) rgba(46, 224, 190, .78),
-    inset 0 0 var(--reader-speech-inner-glow, 8px) rgba(46, 224, 190, .48);
-  opacity: var(--reader-speech-opacity, .8);
-  transition: border-width 80ms linear, box-shadow 80ms linear, opacity 120ms ease, transform 80ms linear;
+  background:
+    linear-gradient(to bottom, rgba(98, 242, 210, .34), transparent 100%) top / 100% 32px no-repeat,
+    linear-gradient(to top, rgba(98, 242, 210, .34), transparent 100%) bottom / 100% 32px no-repeat,
+    linear-gradient(to right, rgba(98, 242, 210, .34), transparent 100%) left / 32px 100% no-repeat,
+    linear-gradient(to left, rgba(98, 242, 210, .34), transparent 100%) right / 32px 100% no-repeat;
+  opacity: .42;
+  transition: opacity 420ms ease;
 }
 
 .personal-reader__speech-frame--hearing .personal-reader__speech-frame-wave {
-  animation: reader-listening-wave 560ms ease-in-out infinite alternate;
+  animation: reader-listening-wave 2.4s ease-in-out infinite alternate;
 }
 
 @keyframes reader-listening-frame {
   0% {
-    filter: brightness(.86) saturate(.9);
-    opacity: .62;
+    filter: brightness(.96) saturate(.92);
+    opacity: .52;
   }
   100% {
-    filter: brightness(1.18) saturate(1.18);
-    opacity: 1;
+    filter: brightness(1.06) saturate(1.04);
+    opacity: .76;
   }
 }
 
 @keyframes reader-listening-wave {
   0% {
-    border-radius: 8px 20px 10px 24px;
-    filter: brightness(.92);
-    opacity: .7;
-    transform: scaleX(.994) scaleY(.996);
-  }
-  45% {
-    border-radius: 22px 8px 26px 10px;
-    filter: brightness(1.2);
-    opacity: 1;
-    transform: scaleX(.999) scaleY(.99);
+    filter: brightness(.96);
+    opacity: .32;
   }
   100% {
-    border-radius: 10px 26px 8px 22px;
-    filter: brightness(1.05);
-    opacity: .82;
-    transform: scaleX(.99) scaleY(.999);
+    filter: brightness(1.08);
+    opacity: .62;
   }
 }
 
