@@ -162,6 +162,11 @@
         <div
           ref="readerContent"
           class="personal-reader__content"
+          :class="{
+            'personal-reader__content--listening': readingSpeechActive,
+            'personal-reader__content--hearing': readingSpeechActive && readingSpeechHasSignal,
+          }"
+          :style="readerSpeechFrameStyle"
           @touchstart="handleReaderTouchStart"
           @touchend="handleReaderTouchEnd"
           @touchcancel="resetReaderTouch"
@@ -240,15 +245,14 @@
 
           <section class="personal-reader__speech-coach" :class="`personal-reader__speech-coach--${readingSpeechStatus}`" aria-live="polite" aria-label="Reading pronunciation coach">
             <button
+              v-if="!readingSpeechActive"
               class="personal-reader__speech-orb"
-              :class="{ 'personal-reader__speech-orb--ready': readingSpeechStatus === 'listening' || readingSpeechStatus === 'noise' }"
-              :style="{ '--reader-speech-level': String(Math.max(0.08, readingSpeechLevel)) }"
-              :aria-label="readingSpeechActive ? 'Pause voice tracking' : 'Start voice tracking'"
+              aria-label="Start voice tracking"
               type="button"
               @click="toggleReadingSpeech"
             >
               <span v-for="bar in 7" :key="bar" :style="{ '--speech-bar': String(bar) }" />
-              <q-icon :name="readingSpeechActive ? 'mic' : 'play_arrow'" />
+              <q-icon name="play_arrow" />
             </button>
             <div class="personal-reader__microphone-status" :class="`personal-reader__microphone-status--${readingMicrophoneIndicator.tone}`" role="status">
               <span class="personal-reader__microphone-status-dot" aria-hidden="true" />
@@ -566,6 +570,15 @@ const readerReferenceWords = computed(() => renderedBookPages.value.flatMap((pag
 const readingSpeechActive = computed(() => readingSpeechStatus.value === 'listening' || readingSpeechStatus.value === 'noise' || readingSpeechStatus.value === 'requesting');
 const readingSpeechDebugText = computed(() => readingSpeechDebugEntries.value.join('\n'));
 const readingSpeechHasSignal = computed(() => readingSpeechLevel.value >= 0.035);
+const readerSpeechFrameStyle = computed(() => {
+  const energy = readingSpeechActive.value ? Math.max(0.04, readingSpeechLevel.value) : 0;
+  return {
+    '--reader-speech-border': `${2 + energy * 7}px`,
+    '--reader-speech-glow': `${5 + energy * 24}px`,
+    '--reader-speech-inner-glow': `${4 + energy * 18}px`,
+    '--reader-speech-opacity': String(0.34 + energy * 0.66),
+  };
+});
 const readingSpeechActionLabel = computed(() => {
   if (readingSpeechActive.value) return 'Stop microphone';
   if (readingSpeechStatus.value === 'error') return 'Retry microphone';

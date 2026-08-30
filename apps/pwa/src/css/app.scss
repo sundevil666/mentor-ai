@@ -1785,6 +1785,51 @@ html.mentor-theme-dark .personal-reader {
   touch-action: pan-y;
 }
 
+.personal-reader--focus .personal-reader__content--listening::before,
+.personal-reader--focus .personal-reader__content--listening::after {
+  border-radius: 8px;
+  content: '';
+  inset: 3px;
+  pointer-events: none;
+  position: absolute;
+  z-index: 8;
+}
+
+.personal-reader--focus .personal-reader__content--listening::before {
+  background: linear-gradient(115deg, #ff4fa3, #d34cff 34%, #ff71ba 67%, #8f5cff) border-box;
+  border: 3px solid transparent;
+  box-shadow: inset 0 0 8px rgba(255, 78, 171, .2);
+  mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+}
+
+.personal-reader--focus .personal-reader__content--listening::after {
+  border: var(--reader-speech-border, 2px) solid rgba(255, 71, 167, .72);
+  box-shadow:
+    0 0 var(--reader-speech-glow, 5px) rgba(255, 62, 159, .5),
+    inset 0 0 var(--reader-speech-inner-glow, 4px) rgba(186, 70, 255, .36);
+  opacity: var(--reader-speech-opacity, .34);
+  transition: border-width 80ms linear, box-shadow 80ms linear, opacity 120ms ease, transform 80ms linear;
+}
+
+.personal-reader--focus .personal-reader__content--hearing::after {
+  animation: reader-listening-wave 720ms ease-in-out infinite alternate;
+}
+
+@keyframes reader-listening-wave {
+  0% { border-radius: 8px 16px 10px 18px; transform: scaleX(.997) scaleY(.999); }
+  45% { border-radius: 17px 8px 19px 10px; transform: scaleX(.999) scaleY(.995); }
+  100% { border-radius: 10px 19px 8px 16px; transform: scaleX(.995) scaleY(.999); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .personal-reader--focus .personal-reader__content--hearing::after {
+    animation: none;
+  }
+}
+
 .personal-reader__end-spacer {
   height: 1px;
   left: var(--reader-paper-scroll-width, 100%);
