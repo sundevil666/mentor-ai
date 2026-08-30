@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { alignReadingSpeech, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
+import { normalizeReadingAudio } from '../src/services/local-reading-transcriber.js';
 
 const reference = tokenizeReadingSpeech('Alice was beginning to get very tired of sitting by her sister on the bank. She read the sentence again because practice matters.');
 
@@ -46,5 +47,21 @@ describe('reading speech tracking', () => {
 
     assert.equal(alignReadingSpeech(browserReference, 'the browser finds this exact spoken sentence', 0).accepted, false);
     assert.equal(alignReadingSpeech(browserReference, 'the browser finds this exact spoken sentence', 0, { maxForwardWords: 360 }).accepted, true);
+  });
+});
+
+describe('tablet reading audio preparation', () => {
+  it('amplifies a quiet speech signal without clipping it', () => {
+    const input = Float32Array.from([0.01, -0.02, 0.015, -0.01]);
+    const result = normalizeReadingAudio(input);
+    assert.equal(result.usable, true);
+    assert.ok(result.gain > 1);
+    assert.ok(Math.max(...Array.from(result.audio, Math.abs)) <= 0.95);
+  });
+
+  it('does not send near-silence to Whisper as speech', () => {
+    const result = normalizeReadingAudio(Float32Array.from([0.0001, -0.0002, 0.0001]));
+    assert.equal(result.usable, false);
+    assert.equal(result.gain, 1);
   });
 });

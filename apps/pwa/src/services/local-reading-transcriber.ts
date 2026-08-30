@@ -7,6 +7,7 @@ type LocalTranscriberOptions = {
 };
 
 export type LocalReadingTranscriber = { stop: () => void };
+export type NormalizedReadingAudio = { audio: Float32Array; rms: number; peak: number; gain: number; usable: boolean };
 
 // Keep chunks long enough for the three-word matcher, but short enough for the
 // reading marker to feel live. The worker applies its own backpressure so a
@@ -47,10 +48,16 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
     options.onDebug?.(`Recording ${(chunkDurationMs / 1_000).toFixed(1)}s audio chunk (${recorder.mimeType || 'default format'}).`);
     recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
     recorder.onstop = () => {
-      if (!stopped && chunks.length) void decodeAudio(new Blob(chunks, { type: recorder?.mimeType })).then((audio) => {
+      if (!stopped && chunks.length) void decodeAudio(new Blob(chunks, { type: recorder?.mimeType })).then((decodedAudio) => {
         const id = ++requestId;
-        options.onDebug?.(`Audio chunk #${id} decoded (${(audio.length / 16_000).toFixed(2)}s); sending to worker.`);
-        worker.postMessage({ id, audio }, [audio.buffer]);
+        const normalized = normalizeReadingAudio(decodedAudio);
+        options.onDebug?.(`Audio chunk #${id} decoded (${(normalized.audio.length / 16_000).toFixed(2)}s); RMS=${normalized.rms.toFixed(4)}, peak=${normalized.peak.toFixed(3)}, gain=${normalized.gain.toFixed(1)}x.`);
+        if (!normalized.usable) {
+          options.onDebug?.(`Audio chunk #${id} is too quiet for reliable recognition; skipped.`);
+          return;
+        }
+        options.onDebug?.(`Sending normalized audio chunk #${id} to worker.`);
+        worker.postMessage({ id, audio: normalized.audio }, [normalized.audio.buffer]);
       }).catch((error) => options.onError(error instanceof Error ? error.message : String(error)));
       else if (!stopped) options.onDebug?.('Audio chunk was empty.');
       if (!stopped) recordChunk();
@@ -83,4 +90,21 @@ async function decodeAudio(blob: Blob): Promise<Float32Array> {
   } finally {
     await context.close();
   }
+}
+
+export function normalizeReadingAudio(input: Float32Array): NormalizedReadingAudio {
+  if (!input.length) return { audio: input, rms: 0, peak: 0, gain: 1, usable: false };
+  let sumSquares = 0;
+  let peak = 0;
+  for (const sample of input) {
+    sumSquares += sample * sample;
+    peak = Math.max(peak, Math.abs(sample));
+  }
+  const rms = Math.sqrt(sumSquares / input.length);
+  if (rms < 0.002 || peak < 0.008) return { audio: input, rms, peak, gain: 1, usable: false };
+  const gain = Math.max(1, Math.min(12, 0.12 / rms, 0.95 / peak));
+  if (gain <= 1.05) return { audio: input, rms, peak, gain: 1, usable: true };
+  const audio = new Float32Array(input.length);
+  for (let index = 0; index < input.length; index += 1) audio[index] = (input[index] ?? 0) * gain;
+  return { audio, rms, peak, gain, usable: true };
 }
