@@ -254,7 +254,7 @@
               <span v-for="bar in 7" :key="bar" :style="{ '--speech-bar': String(bar) }" />
               <q-icon name="play_arrow" />
             </button>
-            <div class="personal-reader__microphone-status" :class="`personal-reader__microphone-status--${readingMicrophoneIndicator.tone}`" role="status">
+            <div v-if="!readingSpeechActive" class="personal-reader__microphone-status" :class="`personal-reader__microphone-status--${readingMicrophoneIndicator.tone}`" role="status">
               <span class="personal-reader__microphone-status-dot" aria-hidden="true" />
               <strong>{{ readingMicrophoneIndicator.title }}</strong>
             </div>

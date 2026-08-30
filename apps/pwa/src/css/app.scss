@@ -1796,13 +1796,12 @@ html.mentor-theme-dark .personal-reader {
 }
 
 .personal-reader--focus .personal-reader__content--listening::before {
-  background: linear-gradient(115deg, #ff4fa3, #d34cff 34%, #ff71ba 67%, #8f5cff) border-box;
-  border: 3px solid transparent;
+  background:
+    linear-gradient(90deg, #ff4fa3, #d34cff 34%, #ff71ba 67%, #8f5cff) top / 100% 3px no-repeat,
+    linear-gradient(270deg, #ff4fa3, #d34cff 34%, #ff71ba 67%, #8f5cff) bottom / 100% 3px no-repeat,
+    linear-gradient(180deg, #ff4fa3, #d34cff 45%, #ff71ba) left / 3px 100% no-repeat,
+    linear-gradient(0deg, #8f5cff, #ff71ba 55%, #ff4fa3) right / 3px 100% no-repeat;
   box-shadow: inset 0 0 8px rgba(255, 78, 171, .2);
-  mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
-  -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
 }
 
 .personal-reader--focus .personal-reader__content--listening::after {
