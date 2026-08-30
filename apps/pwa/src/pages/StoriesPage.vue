@@ -1144,7 +1144,7 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     readerReferenceWords.value,
     alignmentTranscript,
     readingSpeechAnchor,
-    recognitionEngine === 'browser' ? { maxForwardWords: 360 } : undefined,
+    recognitionEngine === 'browser' ? { maxForwardWords: 360 } : { minCoverage: 0.45 },
   );
   if (!match.accepted) {
     appendReadingSpeechDebug(`Match rejected near word ${readingSpeechAnchor}; coverage=${Math.round(match.coverage * 100)}%.`);

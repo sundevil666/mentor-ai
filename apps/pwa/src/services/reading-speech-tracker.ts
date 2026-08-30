@@ -7,6 +7,7 @@ export type ReadingSpeechMatch = {
 
 export type ReadingSpeechAlignmentOptions = {
   maxForwardWords?: number;
+  minCoverage?: number;
 };
 
 export function normalizeReadingWord(value: string): string {
@@ -57,7 +58,7 @@ export function alignReadingSpeech(referenceWords: readonly string[], transcript
   const matchedCount = matchedWordIndexes.length;
   const coverage = matchedCount / spokenWords.length;
   const matchSpan = matchedCount > 1 ? matchedWordIndexes[matchedCount - 1]! - matchedWordIndexes[0]! + 1 : Number.POSITIVE_INFINITY;
-  const accepted = matchedCount >= 3 && coverage >= 0.58 && matchSpan <= spokenWords.length * 2 + 8;
+  const accepted = matchedCount >= 3 && coverage >= (options.minCoverage ?? 0.58) && matchSpan <= spokenWords.length * 2 + 8;
   if (!accepted) return { ...rejected(anchorIndex), coverage };
   return {
     accepted: true,

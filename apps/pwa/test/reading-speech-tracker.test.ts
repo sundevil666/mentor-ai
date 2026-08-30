@@ -48,6 +48,14 @@ describe('reading speech tracking', () => {
     assert.equal(alignReadingSpeech(browserReference, 'the browser finds this exact spoken sentence', 0).accepted, false);
     assert.equal(alignReadingSpeech(browserReference, 'the browser finds this exact spoken sentence', 0, { maxForwardWords: 360 }).accepted, true);
   });
+
+  it('accepts a partially accurate nearby tablet transcript without relaxing browser matching', () => {
+    const tabletReference = tokenizeReadingSpeech('one two three four five six seven eight');
+    const imperfectTranscript = 'one two unclear words five six wrong sounds';
+
+    assert.equal(alignReadingSpeech(tabletReference, imperfectTranscript, 0).accepted, false);
+    assert.equal(alignReadingSpeech(tabletReference, imperfectTranscript, 0, { minCoverage: 0.45 }).accepted, true);
+  });
 });
 
 describe('tablet reading audio preparation', () => {
