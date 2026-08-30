@@ -398,7 +398,7 @@ import { loadContentProgress, saveContentProgress, syncAllContentProgress } from
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineStory } from 'src/services/offline-library';
 import { deleteOfflineStory, formatStoryDuration, formatStorySize, getCachedStoryUrls, saveStoryOffline, storyLibrary, type LibraryStory } from 'src/services/story-library';
 import { useAppStore } from 'src/stores/app-store';
-import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
+import { configurePlaybackAudioSession, isAppleMobileDevice, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 import { deletePersonalBook, importPersonalBook, listPersonalBookArchives, listPersonalBooks, loadPersonalBook, markPersonalBookOpened, mergePersonalBookArchives, type PersonalBook } from 'src/services/personal-book-library';
 import { personalBookSyncControl } from 'src/services/personal-book-sync-control';
 import { fetchReaderPhonetic, fetchReaderTextLookup, saveReadingTranscript, synchronizePersonalReadingBooks, synchronizeReaderVocabulary } from 'src/services/api-client';
@@ -942,10 +942,7 @@ async function toggleReadingSpeech() {
 }
 async function startReadingSpeech() {
   if (readingSpeechRecognition || readingSpeechStream || !readingMode.value) return;
-  const appleTablet = /iPad|iPhone|iPod/.test(navigator.userAgent)
-    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const useLocalRecognition = isIosStandalone()
-    || (appleTablet && window.matchMedia('(display-mode: standalone)').matches);
+  const useLocalRecognition = isAppleMobileDevice();
   if (!navigator.mediaDevices?.getUserMedia || (useLocalRecognition && typeof MediaRecorder === 'undefined') || (!useLocalRecognition && !isSpeechRecognitionAvailable())) {
     readingSpeechStatus.value = 'error';
     readingSpeechMessage.value = 'Live speech recognition is not supported by this browser.';

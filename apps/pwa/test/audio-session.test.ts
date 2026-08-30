@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { configurePlaybackAudioSession, isIosStandalone } from '../src/services/audio-session.js';
+import { configurePlaybackAudioSession, isAppleMobileDevice, isIosStandalone } from '../src/services/audio-session.js';
 
 describe('audio session', () => {
   it('declares long-form playback to iOS before audio starts', () => {
@@ -33,5 +33,6 @@ describe('audio session', () => {
 
     assert.equal(isIosStandalone(ipad), true);
     assert.equal(isIosStandalone({ ...ipad, standalone: false } as unknown as Navigator), false);
+    assert.equal(isAppleMobileDevice({ ...ipad, standalone: false } as unknown as Navigator), true);
   });
 });
