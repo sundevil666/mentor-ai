@@ -11,7 +11,7 @@ export type LocalReadingTranscriber = { stop: () => void };
 // Keep chunks long enough for the three-word matcher, but short enough for the
 // reading marker to feel live. The worker applies its own backpressure so a
 // slower iPad cannot build an ever-growing transcription queue.
-const chunkDurationMs = 2_500;
+const chunkDurationMs = 4_000;
 
 export function startLocalReadingTranscriber(stream: MediaStream, options: LocalTranscriberOptions): LocalReadingTranscriber {
   const worker = new Worker(new URL('../workers/reading-transcription.worker.ts', import.meta.url), { type: 'module' });
@@ -44,7 +44,7 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
     if (stopped || !stream.active) return;
     const chunks: Blob[] = [];
     recorder = new MediaRecorder(stream);
-    options.onDebug?.(`Recording 2.5s audio chunk (${recorder.mimeType || 'default format'}).`);
+    options.onDebug?.(`Recording ${(chunkDurationMs / 1_000).toFixed(1)}s audio chunk (${recorder.mimeType || 'default format'}).`);
     recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
     recorder.onstop = () => {
       if (!stopped && chunks.length) void decodeAudio(new Blob(chunks, { type: recorder?.mimeType })).then((audio) => {

@@ -460,6 +460,7 @@ const readingSpeechSpokenWords = ref(0);
 const readingSpeechDebugEntries = ref<string[]>(['Waiting for microphone start.']);
 let readingSpeechAnchor = 0;
 let readingSpeechFurthestWordIndex = -1;
+let readingSpeechLocalTranscriptWindow: string[] = [];
 let readingSpeechRecognition: ContinuousSpeechRecognition | null = null;
 let localReadingTranscriber: LocalReadingTranscriber | null = null;
 let readingSpeechStream: MediaStream | null = null;
@@ -975,6 +976,7 @@ async function startReadingSpeech() {
   if (readingSpeechRecognition || readingSpeechStream || !readingMode.value) return;
   const useLocalRecognition = isAppleMobileDevice();
   startReadingSpeechDebug(useLocalRecognition ? 'device-whisper' : 'browser-speech');
+  readingSpeechLocalTranscriptWindow = [];
   if (!navigator.mediaDevices?.getUserMedia) {
     appendReadingSpeechDebug('ERROR: getUserMedia is unavailable.');
     readingSpeechStatus.value = 'error';
@@ -997,6 +999,7 @@ async function startReadingSpeech() {
     void startReadingSpeechMeter(readingSpeechStream);
     readingSpeechAnchor = getVisibleReaderWordAnchor();
     appendReadingSpeechDebug(`Reading anchor: word ${readingSpeechAnchor}.`);
+    appendReadingSpeechDebug(`Expected nearby text: "${readerReferenceWords.value.slice(readingSpeechAnchor, readingSpeechAnchor + 18).join(' ')}"`);
     if (useLocalRecognition) {
       if (typeof MediaRecorder === 'undefined') throw new Error('MediaRecorder is unavailable after microphone permission was granted.');
       localReadingTranscriber = startLocalReadingTranscriber(readingSpeechStream, {
@@ -1108,9 +1111,19 @@ function isMicrophonePermissionError(error: unknown) {
     : error instanceof Error && /denied|allowed|permission/i.test(error.message);
 }
 function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'device-whisper' | 'browser' = 'browser') {
-  const heardWords = tokenizeReadingSpeech(transcript);
-  appendReadingSpeechDebug(`Final text (${recognitionEngine}, ${heardWords.length} words): "${transcript}"`);
-  if (!heardWords.length) return;
+  const rawHeardWords = tokenizeReadingSpeech(transcript);
+  appendReadingSpeechDebug(`Final text (${recognitionEngine}, ${rawHeardWords.length} words): "${transcript}"`);
+  if (!rawHeardWords.length) return;
+  if (recognitionEngine === 'device-whisper') {
+    readingSpeechLocalTranscriptWindow = [...readingSpeechLocalTranscriptWindow, transcript].slice(-3);
+  }
+  const alignmentTranscript = recognitionEngine === 'device-whisper'
+    ? readingSpeechLocalTranscriptWindow.join(' ')
+    : transcript;
+  const heardWords = tokenizeReadingSpeech(alignmentTranscript);
+  if (recognitionEngine === 'device-whisper' && readingSpeechLocalTranscriptWindow.length > 1) {
+    appendReadingSpeechDebug(`Matching combined tablet text (${heardWords.length} words from ${readingSpeechLocalTranscriptWindow.length} chunks).`);
+  }
   const book = selectedBook.value;
   if (book) void saveReadingTranscript({
     id: `reading-transcript-${crypto.randomUUID()}`,
@@ -1123,12 +1136,12 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
   }).catch(() => {
     Notify.create({ type: 'warning', message: 'Words were recognized, but could not be saved for analysis.', timeout: 3_000 });
   });
-  const spokenCount = heardWords.length;
-  if (spokenCount < 3) {
+  const spokenCount = rawHeardWords.length;
+  if (heardWords.length < 3) {
     appendReadingSpeechDebug('Match skipped: fewer than 3 recognized words.');
     return;
   }
-  const match = alignReadingSpeech(readerReferenceWords.value, transcript, readingSpeechAnchor);
+  const match = alignReadingSpeech(readerReferenceWords.value, alignmentTranscript, readingSpeechAnchor);
   if (!match.accepted) {
     appendReadingSpeechDebug(`Match rejected near word ${readingSpeechAnchor}; coverage=${Math.round(match.coverage * 100)}%.`);
     readingSpeechStatus.value = 'noise';
@@ -1136,7 +1149,8 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     return;
   }
   readingSpeechAnchor = match.anchorIndex;
-  appendReadingSpeechDebug(`Match accepted: ${match.matchedWordIndexes.length}/${spokenCount} words, coverage=${Math.round(match.coverage * 100)}%, indexes=${match.matchedWordIndexes[0]}–${match.matchedWordIndexes.at(-1)}, next=${match.anchorIndex}.`);
+  appendReadingSpeechDebug(`Match accepted: ${match.matchedWordIndexes.length}/${heardWords.length} words, coverage=${Math.round(match.coverage * 100)}%, indexes=${match.matchedWordIndexes[0]}–${match.matchedWordIndexes.at(-1)}, next=${match.anchorIndex}.`);
+  if (recognitionEngine === 'device-whisper') readingSpeechLocalTranscriptWindow = [];
   readingSpeechAcceptedWords.value += match.matchedWordIndexes.length;
   readingSpeechSpokenWords.value += spokenCount;
   const nextSpoken = new Set(spokenReaderWordIndexes.value);
