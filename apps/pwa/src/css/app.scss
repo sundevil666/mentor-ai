@@ -1845,7 +1845,8 @@ html.mentor-theme-dark .personal-reader {
     linear-gradient(to top, rgba(41, 214, 179, .42), rgba(58, 229, 197, .1) 36%, transparent 100%) bottom / 100% 24px no-repeat,
     linear-gradient(to right, rgba(41, 214, 179, .42), rgba(58, 229, 197, .1) 36%, transparent 100%) left / 24px 100% no-repeat,
     linear-gradient(to left, rgba(41, 214, 179, .42), rgba(58, 229, 197, .1) 36%, transparent 100%) right / 24px 100% no-repeat;
-  animation: reader-listening-frame var(--reader-speech-frame-duration, 9s) linear infinite;
+  animation: reader-listening-frame var(--reader-speech-frame-duration, 8s) linear infinite;
+  will-change: filter, opacity;
 }
 
 .personal-reader__speech-frame-wave {
@@ -1856,47 +1857,53 @@ html.mentor-theme-dark .personal-reader {
     linear-gradient(to left, rgba(98, 242, 210, .28), transparent 100%) right / 16px 100% no-repeat;
   opacity: .42;
   transition: opacity 420ms ease;
+  transform-origin: center;
+  will-change: filter, opacity, transform;
 }
 
 .personal-reader__speech-frame--hearing .personal-reader__speech-frame-wave {
-  animation: reader-listening-wave var(--reader-speech-wave-duration, 6.5s) ease-in-out infinite;
+  animation: reader-listening-wave var(--reader-speech-wave-duration, 4.8s) ease-in-out infinite;
 }
 
 @keyframes reader-listening-frame {
   0% {
     filter: brightness(.98) saturate(1.02) hue-rotate(0deg);
-    opacity: .52;
+    opacity: .42;
   }
   42% {
-    filter: brightness(1.04) saturate(1.24) hue-rotate(195deg);
-    opacity: .76;
+    filter: brightness(1.14) saturate(1.5) hue-rotate(195deg);
+    opacity: .92;
   }
   72% {
-    filter: brightness(1.06) saturate(1.2) hue-rotate(115deg);
-    opacity: .7;
+    filter: brightness(1.16) saturate(1.46) hue-rotate(115deg);
+    opacity: .84;
   }
   100% {
     filter: brightness(.98) saturate(1.02) hue-rotate(0deg);
-    opacity: .52;
+    opacity: .42;
   }
 }
 
 @keyframes reader-listening-wave {
   0% {
     filter: brightness(.98) saturate(1.04) hue-rotate(0deg);
-    opacity: .32;
+    opacity: .2;
+    transform: scale(.985);
   }
   42% {
-    filter: brightness(1.08) saturate(1.28) hue-rotate(195deg);
-    opacity: .62;
+    filter: brightness(1.2) saturate(1.58) hue-rotate(195deg);
+    opacity: .88;
+    transform: scale(1.006);
   }
   72% {
-    filter: brightness(1.1) saturate(1.24) hue-rotate(115deg);
-    opacity: .56;
+    filter: brightness(1.22) saturate(1.52) hue-rotate(115deg);
+    opacity: .76;
+    transform: scale(.994);
   }
   100% {
     filter: brightness(.98) saturate(1.04) hue-rotate(0deg);
-    opacity: .32;
+    opacity: .2;
+    transform: scale(.985);
   }
 }
 

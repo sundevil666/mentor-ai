@@ -582,12 +582,12 @@ const readerSpeechFrameStyle = computed(() => {
   const energy = readingSpeechActive.value ? Math.max(0.04, readingSpeechLevel.value) : 0;
   const energyRatio = Math.max(0, Math.min(1, energy / 0.2));
   const paceRatio = readingSpeechHasSignal.value
-    ? Math.max(0, Math.min(1, (readingSpeechWordsPerMinute.value - 70) / 130))
+    ? Math.max(0, Math.min(1, (readingSpeechWordsPerMinute.value - 55) / 95))
     : 0;
   return {
-    '--reader-speech-frame-duration': `${9 - paceRatio * 4}s`,
-    '--reader-speech-wave-duration': `${6.5 - paceRatio * 3}s`,
-    '--reader-speech-reactivity': String(0.74 + paceRatio * 0.18 + energyRatio * 0.08),
+    '--reader-speech-frame-duration': `${8 - paceRatio * 6.4}s`,
+    '--reader-speech-wave-duration': `${4.8 - paceRatio * 4}s`,
+    '--reader-speech-reactivity': String(0.62 + paceRatio * 0.3 + energyRatio * 0.08),
   };
 });
 const readingSpeechActionLabel = computed(() => {
