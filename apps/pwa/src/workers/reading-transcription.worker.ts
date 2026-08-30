@@ -36,6 +36,7 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
     // Retaining every old chunk makes the marker drift further behind forever.
     // Keep only the newest waiting chunk so recognition catches up to the reader.
     latestPendingRequest = request;
+    self.postMessage({ type: 'debug', message: `Worker busy; keeping newest chunk #${request.id}.` });
     return;
   }
   void transcribe(request);
@@ -43,9 +44,12 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
 
 async function transcribe(request: { id: number; audio: Float32Array }) {
   transcribing = true;
+  const startedAt = performance.now();
+  self.postMessage({ type: 'debug', message: `Worker transcribing chunk #${request.id}.` });
   try {
     const transcriber = await transcriberPromise!;
     const result = await transcriber(request.audio, { language: 'english', task: 'transcribe' });
+    self.postMessage({ type: 'debug', message: `Worker finished chunk #${request.id} in ${((performance.now() - startedAt) / 1_000).toFixed(1)}s.` });
     self.postMessage({ type: 'result', id: request.id, text: result.text?.trim() ?? '' });
   } catch (error) {
     self.postMessage({ type: 'error', id: request.id, message: error instanceof Error ? error.message : String(error) });

@@ -277,6 +277,14 @@
             </div>
           </section>
 
+          <section class="personal-reader__speech-debug" aria-label="Microphone debug log">
+            <div class="personal-reader__speech-debug-heading">
+              <strong>Microphone debug</strong>
+              <q-btn aria-label="Copy microphone debug log" dense flat icon="content_copy" label="Copy" no-caps @click="copyReadingSpeechDebugLog" />
+            </div>
+            <pre>{{ readingSpeechDebugText }}</pre>
+          </section>
+
           <section
             class="personal-reader__lookup"
             aria-live="polite"
@@ -449,6 +457,7 @@ const readingSpeechCaptureUnavailable = ref(false);
 const spokenReaderWordIndexes = ref(new Set<number>());
 const readingSpeechAcceptedWords = ref(0);
 const readingSpeechSpokenWords = ref(0);
+const readingSpeechDebugEntries = ref<string[]>(['Waiting for microphone start.']);
 let readingSpeechAnchor = 0;
 let readingSpeechFurthestWordIndex = -1;
 let readingSpeechRecognition: ContinuousSpeechRecognition | null = null;
@@ -456,6 +465,8 @@ let localReadingTranscriber: LocalReadingTranscriber | null = null;
 let readingSpeechStream: MediaStream | null = null;
 let readingSpeechAudioContext: AudioContext | null = null;
 let readingSpeechAnimationFrame = 0;
+let readingSpeechDebugStartedAt = 0;
+let readingSpeechLastSignalState = false;
 const dailyReadingProgress = ref<DailyReadingProgress>(readDailyReadingProgress());
 const personalBooks = ref<PersonalBook[]>([]);
 const bookSyncing = ref(false);
@@ -552,6 +563,7 @@ const renderedBookPages = computed(() => {
 });
 const readerReferenceWords = computed(() => renderedBookPages.value.flatMap((page) => page.paragraphs.flatMap((paragraph) => paragraph.filter((token) => token.isWord).map((token) => token.text))));
 const readingSpeechActive = computed(() => readingSpeechStatus.value === 'listening' || readingSpeechStatus.value === 'noise' || readingSpeechStatus.value === 'requesting');
+const readingSpeechDebugText = computed(() => readingSpeechDebugEntries.value.join('\n'));
 const readingSpeechHasSignal = computed(() => readingSpeechLevel.value >= 0.035);
 const readingSpeechActionLabel = computed(() => {
   if (readingSpeechActive.value) return 'Stop microphone';
@@ -947,6 +959,7 @@ function goToReaderMarker() {
 }
 async function toggleReadingSpeech() {
   if (readingSpeechActive.value) {
+    appendReadingSpeechDebug('Stop requested by user.');
     stopReadingSpeech('paused');
     readingSpeechMessage.value = 'Your highlighted words are kept. Tap Start listening when you are ready.';
     return;
@@ -958,7 +971,9 @@ async function toggleReadingSpeech() {
 async function startReadingSpeech() {
   if (readingSpeechRecognition || readingSpeechStream || !readingMode.value) return;
   const useLocalRecognition = isAppleMobileDevice();
+  startReadingSpeechDebug(useLocalRecognition ? 'device-whisper' : 'browser-speech');
   if (!navigator.mediaDevices?.getUserMedia) {
+    appendReadingSpeechDebug('ERROR: getUserMedia is unavailable.');
     readingSpeechStatus.value = 'error';
     readingSpeechMessage.value = 'Safari does not expose microphone capture on this page.';
     Notify.create({ type: 'negative', icon: 'mic_off', message: readingSpeechMessage.value, timeout: 8_000 });
@@ -968,24 +983,34 @@ async function startReadingSpeech() {
   readingSpeechPermissionBlocked.value = false;
   readingSpeechCaptureUnavailable.value = false;
   readingSpeechMessage.value = 'Use the device prompt to allow microphone access.';
+  appendReadingSpeechDebug('Requesting microphone permission…');
   try {
     configureCaptureAudioSession();
+    appendReadingSpeechDebug('Audio session configured for capture.');
     readingSpeechStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    const audioTrack = readingSpeechStream.getAudioTracks()[0];
+    const settings = audioTrack?.getSettings();
+    appendReadingSpeechDebug(`Microphone granted: track=${audioTrack?.readyState ?? 'missing'}, enabled=${audioTrack?.enabled ?? false}, muted=${audioTrack?.muted ?? false}, sampleRate=${settings?.sampleRate ?? 'unknown'}, channels=${settings?.channelCount ?? 'unknown'}.`);
     void startReadingSpeechMeter(readingSpeechStream);
     readingSpeechAnchor = getVisibleReaderWordAnchor();
+    appendReadingSpeechDebug(`Reading anchor: word ${readingSpeechAnchor}.`);
     if (useLocalRecognition) {
       if (typeof MediaRecorder === 'undefined') throw new Error('MediaRecorder is unavailable after microphone permission was granted.');
       localReadingTranscriber = startLocalReadingTranscriber(readingSpeechStream, {
         onTranscript: (transcript) => handleReadingSpeechTranscript(transcript, 'device-whisper'),
+        onDebug: (message) => appendReadingSpeechDebug(message),
         onReady: () => {
+          appendReadingSpeechDebug('Offline model ready. Start reading aloud.');
           readingSpeechStatus.value = 'listening';
           readingSpeechMessage.value = 'Read aloud. Recognition is ready.';
         },
         onProgress: (message) => {
+          appendReadingSpeechDebug(message);
           readingSpeechStatus.value = 'requesting';
           readingSpeechMessage.value = message;
         },
         onError: (message) => {
+          appendReadingSpeechDebug(`ERROR: ${message}`);
           stopReadingSpeech('error');
           readingSpeechMessage.value = `Offline speech recognition stopped: ${message}`;
         },
@@ -996,14 +1021,19 @@ async function startReadingSpeech() {
       if (!isSpeechRecognitionAvailable()) throw new Error('SpeechRecognition is unavailable after microphone permission was granted.');
       readingSpeechRecognition = startContinuousSpeechRecognition({
       lang: 'en-US',
-      onInterim: (transcript) => previewReadingSpeechTranscript(transcript),
+      onInterim: (transcript) => {
+        appendReadingSpeechDebug(`Interim text: "${transcript}"`);
+        previewReadingSpeechTranscript(transcript);
+      },
       onFinal: (transcript) => handleReadingSpeechTranscript(transcript, 'browser'),
       onListeningChange: (listening) => {
+        appendReadingSpeechDebug(listening ? 'Browser recognition listening.' : 'Browser recognition reconnecting.');
         if (!readingSpeechRecognition && !listening) return;
         readingSpeechStatus.value = listening ? 'listening' : 'requesting';
         readingSpeechMessage.value = listening ? 'Read naturally. Matching words are highlighted as you speak.' : 'Reconnecting voice recognition…';
       },
       onError: (message) => {
+        appendReadingSpeechDebug(`ERROR: browser recognition: ${message}`);
         stopReadingSpeech('error');
         readingSpeechCaptureUnavailable.value = isMicrophoneCaptureUnavailable(message);
         readingSpeechPermissionBlocked.value = !readingSpeechCaptureUnavailable.value && /not-allowed|permission|denied/i.test(message);
@@ -1025,6 +1055,7 @@ async function startReadingSpeech() {
     readingSpeechCaptureUnavailable.value = isMicrophoneCaptureUnavailable(error);
     readingSpeechPermissionBlocked.value = !readingSpeechCaptureUnavailable.value && isMicrophonePermissionError(error);
     const technicalMessage = microphoneErrorDetails(error);
+    appendReadingSpeechDebug(`ERROR: microphone start failed: ${technicalMessage}`);
     readingSpeechMessage.value = readingSpeechCaptureUnavailable.value
       ? 'The iPad microphone service is unavailable. Fully close Mentor AI, reopen it, and try again.'
       : readingSpeechPermissionBlocked.value
@@ -1075,6 +1106,7 @@ function isMicrophonePermissionError(error: unknown) {
 }
 function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'device-whisper' | 'browser' = 'browser') {
   const heardWords = tokenizeReadingSpeech(transcript);
+  appendReadingSpeechDebug(`Final text (${recognitionEngine}, ${heardWords.length} words): "${transcript}"`);
   if (!heardWords.length) return;
   const book = selectedBook.value;
   if (book) void saveReadingTranscript({
@@ -1089,14 +1121,19 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     Notify.create({ type: 'warning', message: 'Words were recognized, but could not be saved for analysis.', timeout: 3_000 });
   });
   const spokenCount = heardWords.length;
-  if (spokenCount < 3) return;
+  if (spokenCount < 3) {
+    appendReadingSpeechDebug('Match skipped: fewer than 3 recognized words.');
+    return;
+  }
   const match = alignReadingSpeech(readerReferenceWords.value, transcript, readingSpeechAnchor);
   if (!match.accepted) {
+    appendReadingSpeechDebug(`Match rejected near word ${readingSpeechAnchor}; coverage=${Math.round(match.coverage * 100)}%.`);
     readingSpeechStatus.value = 'noise';
     readingSpeechMessage.value = 'I heard sound, but it did not match the nearby book text. Keep reading.';
     return;
   }
   readingSpeechAnchor = match.anchorIndex;
+  appendReadingSpeechDebug(`Match accepted: ${match.matchedWordIndexes.length}/${spokenCount} words, coverage=${Math.round(match.coverage * 100)}%, indexes=${match.matchedWordIndexes[0]}–${match.matchedWordIndexes.at(-1)}, next=${match.anchorIndex}.`);
   readingSpeechAcceptedWords.value += match.matchedWordIndexes.length;
   readingSpeechSpokenWords.value += spokenCount;
   const nextSpoken = new Set(spokenReaderWordIndexes.value);
@@ -1140,7 +1177,10 @@ function getVisibleReaderWordAnchor() {
 }
 async function startReadingSpeechMeter(stream: MediaStream) {
   const AudioContextConstructor = window.AudioContext;
-  if (!AudioContextConstructor) return;
+  if (!AudioContextConstructor) {
+    appendReadingSpeechDebug('Audio meter unavailable: AudioContext missing.');
+    return;
+  }
   readingSpeechAudioContext = new AudioContextConstructor();
   await readingSpeechAudioContext.resume().catch(() => undefined);
   const analyser = readingSpeechAudioContext.createAnalyser();
@@ -1152,11 +1192,17 @@ async function startReadingSpeechMeter(stream: MediaStream) {
     analyser.getByteFrequencyData(samples);
     const average = samples.reduce((sum, value) => sum + value, 0) / Math.max(1, samples.length);
     readingSpeechLevel.value = Math.min(1, average / 72);
+    const hasSignal = readingSpeechLevel.value >= 0.035;
+    if (hasSignal !== readingSpeechLastSignalState) {
+      readingSpeechLastSignalState = hasSignal;
+      appendReadingSpeechDebug(hasSignal ? `Sound detected: level=${readingSpeechLevel.value.toFixed(2)}.` : 'Sound stopped.');
+    }
     readingSpeechAnimationFrame = requestAnimationFrame(update);
   };
   update();
 }
 function stopReadingSpeech(status: ReadingSpeechStatus) {
+  appendReadingSpeechDebug(`Stopping microphone: status=${status}.`);
   readingSpeechRecognition?.stop();
   readingSpeechRecognition = null;
   localReadingTranscriber?.stop();
@@ -1168,8 +1214,38 @@ function stopReadingSpeech(status: ReadingSpeechStatus) {
   void readingSpeechAudioContext?.close();
   readingSpeechAudioContext = null;
   readingSpeechLevel.value = 0;
+  readingSpeechLastSignalState = false;
   readingSpeechStatus.value = status;
   configurePlaybackAudioSession();
+}
+
+function startReadingSpeechDebug(engine: string) {
+  readingSpeechDebugStartedAt = performance.now();
+  readingSpeechDebugEntries.value = [];
+  appendReadingSpeechDebug(`Start. Engine=${engine}; platform=${navigator.platform || 'unknown'}; standalone=${window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone)}; MediaRecorder=${typeof MediaRecorder !== 'undefined'}; AudioContext=${typeof window.AudioContext !== 'undefined'}.`);
+}
+
+function appendReadingSpeechDebug(message: string) {
+  const elapsed = readingSpeechDebugStartedAt ? ((performance.now() - readingSpeechDebugStartedAt) / 1_000).toFixed(1) : '0.0';
+  readingSpeechDebugEntries.value = [...readingSpeechDebugEntries.value.slice(-119), `[+${elapsed}s] ${message}`];
+}
+
+async function copyReadingSpeechDebugLog() {
+  const text = `Mentor AI microphone debug\n${readingSpeechDebugText.value}`;
+  try {
+    await navigator.clipboard.writeText(text);
+    Notify.create({ type: 'positive', icon: 'content_copy', message: 'Microphone debug log copied.' });
+  } catch {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    Notify.create({ type: copied ? 'positive' : 'negative', message: copied ? 'Microphone debug log copied.' : 'Could not copy the debug log.' });
+  }
 }
 function setReadingMode(value: boolean) {
   const progressRatio = getCurrentReaderProgressRatio();

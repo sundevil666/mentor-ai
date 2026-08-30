@@ -1,5 +1,6 @@
 type LocalTranscriberOptions = {
   onTranscript: (text: string) => void;
+  onDebug?: (message: string) => void;
   onReady: () => void;
   onProgress: (message: string) => void;
   onError: (message: string) => void;
@@ -18,9 +19,14 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
   let timer = 0;
   let stopped = false;
   let requestId = 0;
+  options.onDebug?.('Creating offline transcription worker.');
 
   worker.onmessage = (event: MessageEvent<{ type: string; id?: number; text?: string; progress?: number; message?: string }>) => {
-    if (event.data.type === 'result' && event.data.text) options.onTranscript(event.data.text);
+    if (event.data.type === 'debug' && event.data.message) options.onDebug?.(event.data.message);
+    if (event.data.type === 'result') {
+      options.onDebug?.(`Worker result #${event.data.id ?? '?'}: ${event.data.text ? 'text received' : 'empty text'}.`);
+      if (event.data.text) options.onTranscript(event.data.text);
+    }
     if (event.data.type === 'ready') {
       options.onReady();
       recordChunk();
@@ -31,17 +37,22 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
     }
     if (event.data.type === 'error') options.onError(event.data.message ?? 'Offline speech recognition failed.');
   };
+  options.onDebug?.('Initializing offline speech model.');
   worker.postMessage({ type: 'init' });
 
   const recordChunk = () => {
     if (stopped || !stream.active) return;
     const chunks: Blob[] = [];
     recorder = new MediaRecorder(stream);
+    options.onDebug?.(`Recording 2.5s audio chunk (${recorder.mimeType || 'default format'}).`);
     recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
     recorder.onstop = () => {
       if (!stopped && chunks.length) void decodeAudio(new Blob(chunks, { type: recorder?.mimeType })).then((audio) => {
-        worker.postMessage({ id: ++requestId, audio }, [audio.buffer]);
+        const id = ++requestId;
+        options.onDebug?.(`Audio chunk #${id} decoded (${(audio.length / 16_000).toFixed(2)}s); sending to worker.`);
+        worker.postMessage({ id, audio }, [audio.buffer]);
       }).catch((error) => options.onError(error instanceof Error ? error.message : String(error)));
+      else if (!stopped) options.onDebug?.('Audio chunk was empty.');
       if (!stopped) recordChunk();
     };
     recorder.start();

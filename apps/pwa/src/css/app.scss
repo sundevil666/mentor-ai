@@ -2322,6 +2322,32 @@ body.body--dark .personal-reader__sidebar {
 
 .personal-reader__speech-actions { display: flex; gap: 4px; justify-content: center; width: 100%; }
 
+.personal-reader__speech-debug {
+  background: color-mix(in srgb, var(--app-text-strong) 5%, var(--app-surface));
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  width: 100%;
+}
+
+.personal-reader__speech-debug-heading { align-items: center; display: flex; justify-content: space-between; }
+.personal-reader__speech-debug-heading strong { font-size: .72em; }
+
+.personal-reader__speech-debug pre {
+  color: var(--app-muted-strong);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .58em;
+  line-height: 1.35;
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .personal-reader__speech-stats span {
   color: var(--app-muted-strong);
   font-size: .7rem;
