@@ -59,9 +59,9 @@
         <q-btn
           class="analysis-status-button"
           :aria-label="analysisStatusLabel"
-          :color="analysisReadiness.ready ? (analysisReadiness.errorCount > 0 ? 'warning' : 'positive') : undefined"
+          :color="analysisReadiness.ready ? (analysisReadiness.errorCount > 0 ? 'warning' : 'positive') : 'primary'"
           flat
-          icon="monitoring"
+          icon="query_stats"
           round
         >
           <q-badge v-if="analysisReadiness.ready" color="deep-orange-7" floating>!</q-badge>
@@ -69,7 +69,7 @@
           <q-menu anchor="bottom right" self="top right" class="analysis-menu">
             <section class="analysis-center">
               <div class="analysis-center__heading">
-                <q-icon name="monitoring" color="primary" size="28px" />
+                <q-icon name="query_stats" color="primary" size="28px" />
                 <div>
                   <strong>Analysis center</strong>
                   <span>{{ analysisStatusLabel }}</span>
