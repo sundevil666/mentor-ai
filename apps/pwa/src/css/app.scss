@@ -139,6 +139,29 @@ body .q-menu {
   z-index: 2;
 }
 
+.app-version-badge {
+  align-items: center;
+  background: color-mix(in srgb, var(--app-primary) 10%, var(--app-surface));
+  border: 1px solid color-mix(in srgb, var(--app-primary) 28%, transparent);
+  border-radius: 999px;
+  color: var(--app-primary);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  min-height: 28px;
+  order: 0;
+  padding: 0 9px;
+  white-space: nowrap;
+}
+
+.app-version-badge__compact {
+  display: none;
+}
+
 .app-header .lesson-update-button,
 .app-header .sync-status-button,
 .app-header .analysis-status-button,
@@ -3076,6 +3099,20 @@ body.body--dark .personal-reader__lookup-error {
       max(8px, env(safe-area-inset-left));
   }
 
+  .app-version-badge {
+    font-size: 0.66rem;
+    min-height: 26px;
+    padding: 0 6px;
+  }
+
+  .app-version-badge__wide {
+    display: none;
+  }
+
+  .app-version-badge__compact {
+    display: inline;
+  }
+
   .app-header .q-btn {
     height: 44px;
     min-height: 44px;
@@ -3089,7 +3126,7 @@ body.body--dark .personal-reader__lookup-error {
     width: 44px;
   }
 
-  .app-header:has(.personal-books__sync-button) .header-level-trend {
+  .app-header .header-level-trend {
     display: none;
   }
 

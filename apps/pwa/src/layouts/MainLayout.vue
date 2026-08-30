@@ -2,6 +2,11 @@
   <q-layout view="hHh lpR fFf">
     <q-header bordered class="app-header">
       <q-toolbar>
+        <span class="app-version-badge" :aria-label="`Mentor AI version ${appVersion}`">
+          <span class="app-version-badge__wide">{{ appVersionWideLabel }}</span>
+          <span class="app-version-badge__compact">{{ appVersionCompactLabel }}</span>
+          <q-tooltip>Mentor AI version {{ appVersion }}</q-tooltip>
+        </span>
         <div class="app-header__center">
           <q-btn
             v-if="personalBookSyncControl.visible"
@@ -379,6 +384,14 @@ declare global {
 
 const appStore = useAppStore();
 const route = useRoute();
+const appVersion = process.env.APP_VERSION ?? 'development';
+const [appReleaseVersion, appBuildVersion] = appVersion.split('+');
+const appVersionWideLabel = appBuildVersion
+  ? `v${appReleaseVersion} · ${appBuildVersion.slice(0, 7)}`
+  : `v${appReleaseVersion}`;
+const appVersionCompactLabel = appBuildVersion
+  ? `v${appBuildVersion.slice(0, 7)}`
+  : `v${appReleaseVersion}`;
 const isDarkTheme = ref(false);
 const googleClientId = ref<string | null>(null);
 const googleSignInButton = ref<HTMLElement | null>(null);
