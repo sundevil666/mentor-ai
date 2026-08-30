@@ -943,9 +943,10 @@ async function toggleReadingSpeech() {
 async function startReadingSpeech() {
   if (readingSpeechRecognition || readingSpeechStream || !readingMode.value) return;
   const useLocalRecognition = isAppleMobileDevice();
-  if (!navigator.mediaDevices?.getUserMedia || (useLocalRecognition && typeof MediaRecorder === 'undefined') || (!useLocalRecognition && !isSpeechRecognitionAvailable())) {
+  if (!navigator.mediaDevices?.getUserMedia) {
     readingSpeechStatus.value = 'error';
-    readingSpeechMessage.value = 'Live speech recognition is not supported by this browser.';
+    readingSpeechMessage.value = 'Safari does not expose microphone capture on this page.';
+    Notify.create({ type: 'negative', icon: 'mic_off', message: readingSpeechMessage.value, timeout: 8_000 });
     return;
   }
   readingSpeechStatus.value = 'requesting';
@@ -957,6 +958,7 @@ async function startReadingSpeech() {
     void startReadingSpeechMeter(readingSpeechStream);
     readingSpeechAnchor = getVisibleReaderWordAnchor();
     if (useLocalRecognition) {
+      if (typeof MediaRecorder === 'undefined') throw new Error('MediaRecorder is unavailable after microphone permission was granted.');
       localReadingTranscriber = startLocalReadingTranscriber(readingSpeechStream, {
         onTranscript: (transcript) => handleReadingSpeechTranscript(transcript, 'device-whisper'),
         onProgress: (message) => {
@@ -970,7 +972,9 @@ async function startReadingSpeech() {
       });
       readingSpeechStatus.value = 'listening';
       readingSpeechMessage.value = 'Listening locally. The first recognition may take longer while the offline model is prepared.';
-    } else readingSpeechRecognition = startContinuousSpeechRecognition({
+    } else {
+      if (!isSpeechRecognitionAvailable()) throw new Error('SpeechRecognition is unavailable after microphone permission was granted.');
+      readingSpeechRecognition = startContinuousSpeechRecognition({
       lang: 'en-US',
       onInterim: (transcript) => {
         readingSpeechInterimWords.value = tokenizeReadingSpeech(transcript);
@@ -992,7 +996,8 @@ async function startReadingSpeech() {
           : `Speech recognition stopped: ${message}`;
         Notify.create({ type: 'negative', icon: 'mic', message: readingSpeechMessage.value, timeout: 6_000 });
       },
-    });
+      });
+    }
     if (!useLocalRecognition) {
       readingSpeechStatus.value = 'listening';
       readingSpeechMessage.value = 'Read naturally. Matching words are highlighted as you speak.';
@@ -1001,13 +1006,23 @@ async function startReadingSpeech() {
     stopReadingSpeech('error');
     readingSpeechCaptureUnavailable.value = isMicrophoneCaptureUnavailable(error);
     readingSpeechPermissionBlocked.value = !readingSpeechCaptureUnavailable.value && isMicrophonePermissionError(error);
+    const technicalMessage = microphoneErrorDetails(error);
     readingSpeechMessage.value = readingSpeechCaptureUnavailable.value
       ? 'The iPad microphone service is unavailable. Fully close Mentor AI, reopen it, and try again.'
       : readingSpeechPermissionBlocked.value
         ? 'Access is blocked. Tap Fix microphone access for the PWA settings.'
-      : 'The microphone could not be started on this device.';
-    Notify.create({ type: 'negative', icon: 'mic', message: readingSpeechMessage.value, timeout: 6_000 });
+      : `The microphone could not be started: ${technicalMessage}`;
+    Notify.create({
+      type: 'negative',
+      icon: 'mic',
+      message: `${readingSpeechMessage.value} (${technicalMessage})`,
+      timeout: 10_000,
+    });
   }
+}
+function microphoneErrorDetails(error: unknown) {
+  if (error instanceof DOMException) return `${error.name}: ${error.message || 'no details'}`;
+  return error instanceof Error ? error.message : String(error);
 }
 function showMicrophoneAccessHelp() {
   const appleTablet = /iPad|iPhone|iPod/.test(navigator.userAgent)
