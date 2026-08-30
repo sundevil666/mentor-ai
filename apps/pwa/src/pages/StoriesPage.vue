@@ -262,6 +262,7 @@
               }"
               :aria-label="readingSpeechActionLabel"
               :aria-pressed="readingSpeechActive"
+              :disabled="readingSpeechTransitioning"
               :style="{ '--reader-speech-level': String(Math.max(0.08, readingSpeechLevel)) }"
               type="button"
               @click="toggleReadingSpeech"
@@ -458,6 +459,7 @@ const readerSidebarScale = ref(readReaderSidebarScale());
 type ReadingSpeechStatus = 'idle' | 'requesting' | 'listening' | 'noise' | 'paused' | 'error';
 type RenderedReaderToken = { text: string; isWord: boolean; wordIndex?: number };
 const readingSpeechStatus = ref<ReadingSpeechStatus>('idle');
+const readingSpeechTransitioning = ref(false);
 const readingSpeechLevel = ref(0);
 const readingSpeechWordsPerMinute = ref(0);
 const readingSpeechMessage = ref('Tap the microphone to request access and start listening.');
@@ -591,6 +593,7 @@ const readerSpeechFrameStyle = computed(() => {
   };
 });
 const readingSpeechActionLabel = computed(() => {
+  if (readingSpeechTransitioning.value) return 'Microphone state is changing';
   if (readingSpeechActive.value) return 'Stop microphone';
   if (readingSpeechStatus.value === 'error') return 'Retry microphone';
   return 'Turn microphone on';
@@ -1017,15 +1020,21 @@ function goToReaderMarker() {
   marker.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
 }
 async function toggleReadingSpeech() {
+  if (readingSpeechTransitioning.value) return;
+  readingSpeechTransitioning.value = true;
   if (readingSpeechActive.value) {
     appendReadingSpeechDebug('Stop requested by user.');
     stopReadingSpeech('paused');
     readingSpeechMessage.value = 'Your highlighted words are kept. Tap Start listening when you are ready.';
+    await nextTick();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    readingSpeechTransitioning.value = false;
     return;
   }
   readingSpeechPermissionBlocked.value = false;
   readingSpeechCaptureUnavailable.value = false;
   await startReadingSpeech();
+  if (readingSpeechStatus.value !== 'requesting') readingSpeechTransitioning.value = false;
 }
 async function startReadingSpeech() {
   if (readingSpeechRecognition || readingSpeechStream || !readingMode.value) return;
@@ -1037,6 +1046,7 @@ async function startReadingSpeech() {
     appendReadingSpeechDebug('ERROR: getUserMedia is unavailable.');
     readingSpeechStatus.value = 'error';
     readingSpeechMessage.value = 'Safari does not expose microphone capture on this page.';
+    readingSpeechTransitioning.value = false;
     Notify.create({ type: 'negative', icon: 'mic_off', message: readingSpeechMessage.value, timeout: 8_000 });
     return;
   }
@@ -1072,6 +1082,7 @@ async function startReadingSpeech() {
           appendReadingSpeechDebug('Offline model ready. Start reading aloud.');
           readingSpeechStatus.value = 'listening';
           readingSpeechMessage.value = 'Read aloud. Recognition is ready.';
+          readingSpeechTransitioning.value = false;
         },
         onProgress: (message) => {
           appendReadingSpeechDebug(message);
@@ -1082,6 +1093,7 @@ async function startReadingSpeech() {
           appendReadingSpeechDebug(`ERROR: ${message}`);
           stopReadingSpeech('error');
           readingSpeechMessage.value = `Offline speech recognition stopped: ${message}`;
+          readingSpeechTransitioning.value = false;
         },
       });
       readingSpeechStatus.value = 'requesting';
@@ -1100,6 +1112,7 @@ async function startReadingSpeech() {
         if (!readingSpeechRecognition && !listening) return;
         readingSpeechStatus.value = listening ? 'listening' : 'requesting';
         readingSpeechMessage.value = listening ? 'Read naturally. Matching words are highlighted as you speak.' : 'Reconnecting voice recognition…';
+        if (listening) readingSpeechTransitioning.value = false;
       },
       onError: (message) => {
         appendReadingSpeechDebug(`ERROR: browser recognition: ${message}`);
@@ -1112,6 +1125,7 @@ async function startReadingSpeech() {
             ? 'Access is blocked. Tap Fix microphone access for the PWA settings.'
           : `Speech recognition stopped: ${message}`;
         Notify.create({ type: 'negative', icon: 'mic', message: readingSpeechMessage.value, timeout: 6_000 });
+        readingSpeechTransitioning.value = false;
       },
       });
     }
@@ -1130,6 +1144,7 @@ async function startReadingSpeech() {
       : readingSpeechPermissionBlocked.value
         ? 'Access is blocked. Tap Fix microphone access for the PWA settings.'
       : `The microphone could not be started: ${technicalMessage}`;
+    readingSpeechTransitioning.value = false;
     Notify.create({
       type: 'negative',
       icon: 'mic',

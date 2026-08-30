@@ -2396,6 +2396,12 @@ body.body--dark .personal-reader__sidebar {
   box-shadow: 0 8px 22px color-mix(in srgb, var(--category-accent) 26%, transparent);
 }
 
+.personal-reader__speech-orb:disabled {
+  cursor: wait;
+  opacity: .58;
+  pointer-events: none;
+}
+
 .personal-reader__speech-orb::before,
 .personal-reader__speech-orb::after {
   border: 2px solid color-mix(in srgb, var(--category-accent) 30%, transparent);
