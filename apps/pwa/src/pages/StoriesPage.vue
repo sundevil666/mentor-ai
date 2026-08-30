@@ -199,6 +199,15 @@
             </section>
           </article>
           <span class="personal-reader__end-spacer" aria-hidden="true" />
+          <div
+            v-if="readingMode && readingSpeechActive"
+            class="personal-reader__speech-frame"
+            :class="{ 'personal-reader__speech-frame--hearing': readingSpeechHasSignal }"
+            aria-hidden="true"
+          >
+            <span class="personal-reader__speech-frame-base" />
+            <span class="personal-reader__speech-frame-wave" />
+          </div>
         </div>
 
         <aside v-if="readingMode" class="personal-reader__sidebar" aria-label="Reading controls">
