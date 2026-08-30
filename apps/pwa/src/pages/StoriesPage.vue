@@ -479,6 +479,7 @@ let readingSpeechDebugStartedAt = 0;
 let readingSpeechLastSignalState = false;
 let readingSpeechPaceWordCount = 0;
 let readingSpeechPaceSampleAt = 0;
+let resumeReadingSpeechAfterLookup = false;
 const dailyReadingProgress = ref<DailyReadingProgress>(readDailyReadingProgress());
 const personalBooks = ref<PersonalBook[]>([]);
 const bookSyncing = ref(false);
@@ -880,6 +881,12 @@ function normalizeReaderSelection(value: string) {
 async function selectReaderText(rawText: string, speakImmediately: boolean, wordIndex: number | null) {
   const text = normalizeReaderSelection(rawText);
   if (!text || !selectedBook.value) return;
+  if (readingSpeechActive.value) {
+    resumeReadingSpeechAfterLookup = true;
+    appendReadingSpeechDebug(`Pausing microphone while translating "${text}".`);
+    stopReadingSpeech('paused');
+    readingSpeechMessage.value = 'Microphone paused while translating. It will resume automatically.';
+  }
   selectedReaderText.value = text;
   selectedReaderWordIndex.value = wordIndex;
   readerLookup.value = null;
@@ -888,27 +895,37 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
   readerLookupLoading.value = true;
   readerPhoneticLoading.value = !/\s/.test(text);
   const requestId = ++readerLookupRequestId;
-  if (speakImmediately) void speakReaderText(text);
-  const cachedLookup = await findReaderVocabularyLookup(appStore.studentId, text).catch(() => null);
-  if (requestId !== readerLookupRequestId) return;
-  if (cachedLookup) {
-    readerLookup.value = cachedLookup;
-    readerPhonetic.value = cachedLookup.phonetic;
-    readerLookupLoading.value = false;
-    if (!cachedLookup.phonetic && !/\s/.test(text)) void loadReaderPhonetic(text, requestId);
-    await saveReaderLookup(cachedLookup, requestId);
-    return;
-  }
-  if (!/\s/.test(text)) void loadReaderPhonetic(text, requestId);
   try {
-    const lookup = await fetchReaderTextLookup(text);
+    if (speakImmediately) void speakReaderText(text);
+    const cachedLookup = await findReaderVocabularyLookup(appStore.studentId, text).catch(() => null);
     if (requestId !== readerLookupRequestId) return;
-    readerLookup.value = lookup;
-    if (lookup.translation) await saveReaderLookup(lookup, requestId);
+    if (cachedLookup) {
+      readerLookup.value = cachedLookup;
+      readerPhonetic.value = cachedLookup.phonetic;
+      readerLookupLoading.value = false;
+      if (!cachedLookup.phonetic && !/\s/.test(text)) void loadReaderPhonetic(text, requestId);
+      await saveReaderLookup(cachedLookup, requestId);
+      return;
+    }
+    if (!/\s/.test(text)) void loadReaderPhonetic(text, requestId);
+    try {
+      const lookup = await fetchReaderTextLookup(text);
+      if (requestId !== readerLookupRequestId) return;
+      readerLookup.value = lookup;
+      if (lookup.translation) await saveReaderLookup(lookup, requestId);
+    } catch (error) {
+      if (requestId === readerLookupRequestId) readerLookupError.value = error instanceof Error ? error.message : 'Translation is unavailable right now.';
+    } finally {
+      if (requestId === readerLookupRequestId) readerLookupLoading.value = false;
+    }
   } catch (error) {
     if (requestId === readerLookupRequestId) readerLookupError.value = error instanceof Error ? error.message : 'Translation is unavailable right now.';
   } finally {
-    if (requestId === readerLookupRequestId) readerLookupLoading.value = false;
+    if (requestId === readerLookupRequestId && resumeReadingSpeechAfterLookup && readingMode.value) {
+      resumeReadingSpeechAfterLookup = false;
+      appendReadingSpeechDebug('Translation finished; resuming microphone automatically.');
+      await startReadingSpeech();
+    }
   }
 }
 async function loadReaderPhonetic(text: string, requestId: number) {
@@ -957,6 +974,7 @@ async function speakReaderText(text: string) {
 }
 function clearReaderLookup() {
   readerLookupRequestId += 1;
+  resumeReadingSpeechAfterLookup = false;
   selectedReaderText.value = '';
   selectedReaderWordIndex.value = null;
   readerLookup.value = null;
