@@ -1141,7 +1141,12 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     appendReadingSpeechDebug('Match skipped: fewer than 3 recognized words.');
     return;
   }
-  const match = alignReadingSpeech(readerReferenceWords.value, alignmentTranscript, readingSpeechAnchor);
+  const match = alignReadingSpeech(
+    readerReferenceWords.value,
+    alignmentTranscript,
+    readingSpeechAnchor,
+    recognitionEngine === 'browser' ? { maxForwardWords: 360 } : undefined,
+  );
   if (!match.accepted) {
     appendReadingSpeechDebug(`Match rejected near word ${readingSpeechAnchor}; coverage=${Math.round(match.coverage * 100)}%.`);
     readingSpeechStatus.value = 'noise';
@@ -1169,7 +1174,7 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     : 'Following you. A few words were unclear or skipped.';
 }
 function previewReadingSpeechTranscript(transcript: string) {
-  const match = alignReadingSpeech(readerReferenceWords.value, transcript, readingSpeechAnchor);
+  const match = alignReadingSpeech(readerReferenceWords.value, transcript, readingSpeechAnchor, { maxForwardWords: 360 });
   if (!match.accepted) return;
   const preview = new Set(spokenReaderWordIndexes.value);
   match.matchedWordIndexes.forEach((wordIndex) => preview.add(wordIndex));

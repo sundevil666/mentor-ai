@@ -37,4 +37,14 @@ describe('reading speech tracking', () => {
 
     assert.equal(result.accepted, false);
   });
+
+  it('allows the browser recognizer to recover from a wider visible-page offset', () => {
+    const browserReference = tokenizeReadingSpeech([
+      ...Array.from({ length: 40 }, (_, index) => `filler${index}`),
+      'the browser finds this exact spoken sentence',
+    ].join(' '));
+
+    assert.equal(alignReadingSpeech(browserReference, 'the browser finds this exact spoken sentence', 0).accepted, false);
+    assert.equal(alignReadingSpeech(browserReference, 'the browser finds this exact spoken sentence', 0, { maxForwardWords: 360 }).accepted, true);
+  });
 });

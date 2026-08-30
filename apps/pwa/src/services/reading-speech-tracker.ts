@@ -5,6 +5,10 @@ export type ReadingSpeechMatch = {
   anchorIndex: number;
 };
 
+export type ReadingSpeechAlignmentOptions = {
+  maxForwardWords?: number;
+};
+
 export function normalizeReadingWord(value: string): string {
   return value.toLocaleLowerCase('en').replace(/[’]/g, "'").replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
 }
@@ -13,7 +17,7 @@ export function tokenizeReadingSpeech(value: string): string[] {
   return value.match(/[\p{L}\p{N}]+(?:[-'’][\p{L}\p{N}]+)*/gu)?.map(normalizeReadingWord).filter(Boolean) ?? [];
 }
 
-export function alignReadingSpeech(referenceWords: readonly string[], transcript: string, anchorIndex: number): ReadingSpeechMatch {
+export function alignReadingSpeech(referenceWords: readonly string[], transcript: string, anchorIndex: number, options: ReadingSpeechAlignmentOptions = {}): ReadingSpeechMatch {
   const spokenWords = tokenizeReadingSpeech(transcript);
   if (spokenWords.length < 3 || referenceWords.length === 0) return rejected(anchorIndex);
   const normalizedReference = referenceWords.map(normalizeReadingWord);
@@ -21,7 +25,7 @@ export function alignReadingSpeech(referenceWords: readonly string[], transcript
   const searchStart = Math.max(0, safeAnchor - 120);
   // Speech chunks describe only a few nearby seconds. A very large forward
   // window lets common words match a paragraph the reader has not reached yet.
-  const forwardWindow = Math.max(24, spokenWords.length * 3);
+  const forwardWindow = Math.max(options.maxForwardWords ?? 24, spokenWords.length * 3);
   const searchEnd = Math.min(normalizedReference.length, safeAnchor + forwardWindow);
   const searchWords = normalizedReference.slice(searchStart, searchEnd);
   const scores = Array.from({ length: spokenWords.length + 1 }, () => new Uint16Array(searchWords.length + 1));
