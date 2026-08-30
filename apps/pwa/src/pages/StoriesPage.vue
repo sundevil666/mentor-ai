@@ -257,6 +257,7 @@
                 <strong>{{ annualReadingPaceTotal.toLocaleString('en') }} / {{ annualReadingPaceExpected.toLocaleString('en') }}</strong>
               </div>
               <small>{{ annualReadingPaceMessage }}</small>
+              <small>Calendar year · days before tracking use the 3,000-word base.</small>
             </div>
           </section>
 
@@ -428,7 +429,7 @@ import { fetchReaderPhonetic, fetchReaderTextLookup, saveReadingTranscript, sync
 import { getAuthToken } from 'src/services/auth';
 import { findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
-import { annualReadingPace, createDailyReadingProgress, dailyReadingGoalWords, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, readingGoalMessage, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
+import { annualReadingPace, annualReadingPaceMessage as getAnnualReadingPaceMessage, createDailyReadingProgress, dailyReadingGoalWords, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, readingGoalMessage, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { alignReadingSpeech, confirmTabletReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
@@ -574,12 +575,7 @@ const annualReadingPaceSummary = computed(() => annualReadingPace(dailyReadingPr
 const annualReadingPaceTotal = computed(() => annualReadingPaceSummary.value.actualWords);
 const annualReadingPaceExpected = computed(() => annualReadingPaceSummary.value.expectedWords);
 const annualReadingPaceBalance = computed(() => annualReadingPaceSummary.value.balanceWords);
-const annualReadingPaceMessage = computed(() => {
-  const balance = annualReadingPaceBalance.value;
-  if (balance > 0) return `${balance.toLocaleString('en')} words ahead · You can take it easy today.`;
-  if (balance < 0) return `${Math.abs(balance).toLocaleString('en')} words behind · A little extra today will close the gap.`;
-  return 'Right on pace · Keep your usual rhythm.';
-});
+const annualReadingPaceMessage = computed(() => getAnnualReadingPaceMessage(annualReadingPaceBalance.value, dailyReadingTarget.value));
 const readerSidebarScalePercent = computed(() => 100 + readerSidebarScale.value * 10);
 const readerSidebarStyle = computed(() => ({
   '--reader-sidebar-width': `${230 + readerSidebarScale.value * 30}px`,

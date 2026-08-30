@@ -156,16 +156,42 @@ export interface AnnualReadingPace {
 
 export function annualReadingPace(progress: DailyReadingProgress): AnnualReadingPace {
   const year = progress.date.slice(0, 4);
+  const yearStart = `${year}-01-01`;
   const yearHistory = (progress.history ?? []).filter((entry) => entry.date.startsWith(`${year}-`));
-  const actualWords = yearHistory.reduce((total, entry) => total + entry.wordsRead, 0) + dailyWordsRead(progress);
-  const expectedWords = yearHistory.reduce((total, entry) => total + entry.targetWords, 0)
+  const trackingStart = progress.trackingStartDate > yearStart ? progress.trackingStartDate : yearStart;
+  const baselineDays = trackingStart > progress.date ? 0 : daysBetweenReadingDates(yearStart, trackingStart);
+  const baselineWords = baselineDays * dailyReadingGoalWords;
+  const actualWords = baselineWords
+    + yearHistory.reduce((total, entry) => total + entry.wordsRead, 0)
+    + dailyWordsRead(progress);
+  const expectedWords = baselineWords
+    + yearHistory.reduce((total, entry) => total + entry.targetWords, 0)
     + dailyReadingTargetWords(progress);
   return {
     actualWords,
     balanceWords: actualWords - expectedWords,
     expectedWords,
-    trackedDays: yearHistory.length + 1,
+    trackedDays: daysBetweenReadingDates(yearStart, progress.date) + 1,
   };
+}
+
+function daysBetweenReadingDates(from: string, to: string): number {
+  const fromTime = new Date(`${from}T12:00:00Z`).getTime();
+  const toTime = new Date(`${to}T12:00:00Z`).getTime();
+  return Math.max(0, Math.round((toTime - fromTime) / 86_400_000));
+}
+
+export function annualReadingPaceMessage(balanceWords: number, dailyTargetWords: number): string {
+  const absoluteBalance = Math.abs(balanceWords).toLocaleString('en');
+  if (balanceWords >= dailyTargetWords * 7) {
+    return `${absoluteBalance} words ahead · Ease the pace a little to avoid burnout.`;
+  }
+  if (balanceWords > 0) return `${absoluteBalance} words ahead · You can take it easy today.`;
+  if (balanceWords < -dailyTargetWords * 2) {
+    return `${absoluteBalance} words behind · Return gently; consistency matters more than catching up at once.`;
+  }
+  if (balanceWords < 0) return `${absoluteBalance} words behind · A little more today will close the gap.`;
+  return 'Right on pace · Keep your usual rhythm.';
 }
 
 export function readingGoalMessage(wordsRead: number, goalWords = dailyReadingGoalWords): string {

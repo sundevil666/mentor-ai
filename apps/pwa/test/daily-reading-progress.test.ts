@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   annualReadingPace,
+  annualReadingPaceMessage,
   createDailyReadingProgress,
   dailyReadingGoalWords,
   dailyReadingTargetWords,
@@ -83,10 +84,10 @@ describe('daily reading progress', () => {
     progress = recordDailyReadWords(progress, 'book-b', Array.from({ length: 3_500 }, (_, index) => index));
 
     assert.deepEqual(annualReadingPace(progress), {
-      actualWords: 7_500,
+      actualWords: 724_500,
       balanceWords: 500,
-      expectedWords: 7_000,
-      trackedDays: 2,
+      expectedWords: 724_000,
+      trackedDays: 241,
     });
   });
 
@@ -100,10 +101,17 @@ describe('daily reading progress', () => {
       { date: '2026-08-29', wordsRead: 0, targetWords: 4_000 },
     ]);
     assert.deepEqual(annualReadingPace(progress), {
-      actualWords: 4_000,
+      actualWords: 721_000,
       balanceWords: -7_000,
-      expectedWords: 11_000,
-      trackedDays: 3,
+      expectedWords: 728_000,
+      trackedDays: 242,
     });
+  });
+
+  it('uses both encouragement and burnout-aware yearly motivation', () => {
+    assert.match(annualReadingPaceMessage(-800, 3_000), /little more/i);
+    assert.match(annualReadingPaceMessage(-12_000, 3_000), /gently/i);
+    assert.match(annualReadingPaceMessage(2_000, 3_000), /take it easy/i);
+    assert.match(annualReadingPaceMessage(21_000, 3_000), /burnout/i);
   });
 });
