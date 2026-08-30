@@ -1116,13 +1116,6 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
   if (recognitionEngine === 'device-whisper') {
     readingSpeechLocalTranscriptWindow = [...readingSpeechLocalTranscriptWindow, transcript].slice(-3);
   }
-  const alignmentTranscript = recognitionEngine === 'device-whisper'
-    ? readingSpeechLocalTranscriptWindow.join(' ')
-    : transcript;
-  const heardWords = tokenizeReadingSpeech(alignmentTranscript);
-  if (recognitionEngine === 'device-whisper' && readingSpeechLocalTranscriptWindow.length > 1) {
-    appendReadingSpeechDebug(`Matching combined tablet text (${heardWords.length} words from ${readingSpeechLocalTranscriptWindow.length} chunks).`);
-  }
   const book = selectedBook.value;
   if (book) void saveReadingTranscript({
     id: `reading-transcript-${crypto.randomUUID()}`,
@@ -1136,16 +1129,26 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     Notify.create({ type: 'warning', message: 'Words were recognized, but could not be saved for analysis.', timeout: 3_000 });
   });
   const spokenCount = rawHeardWords.length;
-  if (heardWords.length < 3) {
+  if (rawHeardWords.length < 3) {
     appendReadingSpeechDebug('Match skipped: fewer than 3 recognized words.');
     return;
   }
-  const match = alignReadingSpeech(
-    readerReferenceWords.value,
-    alignmentTranscript,
-    readingSpeechAnchor,
-    recognitionEngine === 'browser' ? { maxForwardWords: 360 } : { minCoverage: 0.4 },
-  );
+  const alignmentCandidates = [{ text: transcript, words: rawHeardWords, source: 'current chunk' }];
+  if (recognitionEngine === 'device-whisper' && readingSpeechLocalTranscriptWindow.length > 1) {
+    const combinedText = readingSpeechLocalTranscriptWindow.join(' ');
+    alignmentCandidates.push({ text: combinedText, words: tokenizeReadingSpeech(combinedText), source: `${readingSpeechLocalTranscriptWindow.length} combined chunks` });
+  }
+  const alignmentOptions = recognitionEngine === 'browser' ? { maxForwardWords: 360 } : { minCoverage: 0.4 };
+  const evaluatedCandidates = alignmentCandidates.map((candidate) => ({
+    ...candidate,
+    match: alignReadingSpeech(readerReferenceWords.value, candidate.text, readingSpeechAnchor, alignmentOptions),
+  }));
+  const selectedCandidate = evaluatedCandidates.find((candidate) => candidate.match.accepted)
+    ?? evaluatedCandidates.reduce((best, candidate) => candidate.match.coverage > best.match.coverage ? candidate : best);
+  const { match, words: heardWords } = selectedCandidate;
+  if (recognitionEngine === 'device-whisper') {
+    appendReadingSpeechDebug(`Tablet ${selectedCandidate.source}: coverage=${Math.round(match.coverage * 100)}%, accepted=${match.accepted}.`);
+  }
   if (!match.accepted) {
     appendReadingSpeechDebug(`Match rejected near word ${readingSpeechAnchor}; coverage=${Math.round(match.coverage * 100)}%.`);
     readingSpeechStatus.value = 'noise';
