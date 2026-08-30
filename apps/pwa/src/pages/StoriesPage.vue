@@ -705,6 +705,12 @@ async function openBook(bookId: string) {
     Notify.create({ type: 'negative', message: 'This book has no readable pages.' });
     return;
   }
+  // Apply this book's visual settings before selectedBook makes the reader
+  // visible. Otherwise the previous/default font is painted for one frame and
+  // then jumps after spoken progress finishes loading.
+  const readerSettings = readBookReaderSettings(loaded.book.id);
+  readerFontSize.value = readerSettings.fontSize;
+  applyReadingMode(readerSettings.readingMode);
   selectedBook.value = loaded.book;
   selectedBookChapters.value = loaded.chapters;
   selectedBookPages.value = loaded.pages;
@@ -714,11 +720,8 @@ async function openBook(bookId: string) {
   chapterPageIndexes.value = loaded.pages.map(() => 0);
   await restoreSpokenReadingProgress(loaded.book.id);
   readerMarkerWordIndex.value = readReaderMarker(loaded.book.id);
-  const readerSettings = readBookReaderSettings(loaded.book.id);
-  readerFontSize.value = readerSettings.fontSize;
   await markPersonalBookOpened(loaded.book);
   personalBooks.value = await listPersonalBooks();
-  applyReadingMode(readerSettings.readingMode);
   await nextTick();
   await repaginateReader(readBookProgress(loaded.book.id, loaded.pages.length));
   goToSyncedSpokenPosition();
