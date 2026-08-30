@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { alignReadingSpeech, boundTabletReadingProgress, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
+import { alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
 import { normalizeReadingAudio, startLocalReadingTranscriber } from '../src/services/local-reading-transcriber.js';
 
 const reference = tokenizeReadingSpeech('Alice was beginning to get very tired of sitting by her sister on the bank. She read the sentence again because practice matters.');
@@ -82,6 +82,18 @@ describe('reading speech tracking', () => {
   it('keeps a coherent longer tablet phrase even when recognition starts ahead of the old anchor', () => {
     const coherent = Array.from({ length: 18 }, (_, index) => 15937 + index);
     assert.deepEqual(boundTabletReadingProgress(coherent, 15914, 15), coherent);
+  });
+
+  it('rejects the far-backward false match observed in the tablet log', () => {
+    assert.deepEqual(boundTabletReadingProgress([36081, 36082, 36083], 36309, 8), []);
+  });
+
+  it('recovers one or two words lost at a chunk boundary', () => {
+    assert.deepEqual(confirmTabletReadingWordIndexes([36197, 36198, 36199, 36200], 36195, 15), [36195, 36196, 36197, 36198, 36199, 36200]);
+  });
+
+  it('recovers tiny internal holes but leaves larger skipped ranges uncredited', () => {
+    assert.deepEqual(confirmTabletReadingWordIndexes([10, 11, 13, 16, 20], 10, 9), [10, 11, 12, 13, 14, 15, 16, 20]);
   });
 });
 

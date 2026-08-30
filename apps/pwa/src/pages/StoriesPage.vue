@@ -420,7 +420,7 @@ import { getAuthToken } from 'src/services/auth';
 import { findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { createDailyReadingProgress, dailyReadingGoalWords, dailyWordsRead, localReadingDate, readingGoalMessage, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
-import { alignReadingSpeech, boundTabletReadingProgress, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
+import { alignReadingSpeech, confirmTabletReadingWordIndexes, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
@@ -1214,7 +1214,7 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     return;
   }
   const confirmedWordIndexes = recognitionEngine === 'device-whisper'
-    ? boundTabletReadingProgress(match.matchedWordIndexes, readingSpeechAnchor, heardWords.length)
+    ? confirmTabletReadingWordIndexes(match.matchedWordIndexes, readingSpeechAnchor, heardWords.length)
     : match.matchedWordIndexes;
   if (confirmedWordIndexes.length < 3) {
     appendReadingSpeechDebug('Match rejected after removing forward outliers: fewer than 3 nearby words remain.');
@@ -1224,8 +1224,11 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
   }
   const confirmedLastWord = confirmedWordIndexes.at(-1)!;
   const trimmedMatches = match.matchedWordIndexes.length - confirmedWordIndexes.length;
-  readingSpeechAnchor = recognitionEngine === 'device-whisper' ? confirmedLastWord + 1 : match.anchorIndex;
-  appendReadingSpeechDebug(`Match accepted: ${confirmedWordIndexes.length}/${heardWords.length} words, coverage=${Math.round(match.coverage * 100)}%, indexes=${confirmedWordIndexes[0]}–${confirmedLastWord}, next=${readingSpeechAnchor}${trimmedMatches ? `, trimmed=${trimmedMatches}` : ''}.`);
+  const recoveredWords = confirmedWordIndexes.filter((wordIndex) => !match.matchedWordIndexes.includes(wordIndex)).length;
+  readingSpeechAnchor = recognitionEngine === 'device-whisper'
+    ? Math.max(readingSpeechAnchor, confirmedLastWord + 1)
+    : match.anchorIndex;
+  appendReadingSpeechDebug(`Match accepted: ${confirmedWordIndexes.length}/${heardWords.length} words, coverage=${Math.round(match.coverage * 100)}%, indexes=${confirmedWordIndexes[0]}–${confirmedLastWord}, next=${readingSpeechAnchor}${recoveredWords ? `, recovered=${recoveredWords}` : ''}${trimmedMatches > 0 ? `, trimmed=${trimmedMatches}` : ''}.`);
   if (recognitionEngine === 'device-whisper') readingSpeechLocalTranscriptWindow = [];
   readingSpeechAcceptedWords.value += confirmedWordIndexes.length;
   readingSpeechSpokenWords.value += spokenCount;

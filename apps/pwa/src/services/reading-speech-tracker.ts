@@ -82,10 +82,35 @@ export function alignReadingSpeech(referenceWords: readonly string[], transcript
 export function boundTabletReadingProgress(matchedWordIndexes: readonly number[], anchorIndex: number, spokenWordCount: number): number[] {
   if (!matchedWordIndexes.length || spokenWordCount <= 0) return [];
   const nearby = matchedWordIndexes.filter((wordIndex) => wordIndex >= Math.max(0, anchorIndex - 8));
-  const candidates = nearby.length >= 3 ? nearby : [...matchedWordIndexes];
+  // Never fall back to an old phrase when no nearby match exists. Common words
+  // can otherwise move the tablet anchor hundreds of words backwards.
+  if (nearby.length < 3) return [];
+  const candidates = nearby;
   const startIndex = candidates[0]!;
   const maximumAdvance = spokenWordCount + Math.max(3, Math.ceil(spokenWordCount * 0.5));
   return candidates.filter((wordIndex) => wordIndex <= startIndex + maximumAdvance);
+}
+
+export function confirmTabletReadingWordIndexes(matchedWordIndexes: readonly number[], anchorIndex: number, spokenWordCount: number): number[] {
+  const bounded = boundTabletReadingProgress(matchedWordIndexes, anchorIndex, spokenWordCount);
+  if (bounded.length < 3) return [];
+  const confirmed = new Set(bounded);
+  const firstIndex = bounded[0]!;
+  // Whisper often loses one or two boundary words between consecutive 4-second
+  // chunks. A nearby match immediately after the old anchor confirms that tiny
+  // bridge without crediting an arbitrary unread range.
+  if (firstIndex >= anchorIndex && firstIndex - anchorIndex <= 2) {
+    for (let wordIndex = anchorIndex; wordIndex < firstIndex; wordIndex += 1) confirmed.add(wordIndex);
+  }
+  // Recover only tiny holes bracketed by words Whisper matched in this chunk.
+  // Larger gaps remain uncredited because the reader may really have skipped.
+  for (let index = 1; index < bounded.length; index += 1) {
+    const previous = bounded[index - 1]!;
+    const current = bounded[index]!;
+    if (current - previous > 3) continue;
+    for (let wordIndex = previous + 1; wordIndex < current; wordIndex += 1) confirmed.add(wordIndex);
+  }
+  return [...confirmed].sort((left, right) => left - right);
 }
 
 function rejected(anchorIndex: number): ReadingSpeechMatch {
