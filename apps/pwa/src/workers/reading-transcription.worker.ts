@@ -13,7 +13,12 @@ const maximumWhisperSamples = 28 * 16_000;
 
 async function createTranscriber() {
   const progress_callback = (progress: { status?: string; progress?: number }) => {
-    self.postMessage({ type: 'progress', status: progress.status, progress: progress.progress });
+    // Transformers emits many lifecycle events without a meaningful percentage.
+    // Reporting every one as "Loading speech model" made a normal first load
+    // look like an endless restart loop in the microphone debug panel.
+    if (progress.status === 'progress' && Number.isFinite(progress.progress)) {
+      self.postMessage({ type: 'progress', progress: progress.progress });
+    }
   };
   return await pipeline('automatic-speech-recognition', 'onnx-community/whisper-tiny.en', {
     device: 'wasm',

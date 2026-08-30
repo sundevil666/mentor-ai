@@ -1827,6 +1827,8 @@ html.mentor-theme-dark .personal-reader {
   position: absolute;
   right: min(var(--reader-sidebar-width, 230px), 42vw);
   top: 0;
+  transition: opacity 700ms ease;
+  opacity: var(--reader-speech-reactivity, .78);
   z-index: 50;
 }
 
@@ -1843,7 +1845,7 @@ html.mentor-theme-dark .personal-reader {
     linear-gradient(to top, rgba(41, 214, 179, .42), rgba(58, 229, 197, .1) 36%, transparent 100%) bottom / 100% 24px no-repeat,
     linear-gradient(to right, rgba(41, 214, 179, .42), rgba(58, 229, 197, .1) 36%, transparent 100%) left / 24px 100% no-repeat,
     linear-gradient(to left, rgba(41, 214, 179, .42), rgba(58, 229, 197, .1) 36%, transparent 100%) right / 24px 100% no-repeat;
-  animation: reader-listening-frame 9s linear infinite;
+  animation: reader-listening-frame var(--reader-speech-frame-duration, 9s) linear infinite;
 }
 
 .personal-reader__speech-frame-wave {
@@ -1857,7 +1859,7 @@ html.mentor-theme-dark .personal-reader {
 }
 
 .personal-reader__speech-frame--hearing .personal-reader__speech-frame-wave {
-  animation: reader-listening-wave 6.5s ease-in-out infinite;
+  animation: reader-listening-wave var(--reader-speech-wave-duration, 6.5s) ease-in-out infinite;
 }
 
 @keyframes reader-listening-frame {

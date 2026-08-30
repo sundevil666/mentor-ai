@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { alignReadingSpeech, boundTabletReadingProgress, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
-import { normalizeReadingAudio } from '../src/services/local-reading-transcriber.js';
+import { normalizeReadingAudio, startLocalReadingTranscriber } from '../src/services/local-reading-transcriber.js';
 
 const reference = tokenizeReadingSpeech('Alice was beginning to get very tired of sitting by her sister on the bank. She read the sentence again because practice matters.');
 
@@ -98,5 +98,47 @@ describe('tablet reading audio preparation', () => {
     const result = normalizeReadingAudio(Float32Array.from([0.0001, -0.0002, 0.0001]));
     assert.equal(result.usable, false);
     assert.equal(result.gain, 1);
+  });
+
+  it('keeps the loaded Whisper worker ready across pause and restart', async () => {
+    const originalWorker = globalThis.Worker;
+    const originalWindow = globalThis.window;
+    let workerCount = 0;
+    let initializationCount = 0;
+    class FakeWorker {
+      onmessage: ((event: MessageEvent<{ type: string }>) => void) | null = null;
+      constructor() { workerCount += 1; }
+      postMessage(message: { type?: string }) {
+        if (message.type !== 'init') return;
+        initializationCount += 1;
+        queueMicrotask(() => this.onmessage?.({ data: { type: 'ready' } } as MessageEvent<{ type: string }>));
+      }
+      terminate() { /* The shared ready worker must not be terminated on pause. */ }
+    }
+    Object.assign(globalThis, {
+      Worker: FakeWorker,
+      window: { setTimeout, clearTimeout },
+    });
+    const stream = { active: false } as MediaStream;
+    let readyCount = 0;
+    const options = {
+      onTranscript: () => undefined,
+      onReady: () => { readyCount += 1; },
+      onProgress: () => undefined,
+      onError: (message: string) => assert.fail(message),
+    };
+    try {
+      const first = startLocalReadingTranscriber(stream, options);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      first.stop();
+      const second = startLocalReadingTranscriber(stream, options);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      second.stop();
+      assert.equal(workerCount, 1);
+      assert.equal(initializationCount, 1);
+      assert.equal(readyCount, 2);
+    } finally {
+      Object.assign(globalThis, { Worker: originalWorker, window: originalWindow });
+    }
   });
 });

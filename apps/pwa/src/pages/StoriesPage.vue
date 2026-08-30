@@ -459,6 +459,7 @@ type ReadingSpeechStatus = 'idle' | 'requesting' | 'listening' | 'noise' | 'paus
 type RenderedReaderToken = { text: string; isWord: boolean; wordIndex?: number };
 const readingSpeechStatus = ref<ReadingSpeechStatus>('idle');
 const readingSpeechLevel = ref(0);
+const readingSpeechWordsPerMinute = ref(0);
 const readingSpeechMessage = ref('Tap the microphone to request access and start listening.');
 const readingSpeechPermissionBlocked = ref(false);
 const readingSpeechCaptureUnavailable = ref(false);
@@ -476,6 +477,8 @@ let readingSpeechAudioContext: AudioContext | null = null;
 let readingSpeechAnimationFrame = 0;
 let readingSpeechDebugStartedAt = 0;
 let readingSpeechLastSignalState = false;
+let readingSpeechPaceWordCount = 0;
+let readingSpeechPaceSampleAt = 0;
 const dailyReadingProgress = ref<DailyReadingProgress>(readDailyReadingProgress());
 const personalBooks = ref<PersonalBook[]>([]);
 const bookSyncing = ref(false);
@@ -576,11 +579,14 @@ const readingSpeechDebugText = computed(() => readingSpeechDebugEntries.value.jo
 const readingSpeechHasSignal = computed(() => readingSpeechLevel.value >= 0.035);
 const readerSpeechFrameStyle = computed(() => {
   const energy = readingSpeechActive.value ? Math.max(0.04, readingSpeechLevel.value) : 0;
+  const energyRatio = Math.max(0, Math.min(1, energy / 0.2));
+  const paceRatio = readingSpeechHasSignal.value
+    ? Math.max(0, Math.min(1, (readingSpeechWordsPerMinute.value - 70) / 130))
+    : 0;
   return {
-    '--reader-speech-border': `${3 + energy * 7}px`,
-    '--reader-speech-glow': `${10 + energy * 24}px`,
-    '--reader-speech-inner-glow': `${8 + energy * 18}px`,
-    '--reader-speech-opacity': String(0.78 + energy * 0.22),
+    '--reader-speech-frame-duration': `${9 - paceRatio * 4}s`,
+    '--reader-speech-wave-duration': `${6.5 - paceRatio * 3}s`,
+    '--reader-speech-reactivity': String(0.74 + paceRatio * 0.18 + energyRatio * 0.08),
   };
 });
 const readingSpeechActionLabel = computed(() => {
@@ -1008,6 +1014,7 @@ async function startReadingSpeech() {
   const useLocalRecognition = isAppleMobileDevice();
   startReadingSpeechDebug(useLocalRecognition ? 'device-whisper' : 'browser-speech');
   readingSpeechLocalTranscriptWindow = [];
+  resetReadingSpeechPace();
   if (!navigator.mediaDevices?.getUserMedia) {
     appendReadingSpeechDebug('ERROR: getUserMedia is unavailable.');
     readingSpeechStatus.value = 'error';
@@ -1059,6 +1066,7 @@ async function startReadingSpeech() {
       readingSpeechRecognition = startContinuousSpeechRecognition({
       lang: 'en-US',
       onInterim: (transcript) => {
+        updateReadingSpeechPace(transcript);
         appendReadingSpeechDebug(`Interim text: "${transcript}"`);
       },
       onFinal: (transcript) => handleReadingSpeechTranscript(transcript, 'browser'),
@@ -1142,6 +1150,7 @@ function isMicrophonePermissionError(error: unknown) {
 }
 function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'device-whisper' | 'browser' = 'browser') {
   const rawHeardWords = tokenizeReadingSpeech(transcript);
+  if (recognitionEngine === 'device-whisper') updateReadingSpeechChunkPace(rawHeardWords.length);
   appendReadingSpeechDebug(`Final text (${recognitionEngine}, ${rawHeardWords.length} words): "${transcript}"`);
   if (!rawHeardWords.length) return;
   if (recognitionEngine === 'device-whisper') {
@@ -1266,9 +1275,43 @@ function stopReadingSpeech(status: ReadingSpeechStatus) {
   void readingSpeechAudioContext?.close();
   readingSpeechAudioContext = null;
   readingSpeechLevel.value = 0;
+  readingSpeechWordsPerMinute.value = 0;
   readingSpeechLastSignalState = false;
   readingSpeechStatus.value = status;
   configurePlaybackAudioSession();
+}
+
+function resetReadingSpeechPace() {
+  readingSpeechWordsPerMinute.value = 0;
+  readingSpeechPaceWordCount = 0;
+  readingSpeechPaceSampleAt = performance.now();
+}
+
+function smoothReadingSpeechPace(wordsPerMinute: number) {
+  const boundedPace = Math.max(45, Math.min(240, wordsPerMinute));
+  readingSpeechWordsPerMinute.value = readingSpeechWordsPerMinute.value > 0
+    ? readingSpeechWordsPerMinute.value * 0.68 + boundedPace * 0.32
+    : boundedPace;
+}
+
+function updateReadingSpeechPace(transcript: string) {
+  const wordCount = tokenizeReadingSpeech(transcript).length;
+  const now = performance.now();
+  if (wordCount <= readingSpeechPaceWordCount) {
+    readingSpeechPaceWordCount = wordCount;
+    readingSpeechPaceSampleAt = now;
+    return;
+  }
+  const addedWords = wordCount - readingSpeechPaceWordCount;
+  const elapsedMs = now - readingSpeechPaceSampleAt;
+  if (addedWords < 2 && elapsedMs < 900) return;
+  smoothReadingSpeechPace(addedWords * 60_000 / Math.max(500, elapsedMs));
+  readingSpeechPaceWordCount = wordCount;
+  readingSpeechPaceSampleAt = now;
+}
+
+function updateReadingSpeechChunkPace(wordCount: number) {
+  if (wordCount > 0) smoothReadingSpeechPace(wordCount * 15);
 }
 
 function startReadingSpeechDebug(engine: string) {
