@@ -139,7 +139,7 @@
         </div>
       </section>
 
-      <section v-else-if="selectedBook && selectedBookPages.length" class="personal-reader" :class="{ 'personal-reader--focus': readingMode }" :style="readerSidebarStyle" aria-label="Book reader">
+      <section v-else-if="selectedBook && selectedBookPages.length" class="personal-reader" :class="{ 'personal-reader--focus': readingMode }" :style="[readerSidebarStyle, readerSpeechFrameStyle]" aria-label="Book reader">
         <div v-if="!readingMode" class="personal-reader__toolbar">
           <q-btn color="primary" icon="fullscreen" label="Reading mode" no-caps outline @click="setReadingMode(true)" />
           <q-select
@@ -166,7 +166,6 @@
             'personal-reader__content--listening': readingSpeechActive,
             'personal-reader__content--hearing': readingSpeechActive && readingSpeechHasSignal,
           }"
-          :style="readerSpeechFrameStyle"
           @touchstart="handleReaderTouchStart"
           @touchend="handleReaderTouchEnd"
           @touchcancel="resetReaderTouch"
@@ -199,15 +198,16 @@
             </section>
           </article>
           <span class="personal-reader__end-spacer" aria-hidden="true" />
-          <div
-            v-if="readingMode && readingSpeechActive"
-            class="personal-reader__speech-frame"
-            :class="{ 'personal-reader__speech-frame--hearing': readingSpeechHasSignal }"
-            aria-hidden="true"
-          >
-            <span class="personal-reader__speech-frame-base" />
-            <span class="personal-reader__speech-frame-wave" />
-          </div>
+        </div>
+
+        <div
+          v-if="readingMode && readingSpeechActive"
+          class="personal-reader__speech-frame"
+          :class="{ 'personal-reader__speech-frame--hearing': readingSpeechHasSignal }"
+          aria-hidden="true"
+        >
+          <span class="personal-reader__speech-frame-base" />
+          <span class="personal-reader__speech-frame-wave" />
         </div>
 
         <aside v-if="readingMode" class="personal-reader__sidebar" aria-label="Reading controls">

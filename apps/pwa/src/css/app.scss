@@ -1820,10 +1820,13 @@ html.mentor-theme-dark .personal-reader {
 }
 
 .personal-reader__speech-frame {
-  inset: 0;
+  bottom: 0;
   isolation: isolate;
+  left: 0;
   pointer-events: none;
   position: absolute;
+  right: min(var(--reader-sidebar-width, 230px), 42vw);
+  top: 0;
   z-index: 50;
 }
 
@@ -3487,6 +3490,10 @@ body.body--dark .personal-reader__lookup-error {
 
   .personal-reader--focus .personal-reader__content {
     padding: 0;
+  }
+
+  .personal-reader__speech-frame {
+    right: min(var(--reader-sidebar-mobile-width, 158px), 58vw);
   }
 
   .personal-reader--focus .personal-reader__paper {
