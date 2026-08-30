@@ -24,6 +24,13 @@ export function configurePlaybackAudioSession(target: Navigator = navigator): bo
   return true;
 }
 
+export function configureCaptureAudioSession(target: Navigator = navigator): boolean {
+  const audioSession = (target as NavigatorWithAudioSession).audioSession;
+  if (!audioSession) return false;
+  audioSession.type = 'play-and-record';
+  return true;
+}
+
 type ResumableAudio = Pick<HTMLAudioElement, 'currentTime' | 'duration' | 'pause' | 'play' | 'readyState'>;
 
 export function useRecoveringMediaPlayPause(

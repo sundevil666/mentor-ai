@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { configurePlaybackAudioSession, isAppleMobileDevice, isIosStandalone } from '../src/services/audio-session.js';
+import { configureCaptureAudioSession, configurePlaybackAudioSession, isAppleMobileDevice, isIosStandalone } from '../src/services/audio-session.js';
 
 describe('audio session', () => {
   it('declares long-form playback to iOS before audio starts', () => {
@@ -15,6 +15,15 @@ describe('audio session', () => {
 
   it('falls back safely in browsers without the Audio Session API', () => {
     assert.equal(configurePlaybackAudioSession({} as Navigator), false);
+  });
+
+  it('switches iPad audio to a microphone-compatible category', () => {
+    const target = { audioSession: { type: 'playback' } } as unknown as Navigator;
+
+    assert.equal(configureCaptureAudioSession(target), true);
+    assert.equal((target as unknown as { audioSession: { type: string } }).audioSession.type, 'play-and-record');
+    assert.equal(configurePlaybackAudioSession(target), true);
+    assert.equal((target as unknown as { audioSession: { type: string } }).audioSession.type, 'playback');
   });
 
   it('detects an iPhone Home Screen web app', () => {

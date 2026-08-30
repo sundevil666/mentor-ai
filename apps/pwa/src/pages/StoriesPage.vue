@@ -398,7 +398,7 @@ import { loadContentProgress, saveContentProgress, syncAllContentProgress } from
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineStory } from 'src/services/offline-library';
 import { deleteOfflineStory, formatStoryDuration, formatStorySize, getCachedStoryUrls, saveStoryOffline, storyLibrary, type LibraryStory } from 'src/services/story-library';
 import { useAppStore } from 'src/stores/app-store';
-import { configurePlaybackAudioSession, isAppleMobileDevice, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
+import { configureCaptureAudioSession, configurePlaybackAudioSession, isAppleMobileDevice, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 import { deletePersonalBook, importPersonalBook, listPersonalBookArchives, listPersonalBooks, loadPersonalBook, markPersonalBookOpened, mergePersonalBookArchives, type PersonalBook } from 'src/services/personal-book-library';
 import { personalBookSyncControl } from 'src/services/personal-book-sync-control';
 import { fetchReaderPhonetic, fetchReaderTextLookup, saveReadingTranscript, synchronizePersonalReadingBooks, synchronizeReaderVocabulary } from 'src/services/api-client';
@@ -954,6 +954,7 @@ async function startReadingSpeech() {
   readingSpeechCaptureUnavailable.value = false;
   readingSpeechMessage.value = 'Use the device prompt to allow microphone access.';
   try {
+    configureCaptureAudioSession();
     readingSpeechStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     void startReadingSpeechMeter(readingSpeechStream);
     readingSpeechAnchor = getVisibleReaderWordAnchor();
@@ -1135,6 +1136,7 @@ function stopReadingSpeech(status: ReadingSpeechStatus) {
   readingSpeechAudioContext = null;
   readingSpeechLevel.value = 0;
   readingSpeechStatus.value = status;
+  configurePlaybackAudioSession();
 }
 function setReadingMode(value: boolean) {
   const progressRatio = getCurrentReaderProgressRatio();
