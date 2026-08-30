@@ -5,6 +5,7 @@ import {
   applySpeechRepeat,
   parseSpeechSegments,
   preserveDialogueSpeakerLabels,
+  selectEnglishSystemVoice,
   selectSpeechCacheUrlsToDelete,
   speechCacheMaxAgeMs,
   speechCacheMaxEntries,
@@ -12,6 +13,15 @@ import {
 } from '../src/services/speech-synthesis.js';
 
 describe('speech synthesis voices', () => {
+  it('prefers a natural US English system voice for instant word pronunciation', () => {
+    const voices = [
+      { lang: 'en-GB', name: 'Daniel' },
+      { lang: 'en-US', name: 'Generic English' },
+      { lang: 'en-US', name: 'Samantha' },
+    ] as SpeechSynthesisVoice[];
+    assert.equal(selectEnglishSystemVoice(voices)?.name, 'Samantha');
+  });
+
   it('uses Mia for ordinary text', () => {
     assert.deepEqual(parseSpeechSegments('Where are you?'), [
       { text: 'Where are you?', voice: 'mia' },

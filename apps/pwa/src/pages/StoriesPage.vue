@@ -410,7 +410,7 @@ import { personalBookSyncControl } from 'src/services/personal-book-sync-control
 import { fetchReaderPhonetic, fetchReaderTextLookup, saveReadingTranscript, synchronizePersonalReadingBooks, synchronizeReaderVocabulary } from 'src/services/api-client';
 import { getAuthToken } from 'src/services/auth';
 import { findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
-import { speakWithPreferredVoice } from 'src/services/speech-synthesis';
+import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { createDailyReadingProgress, dailyReadingGoalWords, dailyWordsRead, localReadingDate, readingGoalMessage, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { alignReadingSpeech, boundTabletReadingProgress, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
@@ -915,6 +915,17 @@ async function syncReaderVocabulary() {
   }
 }
 async function speakReaderText(text: string) {
+  const microphoneTracks = readingSpeechStream?.getAudioTracks() ?? [];
+  const muteMicrophone = () => {
+    microphoneTracks.forEach((track) => { track.enabled = false; });
+    if (microphoneTracks.length) appendReadingSpeechDebug(`Microphone muted while pronouncing "${text}".`);
+  };
+  const restoreMicrophone = () => {
+    microphoneTracks.forEach((track) => { if (track.readyState === 'live') track.enabled = true; });
+    if (microphoneTracks.length) appendReadingSpeechDebug('Microphone resumed after word pronunciation.');
+  };
+  const systemVoiceStarted = speakWithSystemVoice(text, { onStart: muteMicrophone, onEnd: restoreMicrophone, onError: restoreMicrophone });
+  if (systemVoiceStarted) return;
   const played = await speakWithPreferredVoice(text, {
     mediaTitle: `Book: ${selectedBook.value?.title ?? 'selected text'}`,
     temporary: true,

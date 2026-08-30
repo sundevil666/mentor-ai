@@ -19,6 +19,12 @@ export interface SpeechPlaybackHandlers {
   temporary?: boolean;
 }
 
+export interface SystemSpeechHandlers {
+  onStart?: () => void;
+  onEnd?: () => void;
+  onError?: () => void;
+}
+
 export const speechCacheMaxEntries = 160;
 export const speechCacheMaxAgeMs = 30 * 86_400_000;
 export const speechMemoryMaxEntries = 12;
@@ -31,6 +37,7 @@ let modelProgress = 0;
 const statusListeners = new Set<() => void>();
 const generatedSpeechCache = new Map<string, Promise<Blob>>();
 let lastSpeechCacheCleanupAt = 0;
+let activeSystemSpeechCleanup: ((completed: boolean) => void) | null = null;
 
 export function isSpeechSynthesisAvailable() {
   return (
@@ -38,6 +45,38 @@ export function isSpeechSynthesisAvailable() {
     'Audio' in window &&
     'fetch' in window
   );
+}
+
+export function speakWithSystemVoice(text: string, handlers: SystemSpeechHandlers = {}) {
+  const trimmedText = text.trim();
+  if (!trimmedText || typeof window === 'undefined' || !('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') return false;
+  activeSystemSpeechCleanup?.(false);
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(trimmedText);
+  utterance.lang = 'en-US';
+  utterance.rate = 0.88;
+  utterance.voice = selectEnglishSystemVoice(window.speechSynthesis.getVoices());
+  let settled = false;
+  const finish = (completed: boolean) => {
+    if (settled) return;
+    settled = true;
+    if (activeSystemSpeechCleanup === finish) activeSystemSpeechCleanup = null;
+    if (completed) handlers.onEnd?.();
+    else handlers.onError?.();
+  };
+  activeSystemSpeechCleanup = finish;
+  utterance.onend = () => finish(true);
+  utterance.onerror = () => finish(false);
+  handlers.onStart?.();
+  window.speechSynthesis.speak(utterance);
+  return true;
+}
+
+export function selectEnglishSystemVoice(voices: readonly SpeechSynthesisVoice[]) {
+  return voices.find((voice) => voice.lang.toLowerCase() === 'en-us' && /samantha|ava|allison|serena|karen/i.test(voice.name))
+    ?? voices.find((voice) => voice.lang.toLowerCase() === 'en-us')
+    ?? voices.find((voice) => voice.lang.toLowerCase().startsWith('en'))
+    ?? null;
 }
 
 export function getSpeechModelStatus() {
