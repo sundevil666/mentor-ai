@@ -6,8 +6,10 @@ export type ReadingSpeechMatch = {
 };
 
 export type ReadingSpeechAlignmentOptions = {
+  maxBackwardWords?: number;
   maxForwardWords?: number;
   minCoverage?: number;
+  minMatchedWords?: number;
 };
 
 export function normalizeReadingWord(value: string): string {
@@ -23,7 +25,7 @@ export function alignReadingSpeech(referenceWords: readonly string[], transcript
   if (spokenWords.length < 3 || referenceWords.length === 0) return rejected(anchorIndex);
   const normalizedReference = referenceWords.map(normalizeReadingWord);
   const safeAnchor = Math.max(0, Math.min(normalizedReference.length - 1, anchorIndex));
-  const searchStart = Math.max(0, safeAnchor - 120);
+  const searchStart = Math.max(0, safeAnchor - (options.maxBackwardWords ?? 120));
   // Speech chunks describe only a few nearby seconds. A very large forward
   // window lets common words match a paragraph the reader has not reached yet.
   const forwardWindow = Math.max(options.maxForwardWords ?? 24, spokenWords.length * 3);
@@ -67,7 +69,7 @@ export function alignReadingSpeech(referenceWords: readonly string[], transcript
     && matchedCount >= 6
     && coverage >= 0.65
     && matchSpan <= spokenWords.length * 4 + 12;
-  const accepted = matchedCount >= 3
+  const accepted = matchedCount >= (options.minMatchedWords ?? 3)
     && coverage >= (options.minCoverage ?? 0.58)
     && (ordinarySpan || highConfidenceTabletSpan);
   if (!accepted) return { ...rejected(anchorIndex), coverage };
@@ -77,6 +79,26 @@ export function alignReadingSpeech(referenceWords: readonly string[], transcript
     coverage,
     anchorIndex: Math.max(safeAnchor, matchedWordIndexes[matchedWordIndexes.length - 1]! + 1),
   };
+}
+
+export function recoverReadingSpeechPosition(referenceWords: readonly string[], transcript: string, anchorIndex: number, maxRecoveryWords = 600): ReadingSpeechMatch {
+  const probeStep = 16;
+  let bestMatch: ReadingSpeechMatch | null = null;
+  const recoveryEnd = Math.min(referenceWords.length - 1, anchorIndex + maxRecoveryWords);
+  for (let probeAnchor = anchorIndex; probeAnchor <= recoveryEnd; probeAnchor += probeStep) {
+    const match = alignReadingSpeech(referenceWords, transcript, probeAnchor, {
+      maxBackwardWords: 8,
+      maxForwardWords: 48,
+      minCoverage: 0.65,
+      minMatchedWords: 5,
+    });
+    if (!match.accepted) continue;
+    if (!bestMatch || match.coverage > bestMatch.coverage
+      || (match.coverage === bestMatch.coverage && match.matchedWordIndexes.length > bestMatch.matchedWordIndexes.length)) {
+      bestMatch = match;
+    }
+  }
+  return bestMatch ?? rejected(anchorIndex);
 }
 
 export function boundTabletReadingProgress(matchedWordIndexes: readonly number[], anchorIndex: number, spokenWordCount: number): number[] {

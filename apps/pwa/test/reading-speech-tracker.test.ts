@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
+import { alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
 import { normalizeReadingAudio, startLocalReadingTranscriber } from '../src/services/local-reading-transcriber.js';
 
 const reference = tokenizeReadingSpeech('Alice was beginning to get very tired of sitting by her sister on the bank. She read the sentence again because practice matters.');
@@ -47,6 +47,30 @@ describe('reading speech tracking', () => {
 
     assert.equal(alignReadingSpeech(browserReference, 'the browser finds this exact spoken sentence', 0).accepted, false);
     assert.equal(alignReadingSpeech(browserReference, 'the browser finds this exact spoken sentence', 0, { maxForwardWords: 360 }).accepted, true);
+  });
+
+  it('lets tablet speech recover a dense phrase farther ahead of a stale visible anchor', () => {
+    const tabletReference = tokenizeReadingSpeech([
+      'the stale anchor starts here',
+      ...Array.from({ length: 90 }, (_, index) => `filler${index}`),
+      'in one day you forget almost everything',
+    ].join(' '));
+    const transcript = 'in one day you forget and everything';
+
+    assert.equal(alignReadingSpeech(tabletReference, transcript, 0, { minCoverage: 0.4 }).accepted, false);
+    const recovered = recoverReadingSpeechPosition(tabletReference, transcript, 0);
+    assert.equal(recovered.accepted, true);
+    assert.ok(recovered.matchedWordIndexes[0]! > 90);
+  });
+
+  it('does not recover a distant tablet position from only common short words', () => {
+    const tabletReference = tokenizeReadingSpeech([
+      'the stale anchor starts here',
+      ...Array.from({ length: 90 }, (_, index) => `filler${index}`),
+      'in one day you forget almost everything',
+    ].join(' '));
+
+    assert.equal(recoverReadingSpeechPosition(tabletReference, 'in one day unrelated noise', 0).accepted, false);
   });
 
   it('accepts a partially accurate nearby tablet transcript without relaxing browser matching', () => {

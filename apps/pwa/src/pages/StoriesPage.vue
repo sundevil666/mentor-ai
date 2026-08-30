@@ -420,7 +420,7 @@ import { getAuthToken } from 'src/services/auth';
 import { findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { createDailyReadingProgress, dailyReadingGoalWords, dailyWordsRead, localReadingDate, readingGoalMessage, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
-import { alignReadingSpeech, confirmTabletReadingWordIndexes, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
+import { alignReadingSpeech, confirmTabletReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
@@ -1208,7 +1208,17 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     ...candidate,
     match: alignReadingSpeech(readerReferenceWords.value, candidate.text, readingSpeechAnchor, alignmentOptions),
   }));
-  const selectedCandidate = evaluatedCandidates.find((candidate) => candidate.match.accepted)
+  const nearbyCandidate = evaluatedCandidates.find((candidate) => candidate.match.accepted);
+  const tabletRecoveryCandidate = recognitionEngine === 'device-whisper' && !nearbyCandidate
+    ? {
+        text: transcript,
+        words: rawHeardWords,
+        source: 'wide position recovery',
+        match: recoverReadingSpeechPosition(readerReferenceWords.value, transcript, readingSpeechAnchor),
+      }
+    : null;
+  const selectedCandidate = nearbyCandidate
+    ?? (tabletRecoveryCandidate?.match.accepted ? tabletRecoveryCandidate : null)
     ?? evaluatedCandidates.reduce((best, candidate) => candidate.match.coverage > best.match.coverage ? candidate : best);
   const { match, words: heardWords } = selectedCandidate;
   if (recognitionEngine === 'device-whisper') {
