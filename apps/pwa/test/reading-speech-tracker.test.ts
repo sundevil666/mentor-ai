@@ -26,4 +26,15 @@ describe('reading speech tracking', () => {
     assert.equal(alignReadingSpeech(reference, 'turn the television down in the kitchen', 0).accepted, false);
     assert.equal(alignReadingSpeech(reference, 'Alice was', 0).accepted, false);
   });
+
+  it('does not jump to repeated words far ahead of the reading position', () => {
+    const repeatedWords = tokenizeReadingSpeech([
+      'we are reading this page together',
+      ...Array.from({ length: 80 }, (_, index) => `filler${index}`),
+      'the old house now is quiet',
+    ].join(' '));
+    const result = alignReadingSpeech(repeatedWords, 'the old house now is quiet', 0);
+
+    assert.equal(result.accepted, false);
+  });
 });

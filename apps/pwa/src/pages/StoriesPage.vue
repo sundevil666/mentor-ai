@@ -1119,6 +1119,12 @@ function previewReadingSpeechTranscript(transcript: string) {
   if (!match.accepted) return;
   const preview = new Set(spokenReaderWordIndexes.value);
   match.matchedWordIndexes.forEach((wordIndex) => preview.add(wordIndex));
+  const furthestPreviewWord = Math.max(...match.matchedWordIndexes);
+  if (furthestPreviewWord > readingSpeechFurthestWordIndex) {
+    for (let wordIndex = Math.max(0, readingSpeechFurthestWordIndex + 1); wordIndex <= furthestPreviewWord; wordIndex += 1) {
+      preview.add(wordIndex);
+    }
+  }
   spokenReaderWordIndexes.value = preview;
 }
 function getVisibleReaderWordAnchor() {
