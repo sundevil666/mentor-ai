@@ -1805,9 +1805,9 @@ html.mentor-theme-dark .personal-reader {
 }
 
 .personal-reader__word--spoken {
-  background: color-mix(in srgb, var(--q-positive) 22%, transparent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--q-positive) 12%, transparent);
-  color: color-mix(in srgb, var(--app-text-strong) 82%, var(--q-positive));
+  background: color-mix(in srgb, #f6d982 62%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, #d49f1f 18%, transparent);
+  color: #30250e;
 }
 
 .personal-reader__word--selected {
@@ -1971,11 +1971,16 @@ body.body--book-reading-mode .mobile-start-dock {
 }
 
 .personal-reader--focus .personal-reader__word--spoken {
-  color: var(--reader-paper-text);
+  color: #30250e;
 }
 
 body.body--dark .personal-reader--focus {
   --reader-focus-background: #171713;
+}
+
+body.body--dark .personal-reader__word--spoken {
+  background: color-mix(in srgb, #d6ae42 42%, transparent);
+  color: #fff4c7;
 }
 
 body.body--dark .personal-reader__paper {
@@ -2261,6 +2266,11 @@ body.body--dark .personal-reader__sidebar {
   position: absolute;
   transform: translate(-50%, -50%);
   z-index: 1;
+}
+
+.personal-reader__speech-orb--ready {
+  background: color-mix(in srgb, var(--q-positive) 20%, var(--app-surface));
+  color: var(--q-positive);
 }
 
 .personal-reader__speech-stats strong {

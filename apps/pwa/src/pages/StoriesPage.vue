@@ -235,6 +235,7 @@
           <section class="personal-reader__speech-coach" :class="`personal-reader__speech-coach--${readingSpeechStatus}`" aria-live="polite" aria-label="Reading pronunciation coach">
             <button
               class="personal-reader__speech-orb"
+              :class="{ 'personal-reader__speech-orb--ready': readingSpeechStatus === 'listening' || readingSpeechStatus === 'noise' }"
               :style="{ '--reader-speech-level': String(Math.max(0.08, readingSpeechLevel)) }"
               :aria-label="readingSpeechActive ? 'Pause voice tracking' : 'Start voice tracking'"
               type="button"
@@ -246,15 +247,6 @@
             <div class="personal-reader__microphone-status" :class="`personal-reader__microphone-status--${readingMicrophoneIndicator.tone}`" role="status">
               <span class="personal-reader__microphone-status-dot" aria-hidden="true" />
               <strong>{{ readingMicrophoneIndicator.title }}</strong>
-            </div>
-            <div class="personal-reader__heard-words" aria-live="polite" aria-label="Words heard by the microphone">
-              <span class="personal-reader__heard-words-label">Last word heard</span>
-              <strong
-                v-if="readingSpeechLastWord"
-                class="personal-reader__heard-word"
-                :class="{ 'personal-reader__heard-word--interim': readingSpeechLastWord.interim }"
-              >{{ readingSpeechLastWord.text }}</strong>
-              <span v-else class="personal-reader__heard-words-empty">{{ readingSpeechPlaceholder }}</span>
             </div>
             <div class="personal-reader__speech-actions">
               <q-btn
@@ -450,9 +442,8 @@ const readingSpeechCaptureUnavailable = ref(false);
 const spokenReaderWordIndexes = ref(new Set<number>());
 const readingSpeechAcceptedWords = ref(0);
 const readingSpeechSpokenWords = ref(0);
-const readingSpeechFinalWords = ref<string[]>([]);
-const readingSpeechInterimWords = ref<string[]>([]);
 let readingSpeechAnchor = 0;
+let readingSpeechFurthestWordIndex = -1;
 let readingSpeechRecognition: ContinuousSpeechRecognition | null = null;
 let localReadingTranscriber: LocalReadingTranscriber | null = null;
 let readingSpeechStream: MediaStream | null = null;
@@ -552,16 +543,6 @@ const renderedBookPages = computed(() => {
 });
 const readerReferenceWords = computed(() => renderedBookPages.value.flatMap((page) => page.paragraphs.flatMap((paragraph) => paragraph.filter((token) => token.isWord).map((token) => token.text))));
 const readingSpeechActive = computed(() => readingSpeechStatus.value === 'listening' || readingSpeechStatus.value === 'noise' || readingSpeechStatus.value === 'requesting');
-const readingSpeechLastWord = computed(() => {
-  const interimWord = readingSpeechInterimWords.value.at(-1);
-  if (interimWord) return { text: interimWord, interim: true };
-  const finalWord = readingSpeechFinalWords.value.at(-1);
-  return finalWord ? { text: finalWord, interim: false } : null;
-});
-const readingSpeechPlaceholder = computed(() => {
-  if (readingSpeechStatus.value === 'requesting') return readingSpeechMessage.value;
-  return readingSpeechActive.value ? 'Listening…' : '—';
-});
 const readingSpeechHasSignal = computed(() => readingSpeechLevel.value >= 0.035);
 const readingSpeechActionLabel = computed(() => {
   if (readingSpeechActive.value) return 'Stop microphone';
@@ -710,7 +691,7 @@ async function openBook(bookId: string) {
   readerPageCount.value = 1;
   readerPageStride.value = 1;
   chapterPageIndexes.value = loaded.pages.map(() => 0);
-  restoreDailySpokenWords(loaded.book.id);
+  await restoreSpokenReadingProgress(loaded.book.id);
   readerMarkerWordIndex.value = readReaderMarker(loaded.book.id);
   const readerSettings = readBookReaderSettings(loaded.book.id);
   readerFontSize.value = readerSettings.fontSize;
@@ -719,6 +700,7 @@ async function openBook(bookId: string) {
   applyReadingMode(readerSettings.readingMode);
   await nextTick();
   await repaginateReader(readBookProgress(loaded.book.id, loaded.pages.length));
+  goToSyncedSpokenPosition();
   startReaderPagination();
 }
 function closeBook() {
@@ -733,6 +715,7 @@ function closeBook() {
   readerPageStride.value = 1;
   chapterPageIndexes.value = [];
   spokenReaderWordIndexes.value = new Set();
+  readingSpeechFurthestWordIndex = -1;
   selectedReaderWordIndex.value = null;
   readerMarkerWordIndex.value = null;
   readingSpeechAcceptedWords.value = 0;
@@ -943,8 +926,6 @@ async function toggleReadingSpeech() {
   }
   readingSpeechPermissionBlocked.value = false;
   readingSpeechCaptureUnavailable.value = false;
-  readingSpeechFinalWords.value = [];
-  readingSpeechInterimWords.value = [];
   await startReadingSpeech();
 }
 async function startReadingSpeech() {
@@ -988,9 +969,7 @@ async function startReadingSpeech() {
       if (!isSpeechRecognitionAvailable()) throw new Error('SpeechRecognition is unavailable after microphone permission was granted.');
       readingSpeechRecognition = startContinuousSpeechRecognition({
       lang: 'en-US',
-      onInterim: (transcript) => {
-        readingSpeechInterimWords.value = tokenizeReadingSpeech(transcript);
-      },
+      onInterim: () => undefined,
       onFinal: (transcript) => handleReadingSpeechTranscript(transcript, 'browser'),
       onListeningChange: (listening) => {
         if (!readingSpeechRecognition && !listening) return;
@@ -1070,8 +1049,6 @@ function isMicrophonePermissionError(error: unknown) {
 function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'device-whisper' | 'browser' = 'browser') {
   const heardWords = tokenizeReadingSpeech(transcript);
   if (!heardWords.length) return;
-  readingSpeechFinalWords.value = heardWords.slice(-1);
-  readingSpeechInterimWords.value = [];
   const book = selectedBook.value;
   if (book) void saveReadingTranscript({
     id: `reading-transcript-${crypto.randomUUID()}`,
@@ -1097,6 +1074,12 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
   readingSpeechSpokenWords.value += spokenCount;
   const nextSpoken = new Set(spokenReaderWordIndexes.value);
   match.matchedWordIndexes.forEach((wordIndex) => nextSpoken.add(wordIndex));
+  const furthestMatchedWord = Math.max(...match.matchedWordIndexes);
+  if (furthestMatchedWord > readingSpeechFurthestWordIndex) {
+    readingSpeechFurthestWordIndex = furthestMatchedWord;
+    for (let wordIndex = 0; wordIndex <= furthestMatchedWord; wordIndex += 1) nextSpoken.add(wordIndex);
+    void persistSpokenReadingProgress(furthestMatchedWord);
+  }
   spokenReaderWordIndexes.value = nextSpoken;
   recordDailySpokenMatch(match.matchedWordIndexes);
   readingSpeechStatus.value = 'listening';
@@ -1138,7 +1121,6 @@ function stopReadingSpeech(status: ReadingSpeechStatus) {
   readingSpeechRecognition = null;
   localReadingTranscriber?.stop();
   localReadingTranscriber = null;
-  readingSpeechInterimWords.value = [];
   readingSpeechStream?.getTracks().forEach((track) => track.stop());
   readingSpeechStream = null;
   cancelAnimationFrame(readingSpeechAnimationFrame);
@@ -1235,12 +1217,38 @@ function restoreDailySpokenWords(bookId: string) {
   readingSpeechAcceptedWords.value = 0;
   readingSpeechSpokenWords.value = 0;
 }
+async function restoreSpokenReadingProgress(bookId: string) {
+  restoreDailySpokenWords(bookId);
+  await syncAllContentProgress().catch(() => undefined);
+  const progress = await loadContentProgress('reading', bookId);
+  const furthestWordIndex = Math.max(-1, Math.floor(progress?.furthestPosition ?? 0) - 1);
+  readingSpeechFurthestWordIndex = furthestWordIndex;
+  if (furthestWordIndex < 0) return;
+  const restored = new Set(spokenReaderWordIndexes.value);
+  for (let wordIndex = 0; wordIndex <= furthestWordIndex; wordIndex += 1) restored.add(wordIndex);
+  spokenReaderWordIndexes.value = restored;
+  readingSpeechAnchor = furthestWordIndex + 1;
+}
+async function persistSpokenReadingProgress(furthestWordIndex: number) {
+  const book = selectedBook.value;
+  if (!book) return;
+  const wordCount = readerReferenceWords.value.length;
+  await saveContentProgress({
+    studentId: appStore.studentId,
+    category: 'reading',
+    contentId: book.id,
+    position: furthestWordIndex + 1,
+    furthestPosition: furthestWordIndex + 1,
+    duration: wordCount,
+    completed: wordCount > 0 && furthestWordIndex >= wordCount - 1,
+    updatedAt: new Date().toISOString(),
+  });
+}
 function recordDailySpokenMatch(wordIndexes: readonly number[]) {
   const book = selectedBook.value;
   if (!book || typeof localStorage === 'undefined') return;
   if (dailyReadingProgress.value.date !== localReadingDate()) {
     dailyReadingProgress.value = createDailyReadingProgress();
-    spokenReaderWordIndexes.value = new Set(wordIndexes);
   }
   dailyReadingProgress.value = recordDailySpokenWords(dailyReadingProgress.value, book.id, wordIndexes);
   localStorage.setItem(dailyReadingProgressKey, JSON.stringify(dailyReadingProgress.value));
@@ -1341,6 +1349,16 @@ async function repaginateReader(position: BookReaderProgress = { progressRatio: 
   } else {
     currentBookPageIndex.value = Math.round(clampProgressRatio(position.progressRatio) * Math.max(0, readerPageCount.value - 1));
   }
+  scrollToReaderPage(false);
+  persistBookProgress();
+}
+function goToSyncedSpokenPosition() {
+  if (readingSpeechFurthestWordIndex < 0 || readerPageStride.value <= 0) return;
+  const word = readerPaper.value?.querySelector<HTMLElement>(`[data-reader-word-index="${readingSpeechFurthestWordIndex}"]`);
+  if (!word) return;
+  const spokenPageIndex = Math.max(0, Math.min(readerPageCount.value - 1, Math.floor((word.offsetLeft + 1) / readerPageStride.value)));
+  if (spokenPageIndex <= currentBookPageIndex.value) return;
+  currentBookPageIndex.value = spokenPageIndex;
   scrollToReaderPage(false);
   persistBookProgress();
 }

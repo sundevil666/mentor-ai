@@ -28,7 +28,6 @@ export async function syncAllContentProgress() {
   if (!navigator.onLine) return;
   const db = await mentorDb;
   const local = await db.getAll('content-progress') as ContentProgress[];
-  if (!local.length) return;
   const merged = await synchronizeContentProgress(local);
   for (const progress of merged) await db.put('content-progress', progress);
 }

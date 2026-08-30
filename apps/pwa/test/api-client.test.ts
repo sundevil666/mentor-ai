@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-import { saveReadingTranscript, synchronizeLearningEvidence, upsertSessionHandoff } from '../src/services/api-client.js';
+import { saveReadingTranscript, synchronizeContentProgress, synchronizeLearningEvidence, upsertSessionHandoff } from '../src/services/api-client.js';
 
 describe('PWA API client', () => {
   beforeEach(() => {
@@ -86,6 +86,25 @@ describe('PWA API client', () => {
     assert.equal(calls[0]?.init?.method, 'POST');
     assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), chunk);
     assert.equal(String(calls[0]?.init?.body).includes('audio'), false);
+  });
+
+  it('requests remote reading progress even when this device has no local progress', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const remoteProgress = {
+      id: 'reading:book-1', studentId: 'demo-student', category: 'reading', contentId: 'book-1',
+      position: 120, furthestPosition: 120, duration: 500, completed: false,
+      sourceDeviceId: 'tablet', updatedAt: '2026-08-30T12:00:00.000Z',
+    };
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url: String(url), init });
+      return jsonResponse([remoteProgress]);
+    };
+
+    const result = await synchronizeContentProgress([]);
+
+    assert.equal(calls[0]?.url, 'http://localhost:4000/api/synchronization');
+    assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { progress: [] });
+    assert.equal(result[0]?.furthestPosition, 120);
   });
 
   it('throws on failed synchronization responses', async () => {
