@@ -1266,6 +1266,7 @@ function startReadingSpeechDebug(engine: string) {
   readingSpeechDebugStartedAt = performance.now();
   readingSpeechDebugEntries.value = [];
   appendReadingSpeechDebug(`Start. Engine=${engine}; platform=${navigator.platform || 'unknown'}; standalone=${window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone)}; MediaRecorder=${typeof MediaRecorder !== 'undefined'}; AudioContext=${typeof window.AudioContext !== 'undefined'}.`);
+  appendReadingSpeechDebug(`Voice frame: viewport=${window.innerWidth}x${window.innerHeight}; fullscreen=${readingMode.value}; reducedMotion=${window.matchMedia('(prefers-reduced-motion: reduce)').matches}; animation=recording-pulse+voice-wave.`);
 }
 
 function appendReadingSpeechDebug(message: string) {
