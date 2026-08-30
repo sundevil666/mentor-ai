@@ -57,6 +57,14 @@ describe('reading speech tracking', () => {
     assert.equal(alignReadingSpeech(tabletReference, imperfectTranscript, 0, { minCoverage: 0.45 }).accepted, true);
   });
 
+  it('accepts three nearby tablet matches out of seven recognized words', () => {
+    const tabletReference = tokenizeReadingSpeech('the dog begins to bark and the reply comes almost immediately');
+    const noisyTranscript = 'the dog unclear sounds reply wrong noise';
+
+    assert.equal(alignReadingSpeech(tabletReference, noisyTranscript, 0, { minCoverage: 0.45 }).accepted, false);
+    assert.equal(alignReadingSpeech(tabletReference, noisyTranscript, 0, { minCoverage: 0.4 }).accepted, true);
+  });
+
   it('trims a repeated-word match that jumps into an unread tablet sentence', () => {
     const bounded = boundTabletReadingProgress([15956, 15957, 15958, 15959, 15960, 15961, 15962, 15977], 15955, 9);
     assert.deepEqual(bounded, [15956, 15957, 15958, 15959, 15960, 15961, 15962]);
