@@ -1748,6 +1748,7 @@ html.mentor-theme-dark .personal-reader {
   overflow: hidden;
   padding: 15px;
   position: relative;
+  touch-action: pan-y;
 }
 
 .personal-reader__end-spacer {

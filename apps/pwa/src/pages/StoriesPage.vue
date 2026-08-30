@@ -159,7 +159,13 @@
           <q-linear-progress rounded size="8px" :value="(currentBookPageIndex + 1) / readerPageCount" color="primary" track-color="grey-3" />
           <span>{{ readerPageCount }} {{ readerPageCount === 1 ? 'page' : 'pages' }}</span>
         </div>
-        <div ref="readerContent" class="personal-reader__content">
+        <div
+          ref="readerContent"
+          class="personal-reader__content"
+          @touchstart="handleReaderTouchStart"
+          @touchend="handleReaderTouchEnd"
+          @touchcancel="resetReaderTouch"
+        >
           <article ref="readerPaper" class="personal-reader__paper" :style="{ fontSize: `${readerFontSize}px` }" @click="handleReaderTextTap">
             <section
               v-for="(page, pageIndex) in renderedBookPages"
@@ -402,6 +408,7 @@ import { alignReadingSpeech, tokenizeReadingSpeech } from 'src/services/reading-
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
+import { detectReaderSwipe, type ReaderSwipePoint } from 'src/services/reader-swipe';
 
 const appStore = useAppStore();
 type StoryLibraryTab = 'audio' | 'books';
@@ -476,6 +483,8 @@ let lastReaderViewportWidth = 0;
 let lastReaderViewportHeight = 0;
 let readerSelectionTimer = 0;
 let readerLookupRequestId = 0;
+let readerTouchStart: ReaderSwipePoint | null = null;
+let suppressReaderTapUntil = 0;
 let personalBookSyncPromise: Promise<void> | null = null;
 const playbackRates = [0.75, 1, 1.25, 1.5];
 const selectedStory = computed(() => storyLibrary.find((story) => story.id === selectedStoryId.value) ?? null);
@@ -756,6 +765,7 @@ function tokenizeReaderParagraph(text: string): Array<{ text: string; isWord: bo
   }));
 }
 function handleReaderTextTap(event: MouseEvent) {
+  if (Date.now() < suppressReaderTapUntil) return;
   const selection = window.getSelection();
   if (selection && !selection.isCollapsed && isReaderSelection(selection)) {
     queueReaderSelectionLookup();
@@ -766,6 +776,23 @@ function handleReaderTextTap(event: MouseEvent) {
   const targetWordIndex = Number(target?.dataset.readerWordIndex);
   const word = targetWord ?? getWordAtPoint(event.clientX, event.clientY);
   if (word) void selectReaderText(word, true, Number.isInteger(targetWordIndex) ? targetWordIndex : null);
+}
+function handleReaderTouchStart(event: TouchEvent) {
+  const touch = event.touches.length === 1 ? event.touches[0] : undefined;
+  readerTouchStart = touch ? { clientX: touch.clientX, clientY: touch.clientY } : null;
+}
+function handleReaderTouchEnd(event: TouchEvent) {
+  const start = readerTouchStart;
+  readerTouchStart = null;
+  const touch = event.changedTouches.length === 1 ? event.changedTouches[0] : undefined;
+  if (!start || !touch) return;
+  const direction = detectReaderSwipe(start, { clientX: touch.clientX, clientY: touch.clientY });
+  if (!direction) return;
+  suppressReaderTapUntil = Date.now() + 400;
+  goToBookPage(currentBookPageIndex.value + (direction === 'next' ? 1 : -1));
+}
+function resetReaderTouch() {
+  readerTouchStart = null;
 }
 function handleReaderSelectionChange() {
   const selection = window.getSelection();

@@ -20,6 +20,7 @@
     "src/services/personal-book-library.ts",
     "src/services/reading-speech-tracker.ts",
     "src/services/reader-pagination.ts",
+    "src/services/reader-swipe.ts",
     "src/services/speech-recognition.ts",
     "src/services/speech-synthesis.ts",
     "src/services/storage-retention.ts",
