@@ -48,7 +48,9 @@ async function transcribe(request: { id: number; audio: Float32Array }) {
   self.postMessage({ type: 'debug', message: `Worker transcribing chunk #${request.id}.` });
   try {
     const transcriber = await transcriberPromise!;
-    const result = await transcriber(request.audio, { language: 'english', task: 'transcribe' });
+    // whisper-tiny.en is English-only and already defaults to transcription.
+    // Transformers.js rejects language/task overrides for this model.
+    const result = await transcriber(request.audio);
     self.postMessage({ type: 'debug', message: `Worker finished chunk #${request.id} in ${((performance.now() - startedAt) / 1_000).toFixed(1)}s.` });
     self.postMessage({ type: 'result', id: request.id, text: result.text?.trim() ?? '' });
   } catch (error) {
