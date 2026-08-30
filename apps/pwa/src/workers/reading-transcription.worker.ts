@@ -8,7 +8,8 @@ env.useBrowserCache = true;
 
 let transcriberPromise: Promise<(audio: Float32Array, options?: Record<string, unknown>) => Promise<TranscriptionResult>> | null = null;
 let transcribing = false;
-let latestPendingRequest: { id: number; audio: Float32Array } | null = null;
+const pendingRequests: Array<{ id: number; audio: Float32Array }> = [];
+const maximumWhisperSamples = 28 * 16_000;
 
 async function createTranscriber() {
   const progress_callback = (progress: { status?: string; progress?: number }) => {
@@ -32,11 +33,12 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   if (!event.data.audio || event.data.id === undefined) return;
   const request = { id: event.data.id, audio: event.data.audio };
   if (transcribing) {
-    // On slower Apple devices inference may take longer than recording a chunk.
-    // Retaining every old chunk makes the marker drift further behind forever.
-    // Keep only the newest waiting chunk so recognition catches up to the reader.
-    latestPendingRequest = request;
-    self.postMessage({ type: 'debug', message: `Worker busy; keeping newest chunk #${request.id}.` });
+    // Whisper can be slower than real time on Apple mobile devices. Never replace
+    // an older pending chunk with a newer one: that used to discard most of a
+    // continuously read page. Pending chunks are combined into efficient batches
+    // when the current transcription finishes.
+    pendingRequests.push(request);
+    self.postMessage({ type: 'debug', message: `Worker busy; queued chunk #${request.id} (${pendingRequests.length} waiting).` });
     return;
   }
   void transcribe(request);
@@ -56,9 +58,35 @@ async function transcribe(request: { id: number; audio: Float32Array }) {
   } catch (error) {
     self.postMessage({ type: 'error', id: request.id, message: error instanceof Error ? error.message : String(error) });
   } finally {
-    const pending = latestPendingRequest;
-    latestPendingRequest = null;
+    const pending = takePendingBatch();
     if (pending) void transcribe(pending);
     else transcribing = false;
   }
+}
+
+function takePendingBatch(): { id: number; audio: Float32Array } | null {
+  if (!pendingRequests.length) return null;
+  const batch: Array<{ id: number; audio: Float32Array }> = [];
+  let sampleCount = 0;
+  while (pendingRequests.length) {
+    const next = pendingRequests[0]!;
+    if (batch.length && sampleCount + next.audio.length > maximumWhisperSamples) break;
+    pendingRequests.shift();
+    batch.push(next);
+    sampleCount += next.audio.length;
+    if (sampleCount >= maximumWhisperSamples) break;
+  }
+  const audio = new Float32Array(sampleCount);
+  let offset = 0;
+  for (const chunk of batch) {
+    audio.set(chunk.audio, offset);
+    offset += chunk.audio.length;
+  }
+  const firstId = batch[0]!.id;
+  const lastId = batch.at(-1)!.id;
+  self.postMessage({
+    type: 'debug',
+    message: `Worker combining queued chunks #${firstId}${lastId === firstId ? '' : `–${lastId}`} (${(sampleCount / 16_000).toFixed(1)}s).`,
+  });
+  return { id: lastId, audio };
 }
