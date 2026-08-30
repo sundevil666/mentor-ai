@@ -412,7 +412,7 @@ import { getAuthToken } from 'src/services/auth';
 import { findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice } from 'src/services/speech-synthesis';
 import { createDailyReadingProgress, dailyReadingGoalWords, dailyWordsRead, localReadingDate, readingGoalMessage, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
-import { alignReadingSpeech, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
+import { alignReadingSpeech, boundTabletReadingProgress, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
@@ -1152,21 +1152,32 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     readingSpeechMessage.value = 'I heard sound, but it did not match the nearby book text. Keep reading.';
     return;
   }
-  readingSpeechAnchor = match.anchorIndex;
-  appendReadingSpeechDebug(`Match accepted: ${match.matchedWordIndexes.length}/${heardWords.length} words, coverage=${Math.round(match.coverage * 100)}%, indexes=${match.matchedWordIndexes[0]}–${match.matchedWordIndexes.at(-1)}, next=${match.anchorIndex}.`);
+  const confirmedWordIndexes = recognitionEngine === 'device-whisper'
+    ? boundTabletReadingProgress(match.matchedWordIndexes, readingSpeechAnchor, heardWords.length)
+    : match.matchedWordIndexes;
+  if (confirmedWordIndexes.length < 3) {
+    appendReadingSpeechDebug('Match rejected after removing forward outliers: fewer than 3 nearby words remain.');
+    readingSpeechStatus.value = 'noise';
+    readingSpeechMessage.value = 'I heard sound, but it did not match the nearby book text. Keep reading.';
+    return;
+  }
+  const confirmedLastWord = confirmedWordIndexes.at(-1)!;
+  const trimmedMatches = match.matchedWordIndexes.length - confirmedWordIndexes.length;
+  readingSpeechAnchor = recognitionEngine === 'device-whisper' ? confirmedLastWord + 1 : match.anchorIndex;
+  appendReadingSpeechDebug(`Match accepted: ${confirmedWordIndexes.length}/${heardWords.length} words, coverage=${Math.round(match.coverage * 100)}%, indexes=${confirmedWordIndexes[0]}–${confirmedLastWord}, next=${readingSpeechAnchor}${trimmedMatches ? `, trimmed=${trimmedMatches}` : ''}.`);
   if (recognitionEngine === 'device-whisper') readingSpeechLocalTranscriptWindow = [];
-  readingSpeechAcceptedWords.value += match.matchedWordIndexes.length;
+  readingSpeechAcceptedWords.value += confirmedWordIndexes.length;
   readingSpeechSpokenWords.value += spokenCount;
   const nextSpoken = new Set(spokenReaderWordIndexes.value);
-  match.matchedWordIndexes.forEach((wordIndex) => nextSpoken.add(wordIndex));
-  const furthestMatchedWord = Math.max(...match.matchedWordIndexes);
+  confirmedWordIndexes.forEach((wordIndex) => nextSpoken.add(wordIndex));
+  const furthestMatchedWord = confirmedLastWord;
   if (furthestMatchedWord > readingSpeechFurthestWordIndex) {
     readingSpeechFurthestWordIndex = furthestMatchedWord;
     for (let wordIndex = 0; wordIndex <= furthestMatchedWord; wordIndex += 1) nextSpoken.add(wordIndex);
     void persistSpokenReadingProgress(furthestMatchedWord);
   }
   spokenReaderWordIndexes.value = nextSpoken;
-  recordDailySpokenMatch(match.matchedWordIndexes);
+  recordDailySpokenMatch(confirmedWordIndexes);
   readingSpeechStatus.value = 'listening';
   readingSpeechMessage.value = match.coverage >= 0.8
     ? 'Great match — keep reading.'

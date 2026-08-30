@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { alignReadingSpeech, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
+import { alignReadingSpeech, boundTabletReadingProgress, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
 import { normalizeReadingAudio } from '../src/services/local-reading-transcriber.js';
 
 const reference = tokenizeReadingSpeech('Alice was beginning to get very tired of sitting by her sister on the bank. She read the sentence again because practice matters.');
@@ -55,6 +55,16 @@ describe('reading speech tracking', () => {
 
     assert.equal(alignReadingSpeech(tabletReference, imperfectTranscript, 0).accepted, false);
     assert.equal(alignReadingSpeech(tabletReference, imperfectTranscript, 0, { minCoverage: 0.45 }).accepted, true);
+  });
+
+  it('trims a repeated-word match that jumps into an unread tablet sentence', () => {
+    const bounded = boundTabletReadingProgress([15956, 15957, 15958, 15959, 15960, 15961, 15962, 15977], 15955, 9);
+    assert.deepEqual(bounded, [15956, 15957, 15958, 15959, 15960, 15961, 15962]);
+  });
+
+  it('keeps a coherent longer tablet phrase even when recognition starts ahead of the old anchor', () => {
+    const coherent = Array.from({ length: 18 }, (_, index) => 15937 + index);
+    assert.deepEqual(boundTabletReadingProgress(coherent, 15914, 15), coherent);
   });
 });
 

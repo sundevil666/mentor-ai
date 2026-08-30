@@ -68,6 +68,15 @@ export function alignReadingSpeech(referenceWords: readonly string[], transcript
   };
 }
 
+export function boundTabletReadingProgress(matchedWordIndexes: readonly number[], anchorIndex: number, spokenWordCount: number): number[] {
+  if (!matchedWordIndexes.length || spokenWordCount <= 0) return [];
+  const nearby = matchedWordIndexes.filter((wordIndex) => wordIndex >= Math.max(0, anchorIndex - 8));
+  const candidates = nearby.length >= 3 ? nearby : [...matchedWordIndexes];
+  const startIndex = candidates[0]!;
+  const maximumAdvance = spokenWordCount + Math.max(3, Math.ceil(spokenWordCount * 0.5));
+  return candidates.filter((wordIndex) => wordIndex <= startIndex + maximumAdvance);
+}
+
 function rejected(anchorIndex: number): ReadingSpeechMatch {
   return { accepted: false, matchedWordIndexes: [], coverage: 0, anchorIndex };
 }
