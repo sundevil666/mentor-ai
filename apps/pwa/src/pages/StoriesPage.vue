@@ -1029,7 +1029,6 @@ async function startReadingSpeech() {
       lang: 'en-US',
       onInterim: (transcript) => {
         appendReadingSpeechDebug(`Interim text: "${transcript}"`);
-        previewReadingSpeechTranscript(transcript);
       },
       onFinal: (transcript) => handleReadingSpeechTranscript(transcript, 'browser'),
       onListeningChange: (listening) => {
@@ -1172,19 +1171,6 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
   readingSpeechMessage.value = match.coverage >= 0.8
     ? 'Great match — keep reading.'
     : 'Following you. A few words were unclear or skipped.';
-}
-function previewReadingSpeechTranscript(transcript: string) {
-  const match = alignReadingSpeech(readerReferenceWords.value, transcript, readingSpeechAnchor, { maxForwardWords: 360 });
-  if (!match.accepted) return;
-  const preview = new Set(spokenReaderWordIndexes.value);
-  match.matchedWordIndexes.forEach((wordIndex) => preview.add(wordIndex));
-  const furthestPreviewWord = Math.max(...match.matchedWordIndexes);
-  if (furthestPreviewWord > readingSpeechFurthestWordIndex) {
-    for (let wordIndex = Math.max(0, readingSpeechFurthestWordIndex + 1); wordIndex <= furthestPreviewWord; wordIndex += 1) {
-      preview.add(wordIndex);
-    }
-  }
-  spokenReaderWordIndexes.value = preview;
 }
 function getVisibleReaderWordAnchor() {
   const viewport = readerContent.value;
