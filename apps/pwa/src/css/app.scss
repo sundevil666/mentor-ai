@@ -1797,19 +1797,19 @@ html.mentor-theme-dark .personal-reader {
 
 .personal-reader--focus .personal-reader__content--listening::before {
   background:
-    linear-gradient(90deg, #ff4fa3, #d34cff 34%, #ff71ba 67%, #8f5cff) top / 100% 3px no-repeat,
-    linear-gradient(270deg, #ff4fa3, #d34cff 34%, #ff71ba 67%, #8f5cff) bottom / 100% 3px no-repeat,
-    linear-gradient(180deg, #ff4fa3, #d34cff 45%, #ff71ba) left / 3px 100% no-repeat,
-    linear-gradient(0deg, #8f5cff, #ff71ba 55%, #ff4fa3) right / 3px 100% no-repeat;
-  box-shadow: inset 0 0 8px rgba(255, 78, 171, .2);
+    linear-gradient(90deg, #29d6b3, #62f2d2 45%, #24bfa5) top / 100% 4px no-repeat,
+    linear-gradient(270deg, #29d6b3, #62f2d2 45%, #24bfa5) bottom / 100% 4px no-repeat,
+    linear-gradient(180deg, #29d6b3, #62f2d2 45%, #24bfa5) left / 4px 100% no-repeat,
+    linear-gradient(0deg, #29d6b3, #62f2d2 45%, #24bfa5) right / 4px 100% no-repeat;
+  box-shadow: inset 0 0 18px rgba(41, 214, 179, .34);
 }
 
 .personal-reader--focus .personal-reader__content--listening::after {
-  border: var(--reader-speech-border, 2px) solid rgba(255, 71, 167, .72);
+  border: var(--reader-speech-border, 3px) solid rgba(79, 238, 205, .92);
   box-shadow:
-    0 0 var(--reader-speech-glow, 5px) rgba(255, 62, 159, .5),
-    inset 0 0 var(--reader-speech-inner-glow, 4px) rgba(186, 70, 255, .36);
-  opacity: var(--reader-speech-opacity, .34);
+    0 0 var(--reader-speech-glow, 10px) rgba(46, 224, 190, .78),
+    inset 0 0 var(--reader-speech-inner-glow, 8px) rgba(46, 224, 190, .48);
+  opacity: var(--reader-speech-opacity, .8);
   transition: border-width 80ms linear, box-shadow 80ms linear, opacity 120ms ease, transform 80ms linear;
 }
 
@@ -2298,7 +2298,7 @@ body.body--dark .personal-reader__sidebar {
   align-items: center;
   appearance: none;
   background: color-mix(in srgb, var(--category-accent) 14%, var(--app-surface));
-  border: 0;
+  border: 3px solid color-mix(in srgb, var(--category-accent) 72%, white);
   border-radius: 50%;
   color: var(--category-accent);
   cursor: pointer;
@@ -2308,6 +2308,7 @@ body.body--dark .personal-reader__sidebar {
   overflow: hidden;
   position: relative;
   width: 82px;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--category-accent) 26%, transparent);
 }
 
 .personal-reader__speech-orb::before,
@@ -2339,12 +2340,37 @@ body.body--dark .personal-reader__sidebar {
 .personal-reader__speech-orb .q-icon {
   background: var(--app-surface);
   border-radius: 50%;
-  font-size: 21px;
+  font-size: 28px;
   inset: 50% auto auto 50%;
   padding: 5px;
   position: absolute;
   transform: translate(-50%, -50%);
   z-index: 1;
+}
+
+.personal-reader__speech-orb--active {
+  background: color-mix(in srgb, var(--q-positive) 24%, var(--app-surface));
+  border-color: var(--q-positive);
+  color: var(--q-positive);
+  box-shadow:
+    0 0 0 6px color-mix(in srgb, var(--q-positive) 18%, transparent),
+    0 0 26px color-mix(in srgb, var(--q-positive) 52%, transparent);
+}
+
+.personal-reader__speech-orb--active::after {
+  animation-duration: 1.15s;
+  border-color: color-mix(in srgb, var(--q-positive) 64%, transparent);
+}
+
+.personal-reader__speech-orb--hearing {
+  box-shadow:
+    0 0 0 8px color-mix(in srgb, var(--q-positive) 22%, transparent),
+    0 0 34px color-mix(in srgb, var(--q-positive) 72%, transparent);
+}
+
+.personal-reader__speech-orb--error {
+  border-color: var(--q-negative);
+  color: var(--q-negative);
 }
 
 .personal-reader__speech-orb--ready {
@@ -3413,8 +3439,8 @@ body.body--dark .personal-reader__lookup-error {
   }
 
   .personal-reader__speech-orb {
-    height: 58px;
-    width: 58px;
+    height: 72px;
+    width: 72px;
   }
 
   .personal-reader__speech-stats strong {

@@ -245,32 +245,27 @@
 
           <section class="personal-reader__speech-coach" :class="`personal-reader__speech-coach--${readingSpeechStatus}`" aria-live="polite" aria-label="Reading pronunciation coach">
             <button
-              v-if="!readingSpeechActive"
               class="personal-reader__speech-orb"
-              aria-label="Start voice tracking"
+              :class="{
+                'personal-reader__speech-orb--active': readingSpeechActive,
+                'personal-reader__speech-orb--hearing': readingSpeechActive && readingSpeechHasSignal,
+                'personal-reader__speech-orb--error': readingSpeechStatus === 'error',
+              }"
+              :aria-label="readingSpeechActionLabel"
+              :aria-pressed="readingSpeechActive"
+              :style="{ '--reader-speech-level': String(Math.max(0.08, readingSpeechLevel)) }"
               type="button"
               @click="toggleReadingSpeech"
             >
               <span v-for="bar in 7" :key="bar" :style="{ '--speech-bar': String(bar) }" />
-              <q-icon name="play_arrow" />
+              <q-icon name="mic" />
             </button>
-            <div v-if="!readingSpeechActive" class="personal-reader__microphone-status" :class="`personal-reader__microphone-status--${readingMicrophoneIndicator.tone}`" role="status">
+            <div class="personal-reader__microphone-status" :class="`personal-reader__microphone-status--${readingMicrophoneIndicator.tone}`" role="status">
               <span class="personal-reader__microphone-status-dot" aria-hidden="true" />
               <strong>{{ readingMicrophoneIndicator.title }}</strong>
             </div>
-            <div class="personal-reader__speech-actions">
+            <div v-if="readingSpeechPermissionBlocked || readingSpeechCaptureUnavailable" class="personal-reader__speech-actions">
               <q-btn
-                :aria-label="readingSpeechActive ? 'Stop microphone' : 'Start microphone'"
-                :icon="readingSpeechActive ? 'stop' : 'mic'"
-                :label="readingSpeechActionLabel"
-                :color="readingSpeechStatus === 'error' ? 'negative' : readingSpeechActive ? 'positive' : 'primary'"
-                dense
-                no-caps
-                outline
-                @click="toggleReadingSpeech"
-              />
-              <q-btn
-                v-if="readingSpeechPermissionBlocked || readingSpeechCaptureUnavailable"
                 aria-label="Microphone access help"
                 color="negative"
                 flat
@@ -573,10 +568,10 @@ const readingSpeechHasSignal = computed(() => readingSpeechLevel.value >= 0.035)
 const readerSpeechFrameStyle = computed(() => {
   const energy = readingSpeechActive.value ? Math.max(0.04, readingSpeechLevel.value) : 0;
   return {
-    '--reader-speech-border': `${2 + energy * 7}px`,
-    '--reader-speech-glow': `${5 + energy * 24}px`,
-    '--reader-speech-inner-glow': `${4 + energy * 18}px`,
-    '--reader-speech-opacity': String(0.34 + energy * 0.66),
+    '--reader-speech-border': `${3 + energy * 7}px`,
+    '--reader-speech-glow': `${10 + energy * 24}px`,
+    '--reader-speech-inner-glow': `${8 + energy * 18}px`,
+    '--reader-speech-opacity': String(0.78 + energy * 0.22),
   };
 });
 const readingSpeechActionLabel = computed(() => {
