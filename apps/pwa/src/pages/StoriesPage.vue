@@ -582,7 +582,7 @@ const readerSpeechFrameStyle = computed(() => {
   const energy = readingSpeechActive.value ? Math.max(0.04, readingSpeechLevel.value) : 0;
   const energyRatio = Math.max(0, Math.min(1, energy / 0.2));
   const paceRatio = readingSpeechHasSignal.value
-    ? Math.max(0, Math.min(1, (readingSpeechWordsPerMinute.value - 55) / 95))
+    ? Math.max(0, Math.min(1, (readingSpeechWordsPerMinute.value - 45) / 55))
     : 0;
   return {
     '--reader-speech-frame-duration': `${8 - paceRatio * 6.4}s`,
