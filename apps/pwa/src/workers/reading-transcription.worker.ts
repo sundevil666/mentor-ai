@@ -7,7 +7,8 @@ env.allowLocalModels = false;
 env.useBrowserCache = true;
 
 let transcriberPromise: Promise<(audio: Float32Array, options?: Record<string, unknown>) => Promise<TranscriptionResult>> | null = null;
-let transcriptionQueue = Promise.resolve();
+let transcribing = false;
+let latestPendingRequest: { id: number; audio: Float32Array } | null = null;
 
 async function createTranscriber() {
   const progress_callback = (progress: { status?: string; progress?: number }) => {
@@ -29,13 +30,29 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
     return;
   }
   if (!event.data.audio || event.data.id === undefined) return;
-  const { audio, id } = event.data;
-  const currentTranscriber = transcriberPromise;
-  transcriptionQueue = transcriptionQueue.then(async () => {
-    const transcriber = await currentTranscriber;
-    const result = await transcriber(audio, { language: 'english', task: 'transcribe' });
-    self.postMessage({ type: 'result', id, text: result.text?.trim() ?? '' });
-  }).catch((error) => {
-    self.postMessage({ type: 'error', id, message: error instanceof Error ? error.message : String(error) });
-  });
+  const request = { id: event.data.id, audio: event.data.audio };
+  if (transcribing) {
+    // On slower Apple devices inference may take longer than recording a chunk.
+    // Retaining every old chunk makes the marker drift further behind forever.
+    // Keep only the newest waiting chunk so recognition catches up to the reader.
+    latestPendingRequest = request;
+    return;
+  }
+  void transcribe(request);
 };
+
+async function transcribe(request: { id: number; audio: Float32Array }) {
+  transcribing = true;
+  try {
+    const transcriber = await transcriberPromise!;
+    const result = await transcriber(request.audio, { language: 'english', task: 'transcribe' });
+    self.postMessage({ type: 'result', id: request.id, text: result.text?.trim() ?? '' });
+  } catch (error) {
+    self.postMessage({ type: 'error', id: request.id, message: error instanceof Error ? error.message : String(error) });
+  } finally {
+    const pending = latestPendingRequest;
+    latestPendingRequest = null;
+    if (pending) void transcribe(pending);
+    else transcribing = false;
+  }
+}

@@ -996,7 +996,7 @@ async function startReadingSpeech() {
       if (!isSpeechRecognitionAvailable()) throw new Error('SpeechRecognition is unavailable after microphone permission was granted.');
       readingSpeechRecognition = startContinuousSpeechRecognition({
       lang: 'en-US',
-      onInterim: () => undefined,
+      onInterim: (transcript) => previewReadingSpeechTranscript(transcript),
       onFinal: (transcript) => handleReadingSpeechTranscript(transcript, 'browser'),
       onListeningChange: (listening) => {
         if (!readingSpeechRecognition && !listening) return;
@@ -1113,6 +1113,13 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
   readingSpeechMessage.value = match.coverage >= 0.8
     ? 'Great match — keep reading.'
     : 'Following you. A few words were unclear or skipped.';
+}
+function previewReadingSpeechTranscript(transcript: string) {
+  const match = alignReadingSpeech(readerReferenceWords.value, transcript, readingSpeechAnchor);
+  if (!match.accepted) return;
+  const preview = new Set(spokenReaderWordIndexes.value);
+  match.matchedWordIndexes.forEach((wordIndex) => preview.add(wordIndex));
+  spokenReaderWordIndexes.value = preview;
 }
 function getVisibleReaderWordAnchor() {
   const viewport = readerContent.value;

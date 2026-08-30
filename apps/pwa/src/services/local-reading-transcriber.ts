@@ -7,7 +7,10 @@ type LocalTranscriberOptions = {
 
 export type LocalReadingTranscriber = { stop: () => void };
 
-const chunkDurationMs = 4_000;
+// Keep chunks long enough for the three-word matcher, but short enough for the
+// reading marker to feel live. The worker applies its own backpressure so a
+// slower iPad cannot build an ever-growing transcription queue.
+const chunkDurationMs = 2_500;
 
 export function startLocalReadingTranscriber(stream: MediaStream, options: LocalTranscriberOptions): LocalReadingTranscriber {
   const worker = new Worker(new URL('../workers/reading-transcription.worker.ts', import.meta.url), { type: 'module' });
