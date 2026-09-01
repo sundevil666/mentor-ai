@@ -1819,6 +1819,12 @@ html.mentor-theme-dark .personal-reader {
   touch-action: pan-y;
 }
 
+.personal-reader__content--dragging {
+  cursor: grabbing;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .personal-reader__speech-frame {
   bottom: 0;
   isolation: isolate;

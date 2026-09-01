@@ -165,8 +165,10 @@
           :class="{
             'personal-reader__content--listening': readingSpeechActive,
             'personal-reader__content--hearing': readingSpeechActive && readingSpeechHasSignal,
+            'personal-reader__content--dragging': readerDragging,
           }"
           @touchstart="handleReaderTouchStart"
+          @touchmove="handleReaderTouchMove"
           @touchend="handleReaderTouchEnd"
           @touchcancel="resetReaderTouch"
         >
@@ -436,7 +438,7 @@ import { alignReadingSpeech, confirmTabletReadingWordIndexes, recoverReadingSpee
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
-import { detectReaderSwipe, type ReaderSwipePoint } from 'src/services/reader-swipe';
+import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, type ReaderSwipePoint } from 'src/services/reader-swipe';
 import { beginReaderLookupInteraction, shouldProcessLateReadingTranscript } from 'src/services/reader-lookup-interaction';
 
 const appStore = useAppStore();
@@ -449,6 +451,7 @@ const selectedBookChapters = ref<ReadingChapter[]>([]);
 const selectedBookPages = ref<ReadingPage[]>([]);
 const currentBookPageIndex = ref(0);
 const readerContent = ref<HTMLElement | null>(null);
+const readerDragging = ref(false);
 const readerPaper = ref<HTMLElement | null>(null);
 const readerPageCount = ref(1);
 const readerPageStride = ref(1);
@@ -523,6 +526,7 @@ let lastReaderViewportHeight = 0;
 let readerSelectionTimer = 0;
 let readerLookupRequestId = 0;
 let readerTouchStart: ReaderSwipePoint | null = null;
+let readerTouchStartScrollLeft = 0;
 let suppressReaderTapUntil = 0;
 let personalBookSyncPromise: Promise<void> | null = null;
 const playbackRates = [0.75, 1, 1.25, 1.5];
@@ -844,19 +848,48 @@ function handleReaderTextTap(event: MouseEvent) {
 function handleReaderTouchStart(event: TouchEvent) {
   const touch = event.touches.length === 1 ? event.touches[0] : undefined;
   readerTouchStart = touch ? { clientX: touch.clientX, clientY: touch.clientY } : null;
+  readerTouchStartScrollLeft = readerContent.value?.scrollLeft ?? 0;
+  readerDragging.value = false;
+}
+function handleReaderTouchMove(event: TouchEvent) {
+  const start = readerTouchStart;
+  const touch = event.touches.length === 1 ? event.touches[0] : undefined;
+  const viewport = readerContent.value;
+  if (!start || !touch || !viewport) return;
+  const current = { clientX: touch.clientX, clientY: touch.clientY };
+  if (!readerDragging.value && !isReaderHorizontalDrag(start, current)) return;
+  readerDragging.value = true;
+  event.preventDefault();
+  const dragOffset = calculateReaderDragOffset(
+    start,
+    current,
+    currentBookPageIndex.value > 0,
+    currentBookPageIndex.value < readerPageCount.value - 1,
+  );
+  viewport.scrollLeft = readerTouchStartScrollLeft - dragOffset;
 }
 function handleReaderTouchEnd(event: TouchEvent) {
   const start = readerTouchStart;
+  const wasDragging = readerDragging.value;
   readerTouchStart = null;
+  readerDragging.value = false;
   const touch = event.changedTouches.length === 1 ? event.changedTouches[0] : undefined;
-  if (!start || !touch) return;
+  if (!start || !touch) {
+    if (wasDragging) scrollToReaderPage();
+    return;
+  }
   const direction = detectReaderSwipe(start, { clientX: touch.clientX, clientY: touch.clientY });
-  if (!direction) return;
-  suppressReaderTapUntil = Date.now() + 400;
+  if (wasDragging) suppressReaderTapUntil = Date.now() + 400;
+  if (!direction) {
+    if (wasDragging) scrollToReaderPage();
+    return;
+  }
   goToBookPage(currentBookPageIndex.value + (direction === 'next' ? 1 : -1));
 }
 function resetReaderTouch() {
   readerTouchStart = null;
+  if (readerDragging.value) scrollToReaderPage();
+  readerDragging.value = false;
 }
 function handleReaderSelectionChange() {
   const selection = window.getSelection();
