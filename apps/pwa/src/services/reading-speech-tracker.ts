@@ -10,6 +10,7 @@ export type ReadingSpeechAlignmentOptions = {
   maxForwardWords?: number;
   minCoverage?: number;
   minMatchedWords?: number;
+  minSpokenWords?: number;
 };
 
 export function normalizeReadingWord(value: string): string {
@@ -22,7 +23,7 @@ export function tokenizeReadingSpeech(value: string): string[] {
 
 export function alignReadingSpeech(referenceWords: readonly string[], transcript: string, anchorIndex: number, options: ReadingSpeechAlignmentOptions = {}): ReadingSpeechMatch {
   const spokenWords = tokenizeReadingSpeech(transcript);
-  if (spokenWords.length < 3 || referenceWords.length === 0) return rejected(anchorIndex);
+  if (spokenWords.length < (options.minSpokenWords ?? 3) || referenceWords.length === 0) return rejected(anchorIndex);
   const normalizedReference = referenceWords.map(normalizeReadingWord);
   const safeAnchor = Math.max(0, Math.min(normalizedReference.length - 1, anchorIndex));
   const searchStart = Math.max(0, safeAnchor - (options.maxBackwardWords ?? 120));
@@ -106,19 +107,19 @@ export function boundTabletReadingProgress(matchedWordIndexes: readonly number[]
   const nearby = matchedWordIndexes.filter((wordIndex) => wordIndex >= Math.max(0, anchorIndex - 8));
   // Never fall back to an old phrase when no nearby match exists. Common words
   // can otherwise move the tablet anchor hundreds of words backwards.
-  if (nearby.length < 3) return [];
+  if (nearby.length < Math.min(3, spokenWordCount)) return [];
   const candidates = nearby;
   const startIndex = candidates[0]!;
   const maximumAdvance = spokenWordCount + Math.max(3, Math.ceil(spokenWordCount * 0.5));
   return candidates.filter((wordIndex) => wordIndex <= startIndex + maximumAdvance);
 }
 
-export function confirmTabletReadingWordIndexes(matchedWordIndexes: readonly number[], anchorIndex: number, spokenWordCount: number): number[] {
+export function confirmTabletReadingWordIndexes(matchedWordIndexes: readonly number[], anchorIndex: number, spokenWordCount: number, minConfirmedWords = 3): number[] {
   const bounded = boundTabletReadingProgress(matchedWordIndexes, anchorIndex, spokenWordCount);
-  if (bounded.length < 3) return [];
+  if (bounded.length < minConfirmedWords) return [];
   const confirmed = new Set(bounded);
   const firstIndex = bounded[0]!;
-  // Whisper often loses one or two boundary words between consecutive 4-second
+  // Whisper often loses one or two boundary words between consecutive audio
   // chunks. A nearby match immediately after the old anchor confirms that tiny
   // bridge without crediting an arbitrary unread range.
   if (firstIndex >= anchorIndex && firstIndex - anchorIndex <= 2) {

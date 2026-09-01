@@ -481,6 +481,7 @@ const readingSpeechDebugEntries = ref<string[]>(['Waiting for microphone start.'
 let readingSpeechAnchor = 0;
 let readingSpeechFurthestWordIndex = -1;
 let readingSpeechLocalTranscriptWindow: string[] = [];
+let readingSpeechPositionLocked = false;
 let readingSpeechRecognition: ContinuousSpeechRecognition | null = null;
 let localReadingTranscriber: LocalReadingTranscriber | null = null;
 let readingSpeechStream: MediaStream | null = null;
@@ -1058,6 +1059,7 @@ async function startReadingSpeech() {
   const useLocalRecognition = isAppleMobileDevice();
   startReadingSpeechDebug(useLocalRecognition ? 'device-whisper' : 'browser-speech');
   readingSpeechLocalTranscriptWindow = [];
+  readingSpeechPositionLocked = false;
   resetReadingSpeechPace();
   if (!navigator.mediaDevices?.getUserMedia) {
     appendReadingSpeechDebug('ERROR: getUserMedia is unavailable.');
@@ -1226,8 +1228,9 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     Notify.create({ type: 'warning', message: 'Words were recognized, but could not be saved for analysis.', timeout: 3_000 });
   });
   const spokenCount = rawHeardWords.length;
-  if (rawHeardWords.length < 3) {
-    appendReadingSpeechDebug('Match skipped: fewer than 3 recognized words.');
+  const minimumRecognizedWords = recognitionEngine === 'device-whisper' && readingSpeechPositionLocked ? 2 : 3;
+  if (rawHeardWords.length < minimumRecognizedWords) {
+    appendReadingSpeechDebug(`Match skipped: fewer than ${minimumRecognizedWords} recognized words.`);
     return;
   }
   const alignmentCandidates = [{ text: transcript, words: rawHeardWords, source: 'current chunk' }];
@@ -1235,7 +1238,11 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     const combinedText = readingSpeechLocalTranscriptWindow.join(' ');
     alignmentCandidates.push({ text: combinedText, words: tokenizeReadingSpeech(combinedText), source: `${readingSpeechLocalTranscriptWindow.length} combined chunks` });
   }
-  const alignmentOptions = recognitionEngine === 'browser' ? { maxForwardWords: 360 } : { minCoverage: 0.4 };
+  const alignmentOptions = recognitionEngine === 'browser'
+    ? { maxForwardWords: 360 }
+    : readingSpeechPositionLocked
+      ? { maxBackwardWords: 6, maxForwardWords: 16, minCoverage: 0.6, minMatchedWords: 2, minSpokenWords: 2 }
+      : { minCoverage: 0.4 };
   const evaluatedCandidates = alignmentCandidates.map((candidate) => ({
     ...candidate,
     match: alignReadingSpeech(readerReferenceWords.value, candidate.text, readingSpeechAnchor, alignmentOptions),
@@ -1263,10 +1270,10 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     return;
   }
   const confirmedWordIndexes = recognitionEngine === 'device-whisper'
-    ? confirmTabletReadingWordIndexes(match.matchedWordIndexes, readingSpeechAnchor, heardWords.length)
+    ? confirmTabletReadingWordIndexes(match.matchedWordIndexes, readingSpeechAnchor, heardWords.length, readingSpeechPositionLocked ? 2 : 3)
     : match.matchedWordIndexes;
-  if (confirmedWordIndexes.length < 3) {
-    appendReadingSpeechDebug('Match rejected after removing forward outliers: fewer than 3 nearby words remain.');
+  if (confirmedWordIndexes.length < minimumRecognizedWords) {
+    appendReadingSpeechDebug(`Match rejected after removing forward outliers: fewer than ${minimumRecognizedWords} nearby words remain.`);
     readingSpeechStatus.value = 'noise';
     readingSpeechMessage.value = 'I heard sound, but it did not match the nearby book text. Keep reading.';
     return;
@@ -1277,6 +1284,7 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
   readingSpeechAnchor = recognitionEngine === 'device-whisper'
     ? Math.max(readingSpeechAnchor, confirmedLastWord + 1)
     : match.anchorIndex;
+  if (recognitionEngine === 'device-whisper') readingSpeechPositionLocked = true;
   appendReadingSpeechDebug(`Match accepted: ${confirmedWordIndexes.length}/${heardWords.length} words, coverage=${Math.round(match.coverage * 100)}%, indexes=${confirmedWordIndexes[0]}–${confirmedLastWord}, next=${readingSpeechAnchor}${recoveredWords ? `, recovered=${recoveredWords}` : ''}${trimmedMatches > 0 ? `, trimmed=${trimmedMatches}` : ''}.`);
   if (recognitionEngine === 'device-whisper') readingSpeechLocalTranscriptWindow = [];
   readingSpeechAcceptedWords.value += confirmedWordIndexes.length;

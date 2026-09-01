@@ -14,10 +14,11 @@ let sharedWorkerInitializing = false;
 let sharedWorkerReady = false;
 let sharedRequestId = 0;
 
-// Keep chunks long enough for the three-word matcher, but short enough for the
-// reading marker to feel live. The worker applies its own backpressure so a
-// slower iPad cannot build an ever-growing transcription queue.
-const chunkDurationMs = 4_000;
+// Short chunks let the marker react while the reader is still on the current
+// phrase. The first position lock may combine chunks; after that the nearby
+// matcher can safely confirm a two-word fragment. The worker applies its own
+// backpressure on slower devices.
+export const localReadingChunkDurationMs = 1_500;
 
 export function startLocalReadingTranscriber(stream: MediaStream, options: LocalTranscriberOptions): LocalReadingTranscriber {
   const worker = sharedWorker ??= new Worker(new URL('../workers/reading-transcription.worker.ts', import.meta.url), { type: 'module' });
@@ -75,7 +76,7 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
     if (stopped || !stream.active) return;
     const chunks: Blob[] = [];
     recorder = new MediaRecorder(stream);
-    options.onDebug?.(`Recording ${(chunkDurationMs / 1_000).toFixed(1)}s audio chunk (${recorder.mimeType || 'default format'}).`);
+    options.onDebug?.(`Recording ${(localReadingChunkDurationMs / 1_000).toFixed(1)}s audio chunk (${recorder.mimeType || 'default format'}).`);
     recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
     recorder.onstop = () => {
       if (chunks.length) {
@@ -99,7 +100,7 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
       if (!stopped) recordChunk();
     };
     recorder.start();
-    timer = window.setTimeout(() => recorder?.state === 'recording' && recorder.stop(), chunkDurationMs);
+    timer = window.setTimeout(() => recorder?.state === 'recording' && recorder.stop(), localReadingChunkDurationMs);
   };
   return {
     stop() {

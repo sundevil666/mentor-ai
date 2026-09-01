@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
-import { normalizeReadingAudio, startLocalReadingTranscriber } from '../src/services/local-reading-transcriber.js';
+import { localReadingChunkDurationMs, normalizeReadingAudio, startLocalReadingTranscriber } from '../src/services/local-reading-transcriber.js';
 
 const reference = tokenizeReadingSpeech('Alice was beginning to get very tired of sitting by her sister on the bank. She read the sentence again because practice matters.');
 
@@ -119,9 +119,26 @@ describe('reading speech tracking', () => {
   it('recovers tiny internal holes but leaves larger skipped ranges uncredited', () => {
     assert.deepEqual(confirmTabletReadingWordIndexes([10, 11, 13, 16, 20], 10, 9), [10, 11, 12, 13, 14, 15, 16, 20]);
   });
+
+  it('confirms a short nearby fragment only after position lock opts into live matching', () => {
+    const liveReference = tokenizeReadingSpeech('that is the reason Graham wanted to leave early');
+    assert.equal(alignReadingSpeech(liveReference, 'Graham wanted', 4).accepted, false);
+    const live = alignReadingSpeech(liveReference, 'Graham wanted', 4, {
+      maxBackwardWords: 6,
+      maxForwardWords: 16,
+      minCoverage: 0.6,
+      minMatchedWords: 2,
+      minSpokenWords: 2,
+    });
+    assert.equal(live.accepted, true);
+    assert.deepEqual(confirmTabletReadingWordIndexes(live.matchedWordIndexes, 4, 2, 2), [4, 5]);
+  });
 });
 
 describe('tablet reading audio preparation', () => {
+  it('captures short audio fragments for responsive word highlighting', () => {
+    assert.equal(localReadingChunkDurationMs, 1_500);
+  });
   it('amplifies a quiet speech signal without clipping it', () => {
     const input = Float32Array.from([0.01, -0.02, 0.015, -0.01]);
     const result = normalizeReadingAudio(input);
