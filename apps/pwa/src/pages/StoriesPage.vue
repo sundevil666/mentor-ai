@@ -323,14 +323,16 @@
               <q-spinner color="primary" size="16px" />
               <span>Loading transcription…</span>
             </div>
-            <div v-if="readerLookupLoading" class="personal-reader__lookup-loading">
-              <q-spinner color="primary" size="24px" />
-              <span>Translating…</span>
+            <div class="personal-reader__lookup-result">
+              <div v-if="readerLookupLoading" class="personal-reader__lookup-loading">
+                <q-spinner color="primary" size="24px" />
+                <span>Translating…</span>
+              </div>
+              <p v-else-if="readerLookup?.translation" class="personal-reader__lookup-translation">{{ readerLookup.translation }}</p>
+              <p v-else-if="readerLookup?.translationError" class="personal-reader__lookup-error">{{ readerLookup.translationError }}</p>
+              <p v-else-if="readerLookupError" class="personal-reader__lookup-error">{{ readerLookupError }}</p>
+              <p v-else class="personal-reader__lookup-hint">Tap a word, or press and hold to select a phrase.</p>
             </div>
-            <p v-else-if="readerLookup?.translation" class="personal-reader__lookup-translation">{{ readerLookup.translation }}</p>
-            <p v-else-if="readerLookup?.translationError" class="personal-reader__lookup-error">{{ readerLookup.translationError }}</p>
-            <p v-else-if="readerLookupError" class="personal-reader__lookup-error">{{ readerLookupError }}</p>
-            <p v-else class="personal-reader__lookup-hint">Tap a word, or press and hold to select a phrase.</p>
             <q-btn
               v-if="readerMarkerWordIndex !== null && readerMarkerWordIndex !== selectedReaderWordIndex"
               class="personal-reader__marker-return"

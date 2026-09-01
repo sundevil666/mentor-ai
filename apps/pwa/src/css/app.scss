@@ -2658,6 +2658,16 @@ body.body--dark .personal-reader__lookup-text {
   padding: 6px 8px;
 }
 
+.personal-reader__lookup-result {
+  align-items: stretch;
+  display: grid;
+  min-height: calc(1.35em + 16px);
+}
+
+.personal-reader__lookup-result > * {
+  min-height: 100%;
+}
+
 .personal-reader__lookup-translation {
   background: var(--app-surface);
   border-left: 4px solid var(--category-accent);
@@ -2675,6 +2685,11 @@ body.body--dark .personal-reader__lookup-text {
   color: var(--app-muted-strong);
   font-size: 0.78em;
   line-height: 1.4;
+}
+
+.personal-reader__lookup-hint {
+  align-content: center;
+  display: grid;
 }
 
 .personal-reader__lookup-error {
