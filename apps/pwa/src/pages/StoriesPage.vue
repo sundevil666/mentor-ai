@@ -437,6 +437,7 @@ import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type Co
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
 import { detectReaderSwipe, type ReaderSwipePoint } from 'src/services/reader-swipe';
+import { beginReaderLookupInteraction, shouldProcessLateReadingTranscript } from 'src/services/reader-lookup-interaction';
 
 const appStore = useAppStore();
 type StoryLibraryTab = 'audio' | 'books';
@@ -904,43 +905,50 @@ function normalizeReaderSelection(value: string) {
 async function selectReaderText(rawText: string, speakImmediately: boolean, wordIndex: number | null) {
   const text = normalizeReaderSelection(rawText);
   if (!text || !selectedBook.value) return;
-  if (readingSpeechActive.value) {
-    resumeReadingSpeechAfterLookup = true;
-    appendReadingSpeechDebug(`Pausing microphone while translating "${text}".`);
-    stopReadingSpeech('paused');
-    readingSpeechMessage.value = 'Microphone paused while translating. It will resume automatically.';
-  }
-  selectedReaderText.value = text;
-  selectedReaderWordIndex.value = wordIndex;
-  readerLookup.value = null;
-  readerPhonetic.value = undefined;
-  readerLookupError.value = '';
-  readerLookupLoading.value = true;
-  readerPhoneticLoading.value = !/\s/.test(text);
+  const shouldResumeReadingSpeech = readingSpeechActive.value;
   const requestId = ++readerLookupRequestId;
   try {
-    if (speakImmediately) void speakReaderText(text);
-    const cachedLookup = await findReaderVocabularyLookup(appStore.studentId, text).catch(() => null);
-    if (requestId !== readerLookupRequestId) return;
-    if (cachedLookup) {
-      readerLookup.value = cachedLookup;
-      readerPhonetic.value = cachedLookup.phonetic;
-      readerLookupLoading.value = false;
-      if (!cachedLookup.phonetic && !/\s/.test(text)) void loadReaderPhonetic(text, requestId);
-      await saveReaderLookup(cachedLookup, requestId);
-      return;
-    }
-    if (!/\s/.test(text)) void loadReaderPhonetic(text, requestId);
-    try {
-      const lookup = await fetchReaderTextLookup(text);
-      if (requestId !== readerLookupRequestId) return;
-      readerLookup.value = lookup;
-      if (lookup.translation) await saveReaderLookup(lookup, requestId);
-    } catch (error) {
-      if (requestId === readerLookupRequestId) readerLookupError.value = error instanceof Error ? error.message : 'Translation is unavailable right now.';
-    } finally {
-      if (requestId === readerLookupRequestId) readerLookupLoading.value = false;
-    }
+    await beginReaderLookupInteraction({
+      revealSelection: () => {
+        selectedReaderText.value = text;
+        selectedReaderWordIndex.value = wordIndex;
+        readerLookup.value = null;
+        readerPhonetic.value = undefined;
+        readerLookupError.value = '';
+        readerLookupLoading.value = true;
+        readerPhoneticLoading.value = !/\s/.test(text);
+      },
+      pauseListening: shouldResumeReadingSpeech ? () => {
+        resumeReadingSpeechAfterLookup = true;
+        appendReadingSpeechDebug(`Pausing microphone while translating "${text}".`);
+        stopReadingSpeech('paused');
+        readingSpeechMessage.value = 'Microphone paused while translating. It will resume automatically.';
+      } : undefined,
+      pronounce: speakImmediately ? () => { void speakReaderText(text); } : undefined,
+      lookup: async () => {
+        const cachedLookup = await findReaderVocabularyLookup(appStore.studentId, text).catch(() => null);
+        if (requestId !== readerLookupRequestId) return;
+        if (cachedLookup) {
+          readerLookup.value = cachedLookup;
+          readerPhonetic.value = cachedLookup.phonetic;
+          readerLookupLoading.value = false;
+          if (!cachedLookup.phonetic && !/\s/.test(text)) void loadReaderPhonetic(text, requestId);
+          await saveReaderLookup(cachedLookup, requestId);
+          return;
+        }
+        if (!/\s/.test(text)) void loadReaderPhonetic(text, requestId);
+        try {
+          const lookup = await fetchReaderTextLookup(text);
+          if (requestId !== readerLookupRequestId) return;
+          readerLookup.value = lookup;
+          if (lookup.translation) await saveReaderLookup(lookup, requestId);
+        } catch (error) {
+          if (requestId === readerLookupRequestId) readerLookupError.value = error instanceof Error ? error.message : 'Translation is unavailable right now.';
+        } finally {
+          if (requestId === readerLookupRequestId) readerLookupLoading.value = false;
+        }
+      },
+    });
   } catch (error) {
     if (requestId === readerLookupRequestId) readerLookupError.value = error instanceof Error ? error.message : 'Translation is unavailable right now.';
   } finally {
@@ -1092,6 +1100,10 @@ async function startReadingSpeech() {
       localReadingTranscriber = startLocalReadingTranscriber(readingSpeechStream, {
         onTranscript: (transcript) => {
           const arrivedAfterPause = !readingSpeechStream;
+          if (arrivedAfterPause && !shouldProcessLateReadingTranscript(readerLookupLoading.value)) {
+            appendReadingSpeechDebug('Ignoring the microphone final chunk while translation is in progress.');
+            return;
+          }
           handleReadingSpeechTranscript(transcript, 'device-whisper');
           if (arrivedAfterPause) {
             readingSpeechStatus.value = 'paused';
