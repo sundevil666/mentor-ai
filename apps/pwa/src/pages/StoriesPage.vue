@@ -295,14 +295,6 @@
             </div>
           </section>
 
-          <section class="personal-reader__speech-debug" aria-label="Microphone debug log">
-            <div class="personal-reader__speech-debug-heading">
-              <strong>Microphone debug</strong>
-              <q-btn aria-label="Copy microphone debug log" dense flat icon="content_copy" label="Copy" no-caps @click="copyReadingSpeechDebugLog" />
-            </div>
-            <pre>{{ readingSpeechDebugText }}</pre>
-          </section>
-
           <section
             class="personal-reader__lookup"
             aria-live="polite"
@@ -349,6 +341,14 @@
               outline
               @click="goToReaderMarker"
             />
+          </section>
+
+          <section class="personal-reader__speech-debug" aria-label="Microphone debug log">
+            <div class="personal-reader__speech-debug-heading">
+              <strong>Microphone debug</strong>
+              <q-btn aria-label="Copy microphone debug log" dense flat icon="content_copy" label="Copy" no-caps @click="copyReadingSpeechDebugLog" />
+            </div>
+            <pre>{{ readingSpeechDebugText }}</pre>
           </section>
 
           <div class="personal-reader__sidebar-navigation">
