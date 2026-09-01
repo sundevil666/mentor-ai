@@ -2603,8 +2603,7 @@ body.body--dark .personal-reader__sidebar {
   border-radius: var(--app-radius-md);
   display: grid;
   gap: 8px;
-  max-height: min(36dvh, 320px);
-  overflow-y: auto;
+  min-height: min(36dvh, 320px);
   padding: 12px;
 }
 
