@@ -37,7 +37,7 @@ let modelProgress = 0;
 const statusListeners = new Set<() => void>();
 const generatedSpeechCache = new Map<string, Promise<Blob>>();
 let lastSpeechCacheCleanupAt = 0;
-let activeSystemSpeechCleanup: ((completed: boolean) => void) | null = null;
+let activeSystemSpeechCleanup: ((completed: boolean, notifyError?: boolean) => void) | null = null;
 
 export function isSpeechSynthesisAvailable() {
   return (
@@ -50,24 +50,27 @@ export function isSpeechSynthesisAvailable() {
 export function speakWithSystemVoice(text: string, handlers: SystemSpeechHandlers = {}) {
   const trimmedText = text.trim();
   if (!trimmedText || typeof window === 'undefined' || !('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') return false;
-  activeSystemSpeechCleanup?.(false);
-  window.speechSynthesis.cancel();
+  if (activeSystemSpeechCleanup) {
+    activeSystemSpeechCleanup(false, false);
+    window.speechSynthesis.cancel();
+  }
   const utterance = new SpeechSynthesisUtterance(trimmedText);
   utterance.lang = 'en-US';
   utterance.rate = 0.88;
   utterance.voice = selectEnglishSystemVoice(window.speechSynthesis.getVoices());
   let settled = false;
-  const finish = (completed: boolean) => {
+  const finish = (completed: boolean, notifyError = true) => {
     if (settled) return;
     settled = true;
     if (activeSystemSpeechCleanup === finish) activeSystemSpeechCleanup = null;
     if (completed) handlers.onEnd?.();
-    else handlers.onError?.();
+    else if (notifyError) handlers.onError?.();
   };
   activeSystemSpeechCleanup = finish;
+  utterance.onstart = () => handlers.onStart?.();
   utterance.onend = () => finish(true);
   utterance.onerror = () => finish(false);
-  handlers.onStart?.();
+  window.speechSynthesis.resume();
   window.speechSynthesis.speak(utterance);
   return true;
 }

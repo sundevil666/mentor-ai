@@ -133,6 +133,22 @@ describe('reading speech tracking', () => {
     assert.equal(live.accepted, true);
     assert.deepEqual(confirmTabletReadingWordIndexes(live.matchedWordIndexes, 4, 2, 2), [4, 5]);
   });
+
+  it('touches only the nearby window in a very large book', () => {
+    const words = Array.from({ length: 40_000 }, (_, index) => `word${index}`);
+    words.splice(38_350, 5, 'anything', 'happen', 'to', 'you', 'today');
+    let indexedReads = 0;
+    const trackedWords = new Proxy(words, {
+      get(target, property, receiver) {
+        if (typeof property === 'string' && /^\d+$/.test(property)) indexedReads += 1;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+
+    const match = alignReadingSpeech(trackedWords, 'anything happen to you today', 38_350);
+    assert.equal(match.accepted, true);
+    assert.ok(indexedReads < 500, `read ${indexedReads} book words for one nearby transcript`);
+  });
 });
 
 describe('tablet reading audio preparation', () => {

@@ -24,14 +24,16 @@ export function tokenizeReadingSpeech(value: string): string[] {
 export function alignReadingSpeech(referenceWords: readonly string[], transcript: string, anchorIndex: number, options: ReadingSpeechAlignmentOptions = {}): ReadingSpeechMatch {
   const spokenWords = tokenizeReadingSpeech(transcript);
   if (spokenWords.length < (options.minSpokenWords ?? 3) || referenceWords.length === 0) return rejected(anchorIndex);
-  const normalizedReference = referenceWords.map(normalizeReadingWord);
-  const safeAnchor = Math.max(0, Math.min(normalizedReference.length - 1, anchorIndex));
+  const safeAnchor = Math.max(0, Math.min(referenceWords.length - 1, anchorIndex));
   const searchStart = Math.max(0, safeAnchor - (options.maxBackwardWords ?? 120));
   // Speech chunks describe only a few nearby seconds. A very large forward
   // window lets common words match a paragraph the reader has not reached yet.
   const forwardWindow = Math.max(options.maxForwardWords ?? 24, spokenWords.length * 3);
-  const searchEnd = Math.min(normalizedReference.length, safeAnchor + forwardWindow);
-  const searchWords = normalizedReference.slice(searchStart, searchEnd);
+  const searchEnd = Math.min(referenceWords.length, safeAnchor + forwardWindow);
+  // A personal book can contain tens of thousands of words. Normalizing the
+  // entire book for every 1.5-second transcript blocked iPad taps for seconds.
+  // Alignment only consumes this bounded nearby window, so normalize only it.
+  const searchWords = referenceWords.slice(searchStart, searchEnd).map(normalizeReadingWord);
   const scores = Array.from({ length: spokenWords.length + 1 }, () => new Uint16Array(searchWords.length + 1));
 
   for (let spokenIndex = 1; spokenIndex <= spokenWords.length; spokenIndex += 1) {

@@ -10,6 +10,7 @@ import {
   speechCacheMaxAgeMs,
   speechCacheMaxEntries,
   splitSpeechTextIntoSentences,
+  speakWithSystemVoice,
 } from '../src/services/speech-synthesis.js';
 
 describe('speech synthesis voices', () => {
@@ -20,6 +21,52 @@ describe('speech synthesis voices', () => {
       { lang: 'en-US', name: 'Samantha' },
     ] as SpeechSynthesisVoice[];
     assert.equal(selectEnglishSystemVoice(voices)?.name, 'Samantha');
+  });
+
+  it('reports system pronunciation only after the platform really starts it', () => {
+    const originalWindow = globalThis.window;
+    const OriginalUtterance = globalThis.SpeechSynthesisUtterance;
+    let utterance: {
+      onstart?: () => void;
+      onend?: () => void;
+      onerror?: () => void;
+      lang: string;
+      rate: number;
+      voice: SpeechSynthesisVoice | null;
+    } | undefined;
+    let started = 0;
+    let failed = 0;
+    let resumed = 0;
+    class FakeUtterance {
+      onstart?: () => void;
+      onend?: () => void;
+      onerror?: () => void;
+      lang = '';
+      rate = 1;
+      voice: SpeechSynthesisVoice | null = null;
+      constructor(readonly text: string) {}
+    }
+    const speechSynthesis = {
+      cancel: () => undefined,
+      getVoices: () => [],
+      resume: () => { resumed += 1; },
+      speak: (value: FakeUtterance) => { utterance = value; },
+    };
+    Object.assign(globalThis, {
+      window: { speechSynthesis },
+      SpeechSynthesisUtterance: FakeUtterance,
+    });
+    try {
+      assert.equal(speakWithSystemVoice('hello', { onStart: () => { started += 1; }, onError: () => { failed += 1; } }), true);
+      assert.equal(started, 0);
+      assert.equal(resumed, 1);
+      utterance?.onstart?.();
+      assert.equal(started, 1);
+      utterance?.onerror?.();
+      assert.equal(failed, 1);
+    } finally {
+      Object.assign(globalThis, { window: originalWindow, SpeechSynthesisUtterance: OriginalUtterance });
+    }
   });
 
   it('uses Mia for ordinary text', () => {

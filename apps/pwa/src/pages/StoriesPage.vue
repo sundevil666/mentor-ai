@@ -1019,6 +1019,7 @@ async function syncReaderVocabulary() {
   }
 }
 async function speakReaderText(text: string) {
+  appendReadingSpeechDebug(`Pronunciation requested for "${text}".`);
   const microphoneTracks = readingSpeechStream?.getAudioTracks() ?? [];
   const muteMicrophone = () => {
     microphoneTracks.forEach((track) => { track.enabled = false; });
@@ -1028,13 +1029,29 @@ async function speakReaderText(text: string) {
     microphoneTracks.forEach((track) => { if (track.readyState === 'live') track.enabled = true; });
     if (microphoneTracks.length) appendReadingSpeechDebug('Microphone resumed after word pronunciation.');
   };
-  const systemVoiceStarted = speakWithSystemVoice(text, { onStart: muteMicrophone, onEnd: restoreMicrophone, onError: restoreMicrophone });
-  if (systemVoiceStarted) return;
-  const played = await speakWithPreferredVoice(text, {
-    mediaTitle: `Book: ${selectedBook.value?.title ?? 'selected text'}`,
-    temporary: true,
+  let fallbackStarted = false;
+  const playFallback = async () => {
+    if (fallbackStarted) return;
+    fallbackStarted = true;
+    restoreMicrophone();
+    appendReadingSpeechDebug(`System pronunciation failed; starting fallback voice for "${text}".`);
+    const played = await speakWithPreferredVoice(text, {
+      mediaTitle: `Book: ${selectedBook.value?.title ?? 'selected text'}`,
+      temporary: true,
+    });
+    appendReadingSpeechDebug(played ? 'Fallback pronunciation started.' : 'Fallback pronunciation failed.');
+    if (!played) Notify.create({ type: 'warning', message: 'Pronunciation is unavailable right now.' });
+  };
+  const systemVoiceStarted = speakWithSystemVoice(text, {
+    onStart: () => {
+      appendReadingSpeechDebug(`System pronunciation started for "${text}".`);
+      muteMicrophone();
+    },
+    onEnd: restoreMicrophone,
+    onError: () => { void playFallback(); },
   });
-  if (!played) Notify.create({ type: 'warning', message: 'Pronunciation is unavailable right now.' });
+  if (systemVoiceStarted) return;
+  await playFallback();
 }
 function clearReaderLookup() {
   readerLookupRequestId += 1;
