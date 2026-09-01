@@ -5,12 +5,13 @@ export interface ReaderLookupInteractionOptions {
   lookup: () => Promise<void>;
 }
 
-/** Keep visible lookup work ahead of MediaRecorder's late final chunk. */
+/** Start user-visible work before the comparatively expensive capture cleanup. */
 export function beginReaderLookupInteraction(options: ReaderLookupInteractionOptions): Promise<void> {
   options.revealSelection();
-  options.pauseListening?.();
   options.pronounce?.();
-  return options.lookup();
+  const lookup = options.lookup();
+  options.pauseListening?.();
+  return lookup;
 }
 
 export function shouldProcessLateReadingTranscript(lookupInProgress: boolean): boolean {

@@ -17,7 +17,7 @@ describe('reader lookup interaction', () => {
       },
     });
 
-    assert.deepEqual(events, ['word-visible', 'microphone-paused', 'pronunciation-started', 'translation-started']);
+    assert.deepEqual(events, ['word-visible', 'pronunciation-started', 'translation-started', 'microphone-paused']);
     finishLookup();
     await interaction;
   });
@@ -29,7 +29,7 @@ describe('reader lookup interaction', () => {
       pauseListening: () => events.push('microphone-paused'),
       lookup: async () => { events.push('translation-started'); },
     });
-    assert.deepEqual(events, ['phrase-visible', 'microphone-paused', 'translation-started']);
+    assert.deepEqual(events, ['phrase-visible', 'translation-started', 'microphone-paused']);
   });
 
   it('drops the recorder final transcript while translation is already in progress', () => {
