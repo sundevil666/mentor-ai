@@ -18,6 +18,7 @@
     "src/services/auth.ts",
     "src/services/indexed-db.ts",
     "src/services/lesson-session-restoration.ts",
+    "src/services/lesson-step-navigation.ts",
     "src/services/offline-library.ts",
     "src/services/offline-lesson-updates.ts",
     "src/services/navigation-category.ts",

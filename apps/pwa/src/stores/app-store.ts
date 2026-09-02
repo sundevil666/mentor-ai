@@ -66,6 +66,7 @@ import { cacheMyShiftActivity, readCachedMyShiftActivity } from 'src/services/my
 import { findOfflineLesson } from 'src/services/offline-library';
 import { selectRetainedUpdateNotifications } from 'src/services/update-notification-retention';
 import { resolveRestoredLessonSessions } from 'src/services/lesson-session-restoration';
+import { rewindLessonSession } from 'src/services/lesson-step-navigation';
 
 interface LearningSessionState {
   id: string;
@@ -592,6 +593,33 @@ export const useAppStore = defineStore('app', {
         await db.put('learning-sessions', toStorageRecord(this.pausedSession), pausedSessionStoreKey);
       }
       await db.delete('learning-sessions', sessionStoreKey);
+    },
+
+    async returnToPreviousExercise() {
+      if (!this.session) {
+        return false;
+      }
+
+      const revisitedAt = now();
+      const exerciseId = rewindLessonSession(this.session, revisitedAt);
+
+      if (!exerciseId) {
+        return false;
+      }
+
+      this.session.events.push(
+        createLearningEvent(
+          this.studentId,
+          this.session.id,
+          this.session.lesson,
+          exerciseId,
+          'exercise-started',
+          revisitedAt,
+        ),
+      );
+      await this.persistSession();
+      await this.publishSessionHandoff();
+      return true;
     },
 
     async resumePausedLesson(expectedSessionId?: string) {

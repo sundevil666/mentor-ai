@@ -142,7 +142,7 @@
               icon="arrow_back"
               round
               :aria-label="lessonBackLabel"
-              @click="returnToLessonChoice()"
+              @click="handleLessonBack"
             >
               <q-tooltip>{{ lessonBackLabel }}</q-tooltip>
             </q-btn>
@@ -1079,6 +1079,7 @@ const homeMetrics = computed(() => {
   ];
 });
 const lessonBackLabel = computed(() => {
+  if ((appStore.session?.currentExerciseIndex ?? 0) > 0) return 'Back to previous step';
   if (lessonReturnDestination.value === 'listening') return 'Back to Listening lessons';
   if (lessonReturnDestination.value === 'speaking') return 'Back to Speaking lessons';
   if (lessonReturnDestination.value === 'specific-lessons') return 'Back to Specific lessons';
@@ -1954,6 +1955,25 @@ async function returnToLessonChoice(destination?: LessonReturnDestination) {
   await appStore.returnToLessonChoice();
   selectedLessonLibrary.value = returnDestination === 'specific-lessons' ? 'home' : returnDestination;
   isLessonLibraryVisible.value = returnDestination === 'specific-lessons';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function handleLessonBack() {
+  if ((appStore.session?.currentExerciseIndex ?? 0) <= 0) {
+    await returnToLessonChoice();
+    return;
+  }
+
+  answer.value = '';
+  speechRecognitionCaptured.value = false;
+  speechRecognitionError.value = '';
+  if (isRecognizingSpeech.value) {
+    stopSpeechRecognition();
+    isRecognizingSpeech.value = false;
+  }
+  stopListeningAudio();
+  setBackTransition();
+  await appStore.returnToPreviousExercise();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
