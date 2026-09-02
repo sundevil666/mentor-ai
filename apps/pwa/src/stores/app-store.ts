@@ -109,7 +109,7 @@ interface AppState {
   isOnline: boolean;
   studentModel: StudentModel;
   session: LearningSessionState | null;
-  pausedSession: LearningSessionState | null;
+  pausedSessions: LearningSessionState[];
   latestRecommendation: Recommendation | null;
   statisticsSnapshots: StatisticsSnapshot[];
   activitySnapshots: ActivitySnapshot[];
@@ -130,6 +130,7 @@ interface AppState {
 
 const sessionStoreKey = 'active-session';
 const pausedSessionStoreKey = 'paused-session';
+const pausedSessionStoreKeyPrefix = 'paused-session:';
 const sessionCheckpointKey = 'mentor-ai:active-session-checkpoint';
 const updateResumeSessionKey = 'mentor-ai:resume-session-after-update';
 let hydrationInFlight: Promise<void> | null = null;
@@ -216,7 +217,7 @@ export const useAppStore = defineStore('app', {
     isOnline: typeof navigator === 'undefined' ? true : navigator.onLine,
     studentModel: initialStudentModel,
     session: null,
-    pausedSession: null,
+    pausedSessions: [],
     latestRecommendation: null,
     statisticsSnapshots: [],
     activitySnapshots: [],
@@ -237,6 +238,7 @@ export const useAppStore = defineStore('app', {
 
   getters: {
     currentExercise: (state): Exercise | null => state.session?.lesson.exercises[state.session.currentExerciseIndex] ?? null,
+    pausedSession: (state): LearningSessionState | null => state.pausedSessions[state.pausedSessions.length - 1] ?? null,
     isLessonComplete: (state): boolean => Boolean(state.session?.completedAt),
     pendingSyncCount: (state): number => state.pendingSyncEvents,
     lessonProgress: (state): number => {
@@ -280,6 +282,12 @@ export const useAppStore = defineStore('app', {
       const savedModel = await db.get('student-models', initialStudentModel.id);
       const savedSession = await db.get('learning-sessions', sessionStoreKey);
       const savedPausedSession = await db.get('learning-sessions', pausedSessionStoreKey);
+      const learningSessionKeys = await db.getAllKeys('learning-sessions');
+      const savedPausedSessions = await Promise.all(
+        learningSessionKeys
+          .filter((key): key is string => typeof key === 'string' && key.startsWith(pausedSessionStoreKeyPrefix))
+          .map((key) => db.get('learning-sessions', key)),
+      );
       const checkpointSession = readSessionCheckpoint();
       const updateResumeSessionId = readUpdateResumeSessionId();
       const statistics = await db.getAll('statistics');
@@ -292,17 +300,18 @@ export const useAppStore = defineStore('app', {
       const restoredSession = checkpointSession ?? (savedSession as LearningSessionState | undefined) ?? null;
       const restoredSessions = resolveRestoredLessonSessions(
         restoredSession,
-        (savedPausedSession as LearningSessionState | undefined) ?? null,
+        [
+          ...savedPausedSessions.filter((session): session is LearningSessionState => Boolean(session)),
+          ...savedPausedSession ? [savedPausedSession as LearningSessionState] : [],
+        ],
         updateResumeSessionId,
       );
       this.session = restoredSessions.activeSession ? toStorageRecord(restoredSessions.activeSession) : null;
-      this.pausedSession = restoredSessions.pausedSession ? toStorageRecord(restoredSessions.pausedSession) : null;
+      this.pausedSessions = deduplicatePausedSessions(restoredSessions.pausedSessions.map(toStorageRecord));
       clearSessionCheckpoint();
       clearUpdateResumeSessionId();
       if (!this.session) await db.delete('learning-sessions', sessionStoreKey);
-      if (this.pausedSession) {
-        await db.put('learning-sessions', toStorageRecord(this.pausedSession), pausedSessionStoreKey);
-      }
+      await this.persistPausedSessions();
       this.latestRecommendation = restoredSession?.recommendation ?? createRecommendationFromModel(this.studentModel, now());
       this.statisticsSnapshots = (statistics as StatisticsSnapshot[]).sort((left, right) =>
         left.createdAt.localeCompare(right.createdAt),
@@ -584,14 +593,12 @@ export const useAppStore = defineStore('app', {
       }
 
       if (!this.session.completedAt) {
-        this.pausedSession = toStorageRecord(this.session);
+        this.pausedSessions = upsertPausedSession(this.pausedSessions, this.session);
       }
       this.session = null;
       clearSessionCheckpoint();
       const db = await mentorDb;
-      if (this.pausedSession) {
-        await db.put('learning-sessions', toStorageRecord(this.pausedSession), pausedSessionStoreKey);
-      }
+      await this.persistPausedSessions();
       await db.delete('learning-sessions', sessionStoreKey);
     },
 
@@ -623,20 +630,42 @@ export const useAppStore = defineStore('app', {
     },
 
     async resumePausedLesson(expectedSessionId?: string) {
-      if (!this.pausedSession || (expectedSessionId && this.pausedSession.id !== expectedSessionId)) return false;
-      this.session = toStorageRecord(this.pausedSession);
-      this.pausedSession = null;
-      const db = await mentorDb;
-      await db.delete('learning-sessions', pausedSessionStoreKey);
+      const pausedSession = expectedSessionId
+        ? this.pausedSessions.find((session) => session.id === expectedSessionId)
+        : this.pausedSessions[this.pausedSessions.length - 1];
+      if (!pausedSession) return false;
+      this.session = toStorageRecord(pausedSession);
+      this.pausedSessions = this.pausedSessions.filter((session) => session.id !== pausedSession.id);
+      await this.persistPausedSessions();
       await this.persistSession();
       await this.publishSessionHandoff();
       return true;
     },
 
+    async dismissPausedLesson(sessionId: string) {
+      if (!this.pausedSessions.some((session) => session.id === sessionId)) return false;
+      this.pausedSessions = this.pausedSessions.filter((session) => session.id !== sessionId);
+      await this.persistPausedSessions();
+      return true;
+    },
+
+    async persistPausedSessions() {
+      const db = await mentorDb;
+      const keys = await db.getAllKeys('learning-sessions');
+      for (const key of keys) {
+        if (key === pausedSessionStoreKey || (typeof key === 'string' && key.startsWith(pausedSessionStoreKeyPrefix))) {
+          await db.delete('learning-sessions', key);
+        }
+      }
+      for (const session of this.pausedSessions) {
+        await db.put('learning-sessions', toStorageRecord(session), `${pausedSessionStoreKeyPrefix}${session.id}`);
+      }
+    },
+
     async resetLocalLearning() {
       this.studentModel = initialStudentModel;
       this.session = null;
-      this.pausedSession = null;
+      this.pausedSessions = [];
       clearSessionCheckpoint();
       this.latestRecommendation = createRecommendationFromModel(initialStudentModel, now());
       this.pendingSyncEvents = 0;
@@ -650,8 +679,7 @@ export const useAppStore = defineStore('app', {
 
       const db = await mentorDb;
       await db.put('student-models', this.studentModel);
-      await db.delete('learning-sessions', sessionStoreKey);
-      await db.delete('learning-sessions', pausedSessionStoreKey);
+      await db.clear('learning-sessions');
       await db.clear('statistics');
       await db.clear('activity-snapshots');
       await db.clear('sync-queue');
@@ -1238,6 +1266,21 @@ function getCurrentDeviceSurface(): DeviceSurface {
 
 function toStorageRecord<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function upsertPausedSession(
+  sessions: LearningSessionState[],
+  session: LearningSessionState,
+): LearningSessionState[] {
+  const templateKey = session.lesson.lessonTemplateKey;
+  return [
+    ...sessions.filter((candidate) => candidate.lesson.lessonTemplateKey !== templateKey),
+    toStorageRecord(session),
+  ];
+}
+
+function deduplicatePausedSessions(sessions: LearningSessionState[]): LearningSessionState[] {
+  return sessions.reduce<LearningSessionState[]>(upsertPausedSession, []);
 }
 
 function createActivitySnapshot(

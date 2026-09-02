@@ -60,26 +60,51 @@
             <button type="button" class="priority-link__main" @click="startRecommendedHomeLesson">
               <q-icon :name="recommendedHomeLesson.mode === 'listening' ? 'headphones' : 'record_voice_over'" size="26px" />
               <span>
-                <small>{{ isPausedLessonRecommended ? 'Continue · ' + pausedLessonProgress + '%' : (isRecommendedLessonPinned ? 'Pinned lesson' : 'Do this first') + ' · ' + recommendedHomeLesson.minutes + ' min' }}</small>
+                <small>{{ recommendedPausedLesson ? 'Continue · ' + lessonSessionProgress(recommendedPausedLesson) + '%' : (isRecommendedLessonPinned ? 'Pinned lesson' : 'Do this first') + ' · ' + recommendedHomeLesson.minutes + ' min' }}</small>
                 <strong>{{ recommendedHomeLesson.title }}</strong>
               </span>
               <q-icon name="arrow_forward" size="24px" />
             </button>
             <div class="priority-link__actions">
+              <q-btn
+                v-if="recommendedPausedLesson && wasLessonCompleted(recommendedPausedLesson)"
+                color="primary"
+                dense
+                flat
+                icon="done_all"
+                label="Finish"
+                no-caps
+                @click="finishRepeatedLesson(recommendedPausedLesson.id)"
+              />
               <q-btn dense flat no-caps color="primary" :icon="isRecommendedLessonPinned ? 'bookmark_remove' : 'push_pin'" :label="isRecommendedLessonPinned ? 'Unpin' : 'Pin'" @click="toggleRecommendedLessonPin" />
               <q-btn v-if="!isRecommendedLessonPinned" dense flat no-caps color="primary" icon="swap_horiz" label="Another" @click="suggestNextHomeLesson" />
             </div>
           </article>
 
-          <article v-if="pausedLesson && !isPausedLessonRecommended" class="priority-link priority-link--resume">
-            <button type="button" class="priority-link__main" @click="resumePausedLesson">
+          <article
+            v-for="pausedLesson in inProgressLessons"
+            :key="pausedLesson.id"
+            class="priority-link priority-link--resume"
+          >
+            <button type="button" class="priority-link__main" @click="resumePausedLesson(pausedLesson.id)">
               <q-icon name="history" size="26px" />
               <span>
-                <small>Continue where you stopped · {{ pausedLessonProgress }}%</small>
+                <small>Continue where you stopped · {{ lessonSessionProgress(pausedLesson) }}%</small>
                 <strong>{{ pausedLesson.lesson.title }}</strong>
               </span>
               <q-icon name="arrow_forward" size="24px" />
             </button>
+            <div v-if="wasLessonCompleted(pausedLesson)" class="priority-link__actions">
+              <q-btn
+                color="primary"
+                dense
+                flat
+                icon="done_all"
+                label="Finish"
+                no-caps
+                @click="finishRepeatedLesson(pausedLesson.id)"
+              />
+            </div>
           </article>
           </template>
 
@@ -669,6 +694,10 @@ import {
 } from 'src/services/user-preferences';
 import { useAppStore } from 'src/stores/app-store';
 import {
+  calculateLessonSessionProgress,
+  canFinishRepeatedLesson,
+} from 'src/services/home-lesson-progress';
+import {
   getSpeechTextsContentVersion,
   isOfflineSpeechLessonUpdateAvailable,
   markOfflineLessonOpened,
@@ -1059,7 +1088,7 @@ function lessonProgressState(templateKey: string): LessonProgressState {
   if ((lessonCompletionCounts.value.get(templateKey) ?? 0) > 0 || (summary?.fullPlays ?? 0) > 0 || (summary?.finishes ?? 0) > 0) {
     return 'completed';
   }
-  if ((summary?.starts ?? 0) > 0 || appStore.pausedSession?.lesson.lessonTemplateKey === templateKey) {
+  if ((summary?.starts ?? 0) > 0 || appStore.pausedSessions.some((session) => session.lesson.lessonTemplateKey === templateKey)) {
     return 'started';
   }
   return 'new';
@@ -1116,19 +1145,18 @@ const recommendedHomeLesson = computed(() =>
   allHomeLessons.value.find((lesson) => lesson.templateKey === pinnedHomeLessonKey.value)
     ?? homeLessonQueue.value[0]!,
 );
-const pausedLesson = computed(() => appStore.pausedSession);
-const pausedLessonProgress = computed(() => {
-  const session = pausedLesson.value;
-  if (!session || session.lesson.exercises.length === 0) return 0;
-  return Math.round((session.currentExerciseIndex / session.lesson.exercises.length) * 100);
-});
-const isPausedLessonRecommended = computed(() => {
-  const session = pausedLesson.value;
-  return Boolean(
-    session?.lesson.lessonTemplateKey
-    && session.lesson.lessonTemplateKey === recommendedHomeLesson.value.templateKey,
-  );
-});
+const recommendedPausedLesson = computed(() => appStore.pausedSessions.find(
+  (session) => session.lesson.lessonTemplateKey === recommendedHomeLesson.value.templateKey,
+));
+const inProgressLessons = computed(() => [...appStore.pausedSessions]
+  .filter((session) => session.id !== recommendedPausedLesson.value?.id)
+  .sort((left, right) => right.startedAt.localeCompare(left.startedAt)));
+function lessonSessionProgress(session: typeof appStore.pausedSessions[number]) {
+  return calculateLessonSessionProgress(session.currentExerciseIndex, session.lesson.exercises.length);
+}
+function wasLessonCompleted(session: typeof appStore.pausedSessions[number]) {
+  return canFinishRepeatedLesson(session.lesson.lessonTemplateKey, lessonCompletionCounts.value);
+}
 const isRecommendedLessonPinned = computed(() =>
   pinnedHomeLessonKey.value === recommendedHomeLesson.value.templateKey,
 );
@@ -1467,16 +1495,20 @@ async function startHomeLesson(lesson: HomeLesson) {
 }
 
 async function startRecommendedHomeLesson() {
-  if (isPausedLessonRecommended.value) {
-    await resumePausedLesson();
+  if (recommendedPausedLesson.value) {
+    await resumePausedLesson(recommendedPausedLesson.value.id);
     return;
   }
   await startHomeLesson(recommendedHomeLesson.value);
 }
 
-async function resumePausedLesson() {
+async function resumePausedLesson(sessionId: string) {
   setForwardTransition();
-  await appStore.resumePausedLesson();
+  await appStore.resumePausedLesson(sessionId);
+}
+
+async function finishRepeatedLesson(sessionId: string) {
+  await appStore.dismissPausedLesson(sessionId);
 }
 
 function toggleRecommendedLessonPin() {

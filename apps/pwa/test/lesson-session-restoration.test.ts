@@ -9,22 +9,31 @@ describe('lesson session restoration', () => {
 
   it('restores the exact prepared lesson as active after an app update', () => {
     assert.deepEqual(
-      resolveRestoredLessonSessions(activeLesson, olderPausedLesson, activeLesson.id),
-      { activeSession: activeLesson, pausedSession: olderPausedLesson },
+      resolveRestoredLessonSessions(activeLesson, [olderPausedLesson], activeLesson.id),
+      { activeSession: activeLesson, pausedSessions: [olderPausedLesson] },
     );
   });
 
   it('keeps an ordinary reload paused when there is no update marker', () => {
     assert.deepEqual(
-      resolveRestoredLessonSessions(activeLesson, null, null),
-      { activeSession: null, pausedSession: activeLesson },
+      resolveRestoredLessonSessions(activeLesson, [olderPausedLesson], null),
+      { activeSession: null, pausedSessions: [olderPausedLesson, activeLesson] },
+    );
+  });
+
+  it('keeps every incomplete saved lesson and drops completed sessions', () => {
+    const completedLesson = { id: 'completed', completedAt: '2026-09-02T09:00:00.000Z' };
+
+    assert.deepEqual(
+      resolveRestoredLessonSessions(null, [olderPausedLesson, completedLesson, activeLesson], null),
+      { activeSession: null, pausedSessions: [olderPausedLesson, activeLesson] },
     );
   });
 
   it('does not resume the wrong or completed session', () => {
-    assert.equal(resolveRestoredLessonSessions(activeLesson, null, 'different-session').activeSession, null);
+    assert.equal(resolveRestoredLessonSessions(activeLesson, [], 'different-session').activeSession, null);
     assert.equal(
-      resolveRestoredLessonSessions({ ...activeLesson, completedAt: '2026-09-02T09:00:00.000Z' }, null, activeLesson.id).activeSession,
+      resolveRestoredLessonSessions({ ...activeLesson, completedAt: '2026-09-02T09:00:00.000Z' }, [], activeLesson.id).activeSession,
       null,
     );
   });

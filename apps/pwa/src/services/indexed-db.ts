@@ -26,8 +26,8 @@ export const mentorDb = openDB('mentor-ai', 14, {
       db.createObjectStore('student-models', { keyPath: 'id' });
     }
 
-    // The store key identifies the one locally restorable session. The value's
-    // `id` remains a unique learning-session id used by evidence and analytics.
+    // Store keys distinguish the active session from every locally paused
+    // lesson. Each value's `id` remains the learning-session analytics id.
     if (oldVersion > 0 && oldVersion < 9 && db.objectStoreNames.contains('learning-sessions')) {
       db.deleteObjectStore('learning-sessions');
     }
