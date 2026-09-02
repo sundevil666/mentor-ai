@@ -206,7 +206,7 @@
               <span>{{ lessonRemainingTimeLabel }}</span>
             </div>
             <q-linear-progress
-              :value="lessonProgressRatio"
+              :value="lessonRemainingRatio"
               color="primary"
               track-color="grey-4"
               rounded
@@ -610,6 +610,11 @@ import {
   createLearningContext,
 } from 'src/services/learning-context';
 import {
+  calculateLessonProgressRatio,
+  calculateLessonRemainingRatio,
+  calculatePlaybackProgress,
+} from 'src/services/lesson-time-progress';
+import {
   hasActiveSpeechPlayback,
   isSpeechBatchCached,
   isSpeechSynthesisAvailable,
@@ -684,6 +689,7 @@ const route = useRoute();
 const answer = ref('');
 const activeWordIndex = ref(0);
 const activeWordEndIndex = ref(0);
+const activeExercisePlaybackProgress = ref(0);
 const isListeningSpeaking = ref(false);
 const isListeningStarting = ref(false);
 const isListeningPaused = ref(false);
@@ -722,12 +728,12 @@ const lessonEstimatedMinutes = computed(() =>
   Math.max(1, Math.round(appStore.session?.lesson.estimatedMinutes ?? 1)),
 );
 const currentExerciseProgress = computed(() => {
-  if (!isListeningPlayer.value || listeningTokens.value.length <= 1) {
-    return 0;
+  if (isListeningPlayer.value && listeningTokens.value.length > 1) {
+    return clampIndex(activeWordIndex.value, 0, listeningTokens.value.length - 1)
+      / (listeningTokens.value.length - 1);
   }
 
-  return clampIndex(activeWordIndex.value, 0, listeningTokens.value.length - 1)
-    / (listeningTokens.value.length - 1);
+  return activeExercisePlaybackProgress.value;
 });
 const lessonProgressRatio = computed(() => {
   const session = appStore.session;
@@ -740,13 +746,15 @@ const lessonProgressRatio = computed(() => {
     return 1;
   }
 
-  return Math.min(
-    1,
-    (session.currentExerciseIndex + currentExerciseProgress.value)
-      / session.lesson.exercises.length,
+  return calculateLessonProgressRatio(
+    session.currentExerciseIndex,
+    currentExerciseProgress.value,
+    session.lesson.exercises.length,
+    Boolean(session.completedAt),
   );
 });
 const displayedLessonProgress = computed(() => Math.round(lessonProgressRatio.value * 100));
+const lessonRemainingRatio = computed(() => calculateLessonRemainingRatio(lessonProgressRatio.value));
 const lessonRemainingSeconds = computed(() =>
   Math.max(0, Math.round(lessonEstimatedMinutes.value * 60 * (1 - lessonProgressRatio.value))),
 );
@@ -1294,6 +1302,10 @@ watch(isListeningPlayer, (isActiveListeningPlayer) => {
   resetListeningPlayback();
 });
 
+watch(currentExercise, () => {
+  activeExercisePlaybackProgress.value = 0;
+});
+
 watch(listeningPlaylist, (playlist) => {
   if (!isListeningPlayer.value || playlist.length === 0) {
     selectedListeningItemId.value = null;
@@ -1430,9 +1442,29 @@ async function recordDialogueAnswer() {
 
 async function playAudio() {
   const text = currentExercise.value?.audioText;
+  const exerciseId = currentExercise.value?.id;
 
   if (text && isSpeechSynthesisAvailable()) {
-    await speakWithPreferredVoice(text, { voice: currentExercise.value?.audioVoice ?? 'mia' });
+    activeExercisePlaybackProgress.value = 0;
+    await speakWithPreferredVoice(text, {
+      voice: currentExercise.value?.audioVoice ?? 'mia',
+      onTimeUpdate: (currentTime, duration) => {
+        if (
+          currentExercise.value?.id !== exerciseId
+          || !Number.isFinite(duration)
+          || duration <= 0
+        ) {
+          return;
+        }
+
+        activeExercisePlaybackProgress.value = calculatePlaybackProgress(currentTime, duration);
+      },
+      onEnd: () => {
+        if (currentExercise.value?.id === exerciseId) {
+          activeExercisePlaybackProgress.value = 1;
+        }
+      },
+    });
   }
 
   await appStore.replayAudio();
