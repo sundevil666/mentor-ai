@@ -638,6 +638,10 @@ import {
   type LocalReadingTranscriber,
 } from 'src/services/local-reading-transcriber';
 import {
+  chooseBestDialogueTranscript,
+  isConfidentDialogueAnswer,
+} from 'src/services/dialogue-speech';
+import {
   readListeningProgressPreference,
   saveListeningProgressPreference,
 } from 'src/services/user-preferences';
@@ -721,6 +725,9 @@ const speechRecognitionError = ref('');
 const speechRecognitionProgress = ref('');
 let dialogueSpeechStream: MediaStream | null = null;
 let dialogueLocalTranscriber: LocalReadingTranscriber | null = null;
+let dialogueSpeechAudioContext: AudioContext | null = null;
+let dialogueSilenceTimer = 0;
+let dialogueRecordingTimeout = 0;
 const speechRecognitionCaptured = ref(false);
 const selectedListeningItemId = ref<string | null>(null);
 const activeSpeechRunId = ref(0);
@@ -1466,15 +1473,23 @@ async function recordDialogueAnswer() {
       dialogueSpeechStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       dialogueLocalTranscriber = startLocalReadingTranscriber(dialogueSpeechStream, {
         onTranscript: (transcript) => {
-          answer.value = [answer.value.trim(), transcript.trim()].filter(Boolean).join(' ').trim();
+          const expected = currentExercise.value?.audioText ?? '';
+          const bestTranscript = chooseBestDialogueTranscript(answer.value, transcript, expected);
+          const matchesExpected = isConfidentDialogueAnswer(bestTranscript, expected);
+          answer.value = matchesExpected ? expected.trim() : bestTranscript;
           speechRecognitionCaptured.value = answer.value.length > 0;
+          if (matchesExpected) stopDialogueSpeechRecording();
         },
-        onReady: () => { speechRecognitionProgress.value = 'Speak now. Tap Stop recording when you finish.'; },
+        onReady: () => {
+          if (dialogueSpeechStream) monitorDialogueSpeech(dialogueSpeechStream);
+          speechRecognitionProgress.value = 'Speak now. Recording stops after a pause.';
+        },
         onProgress: (message) => { speechRecognitionProgress.value = `${message}. Keep this screen open.`; },
         onError: (message) => {
           speechRecognitionError.value = message;
           stopDialogueSpeechRecording();
         },
+        chunkDurationMs: 5_000,
       });
       speechRecognitionProgress.value = 'Preparing offline speech recognition…';
       return;
@@ -1501,9 +1516,45 @@ function stopDialogueSpeechRecording() {
   dialogueLocalTranscriber = null;
   dialogueSpeechStream?.getTracks().forEach((track) => track.stop());
   dialogueSpeechStream = null;
+  window.clearInterval(dialogueSilenceTimer);
+  window.clearTimeout(dialogueRecordingTimeout);
+  dialogueSilenceTimer = 0;
+  dialogueRecordingTimeout = 0;
+  if (dialogueSpeechAudioContext) void dialogueSpeechAudioContext.close().catch(() => undefined);
+  dialogueSpeechAudioContext = null;
   stopSpeechRecognition();
   speechRecognitionProgress.value = '';
   isRecognizingSpeech.value = false;
+}
+
+function monitorDialogueSpeech(stream: MediaStream) {
+  const context = new AudioContext();
+  const analyser = context.createAnalyser();
+  analyser.fftSize = 1024;
+  context.createMediaStreamSource(stream).connect(analyser);
+  dialogueSpeechAudioContext = context;
+  const samples = new Float32Array(analyser.fftSize);
+  let speechStarted = false;
+  let quietSince = 0;
+
+  dialogueSilenceTimer = window.setInterval(() => {
+    if (!isRecognizingSpeech.value) return;
+    analyser.getFloatTimeDomainData(samples);
+    let sumSquares = 0;
+    for (const sample of samples) sumSquares += sample * sample;
+    const rms = Math.sqrt(sumSquares / samples.length);
+    const now = performance.now();
+    if (rms >= 0.012) {
+      speechStarted = true;
+      quietSince = 0;
+      return;
+    }
+    if (!speechStarted) return;
+    quietSince ||= now;
+    if (now - quietSince >= 1_400) stopDialogueSpeechRecording();
+  }, 100);
+
+  dialogueRecordingTimeout = window.setTimeout(() => stopDialogueSpeechRecording(), 15_000);
 }
 
 async function playAudio() {

@@ -4,6 +4,7 @@ type LocalTranscriberOptions = {
   onReady: () => void;
   onProgress: (message: string) => void;
   onError: (message: string) => void;
+  chunkDurationMs?: number;
 };
 
 export type LocalReadingTranscriber = { stop: () => void };
@@ -76,7 +77,8 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
     if (stopped || !stream.active) return;
     const chunks: Blob[] = [];
     recorder = new MediaRecorder(stream);
-    options.onDebug?.(`Recording ${(localReadingChunkDurationMs / 1_000).toFixed(1)}s audio chunk (${recorder.mimeType || 'default format'}).`);
+    const chunkDurationMs = options.chunkDurationMs ?? localReadingChunkDurationMs;
+    options.onDebug?.(`Recording ${(chunkDurationMs / 1_000).toFixed(1)}s audio chunk (${recorder.mimeType || 'default format'}).`);
     recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
     recorder.onstop = () => {
       if (chunks.length) {
@@ -100,7 +102,7 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
       if (!stopped) recordChunk();
     };
     recorder.start();
-    timer = window.setTimeout(() => recorder?.state === 'recording' && recorder.stop(), localReadingChunkDurationMs);
+    timer = window.setTimeout(() => recorder?.state === 'recording' && recorder.stop(), chunkDurationMs);
   };
   return {
     stop() {
