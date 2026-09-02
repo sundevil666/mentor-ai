@@ -26,12 +26,17 @@ const manifestUrl = process.env.APP_UPDATE_MANIFEST_URL ?? '/app-update.json';
 const currentVersion = process.env.APP_VERSION ?? '0.1.0';
 const checkIntervalMs = Number(process.env.APP_UPDATE_CHECK_INTERVAL_MS ?? 60 * 1000);
 const updateReloadRequestKey = 'mentor-ai:update-reload-requested';
+const appUpdatesEnabled = shouldCheckForAppUpdates(Boolean(process.env.DEV));
 
 let intervalId: number | undefined;
 let inFlightCheck: Promise<AppUpdateCheckResult | null> | null = null;
 const notifiedVersions = new Set<string>();
 
 export function startAppUpdatePolling(onUpdate: (result: AppUpdateCheckResult) => void | Promise<void>) {
+  if (!appUpdatesEnabled) {
+    return () => undefined;
+  }
+
   const runUpdateCheck = () => {
     void checkForAppUpdate().then((result) => {
       if (result?.notification) {
@@ -71,6 +76,10 @@ export function startAppUpdatePolling(onUpdate: (result: AppUpdateCheckResult) =
 }
 
 export async function checkForAppUpdate(): Promise<AppUpdateCheckResult | null> {
+  if (!appUpdatesEnabled) {
+    return null;
+  }
+
   if (inFlightCheck) {
     return inFlightCheck;
   }
@@ -231,6 +240,10 @@ async function fetchAppUpdateManifest(): Promise<AppUpdateManifest | null> {
 
 function isNewVersion(version: string): boolean {
   return version !== currentVersion;
+}
+
+export function shouldCheckForAppUpdates(isDevelopment: boolean): boolean {
+  return !isDevelopment;
 }
 
 function createUpdateAvailableMessage(manifest: AppUpdateManifest): string {

@@ -6,6 +6,7 @@ import {
   consumePendingAppUpdate,
   createAppUpdateReloadUrl,
   rememberPendingAppUpdate,
+  shouldCheckForAppUpdates,
 } from '../src/services/app-update.js';
 
 describe('PWA app update checks', () => {
@@ -59,6 +60,11 @@ describe('PWA app update checks', () => {
 
     assert.equal(result, null);
     assert.equal(serviceWorkerUpdates, 0);
+  });
+
+  it('disables production update checks during local development', () => {
+    assert.equal(shouldCheckForAppUpdates(true), false);
+    assert.equal(shouldCheckForAppUpdates(false), true);
   });
 
   it('creates one notification for a newer server manifest version', async () => {
