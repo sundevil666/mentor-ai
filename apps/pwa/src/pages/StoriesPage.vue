@@ -6,7 +6,16 @@
         class="videos-header"
         :class="{ 'videos-header--book-detail': selectedBook }"
       >
-        <q-btn v-if="selectedStory || selectedBook" aria-label="Back to library" color="primary" flat icon="arrow_back" round @click="closeDetail" />
+        <q-btn
+          v-if="selectedStory || selectedBook"
+          aria-label="Back to library"
+          class="app-back-button"
+          color="primary"
+          flat
+          icon="arrow_back"
+          round
+          @click="closeDetail"
+        />
         <div>
           <p>{{ activeTab === 'audio' ? 'English audio library' : 'Your private English library' }}</p>
           <h1>{{ selectedStory?.title ?? selectedBook?.title ?? 'Stories & Books' }}</h1>

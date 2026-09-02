@@ -3,6 +3,7 @@
     <section class="settings-shell">
       <div class="settings-header">
         <q-btn
+          class="app-back-button"
           color="primary"
           flat
           icon="arrow_back"

@@ -136,6 +136,7 @@
         >
           <div class="lesson-nav">
             <q-btn
+              class="app-back-button"
               color="primary"
               flat
               icon="arrow_back"

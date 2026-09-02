@@ -5,6 +5,7 @@
         <q-btn
           v-if="selectedAudio"
           aria-label="Back to audio library"
+          class="app-back-button"
           color="primary"
           flat
           icon="arrow_back"

@@ -226,6 +226,27 @@ body .q-menu {
   order: 4;
 }
 
+.app-back-button {
+  background: color-mix(in srgb, var(--app-surface) 94%, transparent) !important;
+  border: 1px solid var(--app-border-strong);
+  box-shadow: 0 8px 22px rgba(17, 24, 39, 0.16);
+  left: max(12px, env(safe-area-inset-left));
+  position: fixed;
+  top: calc(62px + env(safe-area-inset-top));
+  z-index: 6;
+}
+
+.settings-header,
+.audio-header--detail,
+.patterns-detail-header,
+.videos-page--detail .videos-header {
+  padding-left: 54px;
+}
+
+.lesson-nav__status {
+  margin-left: auto;
+}
+
 .q-notifications__list--top {
   top: calc(54px + env(safe-area-inset-top));
 }
