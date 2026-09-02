@@ -3,6 +3,8 @@ import { describe, it } from 'node:test';
 import {
   calculateLessonProgressRatio,
   calculatePlaybackProgress,
+  calculateRemainingSeconds,
+  estimateAudioTotalSeconds,
   formatRemainingClockTime,
 } from '../src/services/lesson-time-progress.js';
 
@@ -36,5 +38,13 @@ describe('lesson time progress', () => {
   it('marks the decreasing time with a minus sign', () => {
     assert.equal(formatRemainingClockTime(300), '-5:00');
     assert.equal(formatRemainingClockTime(299), '-4:59');
+  });
+
+  it('uses the current dialogue duration instead of the estimated lesson duration', () => {
+    const dialogueDuration = estimateAudioTotalSeconds(120, 15, 30);
+
+    assert.equal(dialogueDuration, 60);
+    assert.equal(calculateRemainingSeconds(dialogueDuration, 0.5), 30);
+    assert.equal(calculateRemainingSeconds(dialogueDuration, 1), 0);
   });
 });

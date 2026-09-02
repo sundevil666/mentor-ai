@@ -206,7 +206,7 @@
               <span>{{ lessonRemainingTimeLabel }}</span>
             </div>
             <q-linear-progress
-              :value="lessonProgressRatio"
+              :value="displayedTimeProgressRatio"
               color="primary"
               track-color="grey-4"
               rounded
@@ -612,6 +612,8 @@ import {
 import {
   calculateLessonProgressRatio,
   calculatePlaybackProgress,
+  calculateRemainingSeconds,
+  estimateAudioTotalSeconds,
   formatRemainingClockTime,
 } from 'src/services/lesson-time-progress';
 import {
@@ -690,6 +692,7 @@ const answer = ref('');
 const activeWordIndex = ref(0);
 const activeWordEndIndex = ref(0);
 const activeExercisePlaybackProgress = ref(0);
+const activeAudioTotalSeconds = ref(0);
 const isListeningSpeaking = ref(false);
 const isListeningStarting = ref(false);
 const isListeningPaused = ref(false);
@@ -722,6 +725,9 @@ let listeningAutoScrollPauseTimer: number | undefined;
 let isProgrammaticListeningScroll = false;
 let programmaticListeningScrollUntil = 0;
 let offlineAudioDownloadRunId = 0;
+let measuredListeningDurationSeconds = 0;
+let measuredListeningTokenCount = 0;
+let measuredListeningSegments = new Set<number>();
 
 const currentExercise = computed(() => appStore.currentExercise);
 const lessonEstimatedMinutes = computed(() =>
@@ -754,10 +760,27 @@ const lessonProgressRatio = computed(() => {
   );
 });
 const displayedLessonProgress = computed(() => Math.round(lessonProgressRatio.value * 100));
-const lessonRemainingSeconds = computed(() =>
-  Math.max(0, Math.round(lessonEstimatedMinutes.value * 60 * (1 - lessonProgressRatio.value))),
+const hasCurrentExerciseAudio = computed(() => Boolean(currentExercise.value?.audioText?.trim()));
+const estimatedCurrentAudioSeconds = computed(() => {
+  const wordCount = isListeningPlayer.value
+    ? listeningTokens.value.length
+    : currentExercise.value?.audioText?.trim().split(/\s+/).filter(Boolean).length ?? 0;
+
+  return estimateAudioTotalSeconds(wordCount);
+});
+const displayedTimeProgressRatio = computed(() =>
+  hasCurrentExerciseAudio.value ? currentExerciseProgress.value : lessonProgressRatio.value,
 );
-const lessonTotalTimeLabel = computed(() => formatClockTime(lessonEstimatedMinutes.value * 60));
+const displayedTotalSeconds = computed(() =>
+  hasCurrentExerciseAudio.value
+    ? activeAudioTotalSeconds.value || estimatedCurrentAudioSeconds.value
+    : lessonEstimatedMinutes.value * 60,
+);
+const lessonRemainingSeconds = computed(() => calculateRemainingSeconds(
+  displayedTotalSeconds.value,
+  displayedTimeProgressRatio.value,
+));
+const lessonTotalTimeLabel = computed(() => formatClockTime(displayedTotalSeconds.value));
 const lessonRemainingTimeLabel = computed(() => formatRemainingClockTime(lessonRemainingSeconds.value));
 const isListeningPlayer = computed(() => {
   if (!appStore.session || !currentExercise.value) {
@@ -1303,6 +1326,7 @@ watch(isListeningPlayer, (isActiveListeningPlayer) => {
 
 watch(currentExercise, () => {
   activeExercisePlaybackProgress.value = 0;
+  resetActiveAudioTiming();
 });
 
 watch(listeningPlaylist, (playlist) => {
@@ -1456,6 +1480,7 @@ async function playAudio() {
           return;
         }
 
+        activeAudioTotalSeconds.value = duration;
         activeExercisePlaybackProgress.value = calculatePlaybackProgress(currentTime, duration);
       },
       onEnd: () => {
@@ -1652,6 +1677,7 @@ async function startListeningAtWord(wordIndex: number) {
   const safeWordIndex = clampIndex(wordIndex, 0, tokens.length - 1);
   const runId = activeSpeechRunId.value + 1;
 
+  resetActiveAudioTiming();
   activeSpeechRunId.value = runId;
   activeWordIndex.value = safeWordIndex;
   activeWordEndIndex.value = safeWordIndex;
@@ -1693,6 +1719,20 @@ async function speakListeningPhrase(wordIndex: number, runId: number) {
         return;
       }
 
+      if (!measuredListeningSegments.has(wordIndex)) {
+        measuredListeningSegments.add(wordIndex);
+        measuredListeningDurationSeconds += duration;
+        measuredListeningTokenCount += playbackTokens.length;
+      }
+
+      if (measuredListeningTokenCount > 0) {
+        activeAudioTotalSeconds.value = estimateAudioTotalSeconds(
+          tokens.length,
+          measuredListeningDurationSeconds,
+          measuredListeningTokenCount,
+        );
+      }
+
       const progressIndex = Math.min(
         playbackTokens.length - 1,
         Math.floor((currentTime / duration) * playbackTokens.length),
@@ -1712,6 +1752,8 @@ async function speakListeningPhrase(wordIndex: number, runId: number) {
         return;
       }
 
+      activeWordIndex.value = tokens.length - 1;
+      activeWordEndIndex.value = tokens.length - 1;
       finishListeningPlayback(runId, false);
     },
     onError: () => {
@@ -1772,10 +1814,18 @@ function stopListeningAudio(saveProgress = true) {
 
 function resetListeningPlayback() {
   stopListeningAudio();
+  resetActiveAudioTiming();
   activeWordIndex.value = 0;
   activeWordEndIndex.value = 0;
   isListeningTranslationVisible.value = false;
   resetListeningAutoScroll();
+}
+
+function resetActiveAudioTiming() {
+  activeAudioTotalSeconds.value = 0;
+  measuredListeningDurationSeconds = 0;
+  measuredListeningTokenCount = 0;
+  measuredListeningSegments = new Set<number>();
 }
 
 function restoreListeningPlayback() {
