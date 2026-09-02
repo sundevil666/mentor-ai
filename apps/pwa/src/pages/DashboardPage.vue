@@ -634,6 +634,10 @@ import {
   stopSpeechRecognition,
 } from 'src/services/speech-recognition';
 import {
+  startLocalReadingTranscriber,
+  type LocalReadingTranscriber,
+} from 'src/services/local-reading-transcriber';
+import {
   readListeningProgressPreference,
   saveListeningProgressPreference,
 } from 'src/services/user-preferences';
@@ -714,6 +718,9 @@ const offlineAudioStatus = ref<'idle' | 'downloading' | 'ready' | 'error'>('idle
 const offlineAudioProgress = ref(0);
 const isRecognizingSpeech = ref(false);
 const speechRecognitionError = ref('');
+const speechRecognitionProgress = ref('');
+let dialogueSpeechStream: MediaStream | null = null;
+let dialogueLocalTranscriber: LocalReadingTranscriber | null = null;
 const speechRecognitionCaptured = ref(false);
 const selectedListeningItemId = ref<string | null>(null);
 const activeSpeechRunId = ref(0);
@@ -792,10 +799,17 @@ const isListeningPlayer = computed(() => {
 const isDialogueTranslationExercise = computed(
   () => currentExercise.value?.type === 'dialogue-translation',
 );
-const speechRecognitionAvailable = computed(() => isSpeechRecognitionAvailable());
+const localSpeechRecognitionAvailable = computed(() => (
+  typeof navigator !== 'undefined'
+  && typeof navigator.mediaDevices?.getUserMedia === 'function'
+  && typeof MediaRecorder !== 'undefined'
+));
+const speechRecognitionAvailable = computed(() => (
+  localSpeechRecognitionAvailable.value || isSpeechRecognitionAvailable()
+));
 const speechSupportMessage = computed(() => {
   if (isRecognizingSpeech.value) {
-    return 'Speak now. Tap Stop recording when you finish.';
+    return speechRecognitionProgress.value || 'Speak now. Tap Stop recording when you finish.';
   }
 
   if (speechRecognitionError.value) {
@@ -810,7 +824,7 @@ const speechSupportMessage = computed(() => {
     return 'Voice recognition is not available on this device. Type the answer here instead.';
   }
 
-  return 'Tap Record answer, then speak. Recording stops automatically after a pause.';
+  return 'Tap Record answer, speak, then tap Stop recording.';
 });
 const speechStatusTitle = computed(() => {
   if (isRecognizingSpeech.value) return 'Recording now';
@@ -1253,7 +1267,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   stopListeningAudio();
-  stopSpeechRecognition();
+  stopDialogueSpeechRecording();
   resetListeningAutoScroll();
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
@@ -1297,8 +1311,7 @@ watch(
     answer.value = '';
     speechRecognitionError.value = '';
     speechRecognitionCaptured.value = false;
-    stopSpeechRecognition();
-    isRecognizingSpeech.value = false;
+    stopDialogueSpeechRecording();
     if (isListeningPlayer.value) {
       selectedListeningItemId.value =
         currentExercise.value?.id ?? listeningPlaylist.value[0]?.id ?? null;
@@ -1438,7 +1451,7 @@ async function recordDialogueAnswer() {
   }
 
   if (isRecognizingSpeech.value) {
-    stopSpeechRecognition();
+    stopDialogueSpeechRecording();
     return;
   }
 
@@ -1446,8 +1459,27 @@ async function recordDialogueAnswer() {
   speechRecognitionCaptured.value = false;
   answer.value = '';
   isRecognizingSpeech.value = true;
+  speechRecognitionProgress.value = '';
 
   try {
+    if (localSpeechRecognitionAvailable.value) {
+      dialogueSpeechStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      dialogueLocalTranscriber = startLocalReadingTranscriber(dialogueSpeechStream, {
+        onTranscript: (transcript) => {
+          answer.value = [answer.value.trim(), transcript.trim()].filter(Boolean).join(' ').trim();
+          speechRecognitionCaptured.value = answer.value.length > 0;
+        },
+        onReady: () => { speechRecognitionProgress.value = 'Speak now. Tap Stop recording when you finish.'; },
+        onProgress: (message) => { speechRecognitionProgress.value = `${message}. Keep this screen open.`; },
+        onError: (message) => {
+          speechRecognitionError.value = message;
+          stopDialogueSpeechRecording();
+        },
+      });
+      speechRecognitionProgress.value = 'Preparing offline speech recognition…';
+      return;
+    }
+
     const result = await recognizeSpeechOnce('en-US', undefined, (transcript) => {
       answer.value = transcript;
     });
@@ -1460,8 +1492,18 @@ async function recordDialogueAnswer() {
         ? error.message
         : 'Speech recognition failed. Type the answer here instead.';
   } finally {
-    isRecognizingSpeech.value = false;
+    if (!dialogueLocalTranscriber) isRecognizingSpeech.value = false;
   }
+}
+
+function stopDialogueSpeechRecording() {
+  dialogueLocalTranscriber?.stop();
+  dialogueLocalTranscriber = null;
+  dialogueSpeechStream?.getTracks().forEach((track) => track.stop());
+  dialogueSpeechStream = null;
+  stopSpeechRecognition();
+  speechRecognitionProgress.value = '';
+  isRecognizingSpeech.value = false;
 }
 
 async function playAudio() {
@@ -1968,8 +2010,7 @@ async function handleLessonBack() {
   speechRecognitionCaptured.value = false;
   speechRecognitionError.value = '';
   if (isRecognizingSpeech.value) {
-    stopSpeechRecognition();
-    isRecognizingSpeech.value = false;
+    stopDialogueSpeechRecording();
   }
   stopListeningAudio();
   setBackTransition();
