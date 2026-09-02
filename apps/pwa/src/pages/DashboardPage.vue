@@ -206,7 +206,7 @@
               <span>{{ lessonRemainingTimeLabel }}</span>
             </div>
             <q-linear-progress
-              :value="lessonRemainingRatio"
+              :value="lessonProgressRatio"
               color="primary"
               track-color="grey-4"
               rounded
@@ -611,8 +611,8 @@ import {
 } from 'src/services/learning-context';
 import {
   calculateLessonProgressRatio,
-  calculateLessonRemainingRatio,
   calculatePlaybackProgress,
+  formatRemainingClockTime,
 } from 'src/services/lesson-time-progress';
 import {
   hasActiveSpeechPlayback,
@@ -754,12 +754,11 @@ const lessonProgressRatio = computed(() => {
   );
 });
 const displayedLessonProgress = computed(() => Math.round(lessonProgressRatio.value * 100));
-const lessonRemainingRatio = computed(() => calculateLessonRemainingRatio(lessonProgressRatio.value));
 const lessonRemainingSeconds = computed(() =>
   Math.max(0, Math.round(lessonEstimatedMinutes.value * 60 * (1 - lessonProgressRatio.value))),
 );
 const lessonTotalTimeLabel = computed(() => formatClockTime(lessonEstimatedMinutes.value * 60));
-const lessonRemainingTimeLabel = computed(() => formatClockTime(lessonRemainingSeconds.value));
+const lessonRemainingTimeLabel = computed(() => formatRemainingClockTime(lessonRemainingSeconds.value));
 const isListeningPlayer = computed(() => {
   if (!appStore.session || !currentExercise.value) {
     return false;

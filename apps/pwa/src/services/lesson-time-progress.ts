@@ -15,8 +15,12 @@ export function calculatePlaybackProgress(currentTime: number, duration: number)
   return clampRatio(currentTime / duration);
 }
 
-export function calculateLessonRemainingRatio(progressRatio: number): number {
-  return 1 - clampRatio(progressRatio);
+export function formatRemainingClockTime(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, Math.round(totalSeconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+
+  return `-${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 function clampRatio(value: number): number {

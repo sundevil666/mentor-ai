@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   calculateLessonProgressRatio,
-  calculateLessonRemainingRatio,
   calculatePlaybackProgress,
+  formatRemainingClockTime,
 } from '../src/services/lesson-time-progress.js';
 
 describe('lesson time progress', () => {
-  it('decreases the remaining bar while a speaking example plays', () => {
+  it('fills the progress bar from left to right while a speaking example plays', () => {
     const beforePlayback = calculateLessonProgressRatio(1, 0, 6, false);
     const duringPlayback = calculateLessonProgressRatio(
       1,
@@ -16,20 +16,25 @@ describe('lesson time progress', () => {
       false,
     );
 
-    assert.equal(calculateLessonRemainingRatio(beforePlayback), 5 / 6);
-    assert.equal(calculateLessonRemainingRatio(duringPlayback), 4.5 / 6);
+    assert.equal(beforePlayback, 1 / 6);
+    assert.equal(duringPlayback, 1.5 / 6);
+    assert.ok(duringPlayback > beforePlayback);
   });
 
   it('keeps playback and remaining ratios within the progress bar range', () => {
     assert.equal(calculatePlaybackProgress(-1, 4), 0);
     assert.equal(calculatePlaybackProgress(8, 4), 1);
     assert.equal(calculatePlaybackProgress(1, 0), 0);
-    assert.equal(calculateLessonRemainingRatio(2), 0);
   });
 
-  it('shows no remaining progress after lesson completion', () => {
+  it('fills the progress bar after lesson completion', () => {
     const completed = calculateLessonProgressRatio(0, 0, 6, true);
 
-    assert.equal(calculateLessonRemainingRatio(completed), 0);
+    assert.equal(completed, 1);
+  });
+
+  it('marks the decreasing time with a minus sign', () => {
+    assert.equal(formatRemainingClockTime(300), '-5:00');
+    assert.equal(formatRemainingClockTime(299), '-4:59');
   });
 });
