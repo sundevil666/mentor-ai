@@ -41,7 +41,7 @@ export function sanitizeReadingTranscript(
     item.studentId !== studentId || !item.id || !item.bookId || !text ||
     !Number.isInteger(item.pageIndex) || item.pageIndex < 0 ||
     !Number.isFinite(Date.parse(item.capturedAt)) ||
-    (item.recognitionEngine !== 'device-whisper' && item.recognitionEngine !== 'browser')
+    (item.recognitionEngine !== 'device-whisper' && item.recognitionEngine !== 'cloud-whisper' && item.recognitionEngine !== 'browser')
   ) return undefined;
   return {
     id: item.id.slice(0, 180), studentId, bookId: item.bookId.slice(0, 160),

@@ -4,6 +4,7 @@ import type { PersonalReadingBookArchive, ReaderVocabularyItem, ReadingTranscrip
 import { learningStateService } from '../services/learning-state.service.js';
 import { getTranslationUsage, TranslationLimitError } from '../services/translation-usage.service.js';
 import { storeReadingTranscript } from '../services/reading-transcripts.service.js';
+import { isCloudReadingTranscriptionConfigured, transcribeReadingAudio } from '../services/reading-transcription.service.js';
 
 export const translateReaderText: RequestHandler = async (req, res, _next) => {
   try {
@@ -55,6 +56,18 @@ export const saveReadingTranscript: RequestHandler = async (req, res, next) => {
       ? await storeReadingTranscript(req.body as ReadingTranscriptChunk, req.authUser)
       : await learningStateService.saveReadingTranscriptChunk(req.body as ReadingTranscriptChunk, req.authUser);
     res.json({ data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getReadingTranscriptionConfiguration: RequestHandler = (_req, res) => {
+  res.json({ data: { configured: isCloudReadingTranscriptionConfigured() } });
+};
+
+export const transcribeReaderAudio: RequestHandler = async (req, res, next) => {
+  try {
+    res.json({ data: await transcribeReadingAudio(req.body?.audioBase64, req.body?.prompt) });
   } catch (error) {
     next(error);
   }

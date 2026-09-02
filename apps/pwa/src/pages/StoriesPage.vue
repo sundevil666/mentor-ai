@@ -456,6 +456,7 @@ import { annualReadingPace, annualReadingPaceMessage as getAnnualReadingPaceMess
 import { alignReadingSpeech, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
+import { canUseCloudReadingTranscription, startCloudReadingTranscriber, type CloudReadingTranscriber } from 'src/services/cloud-reading-transcriber';
 import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
 import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, type ReaderSwipePoint } from 'src/services/reader-swipe';
 import { beginReaderLookupInteraction, shouldProcessLateReadingTranscript } from 'src/services/reader-lookup-interaction';
@@ -509,6 +510,7 @@ let readingSpeechLocalTranscriptWindow: string[] = [];
 let readingSpeechPositionLocked = false;
 let readingSpeechRecognition: ContinuousSpeechRecognition | null = null;
 let localReadingTranscriber: LocalReadingTranscriber | null = null;
+let cloudReadingTranscriber: CloudReadingTranscriber | null = null;
 let readingSpeechStream: MediaStream | null = null;
 let readingSpeechAudioContext: AudioContext | null = null;
 let readingSpeechAnimationFrame = 0;
@@ -1165,19 +1167,24 @@ async function startReadingSpeech() {
     appendReadingSpeechDebug(`Reading anchor: word ${readingSpeechAnchor}.`);
     appendReadingSpeechDebug(`Expected nearby text: "${readerReferenceWords.value.slice(readingSpeechAnchor, readingSpeechAnchor + 18).join(' ')}"`);
     if (useLocalRecognition) {
-      if (typeof MediaRecorder === 'undefined') throw new Error('MediaRecorder is unavailable after microphone permission was granted.');
-      localReadingTranscriber = startLocalReadingTranscriber(readingSpeechStream, {
+      const handleWhisperTranscript = (transcript: string, engine: 'device-whisper' | 'cloud-whisper') => {
+        const arrivedAfterPause = !readingSpeechStream;
+        if (arrivedAfterPause && !shouldProcessLateReadingTranscript(readerLookupLoading.value)) {
+          appendReadingSpeechDebug('Ignoring the microphone final chunk while translation is in progress.');
+          return;
+        }
+        handleReadingSpeechTranscript(transcript, engine);
+        if (arrivedAfterPause) {
+          readingSpeechStatus.value = 'paused';
+          readingSpeechMessage.value = 'The final words were recognized and highlighted. Tap Start listening when you are ready.';
+        }
+      };
+      const startOfflineRecognition = () => {
+        if (!readingSpeechStream || localReadingTranscriber) return;
+        if (typeof MediaRecorder === 'undefined') throw new Error('MediaRecorder is unavailable after microphone permission was granted.');
+        localReadingTranscriber = startLocalReadingTranscriber(readingSpeechStream, {
         onTranscript: (transcript) => {
-          const arrivedAfterPause = !readingSpeechStream;
-          if (arrivedAfterPause && !shouldProcessLateReadingTranscript(readerLookupLoading.value)) {
-            appendReadingSpeechDebug('Ignoring the microphone final chunk while translation is in progress.');
-            return;
-          }
-          handleReadingSpeechTranscript(transcript, 'device-whisper');
-          if (arrivedAfterPause) {
-            readingSpeechStatus.value = 'paused';
-            readingSpeechMessage.value = 'The final words were recognized and highlighted. Tap Start listening when you are ready.';
-          }
+          handleWhisperTranscript(transcript, 'device-whisper');
         },
         onDebug: (message) => appendReadingSpeechDebug(message),
         onReady: () => {
@@ -1197,9 +1204,38 @@ async function startReadingSpeech() {
           readingSpeechMessage.value = `Offline speech recognition stopped: ${message}`;
           readingSpeechTransitioning.value = false;
         },
-      });
-      readingSpeechStatus.value = 'requesting';
-      readingSpeechMessage.value = 'Loading speech model…';
+        });
+        readingSpeechStatus.value = 'requesting';
+        readingSpeechMessage.value = 'Loading offline speech model…';
+      };
+      if (await canUseCloudReadingTranscription()) {
+        appendReadingSpeechDebug('Online Whisper Large V3 Turbo is configured; starting continuous capture.');
+        try {
+          cloudReadingTranscriber = await startCloudReadingTranscriber(readingSpeechStream, {
+            prompt: () => readerReferenceWords.value.slice(Math.max(0, readingSpeechAnchor - 40), readingSpeechAnchor + 320).join(' '),
+            onTranscript: (transcript) => handleWhisperTranscript(transcript, 'cloud-whisper'),
+            onDebug: (message) => appendReadingSpeechDebug(message),
+            onReady: () => {
+              appendReadingSpeechDebug('Online Whisper ready. Start reading aloud.');
+              readingSpeechStatus.value = 'listening';
+              readingSpeechMessage.value = 'Read aloud. Online recognition is ready.';
+              readingSpeechTransitioning.value = false;
+            },
+            onUnavailable: (message) => {
+              appendReadingSpeechDebug(`Online Whisper unavailable: ${message} Switching to offline recognition.`);
+              cloudReadingTranscriber?.stop();
+              cloudReadingTranscriber = null;
+              startOfflineRecognition();
+            },
+          });
+        } catch (error) {
+          appendReadingSpeechDebug(`Online capture could not start: ${microphoneErrorDetails(error)} Switching to offline recognition.`);
+          startOfflineRecognition();
+        }
+      } else {
+        appendReadingSpeechDebug('Online Whisper is not configured or the tablet is offline; using offline recognition.');
+        startOfflineRecognition();
+      }
     } else {
       if (!isSpeechRecognitionAvailable()) throw new Error('SpeechRecognition is unavailable after microphone permission was granted.');
       readingSpeechRecognition = startContinuousSpeechRecognition({
@@ -1290,12 +1326,13 @@ function isMicrophonePermissionError(error: unknown) {
     ? error.name === 'NotAllowedError' || error.name === 'SecurityError'
     : error instanceof Error && /denied|allowed|permission/i.test(error.message);
 }
-function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'device-whisper' | 'browser' = 'browser') {
+function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'device-whisper' | 'cloud-whisper' | 'browser' = 'browser') {
+  const whisperRecognition = recognitionEngine !== 'browser';
   const rawHeardWords = tokenizeReadingSpeech(transcript);
-  if (recognitionEngine === 'device-whisper') updateReadingSpeechChunkPace(rawHeardWords.length);
+  if (whisperRecognition) updateReadingSpeechChunkPace(rawHeardWords.length);
   appendReadingSpeechDebug(`Final text (${recognitionEngine}, ${rawHeardWords.length} words): "${transcript}"`);
   if (!rawHeardWords.length) return;
-  if (recognitionEngine === 'device-whisper') {
+  if (whisperRecognition) {
     readingSpeechLocalTranscriptWindow = [...readingSpeechLocalTranscriptWindow, transcript].slice(-3);
   }
   const book = selectedBook.value;
@@ -1311,7 +1348,7 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     Notify.create({ type: 'warning', message: 'Words were recognized, but could not be saved for analysis.', timeout: 3_000 });
   });
   const spokenCount = rawHeardWords.length;
-  const lockedSingleWordMatch = recognitionEngine === 'device-whisper' && readingSpeechPositionLocked
+  const lockedSingleWordMatch = whisperRecognition && readingSpeechPositionLocked
     ? matchReadingSpeechAtAnchor(readerReferenceWords.value, transcript, readingSpeechAnchor)
     : null;
   // A one-word Whisper chunk is safe only after the position is locked and it
@@ -1319,13 +1356,13 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
   // without letting common isolated words jump the reader position.
   const minimumRecognizedWords = lockedSingleWordMatch?.accepted
     ? 1
-    : recognitionEngine === 'device-whisper' && readingSpeechPositionLocked ? 2 : 3;
+    : whisperRecognition && readingSpeechPositionLocked ? 2 : 3;
   if (rawHeardWords.length < minimumRecognizedWords) {
     appendReadingSpeechDebug(`Match skipped: fewer than ${minimumRecognizedWords} recognized words.`);
     return;
   }
   const alignmentCandidates = [{ text: transcript, words: rawHeardWords, source: 'current chunk' }];
-  if (recognitionEngine === 'device-whisper' && readingSpeechLocalTranscriptWindow.length > 1) {
+  if (whisperRecognition && readingSpeechLocalTranscriptWindow.length > 1) {
     const combinedText = readingSpeechLocalTranscriptWindow.join(' ');
     alignmentCandidates.push({ text: combinedText, words: tokenizeReadingSpeech(combinedText), source: `${readingSpeechLocalTranscriptWindow.length} combined chunks` });
   }
@@ -1341,7 +1378,7 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
       : alignReadingSpeech(readerReferenceWords.value, candidate.text, readingSpeechAnchor, alignmentOptions),
   }));
   const nearbyCandidate = evaluatedCandidates.find((candidate) => candidate.match.accepted);
-  const tabletRecoveryCandidate = recognitionEngine === 'device-whisper' && !nearbyCandidate
+  const tabletRecoveryCandidate = whisperRecognition && !nearbyCandidate
     ? {
         text: transcript,
         words: rawHeardWords,
@@ -1353,7 +1390,7 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     ?? (tabletRecoveryCandidate?.match.accepted ? tabletRecoveryCandidate : null)
     ?? evaluatedCandidates.reduce((best, candidate) => candidate.match.coverage > best.match.coverage ? candidate : best);
   const { match, words: heardWords } = selectedCandidate;
-  if (recognitionEngine === 'device-whisper') {
+  if (whisperRecognition) {
     appendReadingSpeechDebug(`Tablet ${selectedCandidate.source}: coverage=${Math.round(match.coverage * 100)}%, accepted=${match.accepted}.`);
   }
   if (!match.accepted) {
@@ -1362,7 +1399,7 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     readingSpeechMessage.value = 'I heard sound, but it did not match the nearby book text. Keep reading.';
     return;
   }
-  const confirmedWordIndexes = recognitionEngine === 'device-whisper'
+  const confirmedWordIndexes = whisperRecognition
     ? confirmTabletReadingWordIndexes(match.matchedWordIndexes, readingSpeechAnchor, heardWords.length, readingSpeechPositionLocked ? 2 : 3)
     : match.matchedWordIndexes;
   if (confirmedWordIndexes.length < minimumRecognizedWords) {
@@ -1374,12 +1411,12 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
   const confirmedLastWord = confirmedWordIndexes.at(-1)!;
   const trimmedMatches = match.matchedWordIndexes.length - confirmedWordIndexes.length;
   const recoveredWords = confirmedWordIndexes.filter((wordIndex) => !match.matchedWordIndexes.includes(wordIndex)).length;
-  readingSpeechAnchor = recognitionEngine === 'device-whisper'
+  readingSpeechAnchor = whisperRecognition
     ? Math.max(readingSpeechAnchor, confirmedLastWord + 1)
     : match.anchorIndex;
-  if (recognitionEngine === 'device-whisper') readingSpeechPositionLocked = true;
+  if (whisperRecognition) readingSpeechPositionLocked = true;
   appendReadingSpeechDebug(`Match accepted: ${confirmedWordIndexes.length}/${heardWords.length} words, coverage=${Math.round(match.coverage * 100)}%, indexes=${confirmedWordIndexes[0]}–${confirmedLastWord}, next=${readingSpeechAnchor}${recoveredWords ? `, recovered=${recoveredWords}` : ''}${trimmedMatches > 0 ? `, trimmed=${trimmedMatches}` : ''}.`);
-  if (recognitionEngine === 'device-whisper') readingSpeechLocalTranscriptWindow = [];
+  if (whisperRecognition) readingSpeechLocalTranscriptWindow = [];
   readingSpeechAcceptedWords.value += confirmedWordIndexes.length;
   readingSpeechSpokenWords.value += spokenCount;
   const nextSpoken = new Set(spokenReaderWordIndexes.value);
@@ -1439,6 +1476,8 @@ function stopReadingSpeech(status: ReadingSpeechStatus) {
   readingSpeechRecognition = null;
   localReadingTranscriber?.stop();
   localReadingTranscriber = null;
+  cloudReadingTranscriber?.stop();
+  cloudReadingTranscriber = null;
   readingSpeechStream?.getTracks().forEach((track) => track.stop());
   readingSpeechStream = null;
   cancelAnimationFrame(readingSpeechAnimationFrame);

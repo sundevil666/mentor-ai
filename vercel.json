@@ -13,6 +13,10 @@
       "dest": "/api/reader?action=$1"
     },
     {
+      "src": "^/api/reader/transcription$",
+      "dest": "/api/reader?action=transcription"
+    },
+    {
       "src": "^/api/reader/books-synchronize$",
       "dest": "/api/synchronization?action=books"
     },
