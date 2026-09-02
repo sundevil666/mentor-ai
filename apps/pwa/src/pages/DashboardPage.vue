@@ -246,8 +246,8 @@
                   'dialogue-drill__recorder',
                   {
                     'dialogue-drill__recorder--active': isRecognizingSpeech,
-                    'dialogue-drill__recorder--captured': speechRecognitionCaptured,
-                    'dialogue-drill__recorder--error': speechRecognitionError,
+                    'dialogue-drill__recorder--captured': dialogueAnswerStatus === 'correct',
+                    'dialogue-drill__recorder--error': speechRecognitionError || dialogueAnswerStatus === 'incorrect',
                   },
                 ]"
                 role="status"
@@ -276,10 +276,22 @@
 
               <q-input
                 v-model="answer"
+                :class="`dialogue-answer--${dialogueAnswerStatus}`"
+                :color="dialogueAnswerStatus === 'correct' ? 'positive' : undefined"
+                :error="dialogueAnswerStatus === 'incorrect'"
+                hide-bottom-space
                 label="Recognized text or typed answer"
                 outlined
+                @update:model-value="resetDialogueAnswerAssessment"
                 @keyup.enter="submit"
-              />
+              >
+                <template v-if="dialogueAnswerStatus !== 'idle'" #append>
+                  <q-icon
+                    :color="dialogueAnswerStatus === 'correct' ? 'positive' : 'negative'"
+                    :name="dialogueAnswerStatus === 'correct' ? 'check_circle' : 'cancel'"
+                  />
+                </template>
+              </q-input>
 
               <div v-if="currentExercise.audioText" class="dialogue-drill__native">
                 <span>Native answer</span>
@@ -723,6 +735,8 @@ const offlineAudioProgress = ref(0);
 const isRecognizingSpeech = ref(false);
 const speechRecognitionError = ref('');
 const speechRecognitionProgress = ref('');
+const dialogueAnswerStatus = ref<'idle' | 'correct' | 'incorrect'>('idle');
+let dialogueRecognitionRunId = 0;
 let dialogueSpeechStream: MediaStream | null = null;
 let dialogueLocalTranscriber: LocalReadingTranscriber | null = null;
 let dialogueSpeechAudioContext: AudioContext | null = null;
@@ -1316,6 +1330,8 @@ watch(
     isListeningPlaylistVisible.value = false;
     void nextTick(() => window.scrollTo({ top: 0, behavior: 'auto' }));
     answer.value = '';
+    dialogueAnswerStatus.value = 'idle';
+    dialogueRecognitionRunId += 1;
     speechRecognitionError.value = '';
     speechRecognitionCaptured.value = false;
     stopDialogueSpeechRecording();
@@ -1465,20 +1481,17 @@ async function recordDialogueAnswer() {
   speechRecognitionError.value = '';
   speechRecognitionCaptured.value = false;
   answer.value = '';
+  dialogueAnswerStatus.value = 'idle';
   isRecognizingSpeech.value = true;
   speechRecognitionProgress.value = '';
+  const recognitionRunId = ++dialogueRecognitionRunId;
 
   try {
     if (localSpeechRecognitionAvailable.value) {
       dialogueSpeechStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       dialogueLocalTranscriber = startLocalReadingTranscriber(dialogueSpeechStream, {
         onTranscript: (transcript) => {
-          const expected = currentExercise.value?.audioText ?? '';
-          const bestTranscript = chooseBestDialogueTranscript(answer.value, transcript, expected);
-          const matchesExpected = isConfidentDialogueAnswer(bestTranscript, expected);
-          answer.value = matchesExpected ? expected.trim() : bestTranscript;
-          speechRecognitionCaptured.value = answer.value.length > 0;
-          if (matchesExpected) stopDialogueSpeechRecording();
+          applyDialogueTranscript(transcript, recognitionRunId);
         },
         onReady: () => {
           if (dialogueSpeechStream) monitorDialogueSpeech(dialogueSpeechStream);
@@ -1496,10 +1509,10 @@ async function recordDialogueAnswer() {
     }
 
     const result = await recognizeSpeechOnce('en-US', undefined, (transcript) => {
+      if (recognitionRunId !== dialogueRecognitionRunId) return;
       answer.value = transcript;
     });
-    answer.value = result.transcript;
-    speechRecognitionCaptured.value = true;
+    applyDialogueTranscript(result.transcript, recognitionRunId);
   } catch (error) {
     speechRecognitionCaptured.value = false;
     speechRecognitionError.value =
@@ -1509,6 +1522,21 @@ async function recordDialogueAnswer() {
   } finally {
     if (!dialogueLocalTranscriber) isRecognizingSpeech.value = false;
   }
+}
+
+function applyDialogueTranscript(transcript: string, recognitionRunId: number) {
+  if (recognitionRunId !== dialogueRecognitionRunId || !transcript.trim()) return;
+  const expected = currentExercise.value?.audioText ?? '';
+  const bestTranscript = chooseBestDialogueTranscript(answer.value, transcript, expected);
+  const matchesExpected = isConfidentDialogueAnswer(bestTranscript, expected);
+  answer.value = matchesExpected ? expected.trim() : bestTranscript;
+  speechRecognitionCaptured.value = true;
+  dialogueAnswerStatus.value = matchesExpected ? 'correct' : 'incorrect';
+  if (matchesExpected) stopDialogueSpeechRecording();
+}
+
+function resetDialogueAnswerAssessment() {
+  dialogueAnswerStatus.value = 'idle';
 }
 
 function stopDialogueSpeechRecording() {

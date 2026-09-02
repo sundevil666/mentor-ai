@@ -805,6 +805,18 @@ body .q-menu {
   font-size: 0.82rem;
 }
 
+.dialogue-answer--correct .q-field__control {
+  background: color-mix(in srgb, var(--q-positive) 7%, transparent);
+}
+
+.dialogue-answer--correct .q-field__control::before {
+  border-color: var(--q-positive);
+}
+
+.dialogue-answer--incorrect .q-field__control {
+  background: color-mix(in srgb, var(--q-negative) 7%, transparent);
+}
+
 .handoff-actions {
   display: grid;
   gap: 10px;
