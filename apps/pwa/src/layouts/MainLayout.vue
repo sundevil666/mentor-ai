@@ -341,6 +341,7 @@ import type { ConceptLevel, StudentModel, TranslationUsage } from '@mentor-ai/sh
 import { Dark, Notify } from 'quasar';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { personalBookSyncControl } from 'src/services/personal-book-sync-control';
+import { resolveDashboardTrainingCategory } from 'src/services/navigation-category';
 import {
   onBeforeRouteUpdate,
   useRoute,
@@ -523,6 +524,9 @@ const analysisStatusLabel = computed(() => {
   if (analysisReadiness.value.reason === 'volume') return 'Enough evidence has accumulated for analysis.';
   return 'Collecting reliable learning and application evidence.';
 });
+const activeDashboardTraining = computed(() => {
+  return resolveDashboardTrainingCategory(route.query.training, appStore.session?.context.mode);
+});
 const primaryNavigationItems: Array<{
   label: string;
   icon: string;
@@ -535,21 +539,21 @@ const primaryNavigationItems: Array<{
     icon: 'home',
     tone: 'home',
     to: { name: 'dashboard' },
-    isActive: () => route.name === 'dashboard' && route.query.training === undefined,
+    isActive: () => route.name === 'dashboard' && activeDashboardTraining.value === undefined,
   },
   {
     label: 'Listen',
     icon: 'headphones',
     tone: 'listening',
     to: { name: 'dashboard', query: { training: 'listening' } },
-    isActive: () => route.name === 'dashboard' && route.query.training === 'listening',
+    isActive: () => route.name === 'dashboard' && activeDashboardTraining.value === 'listening',
   },
   {
     label: 'Speak',
     icon: 'record_voice_over',
     tone: 'speaking',
     to: { name: 'dashboard', query: { training: 'speaking' } },
-    isActive: () => route.name === 'dashboard' && route.query.training === 'speaking',
+    isActive: () => route.name === 'dashboard' && activeDashboardTraining.value === 'speaking',
   },
   {
     label: 'Patterns',

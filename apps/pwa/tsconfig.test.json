@@ -19,6 +19,7 @@
     "src/services/indexed-db.ts",
     "src/services/offline-library.ts",
     "src/services/offline-lesson-updates.ts",
+    "src/services/navigation-category.ts",
     "src/services/personal-book-library.ts",
     "src/services/reading-speech-tracker.ts",
     "src/services/reader-pagination.ts",
