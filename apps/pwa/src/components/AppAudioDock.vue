@@ -42,23 +42,23 @@
         :unelevated="repeat"
         @click="$emit('update:repeat', !repeat)"
       />
-    </div>
-    <div
-      v-if="playbackRates.length"
-      class="app-audio-dock__rates"
-      aria-label="Playback speed"
-    >
-      <q-btn
-        v-for="rate in playbackRates"
-        :key="rate"
-        :aria-label="`${rate} times speed`"
-        :color="playbackRate === rate ? 'primary' : undefined"
-        dense
-        :label="`${rate}×`"
-        no-caps
-        :outline="playbackRate !== rate"
-        @click="$emit('update:playback-rate', rate)"
-      />
+      <div
+        v-if="playbackRates.length"
+        class="app-audio-dock__rates"
+        aria-label="Playback speed"
+      >
+        <q-btn
+          v-for="rate in playbackRates"
+          :key="rate"
+          :aria-label="`${rate} times speed`"
+          :color="playbackRate === rate ? 'primary' : undefined"
+          dense
+          :label="`${rate}×`"
+          no-caps
+          :outline="playbackRate !== rate"
+          @click="$emit('update:playback-rate', rate)"
+        />
+      </div>
     </div>
     <div class="app-audio-dock__progress">
       <span>{{ formatTime(currentTime) }}</span>

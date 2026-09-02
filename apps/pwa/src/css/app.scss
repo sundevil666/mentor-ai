@@ -594,7 +594,7 @@ body .q-menu {
   color: var(--app-text);
   display: inline-flex;
   font-weight: 700;
-  gap: 5px;
+  gap: 3px;
   min-height: 30px;
   padding: 4px 9px;
 }
@@ -3896,29 +3896,31 @@ body.body--dark .personal-reader__lookup-error {
 .app-audio-dock__buttons {
   align-items: center;
   display: flex;
-  gap: 8px;
+  gap: 5px;
   justify-content: center;
 }
 
 .app-audio-dock__buttons .q-btn {
-  min-height: 42px;
-  min-width: 42px;
+  min-height: 38px;
+  min-width: 38px;
 }
 
 .app-audio-dock__buttons .app-audio-dock__play {
-  min-height: 48px;
-  min-width: 48px;
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .app-audio-dock__rates {
-  display: grid;
-  gap: 6px;
-  grid-auto-columns: minmax(0, 1fr);
-  grid-auto-flow: column;
+  display: contents;
 }
 
 .app-audio-dock__rates .q-btn {
-  min-height: 34px;
+  font-size: 12px;
+  height: 38px;
+  min-height: 38px;
+  min-width: 38px;
+  padding: 0 3px;
+  width: 38px;
 }
 
 .app-audio-dock__progress {
