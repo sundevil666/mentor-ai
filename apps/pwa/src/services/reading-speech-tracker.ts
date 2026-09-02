@@ -92,8 +92,11 @@ export function recoverReadingSpeechPosition(referenceWords: readonly string[], 
     const match = alignReadingSpeech(referenceWords, transcript, probeAnchor, {
       maxBackwardWords: 8,
       maxForwardWords: 48,
-      minCoverage: 0.65,
-      minMatchedWords: 5,
+      // Four accurately recognized consecutive words are enough to relocate
+      // a stale page-start anchor without waiting for a rare 5+ word chunk.
+      // Requiring 80% coverage still rejects partial common-word fragments.
+      minCoverage: 0.8,
+      minMatchedWords: 4,
     });
     if (!match.accepted) continue;
     if (!bestMatch || match.coverage > bestMatch.coverage
@@ -102,6 +105,18 @@ export function recoverReadingSpeechPosition(referenceWords: readonly string[], 
     }
   }
   return bestMatch ?? rejected(anchorIndex);
+}
+
+export function matchReadingSpeechAtAnchor(referenceWords: readonly string[], transcript: string, anchorIndex: number): ReadingSpeechMatch {
+  const spokenWords = tokenizeReadingSpeech(transcript);
+  if (spokenWords.length !== 1 || anchorIndex < 0 || anchorIndex >= referenceWords.length) return rejected(anchorIndex);
+  if (normalizeReadingWord(referenceWords[anchorIndex] ?? '') !== spokenWords[0]) return rejected(anchorIndex);
+  return {
+    accepted: true,
+    matchedWordIndexes: [anchorIndex],
+    coverage: 1,
+    anchorIndex: anchorIndex + 1,
+  };
 }
 
 export function boundTabletReadingProgress(matchedWordIndexes: readonly number[], anchorIndex: number, spokenWordCount: number): number[] {

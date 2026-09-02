@@ -453,7 +453,7 @@ import { getAuthToken } from 'src/services/auth';
 import { findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { annualReadingPace, annualReadingPaceMessage as getAnnualReadingPaceMessage, createDailyReadingProgress, dailyReadingGoalWords, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, readingGoalMessage, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
-import { alignReadingSpeech, confirmTabletReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
+import { alignReadingSpeech, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
@@ -1311,7 +1311,15 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     Notify.create({ type: 'warning', message: 'Words were recognized, but could not be saved for analysis.', timeout: 3_000 });
   });
   const spokenCount = rawHeardWords.length;
-  const minimumRecognizedWords = recognitionEngine === 'device-whisper' && readingSpeechPositionLocked ? 2 : 3;
+  const lockedSingleWordMatch = recognitionEngine === 'device-whisper' && readingSpeechPositionLocked
+    ? matchReadingSpeechAtAnchor(readerReferenceWords.value, transcript, readingSpeechAnchor)
+    : null;
+  // A one-word Whisper chunk is safe only after the position is locked and it
+  // is exactly the next book word. This preserves short dialogue such as “No.”
+  // without letting common isolated words jump the reader position.
+  const minimumRecognizedWords = lockedSingleWordMatch?.accepted
+    ? 1
+    : recognitionEngine === 'device-whisper' && readingSpeechPositionLocked ? 2 : 3;
   if (rawHeardWords.length < minimumRecognizedWords) {
     appendReadingSpeechDebug(`Match skipped: fewer than ${minimumRecognizedWords} recognized words.`);
     return;
@@ -1326,9 +1334,11 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     : readingSpeechPositionLocked
       ? { maxBackwardWords: 6, maxForwardWords: 16, minCoverage: 0.6, minMatchedWords: 2, minSpokenWords: 2 }
       : { minCoverage: 0.4 };
-  const evaluatedCandidates = alignmentCandidates.map((candidate) => ({
+  const evaluatedCandidates = alignmentCandidates.map((candidate, candidateIndex) => ({
     ...candidate,
-    match: alignReadingSpeech(readerReferenceWords.value, candidate.text, readingSpeechAnchor, alignmentOptions),
+    match: candidateIndex === 0 && lockedSingleWordMatch?.accepted
+      ? lockedSingleWordMatch
+      : alignReadingSpeech(readerReferenceWords.value, candidate.text, readingSpeechAnchor, alignmentOptions),
   }));
   const nearbyCandidate = evaluatedCandidates.find((candidate) => candidate.match.accepted);
   const tabletRecoveryCandidate = recognitionEngine === 'device-whisper' && !nearbyCandidate

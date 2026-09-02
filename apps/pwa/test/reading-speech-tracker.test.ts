@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
+import { alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, recoverReadingSpeechPosition, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
 import { localReadingChunkDurationMs, normalizeReadingAudio, startLocalReadingTranscriber } from '../src/services/local-reading-transcriber.js';
 
 const reference = tokenizeReadingSpeech('Alice was beginning to get very tired of sitting by her sister on the bank. She read the sentence again because practice matters.');
@@ -71,6 +71,25 @@ describe('reading speech tracking', () => {
     ].join(' '));
 
     assert.equal(recoverReadingSpeechPosition(tabletReference, 'in one day unrelated noise', 0).accepted, false);
+  });
+
+  it('recovers a stale tablet anchor from an exact four-word phrase', () => {
+    const tabletReference = tokenizeReadingSpeech([
+      'the stale anchor starts here',
+      ...Array.from({ length: 70 }, (_, index) => `filler${index}`),
+      'tell me what happened before the next sentence',
+    ].join(' '));
+
+    const recovered = recoverReadingSpeechPosition(tabletReference, 'Tell me what happened.', 0);
+    assert.equal(recovered.accepted, true);
+    assert.deepEqual(recovered.matchedWordIndexes, [75, 76, 77, 78]);
+  });
+
+  it('accepts one recognized word only when it is exactly at the locked anchor', () => {
+    const lockedReference = tokenizeReadingSpeech('please tell me no are you certain no');
+
+    assert.deepEqual(matchReadingSpeechAtAnchor(lockedReference, 'No.', 3).matchedWordIndexes, [3]);
+    assert.equal(matchReadingSpeechAtAnchor(lockedReference, 'No.', 4).accepted, false);
   });
 
   it('accepts a partially accurate nearby tablet transcript without relaxing browser matching', () => {
