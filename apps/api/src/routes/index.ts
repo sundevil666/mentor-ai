@@ -6,6 +6,7 @@ import { learningStateRouter } from './learning-state.routes.js';
 import { statisticsRouter } from './statistics.routes.js';
 import { userRouter } from './user.routes.js';
 import { readerLookupRouter } from './reader-lookup.routes.js';
+import { speechRouter } from './speech.routes.js';
 
 export const apiRouter = Router();
 
@@ -16,3 +17,4 @@ apiRouter.use('/users', userRouter);
 apiRouter.use('/lessons', lessonRouter);
 apiRouter.use('/statistics', statisticsRouter);
 apiRouter.use('/reader', readerLookupRouter);
+apiRouter.use('/speech', speechRouter);

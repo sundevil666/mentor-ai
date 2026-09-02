@@ -28,6 +28,10 @@ export interface SystemSpeechHandlers {
 export const speechCacheMaxEntries = 160;
 export const speechCacheMaxAgeMs = 30 * 86_400_000;
 export const speechMemoryMaxEntries = 12;
+const speechApiBaseUrl = resolveSpeechApiBaseUrl(
+  process.env.API_BASE_URL,
+  Boolean(process.env.DEV),
+);
 
 let activeAudio: HTMLAudioElement | null = null;
 let activeAudioUrl: string | null = null;
@@ -45,6 +49,13 @@ export function isSpeechSynthesisAvailable() {
     'Audio' in window &&
     'fetch' in window
   );
+}
+
+export function resolveSpeechApiBaseUrl(
+  configuredBaseUrl: string | undefined,
+  isDevelopment: boolean,
+): string {
+  return configuredBaseUrl ?? (isDevelopment ? 'http://localhost:4000' : '');
 }
 
 export function speakWithSystemVoice(text: string, handlers: SystemSpeechHandlers = {}) {
@@ -311,7 +322,7 @@ async function generateAndCacheSpeech(segments: SpeechSegment[]) {
   }
 
   setModelStatus('generating', 0);
-  const response = await fetch('/api/speech', {
+  const response = await fetch(`${speechApiBaseUrl}/api/speech`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ segments }),

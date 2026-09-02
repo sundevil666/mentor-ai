@@ -5,6 +5,7 @@ import {
   applySpeechRepeat,
   parseSpeechSegments,
   preserveDialogueSpeakerLabels,
+  resolveSpeechApiBaseUrl,
   selectEnglishSystemVoice,
   selectSpeechCacheUrlsToDelete,
   speechCacheMaxAgeMs,
@@ -73,6 +74,12 @@ describe('speech synthesis voices', () => {
     assert.deepEqual(parseSpeechSegments('Where are you?'), [
       { text: 'Where are you?', voice: 'mia' },
     ]);
+  });
+
+  it('uses the local API server for generated speech during development', () => {
+    assert.equal(resolveSpeechApiBaseUrl(undefined, true), 'http://localhost:4000');
+    assert.equal(resolveSpeechApiBaseUrl(undefined, false), '');
+    assert.equal(resolveSpeechApiBaseUrl('https://api.example', true), 'https://api.example');
   });
 
   it('assigns Mia and Tom to their dialogue lines', () => {
