@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { collectSpeechRecognitionResult } from '../src/services/speech-recognition.js';
+import {
+  collectSpeechRecognitionResult,
+  shouldRestartSpeechRecognition,
+  speechRecognitionErrorMessage,
+} from '../src/services/speech-recognition.js';
 
 function recognitionResults(
   entries: Array<{ transcript: string; confidence: number; isFinal?: boolean }>,
@@ -29,6 +33,19 @@ describe('speech recognition results', () => {
       transcript: 'I would like to repeat the question',
       confidence: 0.91,
     });
+  });
+
+  it('restarts after an empty premature end but respects stop and timeout', () => {
+    assert.equal(shouldRestartSpeechRecognition(false, false, 200, 15_000), true);
+    assert.equal(shouldRestartSpeechRecognition(true, false, 200, 15_000), false);
+    assert.equal(shouldRestartSpeechRecognition(false, true, 200, 15_000), false);
+    assert.equal(shouldRestartSpeechRecognition(false, false, 15_000, 15_000), false);
+  });
+
+  it('explains microphone and browser speech-service failures', () => {
+    assert.match(speechRecognitionErrorMessage('not-allowed'), /Allow microphone access/);
+    assert.match(speechRecognitionErrorMessage('audio-capture'), /working microphone/);
+    assert.match(speechRecognitionErrorMessage('network'), /try Chrome/);
   });
 
   it('ignores empty fragments and normalizes extra spaces', () => {

@@ -57,6 +57,8 @@ declare global {
 }
 
 let activeRecognition: SpeechRecognitionLike | null = null;
+let activeRecognitionStop: (() => void) | null = null;
+let recognitionRequestId = 0;
 
 const defaultRecognitionTimeoutMs = 15_000;
 const finalSpeechPauseMs = 1_500;
@@ -66,7 +68,18 @@ export function isSpeechRecognitionAvailable(): boolean {
 }
 
 export function stopSpeechRecognition() {
-  activeRecognition?.stop();
+  recognitionRequestId += 1;
+  const stopActiveRecognition = activeRecognitionStop;
+  activeRecognitionStop = null;
+  if (stopActiveRecognition) {
+    stopActiveRecognition();
+  } else {
+    try {
+      activeRecognition?.stop();
+    } catch {
+      activeRecognition?.abort();
+    }
+  }
   activeRecognition = null;
 }
 
@@ -131,7 +144,7 @@ export function startContinuousSpeechRecognition(options: ContinuousSpeechRecogn
   };
 }
 
-export function recognizeSpeechOnce(
+export async function recognizeSpeechOnce(
   lang = 'en-US',
   timeoutMs = defaultRecognitionTimeoutMs,
   onTranscript?: (transcript: string) => void,
@@ -139,16 +152,27 @@ export function recognizeSpeechOnce(
   const SpeechRecognition = getSpeechRecognitionConstructor();
 
   if (!SpeechRecognition) {
-    return Promise.reject(new Error('Speech recognition is not available in this browser.'));
+    throw new Error('Speech recognition is not available in this browser.');
   }
 
   stopSpeechRecognition();
+  const requestId = recognitionRequestId + 1;
+  recognitionRequestId = requestId;
+  const microphoneStream = await requestMicrophoneStream();
+
+  if (requestId !== recognitionRequestId) {
+    stopMicrophoneStream(microphoneStream);
+    throw new Error('Recording stopped.');
+  }
 
   return new Promise((resolve, reject) => {
     const recognition = new SpeechRecognition();
     let settled = false;
+    let explicitlyStopped = false;
     let bestResult: SpeechRecognitionResult = { transcript: '', confidence: 0 };
     let finalSpeechPauseTimer: number | undefined;
+    let restartTimer: number | undefined;
+    const startedAt = Date.now();
 
     activeRecognition = recognition;
     recognition.continuous = true;
@@ -175,13 +199,41 @@ export function recognizeSpeechOnce(
       if (finalSpeechPauseTimer !== undefined) {
         window.clearTimeout(finalSpeechPauseTimer);
       }
+      if (restartTimer !== undefined) {
+        window.clearTimeout(restartTimer);
+      }
+      stopMicrophoneStream(microphoneStream);
       activeRecognition = null;
+      if (activeRecognitionStop === stopCurrentRecognition) activeRecognitionStop = null;
       recognition.onresult = null;
       recognition.onerror = null;
       recognition.onend = null;
       recognition.abort();
       callback();
     }
+
+    function stopCurrentRecognition() {
+      explicitlyStopped = true;
+      try {
+        recognition.stop();
+      } catch {
+        recognition.abort();
+      }
+    }
+
+    function startRecognition() {
+      if (settled || explicitlyStopped || requestId !== recognitionRequestId) return;
+
+      try {
+        recognition.start();
+      } catch (error) {
+        finish(() => reject(new Error(
+          error instanceof Error ? error.message : 'Speech recognition failed.',
+        )));
+      }
+    }
+
+    activeRecognitionStop = stopCurrentRecognition;
 
     recognition.onresult = (event) => {
       const collectedResult = collectSpeechRecognitionResult(event.results);
@@ -204,7 +256,16 @@ export function recognizeSpeechOnce(
     };
 
     recognition.onerror = (event) => {
-      finish(() => reject(new Error(event.error ?? 'Speech recognition failed.')));
+      const error = event.error ?? 'Speech recognition failed.';
+      if (error === 'no-speech' && shouldRestartSpeechRecognition(
+        Boolean(bestResult.transcript),
+        explicitlyStopped,
+        Date.now() - startedAt,
+        timeoutMs,
+      )) {
+        return;
+      }
+      finish(() => reject(new Error(speechRecognitionErrorMessage(error))));
     };
 
     recognition.onend = () => {
@@ -213,11 +274,46 @@ export function recognizeSpeechOnce(
         return;
       }
 
-      finish(() => reject(new Error('No speech was detected.')));
+      if (shouldRestartSpeechRecognition(
+        false,
+        explicitlyStopped,
+        Date.now() - startedAt,
+        timeoutMs,
+      )) {
+        restartTimer = window.setTimeout(startRecognition, 300);
+        return;
+      }
+
+      finish(() => reject(new Error(
+        explicitlyStopped ? 'Recording stopped before speech was detected.' : 'No speech was detected.',
+      )));
     };
 
-    recognition.start();
+    startRecognition();
   });
+}
+
+export function shouldRestartSpeechRecognition(
+  hasTranscript: boolean,
+  explicitlyStopped: boolean,
+  elapsedMs: number,
+  timeoutMs: number,
+): boolean {
+  return !hasTranscript && !explicitlyStopped && elapsedMs < timeoutMs;
+}
+
+export function speechRecognitionErrorMessage(error: string): string {
+  if (error === 'not-allowed' || error === 'service-not-allowed') {
+    return 'Microphone access was blocked. Allow microphone access for this site and try again.';
+  }
+  if (error === 'audio-capture') {
+    return 'No working microphone was found. Check the selected input device and try again.';
+  }
+  if (error === 'network') {
+    return 'The browser speech recognition service could not connect. Check the connection or try Chrome.';
+  }
+  if (error === 'aborted') return 'Recording was stopped.';
+  return error || 'Speech recognition failed.';
 }
 
 export function collectSpeechRecognitionResult(
@@ -250,4 +346,24 @@ function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | null 
   }
 
   return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
+}
+
+async function requestMicrophoneStream(): Promise<MediaStream | null> {
+  if (!navigator.mediaDevices?.getUserMedia) return null;
+
+  try {
+    return await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'NotAllowedError') {
+      throw new Error(speechRecognitionErrorMessage('not-allowed'));
+    }
+    if (error instanceof DOMException && error.name === 'NotFoundError') {
+      throw new Error(speechRecognitionErrorMessage('audio-capture'));
+    }
+    throw error;
+  }
+}
+
+function stopMicrophoneStream(stream: MediaStream | null) {
+  stream?.getTracks().forEach((track) => track.stop());
 }
