@@ -38,7 +38,19 @@
 
       <article v-else class="audio-detail" aria-label="Audio lesson">
         <div class="audio-detail__summary">
-          <div class="audio-detail__icon"><q-icon name="headphones" /></div>
+          <div class="audio-detail__heading">
+            <div class="audio-detail__icon"><q-icon name="headphones" /></div>
+            <q-btn
+              v-if="cachedUrls.has(selectedAudio.sourceUrl)"
+              aria-label="Remove offline copy"
+              color="negative"
+              flat
+              icon="delete_outline"
+              round
+              :loading="busyId === selectedAudio.id"
+              @click="removeAudio(selectedAudio)"
+            />
+          </div>
           <p>{{ selectedAudio.description }}</p>
           <div class="audio-card__meta audio-detail__meta">
             <span><q-icon name="school" /> {{ selectedAudio.level }}</span>
@@ -64,9 +76,8 @@
             />
           </div>
         </section>
-        <div class="audio-detail__offline-action">
-          <q-btn v-if="cachedUrls.has(selectedAudio.sourceUrl)" color="negative" flat icon="delete_outline" label="Remove offline copy" no-caps :loading="busyId === selectedAudio.id" @click="removeAudio(selectedAudio)" />
-          <q-btn v-else color="primary" icon="download_for_offline" label="Save offline" no-caps :disable="!isOnline" :loading="busyId === selectedAudio.id" @click="downloadAudio(selectedAudio)" />
+        <div v-if="!cachedUrls.has(selectedAudio.sourceUrl)" class="audio-detail__offline-action">
+          <q-btn color="primary" icon="download_for_offline" label="Save offline" no-caps :disable="!isOnline" :loading="busyId === selectedAudio.id" @click="downloadAudio(selectedAudio)" />
         </div>
         <AppAudioDock
           :current-time="currentTime"

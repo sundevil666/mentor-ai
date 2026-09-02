@@ -3864,6 +3864,7 @@ body.body--dark .personal-reader__lookup-error {
 .audio-detail { overflow: hidden; }
 .audio-detail__summary { display: grid; gap: 14px; padding: 22px; }
 .audio-detail__summary p { margin: 0; color: var(--app-muted); font-size: 1rem; line-height: 1.55; }
+.audio-detail__heading { display: flex; align-items: center; justify-content: space-between; }
 .audio-detail__icon { display: grid; width: 68px; height: 68px; border-radius: 20px; color: var(--q-primary); background: var(--app-surface-active); place-items: center; }
 .audio-detail__icon .q-icon { font-size: 38px; }
 .audio-detail__meta { padding-left: 0; margin-top: 0; flex-wrap: wrap; }
@@ -3915,12 +3916,16 @@ body.body--dark .personal-reader__lookup-error {
 }
 
 .app-audio-dock__rates .q-btn {
-  font-size: 12px;
-  height: 38px;
-  min-height: 38px;
-  min-width: 38px;
-  padding: 0 3px;
-  width: 38px;
+  font-size: 11px;
+  height: 36px;
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0 2px;
+  width: 36px;
+}
+
+.app-audio-dock__rates .q-btn:first-child {
+  margin-left: 8px;
 }
 
 .app-audio-dock__progress {
