@@ -641,8 +641,10 @@ import {
   stopSpeech,
 } from 'src/services/speech-synthesis';
 import {
+  type ContinuousSpeechRecognition,
   isSpeechRecognitionAvailable,
   recognizeSpeechOnce,
+  startContinuousSpeechRecognition,
   stopSpeechRecognition,
 } from 'src/services/speech-recognition';
 import {
@@ -740,6 +742,7 @@ const dialogueAnswerStatus = ref<'idle' | 'correct' | 'incorrect'>('idle');
 let dialogueRecognitionRunId = 0;
 let dialogueSpeechStream: MediaStream | null = null;
 let dialogueLocalTranscriber: LocalReadingTranscriber | null = null;
+let dialogueLiveRecognition: ContinuousSpeechRecognition | null = null;
 let dialogueSpeechAudioContext: AudioContext | null = null;
 let dialogueSilenceTimer = 0;
 let dialogueRecordingTimeout = 0;
@@ -1498,6 +1501,7 @@ async function recordDialogueAnswer() {
   try {
     if (localSpeechRecognitionAvailable.value) {
       dialogueSpeechStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      startDialogueLiveTranscript(recognitionRunId);
       dialogueLocalTranscriber = startLocalReadingTranscriber(dialogueSpeechStream, {
         onTranscript: (transcript) => {
           applyDialogueTranscript(transcript, recognitionRunId);
@@ -1533,6 +1537,29 @@ async function recordDialogueAnswer() {
   }
 }
 
+function startDialogueLiveTranscript(recognitionRunId: number) {
+  if (!isSpeechRecognitionAvailable()) return;
+  const finalParts: string[] = [];
+  dialogueLiveRecognition = startContinuousSpeechRecognition({
+    lang: 'en-US',
+    onInterim: (transcript) => {
+      if (recognitionRunId !== dialogueRecognitionRunId) return;
+      answer.value = [...finalParts, transcript].filter(Boolean).join(' ').trim();
+    },
+    onFinal: (transcript) => {
+      if (recognitionRunId !== dialogueRecognitionRunId) return;
+      finalParts.push(transcript);
+      answer.value = finalParts.join(' ').trim();
+    },
+    onError: () => {
+      // Browser recognition is only a low-latency preview. Local Whisper still
+      // produces and validates the final answer when the network service fails.
+      dialogueLiveRecognition?.stop();
+      dialogueLiveRecognition = null;
+    },
+  });
+}
+
 function applyDialogueTranscript(transcript: string, recognitionRunId: number) {
   if (recognitionRunId !== dialogueRecognitionRunId || !transcript.trim()) return;
   const expected = currentExercise.value?.audioText ?? '';
@@ -1545,6 +1572,8 @@ function applyDialogueTranscript(transcript: string, recognitionRunId: number) {
 }
 
 function stopDialogueSpeechRecording() {
+  dialogueLiveRecognition?.stop();
+  dialogueLiveRecognition = null;
   dialogueLocalTranscriber?.stop();
   dialogueLocalTranscriber = null;
   dialogueSpeechStream?.getTracks().forEach((track) => track.stop());
