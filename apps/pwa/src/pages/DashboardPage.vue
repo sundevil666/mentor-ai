@@ -1217,6 +1217,7 @@ onMounted(async () => {
   window.addEventListener('offline', handleOffline);
   window.addEventListener('beforeunload', handlePageExit);
   window.addEventListener('pagehide', handlePageExit);
+  window.addEventListener('mentor-ai:prepare-app-update', handlePrepareAppUpdate);
 });
 
 onUnmounted(() => {
@@ -1227,6 +1228,7 @@ onUnmounted(() => {
   window.removeEventListener('offline', handleOffline);
   window.removeEventListener('beforeunload', handlePageExit);
   window.removeEventListener('pagehide', handlePageExit);
+  window.removeEventListener('mentor-ai:prepare-app-update', handlePrepareAppUpdate);
 });
 
 watch(
@@ -1895,6 +1897,11 @@ function handleOffline() {
 function handlePageExit() {
   void appStore.persistSession();
   stopListeningAudio();
+}
+
+function handlePrepareAppUpdate() {
+  saveListeningPlaybackProgress();
+  stopListeningAudio(false);
 }
 
 function tokenizeListeningText(text: string): ListeningToken[] {

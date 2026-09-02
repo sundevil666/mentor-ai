@@ -16,6 +16,7 @@ export interface AppUpdateCheckResult {
 export interface PendingAppUpdate {
   targetVersion: string;
   requestedAt: string;
+  lessonSessionId?: string;
   lessonTitle?: string;
   exerciseNumber?: number;
   exerciseCount?: number;

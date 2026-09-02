@@ -65,6 +65,7 @@ import {
 import { cacheMyShiftActivity, readCachedMyShiftActivity } from 'src/services/my-shift-cache';
 import { findOfflineLesson } from 'src/services/offline-library';
 import { selectRetainedUpdateNotifications } from 'src/services/update-notification-retention';
+import { resolveRestoredLessonSessions } from 'src/services/lesson-session-restoration';
 
 interface LearningSessionState {
   id: string;
@@ -129,6 +130,8 @@ interface AppState {
 const sessionStoreKey = 'active-session';
 const pausedSessionStoreKey = 'paused-session';
 const sessionCheckpointKey = 'mentor-ai:active-session-checkpoint';
+const updateResumeSessionKey = 'mentor-ai:resume-session-after-update';
+let hydrationInFlight: Promise<void> | null = null;
 
 function readSessionCheckpoint(): LearningSessionState | null {
   if (typeof localStorage === 'undefined') return null;
@@ -170,6 +173,33 @@ function clearSessionCheckpoint() {
   if (typeof localStorage === 'undefined') return;
   try {
     localStorage.removeItem(sessionCheckpointKey);
+  } catch {
+    // Ignore unavailable synchronous storage.
+  }
+}
+
+function readUpdateResumeSessionId(): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    return localStorage.getItem(updateResumeSessionKey);
+  } catch {
+    return null;
+  }
+}
+
+function writeUpdateResumeSessionId(sessionId: string) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(updateResumeSessionKey, sessionId);
+  } catch {
+    // The persisted session still remains available as a paused lesson.
+  }
+}
+
+function clearUpdateResumeSessionId() {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.removeItem(updateResumeSessionKey);
   } catch {
     // Ignore unavailable synchronous storage.
   }
@@ -238,11 +268,19 @@ export const useAppStore = defineStore('app', {
     },
 
     async hydrate() {
+      if (this.isHydrated) return;
+      if (hydrationInFlight) {
+        await hydrationInFlight;
+        return;
+      }
+
+      hydrationInFlight = (async () => {
       const db = await mentorDb;
       const savedModel = await db.get('student-models', initialStudentModel.id);
       const savedSession = await db.get('learning-sessions', sessionStoreKey);
       const savedPausedSession = await db.get('learning-sessions', pausedSessionStoreKey);
       const checkpointSession = readSessionCheckpoint();
+      const updateResumeSessionId = readUpdateResumeSessionId();
       const statistics = await db.getAll('statistics');
       const activitySnapshots = await db.getAll('activity-snapshots');
       const queuedEvents = await db.getAll('sync-queue');
@@ -251,14 +289,18 @@ export const useAppStore = defineStore('app', {
 
       this.studentModel = (savedModel as StudentModel | undefined) ?? initialStudentModel;
       const restoredSession = checkpointSession ?? (savedSession as LearningSessionState | undefined) ?? null;
-      this.session = null;
-      this.pausedSession = restoredSession && !restoredSession.completedAt
-        ? toStorageRecord(restoredSession)
-        : (savedPausedSession as LearningSessionState | undefined) ?? null;
+      const restoredSessions = resolveRestoredLessonSessions(
+        restoredSession,
+        (savedPausedSession as LearningSessionState | undefined) ?? null,
+        updateResumeSessionId,
+      );
+      this.session = restoredSessions.activeSession ? toStorageRecord(restoredSessions.activeSession) : null;
+      this.pausedSession = restoredSessions.pausedSession ? toStorageRecord(restoredSessions.pausedSession) : null;
       clearSessionCheckpoint();
-      await db.delete('learning-sessions', sessionStoreKey);
+      clearUpdateResumeSessionId();
+      if (!this.session) await db.delete('learning-sessions', sessionStoreKey);
       if (this.pausedSession) {
-        await db.put('learning-sessions', this.pausedSession, pausedSessionStoreKey);
+        await db.put('learning-sessions', toStorageRecord(this.pausedSession), pausedSessionStoreKey);
       }
       this.latestRecommendation = restoredSession?.recommendation ?? createRecommendationFromModel(this.studentModel, now());
       this.statisticsSnapshots = (statistics as StatisticsSnapshot[]).sort((left, right) =>
@@ -298,6 +340,13 @@ export const useAppStore = defineStore('app', {
       if (this.isOnline) {
         await this.refreshMyShiftActivity(false);
         await this.refreshRemoteLearningState();
+      }
+      })();
+
+      try {
+        await hydrationInFlight;
+      } finally {
+        hydrationInFlight = null;
       }
     },
 
@@ -540,19 +589,20 @@ export const useAppStore = defineStore('app', {
       clearSessionCheckpoint();
       const db = await mentorDb;
       if (this.pausedSession) {
-        await db.put('learning-sessions', this.pausedSession, pausedSessionStoreKey);
+        await db.put('learning-sessions', toStorageRecord(this.pausedSession), pausedSessionStoreKey);
       }
       await db.delete('learning-sessions', sessionStoreKey);
     },
 
-    async resumePausedLesson() {
-      if (!this.pausedSession) return;
+    async resumePausedLesson(expectedSessionId?: string) {
+      if (!this.pausedSession || (expectedSessionId && this.pausedSession.id !== expectedSessionId)) return false;
       this.session = toStorageRecord(this.pausedSession);
       this.pausedSession = null;
       const db = await mentorDb;
       await db.delete('learning-sessions', pausedSessionStoreKey);
       await this.persistSession();
       await this.publishSessionHandoff();
+      return true;
     },
 
     async resetLocalLearning() {
@@ -655,8 +705,11 @@ export const useAppStore = defineStore('app', {
     async prepareForAppUpdate() {
       await this.persistSession();
 
+      if (this.session) writeUpdateResumeSessionId(this.session.id);
+
       return this.session
         ? {
+            lessonSessionId: this.session.id,
             lessonTitle: this.session.lesson.title,
             exerciseNumber: Math.min(this.session.currentExerciseIndex + 1, this.session.lesson.exercises.length),
             exerciseCount: this.session.lesson.exercises.length,

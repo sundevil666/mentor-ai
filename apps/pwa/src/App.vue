@@ -74,7 +74,6 @@
 <script setup lang="ts">
 import { Notify } from 'quasar';
 import { computed, onMounted, onUnmounted } from 'vue';
-import { useRouter } from 'vue-router';
 import {
   activatePendingServiceWorkerUpdate,
   consumePendingAppUpdate,
@@ -89,7 +88,6 @@ import { useAppStore } from 'src/stores/app-store';
 import { syncAllContentProgress } from 'src/services/content-progress';
 
 const appStore = useAppStore();
-const router = useRouter();
 let stopUpdatePolling: (() => void) | undefined;
 let isReloadingForUpdate = false;
 let remoteSyncPollingTimer: number | undefined;
@@ -198,8 +196,8 @@ async function installUpdate(version: string) {
 
   try {
     if (!appStore.isHydrated) await appStore.hydrate();
+    window.dispatchEvent(new Event('mentor-ai:prepare-app-update'));
     const lessonProgress = await appStore.prepareForAppUpdate();
-    if (appStore.session) await router.replace({ name: 'dashboard' });
 
     rememberPendingAppUpdate({
       targetVersion: version,
@@ -229,9 +227,17 @@ async function showCompletedUpdateNotification() {
     await appStore.hydrate();
   }
 
+  const restoredActiveLesson = Boolean(
+    pendingUpdate.lessonSessionId
+    && (
+      appStore.session?.id === pendingUpdate.lessonSessionId
+      || await appStore.resumePausedLesson(pendingUpdate.lessonSessionId)
+    ),
+  );
+
   const installedVersion = process.env.APP_VERSION ?? pendingUpdate.targetVersion;
   const progressCaption = pendingUpdate.lessonTitle
-    ? `${pendingUpdate.lessonTitle} · exercise ${pendingUpdate.exerciseNumber}/${pendingUpdate.exerciseCount} restored.`
+    ? `${pendingUpdate.lessonTitle} · exercise ${pendingUpdate.exerciseNumber}/${pendingUpdate.exerciseCount} ${restoredActiveLesson ? 'restored' : 'saved'}.`
     : 'The latest application version is now active.';
   const notification = await appStore.recordUpdateNotification(
     installedVersion,

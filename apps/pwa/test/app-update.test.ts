@@ -83,12 +83,15 @@ describe('PWA app update checks', () => {
     rememberPendingAppUpdate({
       targetVersion: '0.2.0',
       requestedAt: '2026-08-14T10:00:00.000Z',
+      lessonSessionId: 'session-123',
       lessonTitle: 'Small Talk',
       exerciseNumber: 3,
       exerciseCount: 8,
     });
 
-    assert.equal(consumePendingAppUpdate()?.exerciseNumber, 3);
+    const pendingUpdate = consumePendingAppUpdate();
+    assert.equal(pendingUpdate?.lessonSessionId, 'session-123');
+    assert.equal(pendingUpdate?.exerciseNumber, 3);
     assert.equal(consumePendingAppUpdate(), null);
   });
 
