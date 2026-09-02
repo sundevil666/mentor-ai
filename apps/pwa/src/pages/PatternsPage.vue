@@ -101,7 +101,8 @@
           />
           <div class="pattern-playlist__actions">
             <q-btn
-              color="primary"
+              class="app-play-button"
+              color="blue-7"
               :icon="isLessonPlaying ? 'pause' : 'play_arrow'"
               :label="isLessonPlaying ? 'Pause' : playlistUrl ? 'Play entire loop' : 'Prepare and play'"
               no-caps

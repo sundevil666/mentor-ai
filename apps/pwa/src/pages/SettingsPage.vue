@@ -122,7 +122,8 @@
 
         <div class="voice-actions">
           <q-btn
-            color="primary"
+            class="app-play-button"
+            color="blue-7"
             icon="play_arrow"
             label="Test"
             no-caps

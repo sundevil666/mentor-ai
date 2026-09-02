@@ -98,9 +98,16 @@
                 v-for="lesson in activeTrainingLibrary.lessons"
                 :key="lesson.templateKey"
                 class="training-library-card"
+                :class="`training-library-card--${lessonProgressState(lesson.templateKey)}`"
               >
                 <button type="button" class="training-library-card__body" @click="startLibraryLesson(lesson)">
-                  <span class="training-library-card__title">{{ lesson.title }}</span>
+                  <span class="training-library-card__topline">
+                    <span class="training-library-card__title">{{ lesson.title }}</span>
+                    <span class="training-library-card__status">
+                      <q-icon :name="lessonProgressIcon(lesson.templateKey)" />
+                      {{ lessonProgressLabel(lesson.templateKey) }}
+                    </span>
+                  </span>
                   <strong>{{ lesson.focus }}</strong>
                   <span>{{ lesson.minutes }} min</span>
                 </button>
@@ -493,8 +500,8 @@
                   <q-tooltip>Previous sentence</q-tooltip>
                 </q-btn>
                 <q-btn
-                  color="primary"
-                  class="listening-player__play-button"
+                  color="blue-7"
+                  class="app-play-button listening-player__play-button"
                   unelevated
                   :icon="
                     isListeningPaused
@@ -671,7 +678,12 @@ import {
 } from 'src/services/offline-library';
 import { fetchCurrentLesson } from 'src/services/api-client';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
-import { recordContentEngagement, syncContentEngagement } from 'src/services/content-engagement';
+import {
+  loadContentEngagementSummaries,
+  recordContentEngagement,
+  syncContentEngagement,
+  type ContentEngagementSummary,
+} from 'src/services/content-engagement';
 
 type LessonChoice = {
   templateKey: string;
@@ -728,6 +740,7 @@ const skippedHomeLessonKey = ref(readHomePreference('mentor-ai:home-skipped-less
 const selectedLessonLibrary = ref<TrainingLibraryKey>('home');
 const lessonReturnDestination = ref<LessonReturnDestination>('home');
 const activeEngagementContentId = ref<string | null>(null);
+const lessonEngagementSummaries = ref(new Map<string, ContentEngagementSummary>());
 const libraryDownloadStatus = ref<Record<string, 'idle' | 'checking' | 'downloading' | 'ready' | 'error'>>({});
 const showLessonUpdateDialog = ref(false);
 const isLessonUpdateInstalling = ref(false);
@@ -1040,6 +1053,37 @@ const lessonCompletionCounts = computed(() => {
   }
   return counts;
 });
+type LessonProgressState = 'new' | 'started' | 'completed';
+function lessonProgressState(templateKey: string): LessonProgressState {
+  const summary = lessonEngagementSummaries.value.get(templateKey);
+  if ((lessonCompletionCounts.value.get(templateKey) ?? 0) > 0 || (summary?.fullPlays ?? 0) > 0 || (summary?.finishes ?? 0) > 0) {
+    return 'completed';
+  }
+  if ((summary?.starts ?? 0) > 0 || appStore.pausedSession?.lesson.lessonTemplateKey === templateKey) {
+    return 'started';
+  }
+  return 'new';
+}
+function lessonProgressLabel(templateKey: string) {
+  const state = lessonProgressState(templateKey);
+  if (state === 'completed') return 'Completed';
+  if (state === 'started') return 'In progress';
+  return 'Not started';
+}
+function lessonProgressIcon(templateKey: string) {
+  const state = lessonProgressState(templateKey);
+  if (state === 'completed') return 'check_circle';
+  if (state === 'started') return 'pending';
+  return 'radio_button_unchecked';
+}
+
+async function refreshLessonProgressStates() {
+  lessonEngagementSummaries.value = await loadContentEngagementSummaries('lesson');
+}
+
+function handleLessonEngagementChange() {
+  void refreshLessonProgressStates();
+}
 const weakestSkill = computed(() => {
   const skills = [
     { key: 'listening', label: 'listening', value: appStore.studentModel.listening.score.value },
@@ -1281,7 +1325,10 @@ onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();
   }
-  void syncContentEngagement().catch(() => undefined);
+  await refreshLessonProgressStates();
+  void syncContentEngagement()
+    .then(refreshLessonProgressStates)
+    .catch(() => undefined);
 
   if (!appStore.session && (route.query.training === 'listening' || route.query.training === 'speaking')) {
     await openTrainingLibrary(route.query.training);
@@ -1292,6 +1339,7 @@ onMounted(async () => {
   window.addEventListener('beforeunload', handlePageExit);
   window.addEventListener('pagehide', handlePageExit);
   window.addEventListener('mentor-ai:prepare-app-update', handlePrepareAppUpdate);
+  window.addEventListener('mentor-content-engagement', handleLessonEngagementChange);
 });
 
 onUnmounted(() => {
@@ -1303,6 +1351,7 @@ onUnmounted(() => {
   window.removeEventListener('beforeunload', handlePageExit);
   window.removeEventListener('pagehide', handlePageExit);
   window.removeEventListener('mentor-ai:prepare-app-update', handlePrepareAppUpdate);
+  window.removeEventListener('mentor-content-engagement', handleLessonEngagementChange);
 });
 
 watch(

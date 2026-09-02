@@ -927,6 +927,17 @@ body .q-menu {
   overflow: hidden;
 }
 
+.training-library-card--started {
+  border-color: #f59e0b;
+  border-left-color: #f59e0b;
+}
+
+.training-library-card--completed {
+  background: color-mix(in srgb, var(--app-surface) 92%, #22c55e);
+  border-color: #22c55e;
+  border-left-color: #16a34a;
+}
+
 .training-library-card__body {
   background: transparent;
   border: 0;
@@ -953,6 +964,39 @@ body .q-menu {
   color: var(--app-text-strong);
   font-size: 1.08rem;
   font-weight: 700;
+}
+
+.training-library-card__topline {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.training-library-card__status {
+  align-items: center;
+  background: var(--app-surface-soft);
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  color: var(--app-muted-strong);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  font-weight: 750;
+  gap: 4px;
+  padding: 4px 8px;
+}
+
+.training-library-card--started .training-library-card__status {
+  background: color-mix(in srgb, #f59e0b 14%, var(--app-surface));
+  border-color: #f59e0b;
+  color: #b45309;
+}
+
+.training-library-card--completed .training-library-card__status {
+  background: color-mix(in srgb, #22c55e 14%, var(--app-surface));
+  border-color: #22c55e;
+  color: #15803d;
 }
 
 .training-library-card__offline {
@@ -1169,8 +1213,14 @@ body .q-menu {
 }
 
 .listening-player__play-button {
-  min-height: 56px;
-  min-width: 56px;
+  min-height: 62px;
+  min-width: 62px;
+}
+
+.app-play-button {
+  box-shadow: 0 7px 18px rgb(29 78 216 / 24%);
+  min-height: 52px;
+  min-width: 52px;
 }
 
 .listening-player__controls .q-btn {
@@ -4053,8 +4103,8 @@ p.lesson-complete__eyebrow,
 }
 
 .app-audio-dock__buttons .app-audio-dock__play {
-  min-height: 44px;
-  min-width: 44px;
+  min-height: 52px;
+  min-width: 52px;
 }
 
 .app-audio-dock__rates {

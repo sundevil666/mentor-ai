@@ -15,8 +15,8 @@
       />
       <q-btn
         :aria-label="playing ? 'Pause audio' : 'Play audio'"
-        class="app-audio-dock__play"
-        color="primary"
+        class="app-audio-dock__play app-play-button"
+        color="blue-7"
         :icon="playing ? 'pause' : 'play_arrow'"
         round
         unelevated
