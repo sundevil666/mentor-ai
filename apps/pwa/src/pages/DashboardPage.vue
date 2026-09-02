@@ -276,14 +276,14 @@
 
               <q-input
                 v-model="answer"
-                :class="`dialogue-answer--${dialogueAnswerStatus}`"
+                :class="`dialogue-answer-field dialogue-answer--${dialogueAnswerStatus}`"
                 :color="dialogueAnswerStatus === 'correct' ? 'positive' : undefined"
                 :error="dialogueAnswerStatus === 'incorrect'"
                 hide-bottom-space
-                label="Recognized text or typed answer"
+                label="Recognized answer"
                 outlined
-                @update:model-value="resetDialogueAnswerAssessment"
-                @keyup.enter="submit"
+                readonly
+                tabindex="-1"
               >
                 <template v-if="dialogueAnswerStatus !== 'idle'" #append>
                   <q-icon
@@ -842,7 +842,7 @@ const speechSupportMessage = computed(() => {
   }
 
   if (!speechRecognitionAvailable.value) {
-    return 'Voice recognition is not available on this device. Type the answer here instead.';
+    return 'Voice recognition is not available on this device.';
   }
 
   return 'Tap Record answer, speak, then tap Stop recording.';
@@ -1518,7 +1518,7 @@ async function recordDialogueAnswer() {
     speechRecognitionError.value =
       error instanceof Error
         ? error.message
-        : 'Speech recognition failed. Type the answer here instead.';
+        : 'Speech recognition failed. Tap Record answer to try again.';
   } finally {
     if (!dialogueLocalTranscriber) isRecognizingSpeech.value = false;
   }
@@ -1533,10 +1533,6 @@ function applyDialogueTranscript(transcript: string, recognitionRunId: number) {
   speechRecognitionCaptured.value = true;
   dialogueAnswerStatus.value = matchesExpected ? 'correct' : 'incorrect';
   if (matchesExpected) stopDialogueSpeechRecording();
-}
-
-function resetDialogueAnswerAssessment() {
-  dialogueAnswerStatus.value = 'idle';
 }
 
 function stopDialogueSpeechRecording() {

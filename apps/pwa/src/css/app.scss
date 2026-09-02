@@ -809,6 +809,10 @@ body .q-menu {
   background: color-mix(in srgb, var(--q-positive) 7%, transparent);
 }
 
+.dialogue-answer-field {
+  pointer-events: none;
+}
+
 .dialogue-answer--correct .q-field__control::before {
   border-color: var(--q-positive);
 }
