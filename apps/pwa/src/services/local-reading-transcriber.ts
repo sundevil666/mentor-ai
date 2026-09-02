@@ -21,6 +21,25 @@ let sharedRequestId = 0;
 // backpressure on slower devices.
 export const localReadingChunkDurationMs = 1_500;
 
+export function prepareLocalSpeechTranscriber(): void {
+  if (sharedWorkerReady || sharedWorkerInitializing) return;
+  const worker = sharedWorker ??= new Worker(new URL('../workers/reading-transcription.worker.ts', import.meta.url), { type: 'module' });
+  sharedWorkerInitializing = true;
+  worker.onmessage = (event: MessageEvent<{ type: string }>) => {
+    if (event.data.type === 'ready') {
+      sharedWorkerReady = true;
+      sharedWorkerInitializing = false;
+    }
+    if (event.data.type === 'error') {
+      sharedWorkerInitializing = false;
+      sharedWorkerReady = false;
+      sharedWorker = null;
+      worker.terminate();
+    }
+  };
+  worker.postMessage({ type: 'init' });
+}
+
 export function startLocalReadingTranscriber(stream: MediaStream, options: LocalTranscriberOptions): LocalReadingTranscriber {
   const worker = sharedWorker ??= new Worker(new URL('../workers/reading-transcription.worker.ts', import.meta.url), { type: 'module' });
   let recorder: MediaRecorder | null = null;

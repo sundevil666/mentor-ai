@@ -646,6 +646,7 @@ import {
   stopSpeechRecognition,
 } from 'src/services/speech-recognition';
 import {
+  prepareLocalSpeechTranscriber,
   startLocalReadingTranscriber,
   type LocalReadingTranscriber,
 } from 'src/services/local-reading-transcriber';
@@ -1346,6 +1347,10 @@ watch(
       return;
     }
 
+    if (isDialogueTranslationExercise.value && localSpeechRecognitionAvailable.value) {
+      prepareLocalSpeechTranscriber();
+    }
+
     resetListeningPlayback();
   },
 );
@@ -1579,7 +1584,7 @@ function monitorDialogueSpeech(stream: MediaStream) {
     }
     if (!speechStarted) return;
     quietSince ||= now;
-    if (now - quietSince >= 1_400) stopDialogueSpeechRecording();
+    if (now - quietSince >= 1_000) stopDialogueSpeechRecording();
   }, 100);
 
   dialogueRecordingTimeout = window.setTimeout(() => stopDialogueSpeechRecording(), 15_000);
