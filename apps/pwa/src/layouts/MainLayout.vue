@@ -538,7 +538,11 @@ const primaryNavigationItems: Array<{
     label: 'Home',
     icon: 'home',
     tone: 'home',
-    to: { name: 'dashboard' },
+    get to() {
+      return route.query.training === 'home'
+        ? { name: 'dashboard' }
+        : { name: 'dashboard', query: { training: 'home' } };
+    },
     isActive: () => route.name === 'dashboard' && activeDashboardTraining.value === undefined,
   },
   {
