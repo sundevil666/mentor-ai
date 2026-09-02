@@ -82,12 +82,6 @@
           <q-slider :model-value="currentTime" :min="0" :max="duration || selectedStory.durationSeconds" :step="1" color="primary" @update:model-value="seek" />
           <span>{{ formatStoryDuration(duration || selectedStory.durationSeconds) }}</span>
         </div>
-        <div class="video-playback-settings">
-          <q-toggle v-model="repeat" aria-label="Repeat story" color="primary" icon="repeat" />
-          <div class="video-speed-controls" aria-label="Playback speed">
-            <q-btn v-for="rate in playbackRates" :key="rate" :color="playbackRate === rate ? 'primary' : undefined" :label="`${rate}×`" :outline="playbackRate !== rate" no-caps unelevated @click="setPlaybackRate(rate)" />
-          </div>
-        </div>
         <q-btn
           v-if="isIosStandalone()"
           class="full-width"
@@ -126,12 +120,15 @@
           :current-time="currentTime"
           :duration="duration"
           :fallback-duration="selectedStory.durationSeconds"
+          :playback-rate="playbackRate"
+          :playback-rates="playbackRates"
           :playing="playing"
           :repeat="repeat"
           progress-label="Story progress"
           show-repeat
           @seek="seek"
           @toggle-playback="togglePlayback"
+          @update:playback-rate="setPlaybackRate"
           @update:repeat="repeat = $event"
         />
       </section>

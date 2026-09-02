@@ -51,12 +51,6 @@
 
         <section class="audio-player" aria-label="Audio player">
           <audio ref="audioElement" :src="playbackUrl" controls :loop="repeatEnabled" preload="metadata" @ended="handleEnded" @pause="handlePause" @play="handlePlay" @seeking="handleSeeking" @timeupdate="saveProgress" />
-          <div class="audio-player__settings">
-            <div>
-              <strong>Playback speed</strong>
-              <div class="audio-speed-controls" aria-label="Playback speed"><q-btn v-for="rate in playbackRates" :key="rate" :label="`${rate}×`" :color="playbackRate === rate ? 'primary' : undefined" :outline="playbackRate !== rate" no-caps @click="setPlaybackRate(rate)" /></div>
-            </div>
-          </div>
           <div class="audio-player__actions">
             <a :href="selectedAudio.articleUrl" target="_blank" rel="noopener">Transcript and source <q-icon name="open_in_new" /></a>
             <q-btn
@@ -78,11 +72,14 @@
           :current-time="currentTime"
           :duration="duration"
           :fallback-duration="selectedAudio.durationSeconds"
+          :playback-rate="playbackRate"
+          :playback-rates="playbackRates"
           :playing="isPlaying"
           :repeat="repeatEnabled"
           show-repeat
           @seek="seek"
           @toggle-playback="togglePlayback"
+          @update:playback-rate="setPlaybackRate"
           @update:repeat="setRepeat"
         />
       </article>

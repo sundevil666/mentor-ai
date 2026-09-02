@@ -43,6 +43,23 @@
         @click="$emit('update:repeat', !repeat)"
       />
     </div>
+    <div
+      v-if="playbackRates.length"
+      class="app-audio-dock__rates"
+      aria-label="Playback speed"
+    >
+      <q-btn
+        v-for="rate in playbackRates"
+        :key="rate"
+        :aria-label="`${rate} times speed`"
+        :color="playbackRate === rate ? 'primary' : undefined"
+        dense
+        :label="`${rate}×`"
+        no-caps
+        :outline="playbackRate !== rate"
+        @click="$emit('update:playback-rate', rate)"
+      />
+    </div>
     <div class="app-audio-dock__progress">
       <span>{{ formatTime(currentTime) }}</span>
       <q-slider
@@ -68,6 +85,8 @@ const props = withDefaults(defineProps<{
   disabled?: boolean;
   duration: number;
   fallbackDuration?: number;
+  playbackRate?: number;
+  playbackRates?: number[];
   playing: boolean;
   progressLabel?: string;
   repeat?: boolean;
@@ -75,6 +94,8 @@ const props = withDefaults(defineProps<{
 }>(), {
   disabled: false,
   fallbackDuration: 0,
+  playbackRate: 1,
+  playbackRates: () => [],
   progressLabel: 'Audio progress',
   repeat: false,
   showRepeat: false,
@@ -83,6 +104,7 @@ const props = withDefaults(defineProps<{
 defineEmits<{
   seek: [value: number | null];
   'toggle-playback': [];
+  'update:playback-rate': [value: number];
   'update:repeat': [value: boolean];
 }>();
 
