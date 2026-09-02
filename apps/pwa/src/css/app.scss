@@ -9,6 +9,16 @@ body {
   --app-text-strong: #0d1b18;
   --app-muted: #526762;
   --app-muted-strong: #3f5751;
+  --app-copy-lead: var(--app-muted-strong);
+  --app-copy-card: var(--app-muted-strong);
+  --app-copy-meta: var(--app-muted);
+  --app-copy-action: var(--app-accent);
+  --app-copy-field: var(--app-muted);
+  --app-copy-lead-size: 0.94rem;
+  --app-copy-card-size: 0.86rem;
+  --app-copy-meta-size: 0.76rem;
+  --app-copy-action-size: 0.8rem;
+  --app-copy-field-size: 0.74rem;
   --app-accent: #14645c;
   --app-primary: #0f766e;
   --category-accent: #0f766e;
@@ -34,6 +44,11 @@ body.body--dark {
   --app-text-strong: #ffffff;
   --app-muted: #b5c9c3;
   --app-muted-strong: #d1dfdb;
+  --app-copy-lead: var(--app-muted-strong);
+  --app-copy-card: #bfd2cc;
+  --app-copy-meta: #9db6af;
+  --app-copy-action: var(--app-accent);
+  --app-copy-field: #a8beb8;
   --app-accent: #70d7ca;
   --app-primary: #2bbbad;
   --category-accent: #70d7ca;
@@ -3892,6 +3907,121 @@ body.body--dark .personal-reader__lookup-error {
 .audio-player__actions a { color: var(--q-primary); font-size: 0.86rem; text-decoration: none; }
 .audio-detail__offline-action { display: flex; justify-content: flex-end; padding: 14px 18px; }
 .audio-credit { margin: 18px 4px 0; font-size: 0.78rem; }
+
+/* Semantic text roles. Keep these grouped so new screens do not have to invent
+   another size and gray for every kind of supporting copy. */
+.app-copy--lead,
+.learning-start > p:not(.learning-start__eyebrow),
+.lesson-stage > p:not(.lesson-stage__eyebrow),
+.lesson-complete > p:not(.lesson-complete__eyebrow),
+.training-library__heading p:not(.learning-start__eyebrow),
+.patterns-header > span,
+.patterns-detail-header span,
+.audio-header > div > span,
+.storage-header > div > span,
+.videos-header > div > span {
+  color: var(--app-copy-lead);
+  font-size: var(--app-copy-lead-size);
+  line-height: 1.5;
+}
+
+.app-copy--card,
+.focus-card span,
+.training-library-card__body strong,
+.lesson-card strong,
+.pattern-library-card__body > span:not(.pattern-library-card__meta),
+.pattern-card p,
+.pattern-tip,
+.audio-card__main small,
+.audio-detail__summary p,
+.video-card__body > p,
+.personal-books__empty p,
+.storage-policy span,
+.storage-empty span,
+.learning-panel p {
+  color: var(--app-copy-card);
+  font-size: var(--app-copy-card-size);
+  line-height: 1.5;
+}
+
+.app-copy--meta,
+.home-metric span,
+.pattern-library-card__meta,
+.pattern-card__topline,
+.pattern-example__answer small,
+.audio-card__meta,
+.audio-credit,
+.video-card__meta span,
+.video-progress span,
+.video-storage-note,
+.storage-category-summary,
+.storage-donut span,
+.storage-legend small,
+.storage-note,
+.q-item__label--caption {
+  color: var(--app-copy-meta);
+  font-size: var(--app-copy-meta-size);
+  line-height: 1.35;
+}
+
+.app-copy--action,
+.recommended-action > span,
+.voice-actions > span,
+.pattern-example__prompt,
+.pattern-playlist__heading small,
+.pattern-playlist__repeat small,
+.training-library-card__offline > span {
+  color: var(--app-copy-action);
+  font-size: var(--app-copy-action-size);
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.app-copy--field,
+body .q-field__bottom,
+body .q-field__messages,
+.content-mentor-feedback__statistics {
+  color: var(--app-copy-field);
+  font-size: var(--app-copy-field-size);
+  line-height: 1.35;
+}
+
+.q-field__label,
+.settings-section__heading,
+.panel-heading,
+.metric-tile > span,
+.activity-signal > span,
+.shift-timing-item > span,
+.version-grid span {
+  color: var(--app-muted-strong);
+  font-size: 0.8rem;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+}
+
+p.learning-start__eyebrow,
+p.lesson-stage__eyebrow,
+p.lesson-complete__eyebrow,
+.settings-header p,
+.statistics-header p,
+.storage-header p,
+.patterns-header p,
+.patterns-detail-header p,
+.audio-header p,
+.videos-header p,
+.level-card__copy > span,
+.priority-link__main small,
+.pattern-library-card__body > small,
+.pattern-playlist__heading > div > span,
+.pattern-section-heading span,
+.pattern-frame > span:first-child {
+  color: var(--category-accent, var(--app-accent));
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
 
 .app-audio-dock {
   background: color-mix(in srgb, var(--app-surface) 96%, transparent);
