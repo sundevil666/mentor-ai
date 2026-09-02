@@ -1,5 +1,5 @@
 <template>
-  <q-page class="patterns-page category-theme--patterns">
+  <q-page class="patterns-page category-theme--patterns" :class="{ 'patterns-page--detail': patternSelected }">
     <section class="patterns-shell">
       <header
         v-if="!patternSelected"
@@ -86,8 +86,11 @@
             controls
             :loop="repeatEnabled"
             preload="metadata"
+            @ended="isLessonPlaying = false"
             @pause="isLessonPlaying = false"
             @play="isLessonPlaying = true"
+            @loadedmetadata="updatePlaylistProgress"
+            @timeupdate="updatePlaylistProgress"
           />
           <q-linear-progress
             v-if="playlistPreparing"
@@ -140,6 +143,18 @@
             class="pattern-playlist__offline"
           ><q-icon name="check_circle" /> Downloaded. This playlist works without internet.</span>
         </section>
+        <AppAudioDock
+          :current-time="playlistCurrentTime"
+          :disabled="playlistPreparing"
+          :duration="playlistDuration"
+          :playing="isLessonPlaying"
+          :repeat="repeatEnabled"
+          progress-label="Pattern playlist progress"
+          show-repeat
+          @seek="seekPlaylist"
+          @toggle-playback="togglePlaylist"
+          @update:repeat="setRepeat"
+        />
       </article>
 
       <section
@@ -232,6 +247,7 @@ import { patternLibrary, type PhrasePatternExample } from 'src/services/pattern-
 import { speakWithPreferredVoice, stopSpeech } from 'src/services/speech-synthesis';
 import { deleteOutdatedPatternPlaylists, deletePatternPlaylist, getCachedPatternPlaylist, hasOutdatedPatternPlaylist, preparePatternPlaylist } from 'src/services/pattern-playlist';
 import { configurePlaybackAudioSession } from 'src/services/audio-session';
+import AppAudioDock from 'src/components/AppAudioDock.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -241,6 +257,8 @@ const completedIds = ref(new Set<string>());
 const revealedIds = ref(new Set<string>());
 const playingId = ref<string | null>(null);
 const isLessonPlaying = ref(false);
+const playlistCurrentTime = ref(0);
+const playlistDuration = ref(0);
 const playlistAudio = ref<HTMLAudioElement | null>(null);
 const playlistUrl = ref('');
 const playlistOffline = ref(false);
@@ -254,6 +272,8 @@ const playlistProgress = computed(() => playlistCompleted.value / (selectedPatte
 
 watch(selectedPattern, async (nextPattern) => {
   stopPlaylist();
+  playlistCurrentTime.value = 0;
+  playlistDuration.value = 0;
   stopSpeech();
   revokePlaylistUrl();
   playingId.value = null;
@@ -390,6 +410,22 @@ function revokePlaylistUrl() {
 function stopPlaylist() {
   playlistAudio.value?.pause();
   isLessonPlaying.value = false;
+}
+
+function updatePlaylistProgress() {
+  const player = playlistAudio.value;
+  if (!player) return;
+  playlistCurrentTime.value = player.currentTime;
+  playlistDuration.value = Number.isFinite(player.duration) ? player.duration : 0;
+}
+
+function seekPlaylist(value: number | null) {
+  if (playlistAudio.value && value !== null) playlistAudio.value.currentTime = value;
+}
+
+function setRepeat(value: boolean) {
+  repeatEnabled.value = value;
+  saveRepeatPreference();
 }
 
 function saveRepeatPreference() {

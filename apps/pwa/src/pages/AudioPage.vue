@@ -78,6 +78,17 @@
           <q-btn v-if="cachedUrls.has(selectedAudio.sourceUrl)" color="negative" flat icon="delete_outline" label="Remove offline copy" no-caps :loading="busyId === selectedAudio.id" @click="removeAudio(selectedAudio)" />
           <q-btn v-else color="primary" icon="download_for_offline" label="Save offline" no-caps :disable="!isOnline" :loading="busyId === selectedAudio.id" @click="downloadAudio(selectedAudio)" />
         </div>
+        <AppAudioDock
+          :current-time="currentTime"
+          :duration="duration"
+          :fallback-duration="selectedAudio.durationSeconds"
+          :playing="isPlaying"
+          :repeat="repeatEnabled"
+          show-repeat
+          @seek="seek"
+          @toggle-playback="togglePlayback"
+          @update:repeat="setRepeat"
+        />
       </article>
 
       <p class="audio-credit">Audio and program descriptions: VOA Learning English, public domain. Offline copies stay on this device.</p>
@@ -94,6 +105,7 @@ import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import { recordContentEngagement, syncContentEngagement } from 'src/services/content-engagement';
 import { useAppStore } from 'src/stores/app-store';
 import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
+import AppAudioDock from 'src/components/AppAudioDock.vue';
 
 const appStore = useAppStore();
 const audioElement = ref<HTMLAudioElement | null>(null);
@@ -106,6 +118,8 @@ const playbackRate = ref(1);
 const playbackRates = [0.75, 1, 1.25];
 const repeatEnabled = ref(false);
 const isPlaying = ref(false);
+const currentTime = ref(0);
+const duration = ref(0);
 const isOnline = ref(navigator.onLine);
 let playbackCycleActive = false;
 let playbackCycleStart = 0;
@@ -145,6 +159,8 @@ async function selectAudio(item: LibraryAudio) {
   const player = audioElement.value;
   if (!player) return;
   player.currentTime = readProgress(item.id);
+  currentTime.value = player.currentTime;
+  duration.value = item.durationSeconds;
   player.playbackRate = playbackRate.value;
   updateMediaMetadata(item);
 }
@@ -154,6 +170,8 @@ function closeAudio() {
   selectedAudio.value = null;
   playbackUrl.value = '';
   isPlaying.value = false;
+  currentTime.value = 0;
+  duration.value = 0;
   playbackCycleActive = false;
   playbackCycleFinished = false;
 }
@@ -188,12 +206,17 @@ async function removeAudio(item: LibraryAudio) {
 }
 
 function setPlaybackRate(rate: number) { playbackRate.value = rate; if (audioElement.value) audioElement.value.playbackRate = rate; }
+async function togglePlayback() { const player = audioElement.value; if (!player) return; if (player.paused) { try { await player.play(); } catch { Notify.create({ type: 'negative', message: 'Tap play again to start this audio.' }); } } else player.pause(); }
+function seek(value: number | null) { if (audioElement.value && value !== null) audioElement.value.currentTime = value; }
+function setRepeat(value: boolean) { repeatEnabled.value = value; saveRepeatPreference(); }
 function saveRepeatPreference() { const item = selectedAudio.value; if (item) localStorage.setItem(`mentor-ai:audio-repeat:${item.id}`, String(repeatEnabled.value)); }
 function readRepeatPreference(id: string) { return localStorage.getItem(`mentor-ai:audio-repeat:${id}`) === 'true'; }
 function saveProgress() {
   const player = audioElement.value;
   const item = selectedAudio.value;
   if (!player || !item || !Number.isFinite(player.currentTime)) return;
+  currentTime.value = player.currentTime;
+  duration.value = Number.isFinite(player.duration) ? player.duration : item.durationSeconds;
   localStorage.setItem(`mentor-ai:audio-progress:${item.id}`, String(Math.floor(player.currentTime)));
   observePlaybackCycle(player);
   if ('mediaSession' in navigator && Number.isFinite(player.duration) && player.duration > 0) navigator.mediaSession.setPositionState({ duration: player.duration, playbackRate: player.playbackRate, position: Math.min(player.currentTime, player.duration) });

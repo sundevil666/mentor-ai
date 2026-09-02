@@ -1,5 +1,5 @@
 <template>
-  <q-page class="videos-page category-theme--stories" :class="{ 'videos-page--detail': selectedStory || selectedBook, 'videos-page--book-detail': selectedBook, 'videos-page--reading-mode': readingMode }">
+  <q-page class="videos-page category-theme--stories" :class="{ 'videos-page--detail': selectedStory || selectedBook, 'videos-page--audio-detail': selectedStory, 'videos-page--book-detail': selectedBook, 'videos-page--reading-mode': readingMode }">
     <section class="videos-shell" :class="{ 'videos-shell--detail': selectedStory || selectedBook, 'videos-shell--book-detail': selectedBook }">
       <header
         v-if="!readingMode"
@@ -122,6 +122,18 @@
           <p>{{ selectedStory.description }}</p>
           <p class="story-source">{{ selectedStory.sourceLabel }}. The recording is bundled with the app for reliable offline listening.</p>
         </div>
+        <AppAudioDock
+          :current-time="currentTime"
+          :duration="duration"
+          :fallback-duration="selectedStory.durationSeconds"
+          :playing="playing"
+          :repeat="repeat"
+          progress-label="Story progress"
+          show-repeat
+          @seek="seek"
+          @toggle-playback="togglePlayback"
+          @update:repeat="repeat = $event"
+        />
       </section>
 
       <section v-else-if="!selectedBook && activeTab === 'books'" class="personal-books" aria-label="My books">
@@ -430,6 +442,7 @@ import { Dialog, Notify } from 'quasar';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { ReaderTextLookup, ReadingChapter, ReadingPage } from '@mentor-ai/shared';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
+import AppAudioDock from 'src/components/AppAudioDock.vue';
 import { loadContentEngagementSummaries, recordContentEngagement, syncContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
 import { loadContentProgress, saveContentProgress, syncAllContentProgress } from 'src/services/content-progress';
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineStory } from 'src/services/offline-library';
