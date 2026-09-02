@@ -56,10 +56,6 @@
               <strong>Playback speed</strong>
               <div class="audio-speed-controls" aria-label="Playback speed"><q-btn v-for="rate in playbackRates" :key="rate" :label="`${rate}×`" :color="playbackRate === rate ? 'primary' : undefined" :outline="playbackRate !== rate" no-caps @click="setPlaybackRate(rate)" /></div>
             </div>
-            <div class="audio-repeat-setting">
-              <div><strong>Repeat</strong><span>{{ repeatEnabled ? 'Start again automatically' : 'Stop at the end' }}</span></div>
-              <q-toggle v-model="repeatEnabled" color="primary" icon="repeat" aria-label="Repeat audio" @update:model-value="saveRepeatPreference" />
-            </div>
           </div>
           <div class="audio-player__actions">
             <a :href="selectedAudio.articleUrl" target="_blank" rel="noopener">Transcript and source <q-icon name="open_in_new" /></a>

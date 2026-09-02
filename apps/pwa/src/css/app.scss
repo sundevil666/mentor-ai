@@ -3910,13 +3910,10 @@ body.body--dark .personal-reader__lookup-error {
 .audio-player { display: grid; gap: 18px; padding: 22px; border-block: 1px solid var(--app-border); background: var(--app-surface-soft); }
 .audio-player audio { width: 100%; }
 .story-audio { display: block; width: 100%; }
-.audio-player__settings { display: grid; gap: 18px; grid-template-columns: 1fr 1fr; }
+.audio-player__settings { display: grid; gap: 18px; }
 .audio-player__settings > div { display: grid; gap: 8px; }
 .audio-speed-controls { display: flex; gap: 6px; }
 .audio-speed-controls .q-btn { min-height: 38px; padding: 0 12px; }
-.audio-repeat-setting { display: flex !important; align-items: center; justify-content: space-between; }
-.audio-repeat-setting > div { display: grid; gap: 3px; }
-.audio-repeat-setting span { color: var(--app-muted); font-size: 0.78rem; }
 .audio-player__actions { align-items: center; display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; }
 .audio-player__actions a { color: var(--q-primary); font-size: 0.86rem; text-decoration: none; }
 .audio-detail__offline-action { display: flex; justify-content: flex-end; padding: 14px 18px; }
@@ -3992,7 +3989,6 @@ body.body--dark .personal-reader__lookup-error {
   .audio-card { padding: 14px; }
   .audio-card__meta { flex-wrap: wrap; padding-left: 0; }
   .audio-detail__summary, .audio-player { padding: 16px; }
-  .audio-player__settings { grid-template-columns: 1fr; }
   .audio-player__actions { align-items: stretch; flex-direction: column; }
   .audio-player__actions a { align-self: flex-start; }
   .audio-player__actions .q-btn { width: 100%; }
