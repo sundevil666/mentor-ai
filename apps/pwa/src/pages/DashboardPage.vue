@@ -838,7 +838,9 @@ const speechSupportMessage = computed(() => {
   }
 
   if (speechRecognitionCaptured.value) {
-    return 'Your words are shown in the answer field below. You can edit or record again.';
+    return dialogueAnswerStatus.value === 'correct'
+      ? 'Your answer matches the native phrase.'
+      : 'The recognized answer does not match yet. Tap Record again to retry.';
   }
 
   if (!speechRecognitionAvailable.value) {
@@ -850,14 +852,16 @@ const speechSupportMessage = computed(() => {
 const speechStatusTitle = computed(() => {
   if (isRecognizingSpeech.value) return 'Recording now';
   if (speechRecognitionError.value) return 'Recording failed';
-  if (speechRecognitionCaptured.value) return 'Answer recorded';
+  if (dialogueAnswerStatus.value === 'correct') return 'Correct answer';
+  if (dialogueAnswerStatus.value === 'incorrect') return 'Try again';
   if (!speechRecognitionAvailable.value) return 'Voice recording unavailable';
   return 'Ready to record';
 });
 const speechStatusIcon = computed(() => {
   if (isRecognizingSpeech.value) return 'graphic_eq';
   if (speechRecognitionError.value) return 'error_outline';
-  if (speechRecognitionCaptured.value) return 'check_circle';
+  if (dialogueAnswerStatus.value === 'correct') return 'check_circle';
+  if (dialogueAnswerStatus.value === 'incorrect') return 'cancel';
   if (!speechRecognitionAvailable.value) return 'mic_off';
   return 'mic_none';
 });
