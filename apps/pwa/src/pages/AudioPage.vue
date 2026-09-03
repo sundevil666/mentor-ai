@@ -86,6 +86,7 @@
           :playback-rate="playbackRate"
           :playing="isPlaying"
           :repeat="repeatEnabled"
+          :speed-preference-key="`audio:${selectedAudio.id}`"
           show-repeat
           @seek="seek"
           @toggle-playback="togglePlayback"

@@ -151,6 +151,7 @@
           :playback-rate="playbackRate"
           :playing="isLessonPlaying"
           :repeat="repeatEnabled"
+          :speed-preference-key="selectedPattern ? `pattern:${selectedPattern.id}` : null"
           progress-label="Pattern playlist progress"
           show-repeat
           @seek="seekPlaylist"

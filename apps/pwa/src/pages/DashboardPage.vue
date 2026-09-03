@@ -589,6 +589,7 @@
                 </q-btn>
                 <AudioPlaybackSpeedMenu
                   :model-value="listeningPlaybackRate"
+                  :persistence-key="listeningProgressKey ? `listening:${listeningProgressKey}` : null"
                   @update:model-value="setListeningPlaybackRate"
                 />
               </div>

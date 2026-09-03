@@ -5,7 +5,9 @@
     color="primary"
     flat
     icon="speed"
-    round
+    :label="`${modelValue}×`"
+    no-caps
+    rounded
     :disable="disabled"
   >
     <q-tooltip>Playback speed · {{ modelValue }}×</q-tooltip>
@@ -24,7 +26,7 @@
           clickable
           :active="modelValue === rate"
           active-class="audio-playback-speed-menu__option--active"
-          @click="$emit('update:model-value', rate)"
+          @click="selectRate(rate)"
         >
           <q-item-section>{{ rate }}×</q-item-section>
           <q-item-section
@@ -43,16 +45,28 @@
 </template>
 
 <script setup lang="ts">
-import { audioPlaybackRates, type AudioPlaybackRate } from 'src/services/audio-playback-speed';
+import { watch } from 'vue';
+import { audioPlaybackRates, type AudioPlaybackRate, readAudioPlaybackRate, saveAudioPlaybackRate } from 'src/services/audio-playback-speed';
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   disabled?: boolean;
   modelValue: number;
+  persistenceKey?: string | null;
 }>(), {
   disabled: false,
+  persistenceKey: null,
 });
 
-defineEmits<{
+const emit = defineEmits<{
   'update:model-value': [value: AudioPlaybackRate];
 }>();
+
+watch(() => props.persistenceKey, (persistenceKey) => {
+  if (persistenceKey) emit('update:model-value', readAudioPlaybackRate(persistenceKey));
+}, { immediate: true });
+
+function selectRate(rate: AudioPlaybackRate) {
+  if (props.persistenceKey) saveAudioPlaybackRate(props.persistenceKey, rate);
+  emit('update:model-value', rate);
+}
 </script>

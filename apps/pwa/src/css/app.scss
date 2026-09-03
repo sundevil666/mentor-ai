@@ -4107,7 +4107,9 @@ p.lesson-complete__eyebrow,
   min-width: 52px;
 }
 
-.audio-playback-speed-menu { margin-left: 8px; }
+.audio-playback-speed-menu { margin-left: 8px; padding-inline: 9px; }
+.audio-playback-speed-menu .q-btn__content { gap: 4px; }
+.audio-playback-speed-menu .q-btn__content > span:not(.q-icon) { font-size: 0.74rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .audio-playback-speed-menu__list { min-width: 112px; }
 .audio-playback-speed-menu__option--active { background: var(--category-soft, var(--app-surface-soft)); color: var(--q-primary); font-weight: 800; }
 

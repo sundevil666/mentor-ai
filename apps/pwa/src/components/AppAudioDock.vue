@@ -45,6 +45,7 @@
       <AudioPlaybackSpeedMenu
         :disabled="disabled"
         :model-value="playbackRate"
+        :persistence-key="speedPreferenceKey"
         @update:model-value="$emit('update:playback-rate', $event)"
       />
     </div>
@@ -80,6 +81,7 @@ const props = withDefaults(defineProps<{
   progressLabel?: string;
   repeat?: boolean;
   showRepeat?: boolean;
+  speedPreferenceKey?: string | null;
 }>(), {
   disabled: false,
   fallbackDuration: 0,
@@ -87,6 +89,7 @@ const props = withDefaults(defineProps<{
   progressLabel: 'Audio progress',
   repeat: false,
   showRepeat: false,
+  speedPreferenceKey: null,
 });
 
 defineEmits<{

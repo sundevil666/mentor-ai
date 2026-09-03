@@ -117,6 +117,7 @@
           :playback-rate="playbackRate"
           :playing="playing"
           :repeat="repeat"
+          :speed-preference-key="`story:${selectedStory.id}`"
           progress-label="Story progress"
           show-repeat
           @seek="seek"
