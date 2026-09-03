@@ -1,5 +1,16 @@
 <template>
-  <q-page class="videos-page category-theme--stories" :class="{ 'videos-page--detail': selectedStory || selectedBook, 'videos-page--audio-detail': selectedStory, 'videos-page--book-detail': selectedBook, 'videos-page--reading-mode': readingMode }">
+  <q-page
+    class="videos-page"
+    :class="[
+      isAudioLibrary ? 'category-theme--audio' : 'category-theme--stories',
+      {
+        'videos-page--detail': selectedStory || selectedBook,
+        'videos-page--audio-detail': selectedStory,
+        'videos-page--book-detail': selectedBook,
+        'videos-page--reading-mode': readingMode,
+      },
+    ]"
+  >
     <section class="videos-shell" :class="{ 'videos-shell--detail': selectedStory || selectedBook, 'videos-shell--book-detail': selectedBook }">
       <header
         v-if="!readingMode"
@@ -17,26 +28,35 @@
           @click="closeDetail"
         />
         <div>
-          <p>{{ activeTab === 'audio' ? 'English audio library' : 'Your private English library' }}</p>
-          <h1>{{ selectedStory?.title ?? selectedBook?.title ?? 'Stories & Books' }}</h1>
+          <p>{{ isAudioLibrary ? 'English audio library' : 'Your private English library' }}</p>
+          <h1>{{ selectedStory?.title ?? selectedBook?.title ?? (isAudioLibrary ? 'Audio stories' : 'Reading') }}</h1>
         </div>
       </header>
 
+      <AudioLibraryTabs
+        v-if="isAudioLibrary && !selectedStory"
+        active-tab="stories"
+      />
+
       <q-tabs
-        v-if="!selectedStory && !selectedBook"
-        v-model="activeTab"
+        v-if="!isAudioLibrary && !selectedBook"
+        v-model="activeReadingCategory"
         class="story-library-tabs"
         active-color="primary"
         align="justify"
         indicator-color="primary"
         no-caps
-        @update:model-value="saveActiveTab"
       >
-        <q-tab icon="headphones" label="Audio" name="audio" />
-        <q-tab icon="menu_book" :label="`Books (${personalBooks.length})`" name="books" />
+        <q-tab
+          v-for="category in readingCategories"
+          :key="category.id"
+          :icon="category.icon"
+          :label="category.label"
+          :name="category.id"
+        />
       </q-tabs>
 
-      <section v-if="!selectedStory && !selectedBook && activeTab === 'audio'" class="video-library" aria-label="Audio stories library">
+      <section v-if="isAudioLibrary && !selectedStory" class="video-library" aria-label="Audio stories library">
         <article
           v-for="story in storyLibrary"
           :key="story.id"
@@ -127,7 +147,7 @@
         />
       </section>
 
-      <section v-else-if="!selectedBook && activeTab === 'books'" class="personal-books" aria-label="My books">
+      <section v-else-if="!isAudioLibrary && !selectedBook && activeReadingCategory === 'fiction'" class="personal-books" aria-label="Fiction books">
         <input ref="bookFileInput" class="personal-books__file-input" type="file" accept=".epub,.txt,application/epub+zip,text/plain" @change="handleBookFileSelection">
 
         <div v-if="personalBooks.length" class="personal-book-list">
@@ -395,11 +415,11 @@
         </nav>
       </section>
 
-      <p v-if="!selectedStory && !selectedBook && activeTab === 'audio'" class="video-storage-note">{{ offlineSummary }} Every public-domain recording is bundled with the app in 30–40 minute listening parts.</p>
+      <p v-if="isAudioLibrary && !selectedStory" class="video-storage-note">{{ offlineSummary }} Every public-domain recording is bundled with the app in 30–40 minute listening parts.</p>
     </section>
 
     <q-btn
-      v-if="!selectedStory && !selectedBook && activeTab === 'books'"
+      v-if="!isAudioLibrary && !selectedBook && activeReadingCategory === 'fiction'"
       aria-label="Add a book"
       class="personal-books__add-button"
       color="primary"
@@ -434,6 +454,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { ReaderTextLookup, ReadingChapter, ReadingPage } from '@mentor-ai/shared';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import AppAudioDock from 'src/components/AppAudioDock.vue';
+import AudioLibraryTabs from 'src/components/AudioLibraryTabs.vue';
 import { loadContentEngagementSummaries, recordContentEngagement, syncContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
 import { loadContentProgress, saveContentProgress, syncAllContentProgress } from 'src/services/content-progress';
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineStory } from 'src/services/offline-library';
@@ -455,10 +476,16 @@ import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src
 import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, type ReaderSwipePoint } from 'src/services/reader-swipe';
 import { beginReaderLookupInteraction, shouldProcessLateReadingTranscript } from 'src/services/reader-lookup-interaction';
 
+const props = withDefaults(defineProps<{
+  libraryMode?: 'audio' | 'reading';
+}>(), {
+  libraryMode: 'reading',
+});
+
 const appStore = useAppStore();
-type StoryLibraryTab = 'audio' | 'books';
-const activeTabKey = 'mentor-ai:stories-library-tab';
-const activeTab = ref<StoryLibraryTab>(readActiveTab());
+type ReadingCategory = 'fiction';
+const activeReadingCategory = ref<ReadingCategory>('fiction');
+const isAudioLibrary = computed(() => props.libraryMode === 'audio');
 const selectedStoryId = ref<string | null>(null);
 const selectedBook = ref<PersonalBook | null>(null);
 const selectedBookChapters = ref<ReadingChapter[]>([]);
@@ -546,6 +573,13 @@ let suppressReaderTapUntil = 0;
 let personalBookSyncPromise: Promise<void> | null = null;
 const selectedStory = computed(() => storyLibrary.find((story) => story.id === selectedStoryId.value) ?? null);
 const offlineSummary = computed(() => `${storyLibrary.length} stories · ${formatStoryDuration(storyLibrary.reduce((sum, story) => sum + story.durationSeconds, 0))} total listening.`);
+const readingCategories = computed(() => ([
+  {
+    id: 'fiction' as const,
+    icon: 'auto_stories',
+    label: `Fiction (${personalBooks.value.length})`,
+  },
+]));
 const bookSyncStatus = computed(() => {
   if (!getAuthToken()) return 'Sign in with Google to synchronize books across devices.';
   if (bookSyncing.value) return `Syncing ${personalBooks.value.length} local book${personalBooks.value.length === 1 ? '' : 's'}…`;
@@ -562,9 +596,9 @@ const bookSyncCompactLabel = computed(() => {
   return `${cloudBookCount.value} synced`;
 });
 watch(
-  [activeTab, selectedBook, bookSyncStatus, bookSyncIcon, bookSyncCompactLabel, bookSyncing],
+  [isAudioLibrary, selectedBook, bookSyncStatus, bookSyncIcon, bookSyncCompactLabel, bookSyncing],
   () => {
-    personalBookSyncControl.visible = activeTab.value === 'books' && !selectedBook.value;
+    personalBookSyncControl.visible = !isAudioLibrary.value && !selectedBook.value;
     personalBookSyncControl.disabled = !getAuthToken();
     personalBookSyncControl.icon = bookSyncIcon.value;
     personalBookSyncControl.label = bookSyncCompactLabel.value;
@@ -651,17 +685,21 @@ const readingMicrophoneIndicator = computed(() => {
 
 onMounted(async () => {
   configurePlaybackAudioSession();
-  personalBooks.value = await listPersonalBooks();
-  await syncPersonalBooks().catch(() => undefined);
-  cachedUrls.value = await getCachedStoryUrls();
-  engagementSummaries.value = await loadContentEngagementSummaries('audio');
+  if (isAudioLibrary.value) {
+    cachedUrls.value = await getCachedStoryUrls();
+    engagementSummaries.value = await loadContentEngagementSummaries('audio');
+  } else {
+    personalBooks.value = await listPersonalBooks();
+    await syncPersonalBooks().catch(() => undefined);
+  }
   document.addEventListener('visibilitychange', handleVisibilityChange);
   window.addEventListener('online', handleBookSyncWakeup);
   document.addEventListener('keydown', handleReaderKeydown);
   document.addEventListener('selectionchange', handleReaderSelectionChange);
-  const requestedStoryId = new URLSearchParams(window.location.search).get('story');
+  const requestedStoryId = isAudioLibrary.value
+    ? new URLSearchParams(window.location.search).get('story')
+    : null;
   if (requestedStoryId && storyLibrary.some((story) => story.id === requestedStoryId)) {
-    activeTab.value = 'audio';
     await openStory(requestedStoryId);
   }
 });
@@ -692,13 +730,6 @@ function closeStory() { persistProgress(); audioElement.value?.pause(); selected
 function closeDetail() {
   if (selectedStory.value) closeStory();
   if (selectedBook.value) closeBook();
-}
-function saveActiveTab(value: string | number) {
-  if (value === 'audio' || value === 'books') localStorage.setItem(activeTabKey, value);
-}
-function readActiveTab(): StoryLibraryTab {
-  if (typeof localStorage === 'undefined') return 'audio';
-  return localStorage.getItem(activeTabKey) === 'books' ? 'books' : 'audio';
 }
 function chooseBookFile() { bookFileInput.value?.click(); }
 function handleBookFileSelection(event: Event) {
@@ -1821,7 +1852,7 @@ async function removeBook(book: PersonalBook) {
 function openStoryInSafari() {
   const story = selectedStory.value;
   if (!story) return;
-  const url = new URL('/stories', window.location.origin);
+  const url = new URL('/audio/stories', window.location.origin);
   url.searchParams.set('story', story.id);
   url.searchParams.set('safari-audio', '1');
   window.open(url, '_blank', 'noopener');

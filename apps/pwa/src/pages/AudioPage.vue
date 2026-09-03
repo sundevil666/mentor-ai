@@ -13,13 +13,18 @@
           @click="closeAudio"
         />
         <div>
-          <p>{{ selectedAudio ? 'Audio lesson' : 'Long listening' }}</p>
+          <p>{{ selectedAudio ? 'Podcast episode' : 'English audio library' }}</p>
           <h1>{{ selectedAudio?.title ?? 'Audio' }}</h1>
           <span v-if="!selectedAudio">Complete 30-minute programs in clear, slower American English.</span>
         </div>
       </header>
 
-      <section v-if="!selectedAudio" class="audio-library" aria-label="Audio programs library">
+      <AudioLibraryTabs
+        v-if="!selectedAudio"
+        active-tab="podcasts"
+      />
+
+      <section v-if="!selectedAudio" class="audio-library" aria-label="Podcasts library">
         <article v-for="item in audioLibrary" :key="item.id" class="audio-card">
           <button class="audio-card__main" type="button" @click="selectAudio(item)">
             <q-icon name="chevron_right" />
@@ -110,6 +115,7 @@ import { recordContentEngagement, syncContentEngagement } from 'src/services/con
 import { useAppStore } from 'src/stores/app-store';
 import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 import AppAudioDock from 'src/components/AppAudioDock.vue';
+import AudioLibraryTabs from 'src/components/AudioLibraryTabs.vue';
 
 const appStore = useAppStore();
 const audioElement = ref<HTMLAudioElement | null>(null);

@@ -34,11 +34,23 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'stories',
-        name: 'stories',
+        redirect: (to) => ({ name: 'audio-stories', query: to.query, hash: to.hash }),
+      },
+      {
+        path: 'audio/stories',
+        name: 'audio-stories',
         component: StoriesPage,
+        props: { libraryMode: 'audio' },
         meta: { routeOrder: 1 },
       },
-      { path: 'videos', redirect: { name: 'stories' } },
+      {
+        path: 'reading',
+        name: 'reading',
+        component: StoriesPage,
+        props: { libraryMode: 'reading' },
+        meta: { routeOrder: 1 },
+      },
+      { path: 'videos', redirect: (to) => ({ name: 'audio-stories', query: to.query, hash: to.hash }) },
       {
         path: 'storage', name: 'storage', component: StoragePage, meta: { routeOrder: 2 },
       },

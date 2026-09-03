@@ -27,7 +27,7 @@ export const offlineCategories: Array<{ id: OfflineCategory; label: string; icon
   { id: 'listening', label: 'Listening', icon: 'headphones' },
   { id: 'speaking', label: 'Speaking', icon: 'record_voice_over' },
   { id: 'audio', label: 'Audio', icon: 'podcasts' },
-  { id: 'stories', label: 'Stories', icon: 'auto_stories' },
+  { id: 'stories', label: 'Audio stories', icon: 'auto_stories' },
 ];
 const lessonsKey = 'mentor-ai:offline-lessons:v1';
 const retentionKey = 'mentor-ai:offline-retention:v1';

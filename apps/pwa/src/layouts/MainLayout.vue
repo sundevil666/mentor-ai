@@ -574,14 +574,14 @@ const primaryNavigationItems: Array<{
     icon: 'podcasts',
     tone: 'audio',
     to: { name: 'audio' },
-    isActive: () => route.name === 'audio',
+    isActive: () => route.name === 'audio' || route.name === 'audio-stories',
   },
   {
-    label: 'Stories',
-    icon: 'auto_stories',
+    label: 'Reading',
+    icon: 'menu_book',
     tone: 'stories',
-    to: { name: 'stories' },
-    isActive: () => route.name === 'stories',
+    to: { name: 'reading' },
+    isActive: () => route.name === 'reading',
   },
 ];
 
