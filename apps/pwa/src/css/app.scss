@@ -4061,7 +4061,7 @@ body.body--dark .personal-reader__lookup-error {
 .audio-header p { margin: 0 0 4px; color: var(--category-accent); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
 .audio-header h1 { margin: 0; font-size: clamp(2rem, 7vw, 3rem); line-height: 1.05; }
 .audio-header span, .audio-credit { color: var(--app-muted, #687386); }
-.audio-library { display: grid; gap: 14px; }
+.audio-library { display: grid; gap: 14px; margin-top: 14px; }
 .audio-card, .audio-detail { backdrop-filter: blur(18px) saturate(1.16); border: 1px solid var(--category-border); border-radius: 20px; background: color-mix(in srgb, var(--app-surface) 88%, transparent); box-shadow: 0 14px 36px color-mix(in srgb, var(--category-accent) 10%, transparent); }
 
 @media (max-width: 600px) {
