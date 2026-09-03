@@ -67,6 +67,7 @@ import { findOfflineLesson } from 'src/services/offline-library';
 import { selectRetainedUpdateNotifications } from 'src/services/update-notification-retention';
 import { resolveRestoredLessonSessions } from 'src/services/lesson-session-restoration';
 import { rewindLessonSession } from 'src/services/lesson-step-navigation';
+import { clearSuccessfulSpeakingExerciseKeys } from 'src/services/speaking-exercise-progress';
 
 interface LearningSessionState {
   id: string;
@@ -669,6 +670,7 @@ export const useAppStore = defineStore('app', {
     },
 
     async resetLocalLearning() {
+      clearSuccessfulSpeakingExerciseKeys(this.studentId);
       this.studentModel = initialStudentModel;
       this.session = null;
       this.pausedSessions = [];
