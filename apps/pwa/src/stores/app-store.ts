@@ -830,50 +830,59 @@ export const useAppStore = defineStore('app', {
         return;
       }
 
+      const activeSession = this.session;
+
       const lessonFinishedEvent = createLearningEvent(
         this.studentId,
-        this.session.id,
-        this.session.lesson,
+        activeSession.id,
+        activeSession.lesson,
         undefined,
         'lesson-finished',
         completedAt,
       );
-      const updatedModel = updateStudentModelFromResults(this.studentModel, this.session.results, completedAt);
-      const observation = createObservationFromResults(this.studentId, this.session.results, completedAt);
+      const updatedModel = updateStudentModelFromResults(this.studentModel, activeSession.results, completedAt);
+      const observation = createObservationFromResults(this.studentId, activeSession.results, completedAt);
       const recommendation = createRecommendationFromModel(updatedModel, completedAt);
-
-      this.session.events.push(lessonFinishedEvent);
-      this.session.completedAt = completedAt;
-      this.session.observation = observation;
-      this.session.recommendation = recommendation;
+      const completedSession: LearningSessionState = {
+        ...activeSession,
+        events: [...activeSession.events, lessonFinishedEvent],
+        completedAt,
+        observation,
+        recommendation,
+      };
       this.studentModel = updatedModel;
       this.latestRecommendation = recommendation;
 
-      await this.persistSession();
+      await this.persistSession(completedSession);
       await this.persistStudentModel();
-      await this.persistStatistics(completedAt);
-      await this.persistSyncQueue();
+      await this.persistStatistics(completedAt, completedSession);
+      await this.persistSyncQueue(completedSession);
       await this.pruneLocalStorage();
 
       if (navigator.onLine) {
         await this.syncPendingEvents();
       }
 
+      if (this.session?.id === completedSession.id) {
+        this.session = completedSession;
+      }
+
       logDiagnostic('lesson.completed', {
-        sessionId: this.session.id,
-        lessonId: this.session.lesson.id,
-        exerciseCount: this.session.results.length,
+        sessionId: completedSession.id,
+        lessonId: completedSession.lesson.id,
+        exerciseCount: completedSession.results.length,
         modelVersion: this.studentModel.version,
         pendingSyncEvents: this.pendingSyncEvents,
       });
     },
 
-    async persistSession() {
-      if (!this.session) {
+    async persistSession(completedSession?: LearningSessionState) {
+      const sourceSession = completedSession ?? this.session;
+      if (!sourceSession) {
         return;
       }
 
-      const session = toStorageRecord(this.session);
+      const session = toStorageRecord(sourceSession);
       writeSessionCheckpoint(session);
       const db = await mentorDb;
       await db.put('learning-sessions', session, sessionStoreKey);
@@ -895,68 +904,69 @@ export const useAppStore = defineStore('app', {
       await db.put('student-models', this.studentModel);
     },
 
-    async persistStatistics(createdAt: string) {
-      if (!this.session) {
+    async persistStatistics(createdAt: string, completedSession?: LearningSessionState) {
+      const sourceSession = completedSession ?? this.session;
+      if (!sourceSession) {
         return;
       }
 
-      const completed = this.session.results.filter((result) => result.completionState === 'completed');
+      const completed = sourceSession.results.filter((result) => result.completionState === 'completed');
       const correct = completed.filter((result) => result.correct).length;
       const responseTime = completed.reduce((sum, result) => sum + result.responseTimeMs, 0);
-      const pronunciationIssues = this.session.speechResults.flatMap((result) => result.pronunciationIssues);
+      const pronunciationIssues = sourceSession.speechResults.flatMap((result) => result.pronunciationIssues);
       const activeSeconds = Math.max(
         0,
         Math.min(
-          Math.round((Date.parse(createdAt) - Date.parse(this.session.startedAt)) / 1000),
-          Math.round(this.session.lesson.estimatedMinutes * 60 * 2),
+          Math.round((Date.parse(createdAt) - Date.parse(sourceSession.startedAt)) / 1000),
+          Math.round(sourceSession.lesson.estimatedMinutes * 60 * 2),
         ),
       );
-      const spokenWords = this.session.speechResults.reduce(
+      const spokenWords = sourceSession.speechResults.reduce(
         (total, result) => total + countWords(result.heardText ?? ''),
         0,
       );
 
       const snapshot: StatisticsSnapshot = {
-        id: `statistics-${this.session.id}-${createdAt}`,
+        id: `statistics-${sourceSession.id}-${createdAt}`,
         studentId: this.studentId,
-        sessionId: this.session.id,
-        lessonId: this.session.lesson.id,
+        sessionId: sourceSession.id,
+        lessonId: sourceSession.lesson.id,
         accuracy: completed.length === 0 ? 0 : correct / completed.length,
         averageResponseTimeMs: completed.length === 0 ? 0 : Math.round(responseTime / completed.length),
         attempts: completed.reduce((sum, result) => sum + result.attempts, 0),
         completedExercises: completed.length,
-        audioReplays: this.session.events.filter((event) => event.type === 'audio-replayed').length,
-        speechAttempts: this.session.events.filter((event) => event.type === 'speech-attempted').length,
+        audioReplays: sourceSession.events.filter((event) => event.type === 'audio-replayed').length,
+        speechAttempts: sourceSession.events.filter((event) => event.type === 'speech-attempted').length,
         pronunciationIssueCount: pronunciationIssues.length,
         pronunciationFocus: Array.from(new Set(pronunciationIssues.map((issue) => issue.word))).slice(0, 4),
         activeSeconds,
-        listeningSeconds: this.session.context.mode === 'listening' ? activeSeconds : 0,
+        listeningSeconds: sourceSession.context.mode === 'listening' ? activeSeconds : 0,
         spokenWords,
-        lessonTemplateKey: this.session.lesson.lessonTemplateKey,
+        lessonTemplateKey: sourceSession.lesson.lessonTemplateKey,
         fatigueSignal: this.studentModel.fatigue,
-        learningMode: this.session.context.mode,
-        workShift: this.session.context.workShift,
-        shiftTiming: this.session.context.shiftTiming,
-        dayType: this.session.context.dayType,
-        activityPace: this.session.context.activityPace,
+        learningMode: sourceSession.context.mode,
+        workShift: sourceSession.context.workShift,
+        shiftTiming: sourceSession.context.shiftTiming,
+        dayType: sourceSession.context.dayType,
+        activityPace: sourceSession.context.activityPace,
         createdAt,
       };
 
       const db = await mentorDb;
       await db.put('statistics', { ...snapshot, userId: this.studentId });
       await db.put('concept-evidence', {
-        id: `concept-${this.session.id}-${createdAt}`,
+        id: `concept-${sourceSession.id}-${createdAt}`,
         studentId: this.studentId,
-        lessonId: this.session.lesson.id,
-        concept: this.session.lesson.concept,
-        activityType: this.session.lesson.activityType,
-        teacherDecision: this.session.lesson.teacherDecision,
-        results: this.session.results,
+        lessonId: sourceSession.lesson.id,
+        concept: sourceSession.lesson.concept,
+        activityType: sourceSession.lesson.activityType,
+        teacherDecision: sourceSession.lesson.teacherDecision,
+        results: sourceSession.results,
         createdAt,
       });
       this.statisticsSnapshots = [...this.statisticsSnapshots, snapshot];
       await this.persistActivitySnapshot({
-        ...createActivitySnapshot(this.studentId, this.session.context, this.session.id, createdAt),
+        ...createActivitySnapshot(this.studentId, sourceSession.context, sourceSession.id, createdAt),
         lessonCompleted: true,
         completedExercises: snapshot.completedExercises,
         accuracy: snapshot.accuracy,
@@ -972,19 +982,20 @@ export const useAppStore = defineStore('app', {
         .slice(-80);
     },
 
-    async persistSyncQueue() {
-      if (!this.session) {
+    async persistSyncQueue(completedSession?: LearningSessionState) {
+      const sourceSession = completedSession ?? this.session;
+      if (!sourceSession) {
         return;
       }
 
       const db = await mentorDb;
 
-      for (const event of this.session.events) {
+      for (const event of sourceSession.events) {
         await db.put('sync-queue', {
           ...event,
           status: 'pending',
-          exerciseResults: this.session.results,
-          speechResults: this.session.speechResults,
+          exerciseResults: sourceSession.results,
+          speechResults: sourceSession.speechResults,
         });
       }
 
