@@ -133,7 +133,7 @@
                       {{ lessonProgressLabel(lesson.templateKey) }}
                     </span>
                   </span>
-                  <strong>{{ lesson.focus }}</strong>
+                  <strong v-if="lessonProgressState(lesson.templateKey) !== 'completed'">{{ lesson.focus }}</strong>
                   <span>{{ lesson.minutes }} min</span>
                 </button>
                 <ContentMentorFeedback category="lesson" :content-id="lesson.templateKey" />

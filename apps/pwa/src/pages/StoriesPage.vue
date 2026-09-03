@@ -61,16 +61,20 @@
           v-for="story in storyLibrary"
           :key="story.id"
           class="video-card"
+          :class="{ 'content-library-card--completed': isStoryCompleted(story.id) }"
           role="link"
           tabindex="0"
           @click="openStory(story.id)"
           @keydown.enter="openStory(story.id)"
           @keydown.space.prevent="openStory(story.id)"
         >
-          <q-icon class="video-card__play-backdrop" name="headphones" />
+          <q-icon class="video-card__play-backdrop" :name="isStoryCompleted(story.id) ? 'verified' : 'headphones'" />
           <div class="video-card__body">
-            <div class="video-card__heading"><h2>{{ story.title }}</h2></div>
-            <p>{{ story.description }}</p>
+            <div class="video-card__heading">
+              <h2>{{ story.title }}</h2>
+              <span v-if="isStoryCompleted(story.id)" class="content-library-card__completed-label"><q-icon name="check_circle" /> Completed</span>
+            </div>
+            <p v-if="!isStoryCompleted(story.id)">{{ story.description }}</p>
             <div class="video-card__meta">
               <span><q-icon name="school" /> {{ story.level }}</span>
               <span><q-icon name="schedule" /> {{ formatStoryDuration(story.durationSeconds) }}</span>
@@ -553,6 +557,7 @@ const importingBook = ref(false);
 const audioElement = ref<HTMLAudioElement | null>(null);
 const cachedUrls = ref(new Set<string>());
 const engagementSummaries = ref(new Map<string, ContentEngagementSummary>());
+const completedStoryIds = ref(new Set<string>());
 const currentTime = ref(0);
 const duration = ref(0);
 const playing = ref(false);
@@ -688,6 +693,7 @@ onMounted(async () => {
   if (isAudioLibrary.value) {
     cachedUrls.value = await getCachedStoryUrls();
     engagementSummaries.value = await loadContentEngagementSummaries('audio');
+    await refreshCompletedStories();
   } else {
     personalBooks.value = await listPersonalBooks();
     await syncPersonalBooks().catch(() => undefined);
@@ -1885,7 +1891,19 @@ function handleTimeUpdate() {
   if (Date.now() - lastProgressSave > 5_000) persistProgress();
   updateMediaPosition();
 }
-function handleEnded() { playing.value = false; if (selectedStory.value) void recordEngagement(selectedStory.value.id, 'finished'); persistProgress(true); }
+function handleEnded() {
+  playing.value = false;
+  if (selectedStory.value) {
+    completedStoryIds.value = new Set([...completedStoryIds.value, selectedStory.value.id]);
+    void recordEngagement(selectedStory.value.id, 'finished');
+  }
+  persistProgress(true);
+}
+function isStoryCompleted(id: string) { return completedStoryIds.value.has(id); }
+async function refreshCompletedStories() {
+  const progress = await Promise.all(storyLibrary.map((story) => loadContentProgress('audio', story.id)));
+  completedStoryIds.value = new Set(storyLibrary.filter((_, index) => progress[index]?.completed).map((story) => story.id));
+}
 async function restoreProgress() {
   const story = selectedStory.value;
   const audio = audioElement.value;

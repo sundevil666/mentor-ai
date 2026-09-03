@@ -18,14 +18,16 @@
           v-for="(item, index) in patternLibrary"
           :key="item.id"
           class="pattern-library-card"
+          :class="{ 'content-library-card--completed': isPatternCompleted(item.id) }"
           type="button"
           @click="openPattern(item.id)"
         >
-          <span class="pattern-library-card__icon"><q-icon name="view_agenda" /></span>
+          <span class="pattern-library-card__icon"><q-icon :name="isPatternCompleted(item.id) ? 'verified' : 'view_agenda'" /></span>
           <span class="pattern-library-card__body">
-            <small>Pattern {{ index + 1 }}</small>
+            <small v-if="!isPatternCompleted(item.id)">Pattern {{ index + 1 }}</small>
+            <span v-else class="content-library-card__completed-label"><q-icon name="check_circle" /> Completed</span>
             <strong>{{ item.title }}</strong>
-            <span>{{ item.description }}</span>
+            <span v-if="!isPatternCompleted(item.id)">{{ item.description }}</span>
             <span class="pattern-library-card__meta">
               {{ item.level }} · About {{ item.estimatedMinutes }} min · {{ item.examples.length }} phrases
             </span>
@@ -86,7 +88,7 @@
             controls
             :loop="repeatEnabled"
             preload="metadata"
-            @ended="isLessonPlaying = false"
+            @ended="handlePlaylistEnded"
             @pause="isLessonPlaying = false"
             @play="isLessonPlaying = true"
             @loadedmetadata="updatePlaylistProgress"
@@ -258,6 +260,7 @@ const router = useRouter();
 const selectedPattern = computed(() => patternLibrary.find((item) => item.id === route.query.pattern));
 const patternSelected = computed(() => Boolean(selectedPattern.value));
 const completedIds = ref(new Set<string>());
+const completedPatternIds = ref(readCompletedPatternIds());
 const revealedIds = ref(new Set<string>());
 const playingId = ref<string | null>(null);
 const isLessonPlaying = ref(false);
@@ -308,6 +311,15 @@ function readCompletedIds(patternId: string) {
   } catch { return new Set<string>(); }
 }
 
+function readCompletedPatternIds() {
+  return new Set(patternLibrary.filter((pattern) => {
+    const completed = readCompletedIds(pattern.id);
+    return pattern.examples.length > 0 && pattern.examples.every((example) => completed.has(example.id));
+  }).map((pattern) => pattern.id));
+}
+
+function isPatternCompleted(patternId: string) { return completedPatternIds.value.has(patternId); }
+
 function openPattern(id: string) {
   void router.push({ name: 'patterns', query: { pattern: id } });
 }
@@ -333,6 +345,16 @@ function toggleCompleted(id: string) {
   if (next.has(id)) next.delete(id); else next.add(id);
   completedIds.value = next;
   localStorage.setItem(`mentor-ai:pattern-progress:${pattern.id}`, JSON.stringify([...next]));
+  completedPatternIds.value = readCompletedPatternIds();
+}
+
+function handlePlaylistEnded() {
+  isLessonPlaying.value = false;
+  const pattern = selectedPattern.value;
+  if (!pattern) return;
+  completedIds.value = new Set(pattern.examples.map((example) => example.id));
+  localStorage.setItem(`mentor-ai:pattern-progress:${pattern.id}`, JSON.stringify([...completedIds.value]));
+  completedPatternIds.value = readCompletedPatternIds();
 }
 
 async function playExample(example: PhrasePatternExample) {

@@ -25,10 +25,19 @@
       />
 
       <section v-if="!selectedAudio" class="audio-library" aria-label="Podcasts library">
-        <article v-for="item in audioLibrary" :key="item.id" class="audio-card">
+        <article
+          v-for="item in audioLibrary"
+          :key="item.id"
+          class="audio-card"
+          :class="{ 'content-library-card--completed': isAudioCompleted(item.id) }"
+        >
           <button class="audio-card__main" type="button" @click="selectAudio(item)">
-            <q-icon name="chevron_right" />
-            <span><strong>{{ item.title }}</strong><small>{{ item.description }}</small></span>
+            <q-icon :name="isAudioCompleted(item.id) ? 'verified' : 'chevron_right'" />
+            <span>
+              <span v-if="isAudioCompleted(item.id)" class="content-library-card__completed-label"><q-icon name="check_circle" /> Completed</span>
+              <strong>{{ item.title }}</strong>
+              <small v-if="!isAudioCompleted(item.id)">{{ item.description }}</small>
+            </span>
           </button>
           <div class="audio-card__meta">
             <span><q-icon name="school" /> {{ item.level }}</span>
@@ -111,7 +120,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { audioLibrary, deleteOfflineAudio, formatAudioDuration, formatAudioSize, getCachedAudioUrls, resolveAudioPlaybackUrl, saveAudioOffline, type LibraryAudio } from 'src/services/audio-library';
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineAudio } from 'src/services/offline-library';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
-import { recordContentEngagement, syncContentEngagement } from 'src/services/content-engagement';
+import { loadContentEngagementSummaries, recordContentEngagement, syncContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
 import { useAppStore } from 'src/stores/app-store';
 import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 import AppAudioDock from 'src/components/AppAudioDock.vue';
@@ -130,6 +139,7 @@ const isPlaying = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
 const isOnline = ref(navigator.onLine);
+const engagementSummaries = ref(new Map<string, ContentEngagementSummary>());
 let playbackCycleActive = false;
 let playbackCycleStart = 0;
 let playbackCycleHadForwardSeek = false;
@@ -142,7 +152,8 @@ onMounted(async () => {
   window.addEventListener('online', updateOnlineState);
   window.addEventListener('offline', updateOnlineState);
   configureMediaSession();
-  void syncContentEngagement().catch(() => undefined);
+  engagementSummaries.value = await loadContentEngagementSummaries('audio');
+  void syncContentEngagement().then(refreshAudioCompletion).catch(() => undefined);
   const requestedAudioId = new URLSearchParams(window.location.search).get('audio');
   const requestedAudio = audioLibrary.find((item) => item.id === requestedAudioId);
   if (requestedAudio) await selectAudio(requestedAudio);
@@ -265,6 +276,8 @@ function completePlaybackCycle() {
   void recordAudioEngagement('finished');
   if (playbackCycleStart <= 2 && !playbackCycleHadForwardSeek) void recordAudioEngagement('full-play');
 }
+function isAudioCompleted(id: string) { return (engagementSummaries.value.get(id)?.fullPlays ?? 0) > 0; }
+async function refreshAudioCompletion() { engagementSummaries.value = await loadContentEngagementSummaries('audio'); }
 function handleEnded() {
   const item = selectedAudio.value;
   completePlaybackCycle();
@@ -278,7 +291,7 @@ function recordAudioEngagement(type: 'started' | 'finished' | 'full-play') {
     category: 'audio',
     contentId: selectedAudio.value.id,
     type,
-  });
+  }).then(refreshAudioCompletion);
 }
 function configureMediaSession() {
   if (!('mediaSession' in navigator)) return;
