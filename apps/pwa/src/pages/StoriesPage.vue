@@ -115,7 +115,6 @@
           :duration="duration"
           :fallback-duration="selectedStory.durationSeconds"
           :playback-rate="playbackRate"
-          :playback-rates="playbackRates"
           :playing="playing"
           :repeat="repeat"
           progress-label="Story progress"
@@ -544,7 +543,6 @@ let readerTouchStart: ReaderSwipePoint | null = null;
 let readerTouchStartScrollLeft = 0;
 let suppressReaderTapUntil = 0;
 let personalBookSyncPromise: Promise<void> | null = null;
-const playbackRates = [0.75, 1, 1.25, 1.5];
 const selectedStory = computed(() => storyLibrary.find((story) => story.id === selectedStoryId.value) ?? null);
 const offlineSummary = computed(() => `${storyLibrary.length} stories · ${formatStoryDuration(storyLibrary.reduce((sum, story) => sum + story.durationSeconds, 0))} total listening.`);
 const bookSyncStatus = computed(() => {

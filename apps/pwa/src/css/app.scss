@@ -4107,22 +4107,9 @@ p.lesson-complete__eyebrow,
   min-width: 52px;
 }
 
-.app-audio-dock__rates {
-  display: contents;
-}
-
-.app-audio-dock__rates .q-btn {
-  font-size: 11px;
-  height: 36px;
-  min-height: 36px;
-  min-width: 36px;
-  padding: 0 2px;
-  width: 36px;
-}
-
-.app-audio-dock__rates .q-btn:first-child {
-  margin-left: 8px;
-}
+.audio-playback-speed-menu { margin-left: 8px; }
+.audio-playback-speed-menu__list { min-width: 112px; }
+.audio-playback-speed-menu__option--active { background: var(--category-soft, var(--app-surface-soft)); color: var(--q-primary); font-weight: 800; }
 
 .app-audio-dock__progress {
   align-items: center;

@@ -42,23 +42,11 @@
         :unelevated="repeat"
         @click="$emit('update:repeat', !repeat)"
       />
-      <div
-        v-if="playbackRates.length"
-        class="app-audio-dock__rates"
-        aria-label="Playback speed"
-      >
-        <q-btn
-          v-for="rate in playbackRates"
-          :key="rate"
-          :aria-label="`${rate} times speed`"
-          :color="playbackRate === rate ? 'primary' : undefined"
-          dense
-          :label="`${rate}×`"
-          no-caps
-          :outline="playbackRate !== rate"
-          @click="$emit('update:playback-rate', rate)"
-        />
-      </div>
+      <AudioPlaybackSpeedMenu
+        :disabled="disabled"
+        :model-value="playbackRate"
+        @update:model-value="$emit('update:playback-rate', $event)"
+      />
     </div>
     <div class="app-audio-dock__progress">
       <span>{{ formatTime(currentTime) }}</span>
@@ -79,6 +67,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import AudioPlaybackSpeedMenu from 'src/components/AudioPlaybackSpeedMenu.vue';
+import type { AudioPlaybackRate } from 'src/services/audio-playback-speed';
 
 const props = withDefaults(defineProps<{
   currentTime: number;
@@ -86,7 +76,6 @@ const props = withDefaults(defineProps<{
   duration: number;
   fallbackDuration?: number;
   playbackRate?: number;
-  playbackRates?: number[];
   playing: boolean;
   progressLabel?: string;
   repeat?: boolean;
@@ -95,7 +84,6 @@ const props = withDefaults(defineProps<{
   disabled: false,
   fallbackDuration: 0,
   playbackRate: 1,
-  playbackRates: () => [],
   progressLabel: 'Audio progress',
   repeat: false,
   showRepeat: false,
@@ -104,7 +92,7 @@ const props = withDefaults(defineProps<{
 defineEmits<{
   seek: [value: number | null];
   'toggle-playback': [];
-  'update:playback-rate': [value: number];
+  'update:playback-rate': [value: AudioPlaybackRate];
   'update:repeat': [value: boolean];
 }>();
 

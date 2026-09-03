@@ -14,6 +14,7 @@ export interface SpeechPlaybackHandlers {
   onError?: (error: Error) => void;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   mediaTitle?: string;
+  playbackRate?: number;
   voice?: SpeechVoiceProfile;
   repeat?: boolean;
   temporary?: boolean;
@@ -97,6 +98,10 @@ export function getSpeechModelStatus() {
   return { status: modelStatus, progress: modelProgress } as const;
 }
 
+export function setActiveSpeechPlaybackRate(rate: number) {
+  if (activeAudio) activeAudio.playbackRate = rate;
+}
+
 export function subscribeToSpeechModelStatus(listener: () => void) {
   statusListeners.add(listener);
   return () => statusListeners.delete(listener);
@@ -131,6 +136,7 @@ export async function speakWithPreferredVoice(
     const audioUrl = URL.createObjectURL(generated);
     const audio = new Audio(audioUrl);
     audio.preload = 'auto';
+    audio.playbackRate = handlers.playbackRate ?? 1;
     audio.setAttribute('playsinline', '');
     applySpeechRepeat(audio, handlers.repeat);
     audio.onended = () => {

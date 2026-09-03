@@ -587,6 +587,10 @@
                 >
                   <q-tooltip>Next word</q-tooltip>
                 </q-btn>
+                <AudioPlaybackSpeedMenu
+                  :model-value="listeningPlaybackRate"
+                  @update:model-value="setListeningPlaybackRate"
+                />
               </div>
             </div>
           </transition>
@@ -668,10 +672,12 @@ import {
   preloadSpeechBatch,
   preserveDialogueSpeakerLabels,
   resumeSpeech,
+  setActiveSpeechPlaybackRate,
   setActiveSpeechRepeat,
   speakWithPreferredVoice,
   stopSpeech,
 } from 'src/services/speech-synthesis';
+import AudioPlaybackSpeedMenu from 'src/components/AudioPlaybackSpeedMenu.vue';
 import {
   type ContinuousSpeechRecognition,
   isSpeechRecognitionAvailable,
@@ -795,6 +801,7 @@ const learningTransitionName = ref('learning-slide-forward');
 const exerciseTransitionName = ref('exercise-slide-forward');
 const listeningTextElement = ref<HTMLElement | null>(null);
 const isListeningAutoScrollPaused = ref(false);
+const listeningPlaybackRate = ref(1);
 let listeningAutoScrollPauseTimer: number | undefined;
 let isProgrammaticListeningScroll = false;
 let programmaticListeningScrollUntil = 0;
@@ -1950,6 +1957,7 @@ async function speakListeningPhrase(wordIndex: number, runId: number) {
   activeWordEndIndex.value = wordIndex;
   const started = await speakWithPreferredVoice(playbackText, {
     mediaTitle: selectedListeningItem.value?.title ?? 'English listening practice',
+    playbackRate: listeningPlaybackRate.value,
     repeat: isListeningRepeatEnabled.value,
     onTimeUpdate: (currentTime, duration) => {
       if (runId !== activeSpeechRunId.value || !Number.isFinite(duration) || duration <= 0) {
@@ -2011,6 +2019,11 @@ async function speakListeningPhrase(wordIndex: number, runId: number) {
   }
 
   finishListeningPlayback(runId);
+}
+
+function setListeningPlaybackRate(rate: number) {
+  listeningPlaybackRate.value = rate;
+  setActiveSpeechPlaybackRate(rate);
 }
 
 function finishListeningPlayback(runId: number, allowRepeat = true) {

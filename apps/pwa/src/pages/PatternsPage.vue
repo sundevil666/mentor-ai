@@ -148,12 +148,14 @@
           :current-time="playlistCurrentTime"
           :disabled="playlistPreparing"
           :duration="playlistDuration"
+          :playback-rate="playbackRate"
           :playing="isLessonPlaying"
           :repeat="repeatEnabled"
           progress-label="Pattern playlist progress"
           show-repeat
           @seek="seekPlaylist"
           @toggle-playback="togglePlaylist"
+          @update:playback-rate="setPlaybackRate"
           @update:repeat="setRepeat"
         />
       </article>
@@ -267,6 +269,7 @@ const playlistPreparing = ref(false);
 const playlistCompleted = ref(0);
 const showPlaylistUpdateDialog = ref(false);
 const repeatEnabled = ref(true);
+const playbackRate = ref(1);
 const completedCount = computed(() => completedIds.value.size);
 const progress = computed(() => completedCount.value / (selectedPattern.value?.examples.length ?? 1));
 const playlistProgress = computed(() => playlistCompleted.value / (selectedPattern.value?.examples.length ?? 1));
@@ -418,6 +421,11 @@ function updatePlaylistProgress() {
   if (!player) return;
   playlistCurrentTime.value = player.currentTime;
   playlistDuration.value = Number.isFinite(player.duration) ? player.duration : 0;
+}
+
+function setPlaybackRate(rate: number) {
+  playbackRate.value = rate;
+  if (playlistAudio.value) playlistAudio.value.playbackRate = rate;
 }
 
 function seekPlaylist(value: number | null) {

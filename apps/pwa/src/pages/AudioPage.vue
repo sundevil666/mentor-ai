@@ -84,7 +84,6 @@
           :duration="duration"
           :fallback-duration="selectedAudio.durationSeconds"
           :playback-rate="playbackRate"
-          :playback-rates="playbackRates"
           :playing="isPlaying"
           :repeat="repeatEnabled"
           show-repeat
@@ -119,7 +118,6 @@ const busyId = ref<string | null>(null);
 const playbackUrl = ref('');
 const playbackIsOffline = ref(false);
 const playbackRate = ref(1);
-const playbackRates = [0.75, 1, 1.25];
 const repeatEnabled = ref(false);
 const isPlaying = ref(false);
 const currentTime = ref(0);
