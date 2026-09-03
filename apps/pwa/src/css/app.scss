@@ -3553,7 +3553,7 @@ body.body--dark .personal-reader__lookup-error {
     padding: 8px;
     position: fixed;
     transform: translateX(-50%);
-    width: 100vw;
+    width: calc(100vw - 24px);
     z-index: 20;
   }
 
@@ -4198,7 +4198,7 @@ p.lesson-complete__eyebrow,
   padding: 8px 12px;
   position: fixed;
   transform: translateX(-50%);
-  width: 100vw;
+  width: calc(100vw - 24px);
   z-index: 20;
 }
 
