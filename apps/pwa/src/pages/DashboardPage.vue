@@ -273,6 +273,11 @@
                 <strong>{{ currentExercise.nativePrompt }}</strong>
               </div>
 
+              <div v-if="currentExercise.audioText" class="dialogue-drill__native">
+                <span>Native answer</span>
+                <strong>{{ currentExercise.audioText }}</strong>
+              </div>
+
               <div
                 :class="[
                   'dialogue-drill__recorder',
@@ -304,6 +309,14 @@
                     <small>{{ speechSupportMessage }}</small>
                   </span>
                 </span>
+                <q-btn
+                  class="dialogue-drill__continue"
+                  color="primary"
+                  label="Continue"
+                  unelevated
+                  :disable="answer.trim().length === 0"
+                  @click="submit"
+                />
               </div>
 
               <q-input
@@ -325,20 +338,6 @@
                 </template>
               </q-input>
 
-              <div v-if="currentExercise.audioText" class="dialogue-drill__native">
-                <span>Native answer</span>
-                <strong>{{ currentExercise.audioText }}</strong>
-              </div>
-
-              <div class="lesson-actions">
-                <q-btn
-                  color="primary"
-                  label="Continue"
-                  unelevated
-                  :disable="answer.trim().length === 0"
-                  @click="submit"
-                />
-              </div>
             </div>
 
             <div v-else-if="!isListeningPlayer" :key="currentExercise.id" class="exercise-standard">

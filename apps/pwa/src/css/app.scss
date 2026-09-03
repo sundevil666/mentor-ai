@@ -883,6 +883,11 @@ body .q-menu {
   font-size: 0.82rem;
 }
 
+.dialogue-drill__continue {
+  flex: 0 0 auto;
+  min-height: 48px;
+}
+
 .dialogue-answer--correct .q-field__control {
   background: color-mix(in srgb, var(--q-positive) 7%, transparent);
 }
@@ -3615,11 +3620,18 @@ body.body--dark .personal-reader__lookup-error {
   .dialogue-drill__recorder {
     align-items: stretch;
     display: grid;
-    grid-template-columns: 1fr 48px;
+    grid-template-columns: minmax(0, 1fr) 48px auto;
   }
 
   .dialogue-drill__recorder-status {
     grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .dialogue-drill__continue {
+    grid-column: 3;
+    grid-row: 1;
+    min-width: 108px;
   }
 
   .dialogue-drill__prompt strong,
