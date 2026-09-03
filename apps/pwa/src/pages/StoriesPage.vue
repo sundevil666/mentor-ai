@@ -76,12 +76,6 @@
           @play="handlePlay"
           @timeupdate="handleTimeUpdate"
         />
-        <div class="video-progress" aria-label="Story progress" style="grid-template-columns: auto auto minmax(0, 1fr) auto">
-          <span>{{ formatStoryDuration(currentTime) }}</span>
-          <q-btn :aria-label="playing ? 'Pause story' : 'Play story'" class="app-play-button" color="blue-7" :icon="playing ? 'pause' : 'play_arrow'" round unelevated @click="togglePlayback" />
-          <q-slider :model-value="currentTime" :min="0" :max="duration || selectedStory.durationSeconds" :step="1" color="primary" @update:model-value="seek" />
-          <span>{{ formatStoryDuration(duration || selectedStory.durationSeconds) }}</span>
-        </div>
         <q-btn
           v-if="isIosStandalone()"
           class="full-width"
