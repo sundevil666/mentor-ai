@@ -93,21 +93,23 @@
         <div v-if="!cachedUrls.has(selectedAudio.sourceUrl)" class="audio-detail__offline-action">
           <q-btn color="primary" icon="download_for_offline" label="Save offline" no-caps :disable="!isOnline" :loading="busyId === selectedAudio.id" @click="downloadAudio(selectedAudio)" />
         </div>
-        <AppAudioDock
-          :current-time="currentTime"
-          :duration="duration"
-          :fallback-duration="selectedAudio.durationSeconds"
-          :playback-rate="playbackRate"
-          :playing="isPlaying"
-          :repeat="repeatEnabled"
-          :speed-preference-key="`audio:${selectedAudio.id}`"
-          show-repeat
-          @seek="seek"
-          @toggle-playback="togglePlayback"
-          @update:playback-rate="setPlaybackRate"
-          @update:repeat="setRepeat"
-        />
       </article>
+
+      <AppAudioDock
+        v-if="selectedAudio"
+        :current-time="currentTime"
+        :duration="duration"
+        :fallback-duration="selectedAudio.durationSeconds"
+        :playback-rate="playbackRate"
+        :playing="isPlaying"
+        :repeat="repeatEnabled"
+        :speed-preference-key="`audio:${selectedAudio.id}`"
+        show-repeat
+        @seek="seek"
+        @toggle-playback="togglePlayback"
+        @update:playback-rate="setPlaybackRate"
+        @update:repeat="setRepeat"
+      />
 
       <p class="audio-credit">Audio and program descriptions: VOA Learning English, public domain. Offline copies stay on this device.</p>
     </section>
