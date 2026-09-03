@@ -316,14 +316,26 @@
                     <small>{{ speechSupportMessage }}</small>
                   </span>
                 </span>
-                <q-btn
-                  class="dialogue-drill__continue"
-                  color="primary"
-                  :label="hasPassedCurrentSpeakingExercise ? 'Next' : 'Continue'"
-                  unelevated
-                  :disable="!hasPassedCurrentSpeakingExercise && dialogueAnswerStatus !== 'correct'"
-                  @click="submit"
-                />
+                <div class="dialogue-drill__step-navigation">
+                  <q-btn
+                    v-if="exerciseNavigation.showPrevious"
+                    color="primary"
+                    flat
+                    icon="arrow_back"
+                    label="Previous"
+                    no-caps
+                    :disable="exerciseNavigation.previousDisabled"
+                    @click="handleLessonBack"
+                  />
+                  <q-btn
+                    class="dialogue-drill__continue"
+                    color="primary"
+                    :label="exerciseNavigation.nextLabel"
+                    unelevated
+                    :disable="exerciseNavigation.nextDisabled"
+                    @click="submit"
+                  />
+                </div>
               </div>
 
               <q-input
@@ -390,10 +402,20 @@
               <div class="lesson-actions">
                 <span>{{ currentExercise.successTip }}</span>
                 <q-btn
+                  v-if="exerciseNavigation.showPrevious"
                   color="primary"
-                  label="Continue"
+                  flat
+                  icon="arrow_back"
+                  label="Previous"
+                  no-caps
+                  :disable="exerciseNavigation.previousDisabled"
+                  @click="handleLessonBack"
+                />
+                <q-btn
+                  color="primary"
+                  :label="exerciseNavigation.nextLabel"
                   unelevated
-                  :disable="answer.trim().length === 0"
+                  :disable="exerciseNavigation.nextDisabled"
                   @click="submit"
                 />
               </div>
@@ -435,15 +457,27 @@
                   ]"
                   @scroll="handleListeningTextScroll"
                 >
+                  <div class="listening-player__step-navigation">
+                    <q-btn
+                      v-if="exerciseNavigation.showPrevious"
+                      color="primary"
+                      flat
+                      icon="arrow_back"
+                      label="Previous"
+                      no-caps
+                      :disable="exerciseNavigation.previousDisabled"
+                      @click="handleLessonBack"
+                    />
+                    <q-btn
+                      color="primary"
+                      :label="exerciseNavigation.nextLabel"
+                      no-caps
+                      unelevated
+                      @click="completeListeningExercise"
+                    />
+                  </div>
                   <q-btn
-                    class="listening-player__continue-button"
-                    color="primary"
-                    :label="hasCompletedCurrentLessonExercise ? 'Next' : 'Continue'"
-                    no-caps
-                    unelevated
-                    @click="completeListeningExercise"
-                  />
-                  <q-btn
+                    v-if="!isRepeatedLesson"
                     class="listening-player__start-over-button"
                     color="primary"
                     flat
@@ -702,11 +736,6 @@ import {
   isConfidentDialogueAnswer,
 } from 'src/services/dialogue-speech';
 import {
-  createSpeakingExerciseProgressKey,
-  readSuccessfulSpeakingExerciseKeys,
-  saveSuccessfulSpeakingExerciseKey,
-} from 'src/services/speaking-exercise-progress';
-import {
   readListeningProgressPreference,
   saveListeningProgressPreference,
 } from 'src/services/user-preferences';
@@ -714,6 +743,7 @@ import { useAppStore } from 'src/stores/app-store';
 import {
   calculateLessonSessionProgress,
   canFinishRepeatedLesson,
+  getLessonExerciseNavigation,
 } from 'src/services/home-lesson-progress';
 import {
   getSpeechTextsContentVersion,
@@ -805,7 +835,6 @@ const isRecognizingSpeech = ref(false);
 const speechRecognitionError = ref('');
 const speechRecognitionProgress = ref('');
 const dialogueAnswerStatus = ref<'idle' | 'correct' | 'incorrect'>('idle');
-const successfulLessonExerciseKeys = ref(readSuccessfulSpeakingExerciseKeys(appStore.studentId));
 let dialogueRecognitionRunId = 0;
 let dialogueSpeechStream: MediaStream | null = null;
 let dialogueLocalTranscriber: LocalReadingTranscriber | null = null;
@@ -892,16 +921,18 @@ const isListeningPlayer = computed(() => {
 const isDialogueTranslationExercise = computed(
   () => currentExercise.value?.type === 'dialogue-translation',
 );
-const currentSpeakingExerciseProgressKey = computed(() => createSpeakingExerciseProgressKey(
-  appStore.session?.lesson.lessonTemplateKey ?? 'generated-lesson',
-  appStore.session?.currentExerciseIndex ?? -1,
-  currentExercise.value?.expectedResponse,
+const isRepeatedLesson = computed(() => canFinishRepeatedLesson(
+  appStore.session?.lesson.lessonTemplateKey,
+  lessonCompletionCounts.value,
 ));
-const hasCompletedCurrentLessonExercise = computed(() => {
-  const exerciseKey = currentSpeakingExerciseProgressKey.value;
-  return Boolean(exerciseKey && successfulLessonExerciseKeys.value.has(exerciseKey));
-});
-const hasPassedCurrentSpeakingExercise = computed(() => hasCompletedCurrentLessonExercise.value);
+const exerciseNavigation = computed(() => getLessonExerciseNavigation(
+  isRepeatedLesson.value,
+  appStore.session?.currentExerciseIndex ?? 0,
+  isListeningPlayer.value
+    || (isDialogueTranslationExercise.value
+      ? dialogueAnswerStatus.value === 'correct'
+      : answer.value.trim().length > 0),
+));
 const localSpeechRecognitionAvailable = computed(() => (
   typeof navigator !== 'undefined'
   && typeof navigator.mediaDevices?.getUserMedia === 'function'
@@ -1471,13 +1502,6 @@ watch(
   },
 );
 
-watch(
-  () => appStore.studentId,
-  (studentId) => {
-    successfulLessonExerciseKeys.value = readSuccessfulSpeakingExerciseKeys(studentId);
-  },
-);
-
 watch(isListeningPlayer, (isActiveListeningPlayer) => {
   if (isActiveListeningPlayer) {
     selectedListeningItemId.value =
@@ -1591,7 +1615,7 @@ async function continueFromDevice(handoffId: string) {
 
 async function submit() {
   if (answer.value.trim().length === 0) {
-    if (!hasPassedCurrentSpeakingExercise.value) return;
+    if (!isRepeatedLesson.value) return;
     answer.value = currentExercise.value?.expectedResponse?.trim() ?? 'completed';
   }
 
@@ -1600,16 +1624,9 @@ async function submit() {
 }
 
 async function completeListeningExercise() {
-  rememberCurrentLessonExerciseCompletion();
   answer.value = 'listened';
   stopListeningAudio();
   await submit();
-}
-
-function rememberCurrentLessonExerciseCompletion() {
-  const exerciseKey = currentSpeakingExerciseProgressKey.value;
-  if (!exerciseKey) return;
-  successfulLessonExerciseKeys.value = saveSuccessfulSpeakingExerciseKey(appStore.studentId, exerciseKey);
 }
 
 async function recordDialogueAnswer() {
@@ -1700,7 +1717,6 @@ function applyDialogueTranscript(transcript: string, recognitionRunId: number) {
   answer.value = matchesExpected ? expected.trim() : bestTranscript;
   speechRecognitionCaptured.value = true;
   dialogueAnswerStatus.value = matchesExpected ? 'correct' : 'incorrect';
-  if (matchesExpected) rememberCurrentLessonExerciseCompletion();
   if (matchesExpected) stopDialogueSpeechRecording();
 }
 

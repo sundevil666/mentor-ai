@@ -27,7 +27,6 @@
     "src/services/reader-pagination.ts",
     "src/services/reader-swipe.ts",
     "src/services/speech-recognition.ts",
-    "src/services/speaking-exercise-progress.ts",
     "src/services/speech-synthesis.ts",
     "src/services/storage-retention.ts",
     "src/services/update-notification-retention.ts",

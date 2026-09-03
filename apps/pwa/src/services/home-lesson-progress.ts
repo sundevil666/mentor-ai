@@ -9,3 +9,16 @@ export function canFinishRepeatedLesson(
 ): boolean {
   return Boolean(lessonTemplateKey && (completedLessonCounts.get(lessonTemplateKey) ?? 0) > 0);
 }
+
+export function getLessonExerciseNavigation(
+  repeatedLesson: boolean,
+  currentExerciseIndex: number,
+  completionReady: boolean,
+) {
+  return {
+    showPrevious: repeatedLesson,
+    previousDisabled: currentExerciseIndex <= 0,
+    nextLabel: repeatedLesson ? 'Next' : 'Continue',
+    nextDisabled: !repeatedLesson && !completionReady,
+  } as const;
+}

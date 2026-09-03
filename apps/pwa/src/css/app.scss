@@ -898,6 +898,13 @@ body .q-menu {
   min-height: 48px;
 }
 
+.dialogue-drill__step-navigation {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
 .dialogue-answer--correct .q-field__control {
   background: color-mix(in srgb, var(--q-positive) 7%, transparent);
 }
@@ -1250,7 +1257,9 @@ body.body--dark .training-library-card--completed .training-library-card__status
   z-index: 1;
 }
 
-.listening-player__continue-button {
+.listening-player__step-navigation {
+  display: flex;
+  gap: 6px;
   left: 12px;
   position: absolute;
   top: 10px;
@@ -3675,9 +3684,13 @@ body.body--dark .personal-reader__lookup-error {
   }
 
   .dialogue-drill__continue {
-    grid-column: 3;
-    grid-row: 1;
     min-width: 108px;
+  }
+
+  .dialogue-drill__step-navigation {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-content: flex-end;
   }
 
   .dialogue-drill__prompt strong,
