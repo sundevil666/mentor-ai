@@ -14,9 +14,9 @@ describe('dashboard navigation category', () => {
     assert.equal(resolveDashboardTrainingCategory(undefined, undefined), undefined);
   });
 
-  it('uses an explicit Home route instead of the active lesson category', () => {
-    assert.equal(resolveDashboardTrainingCategory('home', 'listening'), undefined);
-    assert.equal(resolveDashboardTrainingCategory('home', 'speaking'), undefined);
+  it('uses the active lesson category after starting or resuming it from Home', () => {
+    assert.equal(resolveDashboardTrainingCategory('home', 'listening'), 'listening');
+    assert.equal(resolveDashboardTrainingCategory('home', 'speaking'), 'speaking');
   });
 
   it('gives an explicit library route priority over a paused session', () => {
