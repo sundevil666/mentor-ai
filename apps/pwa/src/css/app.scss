@@ -314,11 +314,19 @@ body .q-menu {
   z-index: 6;
 }
 
-.settings-header,
-.audio-header--detail,
-.patterns-detail-header,
-.videos-page--detail .videos-header {
-  padding-left: 54px;
+.app-detail-header {
+  background: var(--app-bg);
+  justify-content: flex-start;
+  position: sticky;
+  top: calc(55px + env(safe-area-inset-top));
+  z-index: 5;
+}
+
+.app-detail-header > .app-back-button {
+  flex: 0 0 auto;
+  left: auto;
+  position: static;
+  top: auto;
 }
 
 .lesson-nav__status {
@@ -574,8 +582,10 @@ body .q-menu {
   align-items: center;
   display: flex;
   gap: 14px;
-  justify-content: space-between;
 }
+
+.settings-header { justify-content: flex-start; }
+.statistics-header { justify-content: space-between; }
 
 .settings-header p,
 .statistics-header p {
@@ -4272,10 +4282,12 @@ p.lesson-complete__eyebrow,
 }
 
 .audio-page--detail {
+  overflow: visible;
   padding-bottom: calc(260px + env(safe-area-inset-bottom));
 }
 
 .patterns-page--detail {
+  overflow: visible;
   padding-bottom: calc(220px + env(safe-area-inset-bottom));
 }
 

@@ -1,7 +1,7 @@
 <template>
   <q-page class="settings-page">
     <section class="settings-shell">
-      <div class="settings-header">
+      <div class="settings-header app-detail-header">
         <q-btn
           class="app-back-button"
           color="primary"

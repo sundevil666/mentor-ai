@@ -15,7 +15,7 @@
       <header
         v-if="!readingMode"
         class="videos-header"
-        :class="{ 'videos-header--book-detail': selectedBook }"
+        :class="{ 'videos-header--book-detail': selectedBook, 'app-detail-header': selectedStory || selectedBook }"
       >
         <q-btn
           v-if="selectedStory || selectedBook"

@@ -38,7 +38,7 @@
 
       <header
         v-else
-        class="patterns-detail-header"
+        class="patterns-detail-header app-detail-header"
       >
         <q-btn
           aria-label="Back to pattern library"

@@ -1,7 +1,7 @@
 <template>
   <q-page class="audio-page category-theme--audio" :class="{ 'audio-page--detail': selectedAudio }">
     <section class="audio-shell">
-      <header class="audio-header" :class="{ 'audio-header--detail': selectedAudio }">
+      <header class="audio-header" :class="{ 'audio-header--detail app-detail-header': selectedAudio }">
         <q-btn
           v-if="selectedAudio"
           aria-label="Back to audio library"
