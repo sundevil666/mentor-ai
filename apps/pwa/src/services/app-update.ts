@@ -6,6 +6,7 @@ export interface AppUpdateManifest {
   releasedAt?: string;
   updateUrl?: string;
   notes?: string[];
+  affectedRoutes?: string[];
 }
 
 export interface AppUpdateCheckResult {
@@ -20,6 +21,8 @@ export interface PendingAppUpdate {
   lessonTitle?: string;
   exerciseNumber?: number;
   exerciseCount?: number;
+  backgroundNotificationShown?: boolean;
+  reloadImmediately?: boolean;
 }
 
 const manifestUrl = process.env.APP_UPDATE_MANIFEST_URL ?? '/app-update.json';
@@ -235,7 +238,27 @@ async function fetchAppUpdateManifest(): Promise<AppUpdateManifest | null> {
     releasedAt: manifest.releasedAt,
     updateUrl: manifest.updateUrl,
     notes: Array.isArray(manifest.notes) ? manifest.notes.filter((note): note is string => typeof note === 'string') : [],
+    affectedRoutes: Array.isArray(manifest.affectedRoutes)
+      ? manifest.affectedRoutes.filter((route): route is string => typeof route === 'string')
+      : ['*'],
   };
+}
+
+export function isAppUpdateRouteAffected(manifest: AppUpdateManifest, path: string): boolean {
+  const normalizedPath = normalizeRoutePath(path);
+  const affectedRoutes = manifest.affectedRoutes?.length ? manifest.affectedRoutes : ['*'];
+
+  return affectedRoutes.some((route) => {
+    if (route === '*') return true;
+    const normalizedRoute = normalizeRoutePath(route);
+    return normalizedRoute === normalizedPath
+      || (normalizedRoute !== '/' && normalizedPath.startsWith(`${normalizedRoute}/`));
+  });
+}
+
+function normalizeRoutePath(path: string): string {
+  const pathname = path.split(/[?#]/, 1)[0] || '/';
+  return pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
 }
 
 function isNewVersion(version: string): boolean {

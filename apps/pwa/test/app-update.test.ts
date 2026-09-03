@@ -5,6 +5,7 @@ import {
   checkForAppUpdate,
   consumePendingAppUpdate,
   createAppUpdateReloadUrl,
+  isAppUpdateRouteAffected,
   rememberPendingAppUpdate,
   shouldCheckForAppUpdates,
 } from '../src/services/app-update.js';
@@ -112,6 +113,15 @@ describe('PWA app update checks', () => {
     assert.equal(reloadUrl.searchParams.get('app-update'), '0.2.0+abc');
     assert.ok(reloadUrl.searchParams.has('cache-bust'));
     assert.equal(reloadUrl.hash, '#theme');
+  });
+
+  it('matches only routes listed as affected by a page-level update', () => {
+    const manifest = { version: '0.2.0', affectedRoutes: ['/stories', '/settings'] };
+    assert.equal(isAppUpdateRouteAffected(manifest, '/stories'), true);
+    assert.equal(isAppUpdateRouteAffected(manifest, '/stories/item-1?play=1'), true);
+    assert.equal(isAppUpdateRouteAffected(manifest, '/patterns'), false);
+    assert.equal(isAppUpdateRouteAffected({ version: '0.2.0', affectedRoutes: ['*'] }, '/patterns'), true);
+    assert.equal(isAppUpdateRouteAffected({ version: '0.2.0' }, '/'), true);
   });
 });
 

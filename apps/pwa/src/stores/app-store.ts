@@ -124,6 +124,7 @@ interface AppState {
   updateNotifications: UpdateNotification[];
   availableAppUpdate: { version: string; message?: string } | null;
   isAppUpdateInstalling: boolean;
+  isAppUpdateRunningInBackground: boolean;
   sessionHandoffs: LearningSessionHandoff[];
   isHydrated: boolean;
 }
@@ -232,6 +233,7 @@ export const useAppStore = defineStore('app', {
     updateNotifications: [],
     availableAppUpdate: null,
     isAppUpdateInstalling: false,
+    isAppUpdateRunningInBackground: false,
     sessionHandoffs: [],
     isHydrated: false,
   }),
@@ -268,6 +270,10 @@ export const useAppStore = defineStore('app', {
 
     setAppUpdateInstalling(isInstalling: boolean) {
       this.isAppUpdateInstalling = isInstalling;
+    },
+
+    setAppUpdateRunningInBackground(isUpdating: boolean) {
+      this.isAppUpdateRunningInBackground = isUpdating;
     },
 
     async hydrate() {

@@ -13,7 +13,11 @@ navigator.serviceWorker?.addEventListener('controllerchange', () => {
     return;
   }
 
-  if (refreshing || window.localStorage.getItem(updateReloadRequestKey) === null) {
+  if (
+    refreshing
+    || window.localStorage.getItem(updateReloadRequestKey) === null
+    || !shouldReloadImmediately()
+  ) {
     return;
   }
 
@@ -24,6 +28,17 @@ navigator.serviceWorker?.addEventListener('controllerchange', () => {
   url.searchParams.set('cache-bust', Date.now().toString());
   window.location.replace(url);
 });
+
+function shouldReloadImmediately() {
+  const rawValue = window.localStorage.getItem(updateReloadRequestKey);
+
+  try {
+    const value = rawValue ? JSON.parse(rawValue) as { reloadImmediately?: unknown } : null;
+    return value?.reloadImmediately !== false;
+  } catch {
+    return true;
+  }
+}
 
 function readPendingUpdateVersion() {
   const rawValue = window.localStorage.getItem(updateReloadRequestKey);

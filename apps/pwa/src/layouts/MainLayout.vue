@@ -45,10 +45,10 @@
           class="lesson-update-button"
           :aria-label="lessonUpdateTooltip"
           :color="offlineLessonState.status === 'error' ? 'negative' : offlineLessonState.status === 'ready' ? 'positive' : undefined"
-          :disable="!appStore.isOnline || offlineLessonState.status === 'checking' || offlineLessonState.status === 'downloading'"
+          :disable="appStore.isAppUpdateRunningInBackground || !appStore.isOnline || offlineLessonState.status === 'checking' || offlineLessonState.status === 'downloading'"
           flat
           :icon="lessonUpdateIcon"
-          :loading="offlineLessonState.status === 'checking' || offlineLessonState.status === 'downloading'"
+          :loading="appStore.isAppUpdateRunningInBackground || offlineLessonState.status === 'checking' || offlineLessonState.status === 'downloading'"
           round
           @click="checkOfflineLessons(true)"
         >
@@ -485,10 +485,13 @@ const installHelpSteps = computed(() => {
     { icon: 'check_circle', text: 'Confirm the installation.' },
   ];
 });
-const lessonUpdateIcon = computed(() => offlineLessonState.value.status === 'error'
+const lessonUpdateIcon = computed(() => appStore.isAppUpdateRunningInBackground
+  ? 'published_with_changes'
+  : offlineLessonState.value.status === 'error'
   ? 'cloud_off'
   : offlineLessonState.value.status === 'ready' ? 'offline_pin' : 'download_for_offline');
 const lessonUpdateTooltip = computed(() => {
+  if (appStore.isAppUpdateRunningInBackground) return 'Mentor AI is updating in the background…';
   const current = offlineLessonState.value;
   if (current.status === 'checking') return 'Checking the server for current lessons…';
   if (current.status === 'downloading') return `Saving current lessons offline: ${current.completed}/${current.total}.`;

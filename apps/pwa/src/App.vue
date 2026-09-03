@@ -1,31 +1,5 @@
 <template>
   <router-view />
-  <transition name="update-available-overlay">
-    <div
-      v-if="appStore.availableAppUpdate && !appStore.isAppUpdateInstalling"
-      class="app-update-available-overlay"
-      aria-hidden="true"
-    />
-  </transition>
-  <transition name="update-button">
-    <q-btn
-      v-if="appStore.availableAppUpdate && !appStore.isAppUpdateInstalling"
-      class="app-update-floating-button"
-      :aria-label="appUpdateButtonTooltip"
-      color="amber-8"
-      icon="system_update_alt"
-      label="Update"
-      no-caps
-      @click="handleUpdateButtonClick"
-    >
-      <q-badge
-        color="red-7"
-        floating
-        rounded
-      />
-      <q-tooltip>{{ appUpdateButtonTooltip }}</q-tooltip>
-    </q-btn>
-  </transition>
   <transition name="update-overlay">
     <div
       v-if="appStore.isAppUpdateInstalling"
@@ -34,6 +8,15 @@
       aria-live="assertive"
       aria-busy="true"
     >
+      <q-btn
+        v-if="isRouteUpdateInstalling"
+        class="app-update-overlay__back"
+        aria-label="Go back while this page updates"
+        flat
+        icon="arrow_back"
+        round
+        @click="leaveUpdatingPage"
+      />
       <div
         class="app-update-overlay__glow"
         aria-hidden="true"
@@ -64,7 +47,7 @@
             name="touch_app"
             size="20px"
           />
-          <span>No action is needed. Please keep the app open.</span>
+          <span>{{ isRouteUpdateInstalling ? 'You can go back and use another page while this finishes.' : 'No action is needed. Please keep the app open.' }}</span>
         </div>
       </div>
     </div>
@@ -73,12 +56,14 @@
 
 <script setup lang="ts">
 import { Notify } from 'quasar';
-import { computed, onMounted, onUnmounted } from 'vue';
+import { nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { useRoute, useRouter, type RouteLocationNormalized } from 'vue-router';
 import {
   activatePendingServiceWorkerUpdate,
   consumePendingAppUpdate,
   createAppUpdateReloadUrl,
   checkForAppUpdate,
+  isAppUpdateRouteAffected,
   rememberPendingAppUpdate,
   startAppUpdatePolling,
   showSystemUpdateNotification,
@@ -88,19 +73,24 @@ import { useAppStore } from 'src/stores/app-store';
 import { syncAllContentProgress } from 'src/services/content-progress';
 
 const appStore = useAppStore();
+const router = useRouter();
+const route = useRoute();
 let stopUpdatePolling: (() => void) | undefined;
+let removeRouteGuard: (() => void) | undefined;
 let isReloadingForUpdate = false;
 let remoteSyncPollingTimer: number | undefined;
-
-const appUpdateButtonTooltip = computed(() => appStore.availableAppUpdate
-  ? `Update ${appStore.availableAppUpdate.version} is ready. Click to install.`
-  : 'Check for a Mentor AI update.');
+let pendingManifest: AppUpdateCheckResult['manifest'] | null = null;
+let activatedBackgroundManifest: AppUpdateCheckResult['manifest'] | null = null;
+let routeUpdateCancelled = false;
+let dismissActiveUpdatePrompt: (() => void) | undefined;
+const isRouteUpdateInstalling = ref(false);
 
 onMounted(async () => {
   window.addEventListener('mentor-ai:update-available', handleUpdateAvailable);
   window.addEventListener('mentor-ai:install-update', handleInstallUpdateRequest);
   window.addEventListener('mentor-ai:check-update', handleManualUpdateCheck);
   document.addEventListener('visibilitychange', handleVisibilitySync);
+  removeRouteGuard = router.afterEach(handleRouteChanged);
   window.addEventListener('online', handleContentProgressSync);
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
@@ -115,6 +105,7 @@ onUnmounted(() => {
   window.removeEventListener('mentor-ai:install-update', handleInstallUpdateRequest);
   window.removeEventListener('mentor-ai:check-update', handleManualUpdateCheck);
   document.removeEventListener('visibilitychange', handleVisibilitySync);
+  removeRouteGuard?.();
   navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
   stopRemoteSyncPolling();
   stopUpdatePolling?.();
@@ -131,7 +122,9 @@ function handleOnline() { appStore.setNetworkStatus(true); }
 function handleOffline() { appStore.setNetworkStatus(false); }
 
 function handleUpdateAvailable() {
-  appStore.setAvailableAppUpdate('new version');
+  void checkForAppUpdate().then((result) => {
+    if (result) handleServerUpdateAvailable(result);
+  });
 }
 
 function handleServerUpdateAvailable(result: AppUpdateCheckResult) {
@@ -139,11 +132,27 @@ function handleServerUpdateAvailable(result: AppUpdateCheckResult) {
     return;
   }
 
-  appStore.setAvailableAppUpdate(result.manifest.version, result.notification?.message);
+  if (pendingManifest?.version === result.manifest.version || activatedBackgroundManifest?.version === result.manifest.version) return;
+  pendingManifest = result.manifest;
 
-  if (document.visibilityState !== 'visible' && result.notification) {
-    void showSystemUpdateNotification(result.notification);
+  if (isAppUpdateRouteAffected(result.manifest, route.path)) {
+    appStore.setAvailableAppUpdate(result.manifest.version, result.notification?.message);
+    showActivePageUpdatePrompt(result.manifest.version);
+  } else {
+    void installUpdateInBackground(result.manifest);
   }
+}
+
+function showActivePageUpdatePrompt(version: string) {
+  dismissActiveUpdatePrompt?.();
+  dismissActiveUpdatePrompt = Notify.create({
+    type: 'info',
+    icon: 'system_update_alt',
+    message: 'This page has an update ready',
+    caption: 'Update now, or open another page and Mentor AI will finish it in the background.',
+    timeout: 0,
+    actions: [{ label: 'OK', color: 'white', handler: () => void installUpdate(version) }],
+  });
 }
 
 function handleInstallUpdateRequest() {
@@ -151,17 +160,6 @@ function handleInstallUpdateRequest() {
 
   if (update) {
     void installUpdate(update.version);
-  }
-}
-
-function handleUpdateButtonClick() {
-  if (!navigator.onLine) {
-    Notify.create({ type: 'warning', icon: 'wifi_off', message: 'Internet is required to update Mentor AI' });
-    return;
-  }
-
-  if (appStore.availableAppUpdate) {
-    handleInstallUpdateRequest();
   }
 }
 
@@ -192,6 +190,7 @@ async function installUpdate(version: string) {
   }
 
   isReloadingForUpdate = true;
+  dismissActiveUpdatePrompt?.();
   appStore.setAppUpdateInstalling(true);
 
   try {
@@ -214,6 +213,114 @@ async function installUpdate(version: string) {
   }
 }
 
+async function installUpdateInBackground(manifest: AppUpdateCheckResult['manifest']) {
+  if (isReloadingForUpdate || appStore.isAppUpdateRunningInBackground) return;
+  appStore.setAppUpdateRunningInBackground(true);
+  dismissActiveUpdatePrompt?.();
+
+  try {
+    const progress = await prepareUpdateProgress();
+    await activatePendingServiceWorkerUpdate();
+    rememberPendingAppUpdate({
+      targetVersion: manifest.version,
+      requestedAt: new Date().toISOString(),
+      backgroundNotificationShown: true,
+      reloadImmediately: false,
+      ...progress,
+    });
+    activatedBackgroundManifest = manifest;
+    pendingManifest = null;
+    appStore.availableAppUpdate = null;
+
+    const notification = await appStore.recordUpdateNotification(
+      manifest.version,
+      'Mentor AI was updated automatically in the background.',
+    );
+    if (document.visibilityState !== 'visible') await showSystemUpdateNotification(notification);
+    Notify.create({
+      type: 'positive',
+      icon: 'published_with_changes',
+      message: 'Mentor AI was updated in the background',
+      actions: [{ label: 'OK', color: 'white' }],
+      timeout: 0,
+    });
+    if (document.visibilityState !== 'visible') reloadWithBackgroundUpdate(route.fullPath);
+  } catch {
+    Notify.create({ type: 'negative', icon: 'cloud_off', message: 'Could not update Mentor AI in the background' });
+  } finally {
+    appStore.setAppUpdateRunningInBackground(false);
+  }
+}
+
+async function prepareUpdateProgress() {
+  if (!appStore.isHydrated) await appStore.hydrate();
+  window.dispatchEvent(new Event('mentor-ai:prepare-app-update'));
+  return appStore.prepareForAppUpdate();
+}
+
+function handleRouteChanged(to: RouteLocationNormalized, from: RouteLocationNormalized) {
+  if (activatedBackgroundManifest) {
+    void showRouteUpdateAndReload(to.fullPath, isAppUpdateRouteAffected(activatedBackgroundManifest, to.path));
+    return;
+  }
+  if (!pendingManifest || to.fullPath === from.fullPath) return;
+  if (isAppUpdateRouteAffected(pendingManifest, to.path)) {
+    routeUpdateCancelled = false;
+    isRouteUpdateInstalling.value = true;
+    appStore.setAppUpdateInstalling(true);
+    void installUpdateToRoute(pendingManifest.version, to.fullPath);
+  } else {
+    void installUpdateInBackground(pendingManifest);
+  }
+}
+
+async function installUpdateToRoute(version: string, target: string) {
+  try {
+    const progress = await prepareUpdateProgress();
+    rememberPendingAppUpdate({
+      targetVersion: version,
+      requestedAt: new Date().toISOString(),
+      reloadImmediately: false,
+      ...progress,
+    });
+    await activatePendingServiceWorkerUpdate();
+    if (routeUpdateCancelled) {
+      activatedBackgroundManifest = pendingManifest;
+      pendingManifest = null;
+      return;
+    }
+    reloadWithBackgroundUpdate(target);
+  } catch {
+    isRouteUpdateInstalling.value = false;
+    appStore.setAppUpdateInstalling(false);
+  }
+}
+
+async function showRouteUpdateAndReload(target: string, showLoader: boolean) {
+  if (showLoader) {
+    isRouteUpdateInstalling.value = true;
+    appStore.setAppUpdateInstalling(true);
+    await nextTick();
+    await new Promise((resolve) => window.setTimeout(resolve, 80));
+  }
+  reloadWithBackgroundUpdate(target);
+}
+
+function reloadWithBackgroundUpdate(target: string) {
+  if (!activatedBackgroundManifest && !pendingManifest) return;
+  isReloadingForUpdate = true;
+  const version = activatedBackgroundManifest?.version ?? pendingManifest?.version ?? 'new-version';
+  const targetUrl = new URL(target, window.location.origin);
+  window.location.replace(createAppUpdateReloadUrl(targetUrl as unknown as Location, version));
+}
+
+function leaveUpdatingPage() {
+  routeUpdateCancelled = true;
+  isRouteUpdateInstalling.value = false;
+  appStore.setAppUpdateInstalling(false);
+  router.back();
+}
+
 async function showCompletedUpdateNotification() {
   const pendingUpdate = consumePendingAppUpdate();
 
@@ -234,6 +341,8 @@ async function showCompletedUpdateNotification() {
       || await appStore.resumePausedLesson(pendingUpdate.lessonSessionId)
     ),
   );
+
+  if (pendingUpdate.backgroundNotificationShown) return;
 
   const installedVersion = process.env.APP_VERSION ?? pendingUpdate.targetVersion;
   const progressCaption = pendingUpdate.lessonTitle
@@ -281,6 +390,8 @@ function handleVisibilitySync() {
   if (document.visibilityState === 'visible') {
     void appStore.refreshMyShiftActivity(false);
     void refreshRemoteProgress(true);
+  } else if (activatedBackgroundManifest) {
+    reloadWithBackgroundUpdate(route.fullPath);
   }
 }
 
@@ -317,35 +428,6 @@ async function refreshRemoteProgress(showNotification: boolean) {
 </script>
 
 <style scoped>
-.app-update-available-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9000;
-  background: rgba(15, 23, 42, 0.64);
-  backdrop-filter: blur(3px);
-  touch-action: none;
-}
-
-.app-update-floating-button {
-  position: fixed;
-  top: calc(env(safe-area-inset-top) + 72px);
-  right: max(16px, env(safe-area-inset-right));
-  z-index: 9001;
-  min-width: 52px;
-  min-height: 52px;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.3);
-}
-
-.app-update-floating-button.q-btn--rectangle {
-  min-width: 132px;
-  border: 2px solid rgba(255, 255, 255, 0.92);
-  border-radius: 18px;
-  color: #111827;
-  font-size: 16px;
-  font-weight: 800;
-  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.38);
-}
-
 .app-update-overlay {
   position: fixed;
   inset: 0;
@@ -358,6 +440,14 @@ async function refreshRemoteProgress(showNotification: boolean) {
   cursor: wait;
   touch-action: none;
   user-select: none;
+}
+
+.app-update-overlay__back {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 12px);
+  left: max(12px, env(safe-area-inset-left));
+  z-index: 1;
+  color: #0f766e;
 }
 
 .app-update-overlay__glow {
@@ -434,15 +524,6 @@ async function refreshRemoteProgress(showNotification: boolean) {
 .update-overlay-leave-active { transition: opacity 180ms ease; }
 .update-overlay-enter-from,
 .update-overlay-leave-to { opacity: 0; }
-
-.update-available-overlay-enter-active,
-.update-available-overlay-leave-active,
-.update-button-enter-active,
-.update-button-leave-active { transition: opacity 180ms ease, transform 180ms ease; }
-.update-available-overlay-enter-from,
-.update-available-overlay-leave-to { opacity: 0; }
-.update-button-enter-from,
-.update-button-leave-to { opacity: 0; transform: translateY(-8px); }
 
 @keyframes update-glow {
   0%, 100% { opacity: 0.7; transform: scale(0.94); }
