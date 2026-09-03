@@ -298,15 +298,16 @@
                 aria-live="polite"
               >
                 <q-btn
+                  class="dialogue-drill__record-button"
                   :color="isRecognizingSpeech ? 'negative' : 'primary'"
                   :icon="isRecognizingSpeech ? 'stop_circle' : 'mic'"
-                  :label="isRecognizingSpeech ? 'Stop recording' : speechRecognitionCaptured ? 'Record again' : 'Record answer'"
+                  :label="isRecognizingSpeech ? 'Stop' : speechRecognitionCaptured ? 'Again' : 'Record'"
                   unelevated
                   no-caps
                   :disable="!speechRecognitionAvailable"
                   @click="recordDialogueAnswer"
                 />
-                <q-btn color="primary" flat icon="volume_up" round @click="playAudio">
+                <q-btn class="dialogue-drill__play-button" color="primary" flat icon="volume_up" round @click="playAudio">
                   <q-tooltip>Play native answer</q-tooltip>
                 </q-btn>
                 <span class="dialogue-drill__recorder-status">

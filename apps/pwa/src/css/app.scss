@@ -898,6 +898,12 @@ body .q-menu {
   min-height: 48px;
 }
 
+.dialogue-drill__record-button {
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding-inline: 14px;
+}
+
 .dialogue-drill__step-navigation {
   align-items: center;
   display: flex;
@@ -3675,7 +3681,8 @@ body.body--dark .personal-reader__lookup-error {
   .dialogue-drill__recorder {
     align-items: stretch;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 48px auto;
+    gap: 6px;
+    grid-template-columns: auto 36px minmax(0, 1fr);
   }
 
   .dialogue-drill__recorder-status {
@@ -3683,14 +3690,40 @@ body.body--dark .personal-reader__lookup-error {
     grid-row: 2;
   }
 
+  .dialogue-drill__record-button {
+    font-size: 0.72rem;
+    grid-column: 1;
+    grid-row: 1;
+    min-height: 40px;
+    padding-inline: 6px;
+    white-space: nowrap;
+  }
+
+  .dialogue-drill__play-button {
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 36px;
+    min-width: 36px;
+  }
+
   .dialogue-drill__continue {
-    min-width: 108px;
+    min-height: 40px;
+    min-width: 54px;
   }
 
   .dialogue-drill__step-navigation {
-    grid-column: 1 / -1;
-    grid-row: 3;
+    grid-column: 3;
+    grid-row: 1;
     justify-content: flex-end;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .dialogue-drill__step-navigation .q-btn {
+    font-size: 0.68rem;
+    min-height: 40px;
+    padding-inline: 5px;
+    white-space: nowrap;
   }
 
   .dialogue-drill__prompt strong,
