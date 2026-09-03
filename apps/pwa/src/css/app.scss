@@ -1282,13 +1282,16 @@ body .q-menu {
   background: var(--app-surface-soft);
   border: 1px solid var(--app-border-strong);
   border-radius: var(--app-radius-md);
+  box-sizing: border-box;
   color: var(--app-muted-strong);
   display: flex;
+  flex-wrap: wrap;
   gap: 14px;
-  justify-content: space-between;
+  justify-content: center;
   padding: 14px;
   position: sticky;
   bottom: 12px;
+  width: 100%;
   z-index: 1;
 }
 
@@ -3545,15 +3548,12 @@ body.body--dark .personal-reader__lookup-error {
 
   .listening-player__controls {
     bottom: calc(85px + env(safe-area-inset-bottom));
-    display: grid;
     gap: 4px;
-    grid-template-columns: repeat(6, minmax(40px, 1fr));
     left: 50%;
     padding: 8px;
     position: fixed;
-    right: auto;
     transform: translateX(-50%);
-    width: min(calc(100vw - 32px), 398px);
+    width: 100vw;
     z-index: 20;
   }
 
@@ -4190,15 +4190,15 @@ p.lesson-complete__eyebrow,
   border: 1px solid var(--app-border-strong);
   border-radius: 18px;
   bottom: calc(92px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
   box-shadow: 0 14px 34px rgba(17, 24, 39, 0.2);
   display: grid;
   gap: 6px;
   left: 50%;
-  max-width: 520px;
   padding: 8px 12px;
   position: fixed;
   transform: translateX(-50%);
-  width: min(520px, calc(100vw - 24px));
+  width: 100vw;
   z-index: 20;
 }
 
