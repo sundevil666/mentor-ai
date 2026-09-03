@@ -3221,6 +3221,17 @@ body.body--dark .personal-reader__lookup-error {
   width: 100%;
 }
 
+.content-mentor-feedback--selection-hidden {
+  padding-bottom: 12px;
+}
+
+.lesson-stage__feedback {
+  background: color-mix(in srgb, var(--app-surface) 88%, transparent);
+  border: 1px solid var(--category-border);
+  border-radius: var(--app-radius-md);
+  padding: 12px;
+}
+
 .video-card__engagement {
   flex-basis: 100%;
   color: var(--app-muted-strong);

@@ -46,7 +46,7 @@
             <q-btn v-if="cachedUrls.has(item.sourceUrl)" :aria-label="`Delete ${item.title} from offline storage`" color="negative" flat icon="delete_outline" round :loading="busyId === item.id" @click="removeAudio(item)" />
             <q-btn v-else :aria-label="`Save ${item.title} offline`" color="primary" flat icon="download_for_offline" round :disable="!isOnline" :loading="busyId === item.id" @click="downloadAudio(item)" />
           </div>
-          <ContentMentorFeedback category="audio" :content-id="item.id" />
+          <ContentMentorFeedback category="audio" :content-id="item.id" hide-select-after-feedback />
         </article>
       </section>
 

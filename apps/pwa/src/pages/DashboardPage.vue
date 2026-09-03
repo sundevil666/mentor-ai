@@ -136,7 +136,7 @@
                   <strong v-if="lessonProgressState(lesson.templateKey) !== 'completed'">{{ lesson.focus }}</strong>
                   <span>{{ lesson.minutes }} min</span>
                 </button>
-                <ContentMentorFeedback category="lesson" :content-id="lesson.templateKey" />
+                <ContentMentorFeedback category="lesson" :content-id="lesson.templateKey" hide-select-after-feedback />
                 <div class="training-library-card__offline">
                   <q-icon
                     :name="libraryDownloadIcon(lesson.templateKey)"
@@ -245,6 +245,13 @@
               size="8px"
             />
           </div>
+
+          <ContentMentorFeedback
+            v-if="currentLessonFeedbackContentId"
+            class="lesson-stage__feedback"
+            category="lesson"
+            :content-id="currentLessonFeedbackContentId"
+          />
 
           <transition :name="exerciseTransitionName">
             <div
@@ -780,6 +787,12 @@ const skippedHomeLessonKey = ref(readHomePreference('mentor-ai:home-skipped-less
 const selectedLessonLibrary = ref<TrainingLibraryKey>('home');
 const lessonReturnDestination = ref<LessonReturnDestination>('home');
 const activeEngagementContentId = ref<string | null>(null);
+const currentLessonFeedbackContentId = computed(() => (
+  appStore.session?.lesson.lessonTemplateKey
+  ?? activeEngagementContentId.value
+  ?? appStore.session?.lesson.id
+  ?? null
+));
 const lessonEngagementSummaries = ref(new Map<string, ContentEngagementSummary>());
 const libraryDownloadStatus = ref<Record<string, 'idle' | 'checking' | 'downloading' | 'ready' | 'error'>>({});
 const showLessonUpdateDialog = ref(false);

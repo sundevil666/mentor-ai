@@ -1,9 +1,14 @@
 <template>
-  <div class="content-mentor-feedback" @click.stop>
+  <div
+    class="content-mentor-feedback"
+    :class="{ 'content-mentor-feedback--selection-hidden': !showSelect }"
+    @click.stop
+  >
     <span class="content-mentor-feedback__statistics">
       <q-icon name="insights" /> {{ statisticsLabel }}
     </span>
     <q-select
+      v-if="showSelect"
       class="content-mentor-feedback__select"
       dense
       emit-value
@@ -27,7 +32,13 @@ import {
 } from 'src/services/content-engagement';
 import { useAppStore } from 'src/stores/app-store';
 
-const props = defineProps<{ category: ContentProgressCategory; contentId: string }>();
+const props = withDefaults(defineProps<{
+  category: ContentProgressCategory;
+  contentId: string;
+  hideSelectAfterFeedback?: boolean;
+}>(), {
+  hideSelectAfterFeedback: false,
+});
 const appStore = useAppStore();
 const summary = ref<ContentEngagementSummary>({ starts: 0, finishes: 0, fullPlays: 0 });
 const feedbackOptions = computed<Array<{ label: string; value: ContentFeedbackValue }>>(() => [
@@ -44,6 +55,7 @@ const statisticsLabel = computed(() => {
   const lastLabel = props.category === 'lesson' ? 'full completions' : 'full plays';
   return `${summary.value.starts} starts · ${summary.value.finishes} finishes · ${summary.value.fullPlays} ${lastLabel}`;
 });
+const showSelect = computed(() => !props.hideSelectAfterFeedback || !summary.value.feedback);
 
 onMounted(() => {
   void refresh();
