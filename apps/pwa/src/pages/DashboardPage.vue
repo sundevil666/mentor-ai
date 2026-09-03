@@ -438,7 +438,7 @@
                   <q-btn
                     class="listening-player__continue-button"
                     color="primary"
-                    label="Continue"
+                    :label="hasCompletedCurrentLessonExercise ? 'Next' : 'Continue'"
                     no-caps
                     unelevated
                     @click="completeListeningExercise"
@@ -805,7 +805,7 @@ const isRecognizingSpeech = ref(false);
 const speechRecognitionError = ref('');
 const speechRecognitionProgress = ref('');
 const dialogueAnswerStatus = ref<'idle' | 'correct' | 'incorrect'>('idle');
-const successfulSpeakingExerciseKeys = ref(readSuccessfulSpeakingExerciseKeys(appStore.studentId));
+const successfulLessonExerciseKeys = ref(readSuccessfulSpeakingExerciseKeys(appStore.studentId));
 let dialogueRecognitionRunId = 0;
 let dialogueSpeechStream: MediaStream | null = null;
 let dialogueLocalTranscriber: LocalReadingTranscriber | null = null;
@@ -893,14 +893,15 @@ const isDialogueTranslationExercise = computed(
   () => currentExercise.value?.type === 'dialogue-translation',
 );
 const currentSpeakingExerciseProgressKey = computed(() => createSpeakingExerciseProgressKey(
-  appStore.session?.lesson.lessonTemplateKey,
+  appStore.session?.lesson.lessonTemplateKey ?? 'generated-lesson',
   appStore.session?.currentExerciseIndex ?? -1,
   currentExercise.value?.expectedResponse,
 ));
-const hasPassedCurrentSpeakingExercise = computed(() => {
+const hasCompletedCurrentLessonExercise = computed(() => {
   const exerciseKey = currentSpeakingExerciseProgressKey.value;
-  return Boolean(exerciseKey && successfulSpeakingExerciseKeys.value.has(exerciseKey));
+  return Boolean(exerciseKey && successfulLessonExerciseKeys.value.has(exerciseKey));
 });
+const hasPassedCurrentSpeakingExercise = computed(() => hasCompletedCurrentLessonExercise.value);
 const localSpeechRecognitionAvailable = computed(() => (
   typeof navigator !== 'undefined'
   && typeof navigator.mediaDevices?.getUserMedia === 'function'
@@ -1473,7 +1474,7 @@ watch(
 watch(
   () => appStore.studentId,
   (studentId) => {
-    successfulSpeakingExerciseKeys.value = readSuccessfulSpeakingExerciseKeys(studentId);
+    successfulLessonExerciseKeys.value = readSuccessfulSpeakingExerciseKeys(studentId);
   },
 );
 
@@ -1599,9 +1600,16 @@ async function submit() {
 }
 
 async function completeListeningExercise() {
+  rememberCurrentLessonExerciseCompletion();
   answer.value = 'listened';
   stopListeningAudio();
   await submit();
+}
+
+function rememberCurrentLessonExerciseCompletion() {
+  const exerciseKey = currentSpeakingExerciseProgressKey.value;
+  if (!exerciseKey) return;
+  successfulLessonExerciseKeys.value = saveSuccessfulSpeakingExerciseKey(appStore.studentId, exerciseKey);
 }
 
 async function recordDialogueAnswer() {
@@ -1692,10 +1700,7 @@ function applyDialogueTranscript(transcript: string, recognitionRunId: number) {
   answer.value = matchesExpected ? expected.trim() : bestTranscript;
   speechRecognitionCaptured.value = true;
   dialogueAnswerStatus.value = matchesExpected ? 'correct' : 'incorrect';
-  const exerciseKey = currentSpeakingExerciseProgressKey.value;
-  if (matchesExpected && exerciseKey) {
-    successfulSpeakingExerciseKeys.value = saveSuccessfulSpeakingExerciseKey(appStore.studentId, exerciseKey);
-  }
+  if (matchesExpected) rememberCurrentLessonExerciseCompletion();
   if (matchesExpected) stopDialogueSpeechRecording();
 }
 

@@ -17,13 +17,22 @@ function createStorage() {
   };
 }
 
-describe('Speaking exercise progress', () => {
+describe('Lesson exercise progress', () => {
   it('creates a stable key from the lesson, step, and normalized answer', () => {
     assert.equal(
       createSpeakingExerciseProgressKey('polite-speaking', 2, '  Could you   repeat that PLEASE '),
       'polite-speaking:2:could you repeat that please',
     );
     assert.equal(createSpeakingExerciseProgressKey(undefined, 2, 'answer'), null);
+  });
+
+  it('uses the same persistent progress for listening-text exercises', () => {
+    const storage = createStorage();
+    const exerciseKey = createSpeakingExerciseProgressKey('commute-listening', 0, 'listened');
+    assert.ok(exerciseKey);
+
+    saveSuccessfulSpeakingExerciseKey('student-1', exerciseKey, storage);
+    assert.equal(readSuccessfulSpeakingExerciseKeys('student-1', storage).has(exerciseKey), true);
   });
 
   it('remembers a successful exercise for one student until learning data is cleared', () => {
