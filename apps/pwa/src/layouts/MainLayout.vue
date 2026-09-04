@@ -311,6 +311,7 @@
         class="mobile-start-dock__button"
         :class="[`mobile-start-dock__button--${item.tone}`, { 'mobile-start-dock__button--active': item.isActive() }]"
         :to="item.to"
+        @click="handlePrimaryNavigationClick($event, item)"
       >
         <q-icon :name="item.icon" size="24px" />
         <span>{{ item.label }}</span>
@@ -341,10 +342,11 @@ import type { ConceptLevel, StudentModel, TranslationUsage } from '@mentor-ai/sh
 import { Dark, Notify } from 'quasar';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { personalBookSyncControl } from 'src/services/personal-book-sync-control';
-import { resolveDashboardTrainingCategory } from 'src/services/navigation-category';
+import { openDashboardHome, resolveDashboardTrainingCategory } from 'src/services/navigation-category';
 import {
   onBeforeRouteUpdate,
   useRoute,
+  useRouter,
   type RouteLocationNormalizedLoaded,
   type RouteLocationRaw,
 } from 'vue-router';
@@ -530,6 +532,7 @@ const analysisStatusLabel = computed(() => {
 const activeDashboardTraining = computed(() => {
   return resolveDashboardTrainingCategory(route.query.training, appStore.session?.context.mode);
 });
+const router = useRouter();
 const primaryNavigationItems: Array<{
   label: string;
   icon: string;
@@ -584,6 +587,21 @@ const primaryNavigationItems: Array<{
     isActive: () => route.name === 'reading',
   },
 ];
+
+async function handlePrimaryNavigationClick(
+  event: MouseEvent,
+  item: (typeof primaryNavigationItems)[number],
+) {
+  if (item.tone !== 'home') return;
+
+  event.preventDefault();
+  await openDashboardHome(Boolean(appStore.session), {
+    leaveActiveLesson: () => appStore.returnToLessonChoice(),
+    showHome: async () => {
+      await router.push({ name: 'dashboard', query: { training: 'home' } });
+    },
+  });
+}
 
 onMounted(async () => {
   await cleanupExpiredOfflineLessons();
