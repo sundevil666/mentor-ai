@@ -172,7 +172,7 @@ describe('reading speech tracking', () => {
 
 describe('tablet reading audio preparation', () => {
   it('captures short audio fragments for responsive word highlighting', () => {
-    assert.equal(localReadingChunkDurationMs, 1_500);
+    assert.equal(localReadingChunkDurationMs, 1_200);
   });
   it('amplifies a quiet speech signal without clipping it', () => {
     const input = Float32Array.from([0.01, -0.02, 0.015, -0.01]);
@@ -209,7 +209,7 @@ describe('tablet reading audio preparation', () => {
     }
     Object.assign(globalThis, {
       Worker: FakeWorker,
-      window: { setTimeout, clearTimeout },
+      window: { setTimeout, clearTimeout, setInterval, clearInterval },
     });
     const stream = { active: false } as MediaStream;
     let readyCount = 0;

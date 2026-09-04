@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { beginReaderLookupInteraction, shouldProcessLateReadingTranscript } from '../src/services/reader-lookup-interaction.js';
+import { beginReaderLookupInteraction, shouldProcessReadingTranscript } from '../src/services/reader-lookup-interaction.js';
 
 describe('reader lookup interaction', () => {
   it('reveals and starts a tapped word without waiting for the microphone final chunk', async () => {
@@ -9,7 +9,7 @@ describe('reader lookup interaction', () => {
     const lookupFinished = new Promise<void>((resolve) => { finishLookup = resolve; });
     const interaction = beginReaderLookupInteraction({
       revealSelection: () => events.push('word-visible'),
-      pauseListening: () => events.push('microphone-paused'),
+      suppressListening: () => events.push('listening-suppressed'),
       pronounce: () => events.push('pronunciation-started'),
       lookup: () => {
         events.push('translation-started');
@@ -17,7 +17,7 @@ describe('reader lookup interaction', () => {
       },
     });
 
-    assert.deepEqual(events, ['word-visible', 'pronunciation-started', 'translation-started', 'microphone-paused']);
+    assert.deepEqual(events, ['word-visible', 'listening-suppressed', 'pronunciation-started', 'translation-started']);
     finishLookup();
     await interaction;
   });
@@ -26,14 +26,14 @@ describe('reader lookup interaction', () => {
     const events: string[] = [];
     await beginReaderLookupInteraction({
       revealSelection: () => events.push('phrase-visible'),
-      pauseListening: () => events.push('microphone-paused'),
+      suppressListening: () => events.push('listening-suppressed'),
       lookup: async () => { events.push('translation-started'); },
     });
-    assert.deepEqual(events, ['phrase-visible', 'translation-started', 'microphone-paused']);
+    assert.deepEqual(events, ['phrase-visible', 'listening-suppressed', 'translation-started']);
   });
 
-  it('drops the recorder final transcript while translation is already in progress', () => {
-    assert.equal(shouldProcessLateReadingTranscript(true), false);
-    assert.equal(shouldProcessLateReadingTranscript(false), true);
+  it('gates recognition results while translation is in progress', () => {
+    assert.equal(shouldProcessReadingTranscript(true), false);
+    assert.equal(shouldProcessReadingTranscript(false), true);
   });
 });

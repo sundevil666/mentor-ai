@@ -10,6 +10,7 @@ let transcriberPromise: Promise<(audio: Float32Array, options?: Record<string, u
 let transcribing = false;
 const pendingRequests: Array<{ id: number; audio: Float32Array }> = [];
 const maximumWhisperSamples = 28 * 16_000;
+const maximumPendingSamples = 6 * 16_000;
 
 async function createTranscriber() {
   const progress_callback = (progress: { status?: string; progress?: number }) => {
@@ -38,11 +39,16 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   if (!event.data.audio || event.data.id === undefined) return;
   const request = { id: event.data.id, audio: event.data.audio };
   if (transcribing) {
-    // Whisper can be slower than real time on Apple mobile devices. Never replace
-    // an older pending chunk with a newer one: that used to discard most of a
-    // continuously read page. Pending chunks are combined into efficient batches
-    // when the current transcription finishes.
+    // Whisper can be slower than real time on Apple mobile devices. Preserve a
+    // short ordered backlog, but cap it so old audio cannot make highlighting
+    // drift farther and farther behind the reader.
     pendingRequests.push(request);
+    let pendingSamples = pendingRequests.reduce((total, item) => total + item.audio.length, 0);
+    while (pendingRequests.length > 1 && pendingSamples > maximumPendingSamples) {
+      const dropped = pendingRequests.shift()!;
+      pendingSamples -= dropped.audio.length;
+      self.postMessage({ type: 'debug', message: `Worker overloaded; dropped stale batch #${dropped.id} to keep highlighting current.` });
+    }
     self.postMessage({ type: 'debug', message: `Worker busy; queued chunk #${request.id} (${pendingRequests.length} waiting).` });
     return;
   }

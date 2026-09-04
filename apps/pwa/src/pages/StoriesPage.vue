@@ -475,10 +475,9 @@ import { annualReadingPace, annualReadingPaceMessage as getAnnualReadingPaceMess
 import { alignReadingSpeech, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
-import { canUseCloudReadingTranscription, startCloudReadingTranscriber, type CloudReadingTranscriber } from 'src/services/cloud-reading-transcriber';
 import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
 import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, type ReaderSwipePoint } from 'src/services/reader-swipe';
-import { beginReaderLookupInteraction, shouldProcessLateReadingTranscript } from 'src/services/reader-lookup-interaction';
+import { beginReaderLookupInteraction, shouldProcessReadingTranscript } from 'src/services/reader-lookup-interaction';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
 
 const props = withDefaults(defineProps<{
@@ -538,7 +537,6 @@ let readingSpeechLocalTranscriptWindow: string[] = [];
 let readingSpeechPositionLocked = false;
 let readingSpeechRecognition: ContinuousSpeechRecognition | null = null;
 let localReadingTranscriber: LocalReadingTranscriber | null = null;
-let cloudReadingTranscriber: CloudReadingTranscriber | null = null;
 let readingSpeechStream: MediaStream | null = null;
 let readingSpeechAudioContext: AudioContext | null = null;
 let readingSpeechAnimationFrame = 0;
@@ -546,7 +544,7 @@ let readingSpeechDebugStartedAt = 0;
 let readingSpeechLastSignalState = false;
 let readingSpeechPaceWordCount = 0;
 let readingSpeechPaceSampleAt = 0;
-let resumeReadingSpeechAfterLookup = false;
+let readingSpeechSuppressedForLookup = false;
 const dailyReadingProgress = ref<DailyReadingProgress>(readDailyReadingProgress());
 const personalBooks = ref<PersonalBook[]>([]);
 const bookSyncing = ref(false);
@@ -999,6 +997,7 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
   if (!text || !selectedBook.value) return;
   const shouldResumeReadingSpeech = readingSpeechActive.value;
   const requestId = ++readerLookupRequestId;
+  const interactionStartedAt = performance.now();
   try {
     await beginReaderLookupInteraction({
       revealSelection: () => {
@@ -1009,12 +1008,14 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
         readerLookupError.value = '';
         readerLookupLoading.value = true;
         readerPhoneticLoading.value = !/\s/.test(text);
+        appendReadingSpeechDebug(`Lookup word visible after ${Math.round(performance.now() - interactionStartedAt)}ms: "${text}".`);
+        void nextTick().then(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
+          .then(() => appendReadingSpeechDebug(`Lookup UI painted after ${Math.round(performance.now() - interactionStartedAt)}ms.`));
       },
-      pauseListening: shouldResumeReadingSpeech ? () => {
-        resumeReadingSpeechAfterLookup = true;
-        appendReadingSpeechDebug(`Pausing microphone while translating "${text}".`);
-        stopReadingSpeech('paused');
-        readingSpeechMessage.value = 'Microphone paused while translating. It will resume automatically.';
+      suppressListening: shouldResumeReadingSpeech ? () => {
+        readingSpeechSuppressedForLookup = true;
+        appendReadingSpeechDebug(`Ignoring recognition results while translating "${text}"; capture stays warm.`);
+        readingSpeechMessage.value = 'Translation has priority. Listening will continue automatically.';
       } : undefined,
       pronounce: speakImmediately ? () => { void speakReaderText(text); } : undefined,
       lookup: async () => {
@@ -1024,6 +1025,7 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
           readerLookup.value = cachedLookup;
           readerPhonetic.value = cachedLookup.phonetic;
           readerLookupLoading.value = false;
+          appendReadingSpeechDebug(`Cached translation ready after ${Math.round(performance.now() - interactionStartedAt)}ms.`);
           if (!cachedLookup.phonetic && !/\s/.test(text)) void loadReaderPhonetic(text, requestId);
           await saveReaderLookup(cachedLookup, requestId);
           return;
@@ -1033,6 +1035,7 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
           const lookup = await fetchReaderTextLookup(text);
           if (requestId !== readerLookupRequestId) return;
           readerLookup.value = lookup;
+          appendReadingSpeechDebug(`Online translation ready after ${Math.round(performance.now() - interactionStartedAt)}ms.`);
           if (lookup.translation) await saveReaderLookup(lookup, requestId);
         } catch (error) {
           if (requestId === readerLookupRequestId) readerLookupError.value = error instanceof Error ? error.message : 'Translation is unavailable right now.';
@@ -1044,10 +1047,10 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
   } catch (error) {
     if (requestId === readerLookupRequestId) readerLookupError.value = error instanceof Error ? error.message : 'Translation is unavailable right now.';
   } finally {
-    if (requestId === readerLookupRequestId && resumeReadingSpeechAfterLookup && readingMode.value) {
-      resumeReadingSpeechAfterLookup = false;
-      appendReadingSpeechDebug('Translation finished; resuming microphone automatically.');
-      await startReadingSpeech();
+    if (requestId === readerLookupRequestId && readingSpeechSuppressedForLookup) {
+      readingSpeechSuppressedForLookup = false;
+      appendReadingSpeechDebug(`Translation interaction finished after ${Math.round(performance.now() - interactionStartedAt)}ms; recognition results enabled.`);
+      if (readingSpeechActive.value) readingSpeechMessage.value = 'Read aloud. Recognition is ready.';
     }
   }
 }
@@ -1114,7 +1117,7 @@ async function speakReaderText(text: string) {
 }
 function clearReaderLookup() {
   readerLookupRequestId += 1;
-  resumeReadingSpeechAfterLookup = false;
+  readingSpeechSuppressedForLookup = false;
   selectedReaderText.value = '';
   selectedReaderWordIndex.value = null;
   readerLookup.value = null;
@@ -1205,24 +1208,18 @@ async function startReadingSpeech() {
     appendReadingSpeechDebug(`Reading anchor: word ${readingSpeechAnchor}.`);
     appendReadingSpeechDebug(`Expected nearby text: "${readerReferenceWords.value.slice(readingSpeechAnchor, readingSpeechAnchor + 18).join(' ')}"`);
     if (useLocalRecognition) {
-      const handleWhisperTranscript = (transcript: string, engine: 'device-whisper' | 'cloud-whisper') => {
-        const arrivedAfterPause = !readingSpeechStream;
-        if (arrivedAfterPause && !shouldProcessLateReadingTranscript(readerLookupLoading.value)) {
-          appendReadingSpeechDebug('Ignoring the microphone final chunk while translation is in progress.');
+      const handleWhisperTranscript = (transcript: string) => {
+        if (!shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) {
+          appendReadingSpeechDebug('Ignoring a recognition result while translation has priority.');
           return;
         }
-        handleReadingSpeechTranscript(transcript, engine);
-        if (arrivedAfterPause) {
-          readingSpeechStatus.value = 'paused';
-          readingSpeechMessage.value = 'The final words were recognized and highlighted. Tap Start listening when you are ready.';
-        }
+        handleReadingSpeechTranscript(transcript, 'device-whisper');
       };
       const startOfflineRecognition = () => {
         if (!readingSpeechStream || localReadingTranscriber) return;
-        if (typeof MediaRecorder === 'undefined') throw new Error('MediaRecorder is unavailable after microphone permission was granted.');
         localReadingTranscriber = startLocalReadingTranscriber(readingSpeechStream, {
         onTranscript: (transcript) => {
-          handleWhisperTranscript(transcript, 'device-whisper');
+          handleWhisperTranscript(transcript);
         },
         onDebug: (message) => appendReadingSpeechDebug(message),
         onReady: () => {
@@ -1246,34 +1243,7 @@ async function startReadingSpeech() {
         readingSpeechStatus.value = 'requesting';
         readingSpeechMessage.value = 'Loading offline speech model…';
       };
-      if (await canUseCloudReadingTranscription()) {
-        appendReadingSpeechDebug('Online Whisper Large V3 Turbo is configured; starting continuous capture.');
-        try {
-          cloudReadingTranscriber = await startCloudReadingTranscriber(readingSpeechStream, {
-            prompt: () => readerReferenceWords.value.slice(Math.max(0, readingSpeechAnchor - 40), readingSpeechAnchor + 320).join(' '),
-            onTranscript: (transcript) => handleWhisperTranscript(transcript, 'cloud-whisper'),
-            onDebug: (message) => appendReadingSpeechDebug(message),
-            onReady: () => {
-              appendReadingSpeechDebug('Online Whisper ready. Start reading aloud.');
-              readingSpeechStatus.value = 'listening';
-              readingSpeechMessage.value = 'Read aloud. Online recognition is ready.';
-              readingSpeechTransitioning.value = false;
-            },
-            onUnavailable: (message) => {
-              appendReadingSpeechDebug(`Online Whisper unavailable: ${message} Switching to offline recognition.`);
-              cloudReadingTranscriber?.stop();
-              cloudReadingTranscriber = null;
-              startOfflineRecognition();
-            },
-          });
-        } catch (error) {
-          appendReadingSpeechDebug(`Online capture could not start: ${microphoneErrorDetails(error)} Switching to offline recognition.`);
-          startOfflineRecognition();
-        }
-      } else {
-        appendReadingSpeechDebug('Online Whisper is not configured or the tablet is offline; using offline recognition.');
-        startOfflineRecognition();
-      }
+      startOfflineRecognition();
     } else {
       if (!isSpeechRecognitionAvailable()) throw new Error('SpeechRecognition is unavailable after microphone permission was granted.');
       readingSpeechRecognition = startContinuousSpeechRecognition({
@@ -1364,7 +1334,7 @@ function isMicrophonePermissionError(error: unknown) {
     ? error.name === 'NotAllowedError' || error.name === 'SecurityError'
     : error instanceof Error && /denied|allowed|permission/i.test(error.message);
 }
-function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'device-whisper' | 'cloud-whisper' | 'browser' = 'browser') {
+function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'device-whisper' | 'browser' = 'browser') {
   const whisperRecognition = recognitionEngine !== 'browser';
   const rawHeardWords = tokenizeReadingSpeech(transcript);
   if (whisperRecognition) updateReadingSpeechChunkPace(rawHeardWords.length);
@@ -1514,8 +1484,7 @@ function stopReadingSpeech(status: ReadingSpeechStatus) {
   readingSpeechRecognition = null;
   localReadingTranscriber?.stop();
   localReadingTranscriber = null;
-  cloudReadingTranscriber?.stop();
-  cloudReadingTranscriber = null;
+  readingSpeechSuppressedForLookup = false;
   readingSpeechStream?.getTracks().forEach((track) => track.stop());
   readingSpeechStream = null;
   cancelAnimationFrame(readingSpeechAnimationFrame);
@@ -1565,7 +1534,7 @@ function updateReadingSpeechChunkPace(wordCount: number) {
 function startReadingSpeechDebug(engine: string) {
   readingSpeechDebugStartedAt = performance.now();
   readingSpeechDebugEntries.value = [];
-  appendReadingSpeechDebug(`Start. Engine=${engine}; platform=${navigator.platform || 'unknown'}; standalone=${window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone)}; MediaRecorder=${typeof MediaRecorder !== 'undefined'}; AudioContext=${typeof window.AudioContext !== 'undefined'}.`);
+  appendReadingSpeechDebug(`Start. Engine=${engine}; platform=${navigator.platform || 'unknown'}; standalone=${window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone)}; AudioWorklet=${typeof window.AudioContext !== 'undefined' && 'audioWorklet' in window.AudioContext.prototype}; AudioContext=${typeof window.AudioContext !== 'undefined'}.`);
   appendReadingSpeechDebug(`Voice frame: viewport=${window.innerWidth}x${window.innerHeight}; fullscreen=${readingMode.value}; reducedMotion=${window.matchMedia('(prefers-reduced-motion: reduce)').matches}; animation=recording-pulse+voice-wave.`);
 }
 

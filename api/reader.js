@@ -20,19 +20,6 @@ module.exports = async (request, response) => {
       return;
     }
 
-    if (action === 'transcription') {
-      const transcriptionService = await import('../apps/api/src/services/reading-transcription.service.js');
-      if (request.method === 'GET') {
-        sendJson(response, 200, { configured: transcriptionService.isCloudReadingTranscriptionConfigured() });
-        return;
-      }
-      if (request.method === 'POST') {
-        const body = await readJsonBody(request);
-        sendJson(response, 200, await transcriptionService.transcribeReadingAudio(body?.audioBase64, body?.prompt));
-        return;
-      }
-    }
-
     sendJson(response, 404, { message: 'Reader endpoint not found.' });
   } catch (error) {
     handleError(response, error);

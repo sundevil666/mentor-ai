@@ -251,22 +251,6 @@ export async function saveReadingTranscript(chunk: ReadingTranscriptChunk): Prom
   return ((await response.json()) as ApiResponse<ReadingTranscriptChunk>).data;
 }
 
-export async function fetchOnlineReadingTranscriptionConfiguration(): Promise<{ configured: boolean }> {
-  const response = await fetch(`${apiBaseUrl}/api/reader/transcription`, { headers: authHeaders() });
-  if (!response.ok) throw new Error('Online reading transcription configuration is unavailable.');
-  return ((await response.json()) as ApiResponse<{ configured: boolean }>).data;
-}
-
-export async function transcribeReadingAudioOnline(audio: Uint8Array, prompt: string): Promise<{ text: string }> {
-  const response = await fetch(`${apiBaseUrl}/api/reader/transcription`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ audioBase64: bytesToBase64(audio), prompt }),
-  });
-  if (!response.ok) throw new Error(response.status === 429 ? 'The free online transcription limit is temporarily exhausted.' : 'Online reading transcription failed.');
-  return ((await response.json()) as ApiResponse<{ text: string }>).data;
-}
-
 export async function synchronizeLearningEvidence(
   events: LearningEvent[],
   exerciseResults: ExerciseResult[],
@@ -293,13 +277,4 @@ function authHeaders(): Record<string, string> {
   const token = getAuthToken();
 
   return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = '';
-  const chunkSize = 0x8000;
-  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
-  }
-  return btoa(binary);
 }

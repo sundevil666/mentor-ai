@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
@@ -9,7 +9,7 @@ const source = (path) => readFileSync(new URL(path, root), 'utf8');
 const trackedFiles = () =>
   execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' })
     .split('\n')
-    .filter(Boolean);
+    .filter((path) => path && existsSync(new URL(path, root)));
 
 const pwaApiClient = source('apps/pwa/src/services/api-client.ts');
 const pwaStore = source('apps/pwa/src/stores/app-store.ts');

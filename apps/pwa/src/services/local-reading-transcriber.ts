@@ -15,11 +15,10 @@ let sharedWorkerInitializing = false;
 let sharedWorkerReady = false;
 let sharedRequestId = 0;
 
-// Short chunks let the marker react while the reader is still on the current
-// phrase. The first position lock may combine chunks; after that the nearby
-// matcher can safely confirm a two-word fragment. The worker applies its own
-// backpressure on slower devices.
-export const localReadingChunkDurationMs = 1_500;
+// A persistent AudioWorklet avoids repeatedly constructing MediaRecorder and
+// AudioContext instances. Small, non-overlapping PCM batches keep the marker
+// moving while silence is discarded before it reaches Whisper.
+export const localReadingChunkDurationMs = 1_200;
 
 export function prepareLocalSpeechTranscriber(): void {
   if (sharedWorkerReady || sharedWorkerInitializing) return;
@@ -42,9 +41,14 @@ export function prepareLocalSpeechTranscriber(): void {
 
 export function startLocalReadingTranscriber(stream: MediaStream, options: LocalTranscriberOptions): LocalReadingTranscriber {
   const worker = sharedWorker ??= new Worker(new URL('../workers/reading-transcription.worker.ts', import.meta.url), { type: 'module' });
-  let recorder: MediaRecorder | null = null;
+  let context: AudioContext | null = null;
+  let source: MediaStreamAudioSourceNode | null = null;
+  let processor: AudioWorkletNode | null = null;
+  let silentOutput: GainNode | null = null;
   let timer = 0;
   let stopped = false;
+  let pcmChunks: Float32Array[] = [];
+  let pcmSampleCount = 0;
   const firstSessionRequestId = sharedRequestId + 1;
   options.onDebug?.(sharedWorkerReady ? 'Reusing ready offline speech model.' : sharedWorkerInitializing ? 'Waiting for offline speech model already loading.' : 'Creating offline transcription worker.');
 
@@ -70,7 +74,7 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
     if (stopped) return;
     if (event.data.type === 'ready') {
       options.onReady();
-      recordChunk();
+      void startCapture().catch((error) => options.onError(error instanceof Error ? error.message : String(error)));
     }
     if (event.data.type === 'progress') {
       const progress = Number.isFinite(event.data.progress) ? ` ${Math.round(event.data.progress ?? 0)}%` : '';
@@ -84,7 +88,7 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
     queueMicrotask(() => {
       if (stopped) return;
       options.onReady();
-      recordChunk();
+      void startCapture().catch((error) => options.onError(error instanceof Error ? error.message : String(error)));
     });
   } else if (!sharedWorkerInitializing) {
     sharedWorkerInitializing = true;
@@ -92,42 +96,58 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
     worker.postMessage({ type: 'init' });
   }
 
-  const recordChunk = () => {
-    if (stopped || !stream.active) return;
-    const chunks: Blob[] = [];
-    recorder = new MediaRecorder(stream);
-    const chunkDurationMs = options.chunkDurationMs ?? localReadingChunkDurationMs;
-    options.onDebug?.(`Recording ${(chunkDurationMs / 1_000).toFixed(1)}s audio chunk (${recorder.mimeType || 'default format'}).`);
-    recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
-    recorder.onstop = () => {
-      if (chunks.length) {
-        // Reserve the id before asynchronous decoding so a quick restart can
-        // identify and ignore this previous session's late result.
-        const id = ++sharedRequestId;
-        void decodeAudio(new Blob(chunks, { type: recorder?.mimeType })).then((decodedAudio) => {
-          const normalized = normalizeReadingAudio(decodedAudio);
-          options.onDebug?.(`Audio chunk #${id} decoded (${(normalized.audio.length / 16_000).toFixed(2)}s); RMS=${normalized.rms.toFixed(4)}, peak=${normalized.peak.toFixed(3)}, gain=${normalized.gain.toFixed(1)}x.`);
-          if (!normalized.usable) {
-            options.onDebug?.(`Audio chunk #${id} is too quiet for reliable recognition; skipped.`);
-            return;
-          }
-          options.onDebug?.(`Sending normalized audio chunk #${id} to worker.`);
-          worker.postMessage({ id, audio: normalized.audio }, [normalized.audio.buffer]);
-        }).catch((error) => {
-          if (!stopped) options.onError(error instanceof Error ? error.message : String(error));
-          else options.onDebug?.(`Final audio chunk could not be decoded: ${error instanceof Error ? error.message : String(error)}.`);
-        });
-      } else options.onDebug?.('Audio chunk was empty.');
-      if (!stopped) recordChunk();
+  const flushPcm = () => {
+    if (stopped || !pcmSampleCount) return;
+    const captured = joinPcmChunks(pcmChunks, pcmSampleCount);
+    pcmChunks = [];
+    pcmSampleCount = 0;
+    if (!context) return;
+    const normalized = normalizeReadingAudio(resampleReadingAudio(captured, context.sampleRate, 16_000));
+    const id = ++sharedRequestId;
+    options.onDebug?.(`PCM batch #${id} (${(normalized.audio.length / 16_000).toFixed(2)}s); RMS=${normalized.rms.toFixed(4)}, peak=${normalized.peak.toFixed(3)}, gain=${normalized.gain.toFixed(1)}x.`);
+    if (!normalized.usable) {
+      options.onDebug?.(`PCM batch #${id} is quiet; skipped before Whisper.`);
+      return;
+    }
+    options.onDebug?.(`Sending speech batch #${id} to worker.`);
+    worker.postMessage({ id, audio: normalized.audio }, [normalized.audio.buffer]);
+  };
+
+  let captureStarted = false;
+  const startCapture = async () => {
+    if (captureStarted || stopped || !stream.active) return;
+    captureStarted = true;
+    context = new AudioContext();
+    if (!context.audioWorklet) throw new Error('AudioWorklet is unavailable.');
+    await context.audioWorklet.addModule('/reading-audio-processor.js');
+    if (stopped) return;
+    source = context.createMediaStreamSource(stream);
+    processor = new AudioWorkletNode(context, 'reading-audio-processor');
+    silentOutput = context.createGain();
+    silentOutput.gain.value = 0;
+    processor.port.onmessage = (event: MessageEvent<Float32Array>) => {
+      if (stopped || !(event.data instanceof Float32Array)) return;
+      pcmChunks.push(event.data);
+      pcmSampleCount += event.data.length;
     };
-    recorder.start();
-    timer = window.setTimeout(() => recorder?.state === 'recording' && recorder.stop(), chunkDurationMs);
+    source.connect(processor).connect(silentOutput).connect(context.destination);
+    if (context.state === 'suspended') await context.resume();
+    const chunkDurationMs = options.chunkDurationMs ?? localReadingChunkDurationMs;
+    options.onDebug?.(`Continuous PCM capture ready; checking speech every ${(chunkDurationMs / 1_000).toFixed(1)}s.`);
+    timer = window.setInterval(flushPcm, chunkDurationMs);
   };
   return {
     stop() {
       stopped = true;
-      window.clearTimeout(timer);
-      if (recorder?.state === 'recording') recorder.stop();
+      window.clearInterval(timer);
+      processor && (processor.port.onmessage = null);
+      processor?.disconnect();
+      source?.disconnect();
+      silentOutput?.disconnect();
+      void context?.close();
+      context = null;
+      pcmChunks = [];
+      pcmSampleCount = 0;
       // Keep the worker and its model alive between Pause/Start taps. Loading
       // Whisper is the slow part on iPad; destroying it here made every retry
       // begin the same long model initialization again.
@@ -135,21 +155,26 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
   };
 }
 
-async function decodeAudio(blob: Blob): Promise<Float32Array> {
-  const context = new AudioContext();
-  try {
-    const decoded = await context.decodeAudioData(await blob.arrayBuffer());
-    const outputLength = Math.ceil(decoded.duration * 16_000);
-    const offline = new OfflineAudioContext(1, outputLength, 16_000);
-    const source = offline.createBufferSource();
-    source.buffer = decoded;
-    source.connect(offline.destination);
-    source.start();
-    const rendered = await offline.startRendering();
-    return new Float32Array(rendered.getChannelData(0));
-  } finally {
-    await context.close();
+export function resampleReadingAudio(input: Float32Array, sourceRate: number, targetRate: number): Float32Array {
+  if (!input.length || sourceRate <= 0 || targetRate <= 0) return new Float32Array();
+  if (sourceRate === targetRate) return input.slice();
+  const output = new Float32Array(Math.max(1, Math.floor(input.length * targetRate / sourceRate)));
+  const ratio = sourceRate / targetRate;
+  for (let index = 0; index < output.length; index += 1) {
+    const position = index * ratio;
+    const left = Math.floor(position);
+    const right = Math.min(input.length - 1, left + 1);
+    const fraction = position - left;
+    output[index] = (input[left] ?? 0) * (1 - fraction) + (input[right] ?? 0) * fraction;
   }
+  return output;
+}
+
+function joinPcmChunks(chunks: readonly Float32Array[], sampleCount: number): Float32Array {
+  const output = new Float32Array(sampleCount);
+  let offset = 0;
+  chunks.forEach((chunk) => { output.set(chunk, offset); offset += chunk.length; });
+  return output;
 }
 
 export function normalizeReadingAudio(input: Float32Array): NormalizedReadingAudio {

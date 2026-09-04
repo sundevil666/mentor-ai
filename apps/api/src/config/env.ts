@@ -47,6 +47,4 @@ export const config = {
     .filter(Boolean),
   googleSessionSecret: process.env.GOOGLE_SESSION_SECRET,
   googleTranslateApiKey: process.env.GOOGLE_TRANSLATE_API_KEY,
-  cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
-  cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
 };

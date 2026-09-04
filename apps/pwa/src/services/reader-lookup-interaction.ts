@@ -1,19 +1,18 @@
 export interface ReaderLookupInteractionOptions {
   revealSelection: () => void;
-  pauseListening?: () => void;
+  suppressListening?: () => void;
   pronounce?: () => void;
   lookup: () => Promise<void>;
 }
 
-/** Start user-visible work before the comparatively expensive capture cleanup. */
+/** Start user-visible work first; listening is gated without tearing capture down. */
 export function beginReaderLookupInteraction(options: ReaderLookupInteractionOptions): Promise<void> {
   options.revealSelection();
+  options.suppressListening?.();
   options.pronounce?.();
-  const lookup = options.lookup();
-  options.pauseListening?.();
-  return lookup;
+  return options.lookup();
 }
 
-export function shouldProcessLateReadingTranscript(lookupInProgress: boolean): boolean {
-  return !lookupInProgress;
+export function shouldProcessReadingTranscript(listeningSuppressed: boolean): boolean {
+  return !listeningSuppressed;
 }
