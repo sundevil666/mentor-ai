@@ -1258,13 +1258,13 @@ async function startReadingSpeech() {
       onInterim: (transcript) => {
         updateReadingSpeechPace(transcript);
         appendReadingSpeechDebug(`Interim text: "${transcript}"`);
-        if (!shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
+        if (!readingSpeechRecognition || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
         const previewWordIndexes = previewBrowserReadingWordIndexes(readerReferenceWords.value, transcript, readingSpeechAnchor);
-        if (previewWordIndexes.length) provisionalReaderWordIndexes.value = new Set(previewWordIndexes);
+        provisionalReaderWordIndexes.value = new Set(previewWordIndexes);
       },
       onFinal: (transcript) => {
         provisionalReaderWordIndexes.value = new Set();
-        if (!shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
+        if (!readingSpeechRecognition || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
         handleReadingSpeechTranscript(transcript, 'browser');
       },
       onListeningChange: (listening) => {

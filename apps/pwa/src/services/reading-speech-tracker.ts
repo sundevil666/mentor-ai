@@ -120,20 +120,27 @@ export function matchReadingSpeechAtAnchor(referenceWords: readonly string[], tr
 }
 
 export function previewBrowserReadingWordIndexes(referenceWords: readonly string[], transcript: string, anchorIndex: number): number[] {
+  const spokenWords = tokenizeReadingSpeech(transcript);
   const match = alignReadingSpeech(referenceWords, transcript, anchorIndex, {
     maxForwardWords: 360,
-    minCoverage: 0.5,
     minMatchedWords: 2,
     minSpokenWords: 2,
   });
   if (!match.accepted) return [];
-  const firstIndex = match.matchedWordIndexes[0];
-  const lastIndex = match.matchedWordIndexes.at(-1);
-  if (firstIndex === undefined || lastIndex === undefined) return [];
+  const firstIndex = match.matchedWordIndexes[0]!;
+  const lastIndex = match.matchedWordIndexes.at(-1)!;
+  if (lastIndex - firstIndex + 1 > spokenWords.length * 2 + 8) return [];
   // Interim browser transcripts are rewritten continuously and commonly omit
-  // small words. Paint the coherent recognized span so the live highlight does
-  // not visibly flicker or leave holes; only final results are persisted.
-  return Array.from({ length: lastIndex - firstIndex + 1 }, (_, offset) => firstIndex + offset);
+  // an article or preposition. Bridge only one missing book word; filling the
+  // complete first-to-last span can paint unread sentences when common words
+  // happen to match across a paragraph.
+  const preview = new Set(match.matchedWordIndexes);
+  for (let index = 1; index < match.matchedWordIndexes.length; index += 1) {
+    const previous = match.matchedWordIndexes[index - 1]!;
+    const current = match.matchedWordIndexes[index]!;
+    if (current - previous === 2) preview.add(previous + 1);
+  }
+  return [...preview].sort((left, right) => left - right);
 }
 
 export function boundTabletReadingProgress(matchedWordIndexes: readonly number[], anchorIndex: number, spokenWordCount: number): number[] {

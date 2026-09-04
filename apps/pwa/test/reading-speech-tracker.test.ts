@@ -56,6 +56,25 @@ describe('reading speech tracking', () => {
     assert.deepEqual(preview, [4, 5, 6, 7, 8, 9, 10, 11]);
   });
 
+  it('does not fill unread text between distant interim matches', () => {
+    const paragraph = tokenizeReadingSpeech([
+      'Camila exits through the front door',
+      ...Array.from({ length: 90 }, (_, index) => `unread${index}`),
+      'the key is hidden by the desk',
+    ].join(' '));
+
+    assert.deepEqual(
+      previewBrowserReadingWordIndexes(paragraph, 'Camila exits through the front door the key is hidden by the desk', 0),
+      [],
+    );
+  });
+
+  it('bridges only one small word omitted by an interim transcript', () => {
+    const phrase = tokenizeReadingSpeech('Graham disappears back into the quiet kitchen');
+
+    assert.deepEqual(previewBrowserReadingWordIndexes(phrase, 'Graham disappears back into quiet kitchen', 0), [0, 1, 2, 3, 4, 5, 6]);
+  });
+
   it('does not preview unrelated or one-word interim browser noise', () => {
     assert.deepEqual(previewBrowserReadingWordIndexes(reference, 'television kitchen noise', 0), []);
     assert.deepEqual(previewBrowserReadingWordIndexes(reference, 'Alice', 0), []);
