@@ -1,29 +1,88 @@
+const numberWords: Record<string, string> = {
+  '0': 'zero',
+  '1': 'one',
+  '2': 'two',
+  '3': 'three',
+  '4': 'four',
+  '5': 'five',
+  '6': 'six',
+  '7': 'seven',
+  '8': 'eight',
+  '9': 'nine',
+  '10': 'ten',
+  '11': 'eleven',
+  '12': 'twelve',
+  '13': 'thirteen',
+  '14': 'fourteen',
+  '15': 'fifteen',
+  '16': 'sixteen',
+  '17': 'seventeen',
+  '18': 'eighteen',
+  '19': 'nineteen',
+  '20': 'twenty',
+};
+
+function normalizeWord(word: string): string {
+  const normalized = word.toLocaleLowerCase('en');
+  return numberWords[normalized] ?? normalized;
+}
+
 function words(text: string): string[] {
-  const numberWords: Record<string, string> = {
-    '0': 'zero',
-    '1': 'one',
-    '2': 'two',
-    '3': 'three',
-    '4': 'four',
-    '5': 'five',
-    '6': 'six',
-    '7': 'seven',
-    '8': 'eight',
-    '9': 'nine',
-    '10': 'ten',
-    '11': 'eleven',
-    '12': 'twelve',
-    '13': 'thirteen',
-    '14': 'fourteen',
-    '15': 'fifteen',
-    '16': 'sixteen',
-    '17': 'seventeen',
-    '18': 'eighteen',
-    '19': 'nineteen',
-    '20': 'twenty',
-  };
   return (text.toLocaleLowerCase('en').match(/[a-z]+(?:'[a-z]+)?|\d+/g) ?? [])
-    .map((word) => numberWords[word] ?? word);
+    .map(normalizeWord);
+}
+
+export interface DialogueExpectedSegment {
+  text: string;
+  matched: boolean | null;
+}
+
+export function getDialogueExpectedSegments(transcript: string, expected: string): DialogueExpectedSegment[] {
+  const expectedMatches = [...expected.matchAll(/[a-z]+(?:'[a-z]+)?|\d+/gi)];
+  if (!expectedMatches.length) return expected ? [{ text: expected, matched: null }] : [];
+
+  const target = expectedMatches.map((match) => normalizeWord(match[0]));
+  const heard = words(transcript);
+  const matchedTargetIndexes = findOrderedMatches(target, heard);
+  const segments: DialogueExpectedSegment[] = [];
+  let cursor = 0;
+
+  expectedMatches.forEach((match, index) => {
+    const start = match.index ?? cursor;
+    if (start > cursor) segments.push({ text: expected.slice(cursor, start), matched: null });
+    segments.push({ text: match[0], matched: matchedTargetIndexes.has(index) });
+    cursor = start + match[0].length;
+  });
+
+  if (cursor < expected.length) segments.push({ text: expected.slice(cursor), matched: null });
+  return segments;
+}
+
+function findOrderedMatches(target: string[], heard: string[]): Set<number> {
+  const lengths = Array.from({ length: target.length + 1 }, () => Array<number>(heard.length + 1).fill(0));
+  for (let targetIndex = target.length - 1; targetIndex >= 0; targetIndex -= 1) {
+    for (let heardIndex = heard.length - 1; heardIndex >= 0; heardIndex -= 1) {
+      lengths[targetIndex][heardIndex] = target[targetIndex] === heard[heardIndex]
+        ? 1 + (lengths[targetIndex + 1]?.[heardIndex + 1] ?? 0)
+        : Math.max(lengths[targetIndex + 1]?.[heardIndex] ?? 0, lengths[targetIndex]?.[heardIndex + 1] ?? 0);
+    }
+  }
+
+  const matches = new Set<number>();
+  let targetIndex = 0;
+  let heardIndex = 0;
+  while (targetIndex < target.length && heardIndex < heard.length) {
+    if (target[targetIndex] === heard[heardIndex]) {
+      matches.add(targetIndex);
+      targetIndex += 1;
+      heardIndex += 1;
+    } else if ((lengths[targetIndex + 1]?.[heardIndex] ?? 0) >= (lengths[targetIndex]?.[heardIndex + 1] ?? 0)) {
+      targetIndex += 1;
+    } else {
+      heardIndex += 1;
+    }
+  }
+  return matches;
 }
 
 export function dialogueAnswerCoverage(transcript: string, expected: string): number {

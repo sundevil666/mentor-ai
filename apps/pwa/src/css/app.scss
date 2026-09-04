@@ -838,6 +838,13 @@ body .q-menu {
   line-height: 1.35;
 }
 
+.dialogue-drill__matched-word {
+  background: color-mix(in srgb, var(--q-positive) 30%, transparent);
+  border-radius: 4px;
+  color: inherit;
+  padding: 1px 2px;
+}
+
 .dialogue-drill__recorder {
   align-items: center;
   background: var(--app-surface-soft);

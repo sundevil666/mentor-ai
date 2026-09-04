@@ -282,7 +282,12 @@
 
               <div v-if="currentExercise.audioText" class="dialogue-drill__native">
                 <span>Native answer</span>
-                <strong>{{ currentExercise.audioText }}</strong>
+                <strong>
+                  <template v-for="(segment, index) in dialogueExpectedSegments" :key="`${index}:${segment.text}`">
+                    <mark v-if="segment.matched" class="dialogue-drill__matched-word">{{ segment.text }}</mark>
+                    <template v-else>{{ segment.text }}</template>
+                  </template>
+                </strong>
               </div>
 
               <div
@@ -734,6 +739,7 @@ import {
 } from 'src/services/local-reading-transcriber';
 import {
   chooseBestDialogueTranscript,
+  getDialogueExpectedSegments,
   isConfidentDialogueAnswer,
 } from 'src/services/dialogue-speech';
 import {
@@ -922,6 +928,10 @@ const isListeningPlayer = computed(() => {
 const isDialogueTranslationExercise = computed(
   () => currentExercise.value?.type === 'dialogue-translation',
 );
+const dialogueExpectedSegments = computed(() => getDialogueExpectedSegments(
+  speechRecognitionCaptured.value ? answer.value : '',
+  currentExercise.value?.audioText ?? '',
+));
 const isRepeatedLesson = computed(() => canFinishRepeatedLesson(
   appStore.session?.lesson.lessonTemplateKey,
   lessonCompletionCounts.value,
@@ -1620,8 +1630,11 @@ async function submit() {
     answer.value = currentExercise.value?.expectedResponse?.trim() ?? 'completed';
   }
 
+  const submittedAnswer = isDialogueTranslationExercise.value && dialogueAnswerStatus.value === 'correct'
+    ? currentExercise.value?.expectedResponse?.trim() ?? answer.value
+    : answer.value;
   setForwardTransition();
-  await appStore.submitCurrentExercise(answer.value);
+  await appStore.submitCurrentExercise(submittedAnswer);
 }
 
 async function completeListeningExercise() {
@@ -1715,7 +1728,7 @@ function applyDialogueTranscript(transcript: string, recognitionRunId: number) {
   const expected = currentExercise.value?.audioText ?? '';
   const bestTranscript = chooseBestDialogueTranscript(answer.value, transcript, expected);
   const matchesExpected = isConfidentDialogueAnswer(bestTranscript, expected);
-  answer.value = matchesExpected ? expected.trim() : bestTranscript;
+  answer.value = bestTranscript;
   speechRecognitionCaptured.value = true;
   dialogueAnswerStatus.value = matchesExpected ? 'correct' : 'incorrect';
   if (matchesExpected) stopDialogueSpeechRecording();

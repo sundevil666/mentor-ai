@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   chooseBestDialogueTranscript,
   dialogueAnswerCoverage,
+  getDialogueExpectedSegments,
   isConfidentDialogueAnswer,
 } from '../src/services/dialogue-speech.js';
 
@@ -32,5 +33,33 @@ describe('dialogue speech recognition', () => {
       chooseBestDialogueTranscript('What time start', 'What time do you start work today', 'What time do you start work today?'),
       'What time do you start work today',
     );
+  });
+
+  it('marks the correctly recognized expected words in order', () => {
+    const segments = getDialogueExpectedSegments(
+      'I ran Pavel near the station morning',
+      'I ran into Pavel near the station this morning.',
+    );
+    const wordSegments = segments.filter((segment) => segment.matched !== null);
+
+    assert.deepEqual(
+      wordSegments.map((segment) => [segment.text, segment.matched]),
+      [
+        ['I', true],
+        ['ran', true],
+        ['into', false],
+        ['Pavel', true],
+        ['near', true],
+        ['the', true],
+        ['station', true],
+        ['this', false],
+        ['morning', true],
+      ],
+    );
+  });
+
+  it('uses the same number normalization for highlighting and assessment', () => {
+    const segments = getDialogueExpectedSegments('I start at 7', 'I start at seven');
+    assert.equal(segments.filter((segment) => segment.matched === true).length, 4);
   });
 });
