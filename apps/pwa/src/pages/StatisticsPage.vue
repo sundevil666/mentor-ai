@@ -158,20 +158,25 @@ onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();
   }
-  if (appStore.isOnline) {
-    await appStore.refreshRemoteLearningState();
-    activityTotals.value = await syncLearningActivity().catch(() => loadLearningActivityTotals());
-  } else {
-    await refreshActivityTotals();
-  }
+  await refreshActivityTotals();
+  if (appStore.isOnline) void refreshFromServer();
+  window.addEventListener('online', refreshFromServer);
   window.addEventListener('mentor-learning-activity-updated', refreshActivityTotals);
 });
 
-onBeforeUnmount(() => window.removeEventListener('mentor-learning-activity-updated', refreshActivityTotals));
+onBeforeUnmount(() => {
+  window.removeEventListener('online', refreshFromServer);
+  window.removeEventListener('mentor-learning-activity-updated', refreshActivityTotals);
+});
 
 async function sync() {
+  await refreshFromServer();
+}
+
+async function refreshFromServer() {
+  if (!navigator.onLine) return;
   await appStore.refreshRemoteLearningState();
-  activityTotals.value = await syncLearningActivity();
+  activityTotals.value = await syncLearningActivity().catch(() => loadLearningActivityTotals());
 }
 
 async function refreshActivityTotals() { activityTotals.value = await loadLearningActivityTotals(); }
