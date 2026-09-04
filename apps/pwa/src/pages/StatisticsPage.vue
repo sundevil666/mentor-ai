@@ -6,15 +6,6 @@
           <p>Learning data</p>
           <h1>Statistics</h1>
         </div>
-        <q-btn
-          color="primary"
-          outline
-          icon="restart_alt"
-          round
-          @click="reset"
-        >
-          <q-tooltip>Reset local learning</q-tooltip>
-        </q-btn>
       </header>
 
       <section class="learning-overview">
@@ -36,15 +27,19 @@
         </div>
         <div class="metric-tile">
           <span>Lessons</span>
-          <strong>{{ appStore.completedLessonsCount }}</strong>
+          <strong>{{ serverSummary.lessons }}</strong>
         </div>
         <div class="metric-tile">
-          <span>Accuracy</span>
-          <strong>{{ latestAccuracy }}</strong>
+          <span>Words spoken</span>
+          <strong>{{ serverSummary.spokenWords.toLocaleString() }}</strong>
         </div>
         <div class="metric-tile">
-          <span>Current progress</span>
-          <strong>{{ appStore.lessonProgress }}%</strong>
+          <span>Average accuracy</span>
+          <strong>{{ averageAccuracy }}</strong>
+        </div>
+        <div class="metric-tile">
+          <span>Practice days</span>
+          <strong>{{ serverSummary.practiceDays }}</strong>
         </div>
       </section>
 
@@ -87,7 +82,8 @@
           </div>
           <p>{{ syncDetail }}</p>
           <p v-if="appStore.latestStatistics">
-            Last lesson: {{ latestAccuracy }} accuracy, {{ appStore.latestStatistics.completedExercises }} exercises.
+            Last lesson: {{ latestAccuracy }} accuracy, {{ appStore.latestStatistics.completedExercises }} exercises,
+            {{ formatDisplayDate(appStore.latestStatistics.createdAt) }}.
           </p>
           <p v-if="pronunciationSummary">
             {{ pronunciationSummary }}
@@ -108,10 +104,25 @@ import type { LearningActivityTotals } from '@mentor-ai/shared';
 const appStore = useAppStore();
 const activityTotals = ref<LearningActivityTotals>({ listeningSeconds: 0, readingSeconds: 0, speakingSeconds: 0, totalSeconds: 0, updatedAt: null });
 
+const serverSummary = computed(() => {
+  const snapshots = appStore.statisticsSnapshots;
+  return {
+    lessons: snapshots.length,
+    spokenWords: snapshots.reduce((sum, snapshot) => sum + Math.max(0, snapshot.spokenWords ?? 0), 0),
+    practiceDays: new Set(snapshots.map((snapshot) => snapshot.createdAt.slice(0, 10))).size,
+    averageAccuracy: snapshots.length
+      ? snapshots.reduce((sum, snapshot) => sum + snapshot.accuracy, 0) / snapshots.length
+      : null,
+  };
+});
+
 const latestAccuracy = computed(() => {
   const accuracy = appStore.latestStatistics?.accuracy;
   return accuracy === undefined ? '0%' : `${Math.round(accuracy * 100)}%`;
 });
+const averageAccuracy = computed(() => serverSummary.value.averageAccuracy === null
+  ? '—'
+  : `${Math.round(serverSummary.value.averageAccuracy * 100)}%`);
 const skillRows = computed(() => [
   { label: 'Vocabulary', value: appStore.studentModel.vocabulary.score.value },
   { label: 'Grammar', value: appStore.studentModel.grammar.score.value },
@@ -147,15 +158,19 @@ onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();
   }
-  await refreshActivityTotals();
-  void syncLearningActivity().then((totals) => { activityTotals.value = totals; }).catch(() => undefined);
+  if (appStore.isOnline) {
+    await appStore.refreshRemoteLearningState();
+    activityTotals.value = await syncLearningActivity().catch(() => loadLearningActivityTotals());
+  } else {
+    await refreshActivityTotals();
+  }
   window.addEventListener('mentor-learning-activity-updated', refreshActivityTotals);
 });
 
 onBeforeUnmount(() => window.removeEventListener('mentor-learning-activity-updated', refreshActivityTotals));
 
 async function sync() {
-  await appStore.syncPendingEvents();
+  await appStore.refreshRemoteLearningState();
   activityTotals.value = await syncLearningActivity();
 }
 
@@ -169,7 +184,4 @@ function formatDuration(seconds: number) {
   return remainder ? `${hours} h ${remainder} min` : `${hours} h`;
 }
 
-async function reset() {
-  await appStore.resetLocalLearning();
-}
 </script>
