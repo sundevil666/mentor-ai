@@ -1888,6 +1888,8 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
 
 .videos-header--book-detail {
   min-width: 0;
+  position: static;
+  top: auto;
 }
 
 .videos-header--book-detail > div {
