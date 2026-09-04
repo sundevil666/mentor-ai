@@ -56,6 +56,7 @@ import {
 } from 'src/services/user-preferences';
 import { formatDisplayDate } from 'src/services/date-format';
 import { saveContentProgress } from 'src/services/content-progress';
+import { recordLearningActivity } from 'src/services/learning-activity';
 import {
   fetchMyShiftActivity,
   isMyShiftConnected,
@@ -961,6 +962,15 @@ export const useAppStore = defineStore('app', {
 
       const db = await mentorDb;
       await db.put('statistics', toStorageRecord({ ...snapshot, userId: this.studentId }));
+      if (activeSeconds > 0 && (sourceSession.context.mode === 'listening' || sourceSession.context.mode === 'speaking')) {
+        await recordLearningActivity({
+          studentId: this.studentId,
+          kind: sourceSession.context.mode,
+          contentId: sourceSession.lesson.id,
+          activeSeconds,
+          endedAt: createdAt,
+        });
+      }
       await db.put('concept-evidence', toStorageRecord({
         id: `concept-${sourceSession.id}-${createdAt}`,
         studentId: this.studentId,

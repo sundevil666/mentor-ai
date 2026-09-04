@@ -4,6 +4,24 @@ import { describe, it } from 'node:test';
 import { learningStateService } from '../dist/services/learning-state.service.js';
 
 describe('learning state service', () => {
+  it('deduplicates device activity and returns combined account totals', async () => {
+    const stamp = Date.now();
+    const listening = {
+      id: `activity-listening-${stamp}`, studentId: 'demo-student', kind: 'listening', contentId: 'audio-1',
+      activeSeconds: 60, sourceDeviceId: 'phone', startedAt: '2026-09-04T08:00:00.000Z', endedAt: '2026-09-04T08:01:00.000Z',
+    };
+    const reading = {
+      id: `activity-reading-${stamp}`, studentId: 'demo-student', kind: 'reading', contentId: 'book-1',
+      activeSeconds: 45, sourceDeviceId: 'tablet', startedAt: '2026-09-04T08:02:00.000Z', endedAt: '2026-09-04T08:02:45.000Z',
+    };
+    const first = await learningStateService.mergeLearningActivityEvents([listening, reading]);
+    const retry = await learningStateService.mergeLearningActivityEvents([listening]);
+    assert.deepEqual(first.acknowledgedIds, [listening.id, reading.id]);
+    assert.equal(retry.totals.listeningSeconds >= 60, true);
+    assert.equal(retry.totals.readingSeconds >= 45, true);
+    assert.equal(retry.totals.totalSeconds, retry.totals.listeningSeconds + retry.totals.readingSeconds + retry.totals.speakingSeconds);
+  });
+
   it('deduplicates valid application telemetry and rejects another student data', async () => {
     const stamp = Date.now();
     const valid = {

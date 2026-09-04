@@ -71,6 +71,7 @@ import {
 } from 'src/services/app-update';
 import { useAppStore } from 'src/stores/app-store';
 import { syncAllContentProgress } from 'src/services/content-progress';
+import { syncLearningActivity } from 'src/services/learning-activity';
 
 const appStore = useAppStore();
 const router = useRouter();
@@ -116,6 +117,7 @@ onUnmounted(() => {
 
 function handleContentProgressSync() {
   void syncAllContentProgress().catch(() => undefined);
+  void syncLearningActivity().catch(() => undefined);
 }
 
 function handleOnline() { appStore.setNetworkStatus(true); }
@@ -374,8 +376,12 @@ function removeUpdateReloadParameters() {
 
 function startRemoteSyncPolling() {
   void refreshRemoteProgress(false);
+  void syncLearningActivity().catch(() => undefined);
   remoteSyncPollingTimer = window.setInterval(() => {
-    if (document.visibilityState === 'visible' && navigator.onLine) void refreshRemoteProgress(true);
+    if (document.visibilityState === 'visible' && navigator.onLine) {
+      void refreshRemoteProgress(true);
+      void syncLearningActivity().catch(() => undefined);
+    }
   }, 30000);
 }
 
@@ -390,6 +396,7 @@ function handleVisibilitySync() {
   if (document.visibilityState === 'visible') {
     void appStore.refreshMyShiftActivity(false);
     void refreshRemoteProgress(true);
+    void syncLearningActivity().catch(() => undefined);
   } else if (activatedBackgroundManifest) {
     reloadWithBackgroundUpdate(route.fullPath);
   }

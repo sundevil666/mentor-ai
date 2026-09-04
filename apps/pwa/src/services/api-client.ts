@@ -6,6 +6,8 @@ import type {
   ExerciseResult,
   GeneratedLesson,
   LearningContext,
+  LearningActivityEvent,
+  LearningActivitySyncResult,
   LearningSessionHandoff,
   LearningEvent,
   PersonalReadingBookArchive,
@@ -193,7 +195,7 @@ export async function upsertSessionHandoff(handoff: LearningSessionHandoff): Pro
 }
 
 export async function synchronizeContentProgress(progress: ContentProgress[]): Promise<ContentProgress[]> {
-  const response = await fetch(`${apiBaseUrl}/api/synchronization`, {
+  const response = await fetch(`${apiBaseUrl}/api/content-progress-synchronize`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ progress }),
@@ -205,13 +207,25 @@ export async function synchronizeContentProgress(progress: ContentProgress[]): P
 export async function synchronizeContentEngagement(
   engagementEvents: ContentEngagementEvent[],
 ): Promise<ContentEngagementEvent[]> {
-  const response = await fetch(`${apiBaseUrl}/api/synchronization`, {
+  const response = await fetch(`${apiBaseUrl}/api/content-engagement-synchronize`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ engagementEvents }),
   });
   if (!response.ok) throw new Error('Content engagement synchronization failed.');
   return ((await response.json()) as ApiResponse<ContentEngagementEvent[]>).data;
+}
+
+export async function synchronizeLearningActivity(
+  activityEvents: LearningActivityEvent[],
+): Promise<LearningActivitySyncResult> {
+  const response = await fetch(`${apiBaseUrl}/api/learning-activity-synchronize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ activityEvents }),
+  });
+  if (!response.ok) throw new Error('Learning activity synchronization failed.');
+  return ((await response.json()) as ApiResponse<LearningActivitySyncResult>).data;
 }
 
 export async function synchronizeApplicationTelemetry(

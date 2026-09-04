@@ -10,10 +10,13 @@ import {
   type ContentEngagementEvent,
   type LearningContext,
   type LearningEvent,
+  type LearningActivityEvent,
+  type LearningActivityTotals,
   type PersonalReadingBookArchive,
   type ReaderVocabularyItem,
   type ReadingTranscriptChunk,
   type SpeechResult,
+  type StatisticsSnapshot,
   type SyncStatus,
   type StudentModel,
   type SynchronizationAcknowledgement,
@@ -110,6 +113,29 @@ export const learningStateService = {
     const contentEngagementEvents = [...merged.values()].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
     await learningStateRepository.write({ ...state, contentEngagementEvents }, user);
     return contentEngagementEvents.filter((event) => event.studentId === state.student.id);
+  },
+
+  async mergeLearningActivityEvents(incoming: LearningActivityEvent[], user?: AuthenticatedUser) {
+    const state = await learningStateRepository.read(user);
+    const merged = new Map(state.learningActivityEvents.map((event) => [event.id, event]));
+    const learningActivityTotals = { ...state.learningActivityTotals };
+    const acknowledgedIds: string[] = [];
+    for (const candidate of incoming) {
+      const safe = sanitizeLearningActivityEvent(candidate, state.student.id);
+      if (!safe) continue;
+      acknowledgedIds.push(safe.id);
+      if (!merged.has(safe.id)) {
+        merged.set(safe.id, safe);
+        learningActivityTotals[`${safe.kind}Seconds`] += safe.activeSeconds;
+        learningActivityTotals.totalSeconds += safe.activeSeconds;
+        if (!learningActivityTotals.updatedAt || safe.endedAt > learningActivityTotals.updatedAt) learningActivityTotals.updatedAt = safe.endedAt;
+      }
+    }
+    const learningActivityEvents = [...merged.values()]
+      .sort((left, right) => left.endedAt.localeCompare(right.endedAt))
+      .slice(-50_000);
+    await learningStateRepository.write({ ...state, learningActivityEvents, learningActivityTotals }, user);
+    return { acknowledgedIds, totals: summarizeLearningActivity(learningActivityTotals, state.contentProgress, state.statisticsSnapshots) };
   },
 
   async mergeApplicationTelemetryEvents(incoming: ApplicationTelemetryEvent[], user?: AuthenticatedUser) {
@@ -329,6 +355,39 @@ export const learningStateService = {
     };
   },
 };
+
+function sanitizeLearningActivityEvent(candidate: LearningActivityEvent, studentId: string): LearningActivityEvent | null {
+  if (!candidate || candidate.studentId !== studentId || typeof candidate.id !== 'string'
+    || !['listening', 'reading', 'speaking'].includes(candidate.kind)
+    || typeof candidate.contentId !== 'string' || candidate.contentId.length === 0
+    || !Number.isFinite(candidate.activeSeconds) || candidate.activeSeconds < 1 || candidate.activeSeconds > 60
+    || Number.isNaN(Date.parse(candidate.startedAt)) || Number.isNaN(Date.parse(candidate.endedAt))
+    || typeof candidate.sourceDeviceId !== 'string') return null;
+  return { ...candidate, activeSeconds: Math.round(candidate.activeSeconds) };
+}
+
+function summarizeLearningActivity(
+  activityTotals: LearningActivityTotals,
+  progress: ContentProgress[],
+  statisticsSnapshots: StatisticsSnapshot[],
+): LearningActivityTotals {
+  const totals = { ...activityTotals };
+
+  // Existing synchronized resume progress provides a conservative one-time
+  // baseline for activity completed before active-time tracking was released.
+  const listeningBaseline = progress.filter((item) => item.category === 'audio')
+    .reduce((sum, item) => sum + Math.max(0, item.furthestPosition), 0);
+  const readingWords = progress.filter((item) => item.category === 'reading')
+    .reduce((sum, item) => sum + Math.max(0, item.furthestPosition), 0);
+  const lessonListeningBaseline = statisticsSnapshots.reduce((sum, snapshot) => sum + Math.max(0, snapshot.listeningSeconds ?? 0), 0);
+  const lessonSpeakingBaseline = statisticsSnapshots.filter((snapshot) => snapshot.learningMode === 'speaking')
+    .reduce((sum, snapshot) => sum + Math.max(0, snapshot.activeSeconds ?? 0), 0);
+  totals.listeningSeconds = Math.max(totals.listeningSeconds, Math.round(listeningBaseline + lessonListeningBaseline));
+  totals.readingSeconds = Math.max(totals.readingSeconds, Math.round(readingWords / 200 * 60));
+  totals.speakingSeconds = Math.max(totals.speakingSeconds, Math.round(lessonSpeakingBaseline));
+  totals.totalSeconds = totals.listeningSeconds + totals.readingSeconds + totals.speakingSeconds;
+  return totals;
+}
 
 function isLessonSuitableForContext(lesson: GeneratedLesson, context: LearningContext): boolean {
   if (context.lessonTemplateKey && lesson.lessonTemplateKey !== context.lessonTemplateKey) {

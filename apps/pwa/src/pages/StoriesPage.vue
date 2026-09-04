@@ -479,6 +479,7 @@ import { canUseCloudReadingTranscription, startCloudReadingTranscriber, type Clo
 import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
 import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, type ReaderSwipePoint } from 'src/services/reader-swipe';
 import { beginReaderLookupInteraction, shouldProcessLateReadingTranscript } from 'src/services/reader-lookup-interaction';
+import { ActiveLearningTimer } from 'src/services/learning-activity';
 
 const props = withDefaults(defineProps<{
   libraryMode?: 'audio' | 'reading';
@@ -487,6 +488,8 @@ const props = withDefaults(defineProps<{
 });
 
 const appStore = useAppStore();
+const listeningActivityTimer = new ActiveLearningTimer({ studentId: () => appStore.studentId, kind: 'listening', contentId: () => selectedStoryId.value ?? 'story' });
+const readingActivityTimer = new ActiveLearningTimer({ studentId: () => appStore.studentId, kind: 'reading', contentId: () => selectedBook.value?.id ?? 'book' });
 type ReadingCategory = 'fiction';
 const activeReadingCategory = ref<ReadingCategory>('fiction');
 const isAudioLibrary = computed(() => props.libraryMode === 'audio');
@@ -710,6 +713,8 @@ onMounted(async () => {
   }
 });
 onUnmounted(() => {
+  void listeningActivityTimer.stop();
+  void readingActivityTimer.stop();
   personalBookSyncControl.visible = false;
   personalBookSyncControl.trigger = null;
   persistProgress();
@@ -828,8 +833,10 @@ async function openBook(bookId: string) {
   await repaginateReader(readBookProgress(loaded.book.id, loaded.pages.length));
   goToSyncedSpokenPosition();
   startReaderPagination();
+  readingActivityTimer.start();
 }
 function closeBook() {
+  void readingActivityTimer.stop();
   persistBookProgress();
   stopReaderPagination();
   applyReadingMode(false);
@@ -858,6 +865,7 @@ function goToBookPage(pageIndex: number | null) {
   scrollToReaderPage();
   persistBookProgress();
   readingSpeechAnchor = getVisibleReaderWordAnchor();
+  void readingActivityTimer.checkpoint();
 }
 function goToBookChapter(pageIndex: number | null) {
   if (pageIndex === null || !Number.isInteger(pageIndex)) return;
@@ -1877,9 +1885,11 @@ function handlePlay() {
   configurePlaybackAudioSession();
   playing.value = true;
   setMediaSessionPlaybackState('playing');
+  listeningActivityTimer.start();
   if (selectedStory.value) void recordEngagement(selectedStory.value.id, 'started');
 }
 function handlePause() {
+  void listeningActivityTimer.stop();
   playing.value = false;
   setMediaSessionPlaybackState('paused');
 }
@@ -1890,6 +1900,7 @@ function handleTimeUpdate() {
   duration.value = Number.isFinite(audio.duration) ? audio.duration : (selectedStory.value?.durationSeconds ?? 0);
   if (Date.now() - lastProgressSave > 5_000) persistProgress();
   updateMediaPosition();
+  void listeningActivityTimer.checkpoint();
 }
 function handleEnded() {
   playing.value = false;
@@ -1938,7 +1949,12 @@ async function recordEngagement(id: string, type: 'started' | 'finished') {
 function engagementLabel(id: string) { const summary = engagementSummaries.value.get(id); return summary ? `${summary.starts} starts · ${summary.finishes} finished` : 'Not started'; }
 function handleVisibilityChange() {
   persistProgress();
-  if (document.visibilityState === 'visible') handleBookSyncWakeup();
+  if (document.visibilityState === 'visible') {
+    handleBookSyncWakeup();
+    if (selectedBook.value) readingActivityTimer.start();
+  } else {
+    void readingActivityTimer.stop();
+  }
 }
 function configureMediaSession() {
   const story = selectedStory.value;

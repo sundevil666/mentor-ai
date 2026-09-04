@@ -127,8 +127,10 @@ import { useAppStore } from 'src/stores/app-store';
 import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 import AppAudioDock from 'src/components/AppAudioDock.vue';
 import AudioLibraryTabs from 'src/components/AudioLibraryTabs.vue';
+import { ActiveLearningTimer } from 'src/services/learning-activity';
 
 const appStore = useAppStore();
+const listeningTimer = new ActiveLearningTimer({ studentId: () => appStore.studentId, kind: 'listening', contentId: () => selectedAudio.value?.id ?? 'audio' });
 const audioElement = ref<HTMLAudioElement | null>(null);
 const selectedAudio = ref<LibraryAudio | null>(null);
 const cachedUrls = ref<Set<string>>(new Set());
@@ -162,6 +164,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  void listeningTimer.stop();
   window.removeEventListener('online', updateOnlineState);
   window.removeEventListener('offline', updateOnlineState);
 });
@@ -188,6 +191,7 @@ async function selectAudio(item: LibraryAudio) {
 }
 
 function closeAudio() {
+  void listeningTimer.stop();
   audioElement.value?.pause();
   selectedAudio.value = null;
   playbackUrl.value = '';
@@ -241,6 +245,7 @@ function saveProgress() {
   duration.value = Number.isFinite(player.duration) ? player.duration : item.durationSeconds;
   localStorage.setItem(`mentor-ai:audio-progress:${item.id}`, String(Math.floor(player.currentTime)));
   observePlaybackCycle(player);
+  void listeningTimer.checkpoint();
   if ('mediaSession' in navigator && Number.isFinite(player.duration) && player.duration > 0) navigator.mediaSession.setPositionState({ duration: player.duration, playbackRate: player.playbackRate, position: Math.min(player.currentTime, player.duration) });
 }
 function readProgress(id: string) { const saved = Number(localStorage.getItem(`mentor-ai:audio-progress:${id}`)); return Number.isFinite(saved) && saved > 0 ? saved : 0; }
@@ -248,6 +253,7 @@ function handlePlay() {
   configurePlaybackAudioSession();
   isPlaying.value = true;
   setMediaSessionPlaybackState('playing');
+  listeningTimer.start();
   if (playbackCycleActive || !selectedAudio.value) return;
   playbackCycleActive = true;
   playbackCycleStart = audioElement.value?.currentTime ?? 0;
@@ -257,6 +263,7 @@ function handlePlay() {
   void recordAudioEngagement('started');
 }
 function handlePause() {
+  void listeningTimer.stop();
   isPlaying.value = false;
   setMediaSessionPlaybackState('paused');
 }

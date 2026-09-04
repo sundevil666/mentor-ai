@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-import { saveReadingTranscript, synchronizeContentProgress, synchronizeLearningEvidence, upsertSessionHandoff } from '../src/services/api-client.js';
+import { saveReadingTranscript, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, upsertSessionHandoff } from '../src/services/api-client.js';
 
 describe('PWA API client', () => {
   beforeEach(() => {
@@ -37,6 +37,20 @@ describe('PWA API client', () => {
     assert.equal(calls[0]?.init?.method, 'POST');
     assert.equal(JSON.parse(String(calls[0]?.init?.body)).events[0].id, 'event-1');
     assert.equal(result.acceptedCount, 1);
+  });
+
+  it('synchronizes active-time chunks and receives account totals', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url: String(url), init });
+      return jsonResponse({ acknowledgedIds: ['activity-1'], totals: { listeningSeconds: 60, readingSeconds: 0, speakingSeconds: 0, totalSeconds: 60, updatedAt: '2026-09-04T08:01:00.000Z' } });
+    };
+    const result = await synchronizeLearningActivity([{
+      id: 'activity-1', studentId: 'demo-student', kind: 'listening', contentId: 'audio-1', activeSeconds: 60,
+      sourceDeviceId: 'phone', startedAt: '2026-09-04T08:00:00.000Z', endedAt: '2026-09-04T08:01:00.000Z',
+    }]);
+    assert.equal(calls[0]?.url, 'http://localhost:4000/api/learning-activity-synchronize');
+    assert.equal(result.totals.listeningSeconds, 60);
   });
 
   it('uses PUT when publishing a session handoff', async () => {
@@ -102,7 +116,7 @@ describe('PWA API client', () => {
 
     const result = await synchronizeContentProgress([]);
 
-    assert.equal(calls[0]?.url, 'http://localhost:4000/api/synchronization');
+    assert.equal(calls[0]?.url, 'http://localhost:4000/api/content-progress-synchronize');
     assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { progress: [] });
     assert.equal(result[0]?.furthestPosition, 120);
   });

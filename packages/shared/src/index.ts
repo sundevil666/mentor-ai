@@ -540,6 +540,34 @@ export interface ContentEngagementEvent {
   createdAt: string;
 }
 
+export type LearningActivityKind = 'listening' | 'reading' | 'speaking';
+
+/** Small append-only chunks of real active practice. Devices keep these in an
+ * outbox while offline and delete them only after the server acknowledges them. */
+export interface LearningActivityEvent {
+  id: string;
+  studentId: string;
+  kind: LearningActivityKind;
+  contentId: string;
+  activeSeconds: number;
+  sourceDeviceId: string;
+  startedAt: string;
+  endedAt: string;
+}
+
+export interface LearningActivityTotals {
+  listeningSeconds: number;
+  readingSeconds: number;
+  speakingSeconds: number;
+  totalSeconds: number;
+  updatedAt: string | null;
+}
+
+export interface LearningActivitySyncResult {
+  acknowledgedIds: string[];
+  totals: LearningActivityTotals;
+}
+
 export type ApplicationTelemetryEventType =
   | 'app-opened'
   | 'route-viewed'

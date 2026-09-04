@@ -11,6 +11,8 @@ import {
   type ExerciseResult,
   type LearningSessionHandoff,
   type LearningEvent,
+  type LearningActivityEvent,
+  type LearningActivityTotals,
   type Observation,
   type PersonalReadingBookArchive,
   type Recommendation,
@@ -48,6 +50,8 @@ interface LearningStateRecord {
   readerVocabularyItems: ReaderVocabularyItem[];
   personalReadingBooks: PersonalReadingBookArchive[];
   readingTranscriptChunks: ReadingTranscriptChunk[];
+  learningActivityEvents: LearningActivityEvent[];
+  learningActivityTotals: LearningActivityTotals;
 }
 
 const demoState: LearningStateRecord = {
@@ -69,6 +73,8 @@ const demoState: LearningStateRecord = {
   readerVocabularyItems: [],
   personalReadingBooks: [],
   readingTranscriptChunks: [],
+  learningActivityEvents: [],
+  learningActivityTotals: { listeningSeconds: 0, readingSeconds: 0, speakingSeconds: 0, totalSeconds: 0, updatedAt: null },
 };
 
 export const learningStateRepository = {
@@ -140,6 +146,8 @@ function normalizeState(state: Partial<LearningStateRecord>, user?: Authenticate
     readerVocabularyItems: state.readerVocabularyItems ?? [],
     personalReadingBooks: state.personalReadingBooks ?? [],
     readingTranscriptChunks: state.readingTranscriptChunks ?? [],
+    learningActivityEvents: state.learningActivityEvents ?? [],
+    learningActivityTotals: state.learningActivityTotals ?? defaultState.learningActivityTotals,
   };
 }
 

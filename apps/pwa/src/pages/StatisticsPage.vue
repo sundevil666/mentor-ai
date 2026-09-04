@@ -19,6 +19,22 @@
 
       <section class="learning-overview">
         <div class="metric-tile">
+          <span>Total practice</span>
+          <strong>{{ formatDuration(activityTotals.totalSeconds) }}</strong>
+        </div>
+        <div class="metric-tile">
+          <span>Listening</span>
+          <strong>{{ formatDuration(activityTotals.listeningSeconds) }}</strong>
+        </div>
+        <div class="metric-tile">
+          <span>Reading</span>
+          <strong>{{ formatDuration(activityTotals.readingSeconds) }}</strong>
+        </div>
+        <div class="metric-tile">
+          <span>Speaking</span>
+          <strong>{{ formatDuration(activityTotals.speakingSeconds) }}</strong>
+        </div>
+        <div class="metric-tile">
           <span>Lessons</span>
           <strong>{{ appStore.completedLessonsCount }}</strong>
         </div>
@@ -63,7 +79,7 @@
               flat
               icon="sync"
               round
-              :disable="appStore.pendingSyncCount === 0 || !appStore.isOnline"
+              :disable="!appStore.isOnline"
               @click="sync"
             >
               <q-tooltip>Sync learning evidence</q-tooltip>
@@ -83,11 +99,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useAppStore } from 'src/stores/app-store';
 import { formatDisplayDate } from 'src/services/date-format';
+import { loadLearningActivityTotals, syncLearningActivity } from 'src/services/learning-activity';
+import type { LearningActivityTotals } from '@mentor-ai/shared';
 
 const appStore = useAppStore();
+const activityTotals = ref<LearningActivityTotals>({ listeningSeconds: 0, readingSeconds: 0, speakingSeconds: 0, totalSeconds: 0, updatedAt: null });
 
 const latestAccuracy = computed(() => {
   const accuracy = appStore.latestStatistics?.accuracy;
@@ -128,10 +147,26 @@ onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();
   }
+  await refreshActivityTotals();
+  void syncLearningActivity().then((totals) => { activityTotals.value = totals; }).catch(() => undefined);
+  window.addEventListener('mentor-learning-activity-updated', refreshActivityTotals);
 });
+
+onBeforeUnmount(() => window.removeEventListener('mentor-learning-activity-updated', refreshActivityTotals));
 
 async function sync() {
   await appStore.syncPendingEvents();
+  activityTotals.value = await syncLearningActivity();
+}
+
+async function refreshActivityTotals() { activityTotals.value = await loadLearningActivityTotals(); }
+
+function formatDuration(seconds: number) {
+  const minutes = Math.floor(Math.max(0, seconds) / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder ? `${hours} h ${remainder} min` : `${hours} h`;
 }
 
 async function reset() {
