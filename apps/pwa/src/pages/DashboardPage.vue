@@ -645,24 +645,15 @@
 
         <section v-else key="complete" class="lesson-complete">
           <p class="lesson-complete__eyebrow">Lesson complete</p>
-          <h1>{{ appStore.latestRecommendation?.summary }}</h1>
-          <p>{{ appStore.latestRecommendation?.reason }}</p>
-          <p v-if="appStore.session?.observation">
-            {{ appStore.session.observation.description }}
-          </p>
+          <h1>Great job! You completed the lesson.</h1>
+          <p>Your progress is saved. You can choose the next lesson now.</p>
           <q-btn
             color="primary"
-            label="Improve now"
-            unelevated
-            @click="startWithMode(currentSuggestion.mode)"
-          />
-          <q-btn
-            color="primary"
-            outline
-            icon="arrow_back"
-            :label="lessonBackLabel"
+            icon="check_circle"
+            label="OK"
             no-caps
-            @click="returnToLessonChoice()"
+            unelevated
+            @click="finishLessonAndReturnHome"
           />
         </section>
       </transition>
@@ -698,7 +689,7 @@
 <script setup lang="ts">
 import type { LearningContext, LearningMode, PreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import {
   chooseRecommendedTraining,
   createCurrentActivitySuggestion,
@@ -807,6 +798,7 @@ type PendingLessonUpdate = {
 
 const appStore = useAppStore();
 const route = useRoute();
+const router = useRouter();
 const answer = ref('');
 const activeWordIndex = ref(0);
 const activeWordEndIndex = ref(0);
@@ -2280,6 +2272,13 @@ async function returnToLessonChoice(destination?: LessonReturnDestination) {
   selectedLessonLibrary.value = returnDestination === 'specific-lessons' ? 'home' : returnDestination;
   isLessonLibraryVisible.value = returnDestination === 'specific-lessons';
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function finishLessonAndReturnHome() {
+  await returnToLessonChoice('home');
+  if (route.path !== '/' || route.query.training !== 'home') {
+    await router.push({ path: '/', query: { training: 'home' } });
+  }
 }
 
 async function handleLessonBack() {
