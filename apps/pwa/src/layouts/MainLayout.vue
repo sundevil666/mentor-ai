@@ -305,17 +305,27 @@
     </q-page-container>
 
     <nav class="mobile-start-dock" aria-label="Primary navigation">
-      <router-link
-        v-for="item in primaryNavigationItems"
-        :key="item.label"
-        class="mobile-start-dock__button"
-        :class="[`mobile-start-dock__button--${item.tone}`, { 'mobile-start-dock__button--active': item.isActive() }]"
-        :to="item.to"
-        @click="handlePrimaryNavigationClick($event, item)"
-      >
-        <q-icon :name="item.icon" size="24px" />
-        <span>{{ item.label }}</span>
-      </router-link>
+      <template v-for="item in primaryNavigationItems" :key="item.label">
+        <button
+          v-if="item.tone === 'home'"
+          class="mobile-start-dock__button"
+          :class="[`mobile-start-dock__button--${item.tone}`, { 'mobile-start-dock__button--active': item.isActive() }]"
+          type="button"
+          @click="handleHomeNavigation"
+        >
+          <q-icon :name="item.icon" size="24px" />
+          <span>{{ item.label }}</span>
+        </button>
+        <router-link
+          v-else
+          class="mobile-start-dock__button"
+          :class="[`mobile-start-dock__button--${item.tone}`, { 'mobile-start-dock__button--active': item.isActive() }]"
+          :to="item.to"
+        >
+          <q-icon :name="item.icon" size="24px" />
+          <span>{{ item.label }}</span>
+        </router-link>
+      </template>
     </nav>
 
     <q-dialog v-model="showGoogleSignIn">
@@ -544,11 +554,7 @@ const primaryNavigationItems: Array<{
     label: 'Home',
     icon: 'home',
     tone: 'home',
-    get to() {
-      return route.query.training === 'home'
-        ? { name: 'dashboard' }
-        : { name: 'dashboard', query: { training: 'home' } };
-    },
+    to: { name: 'dashboard', query: { training: 'home' } },
     isActive: () => route.name === 'dashboard' && activeDashboardTraining.value === undefined,
   },
   {
@@ -588,13 +594,7 @@ const primaryNavigationItems: Array<{
   },
 ];
 
-async function handlePrimaryNavigationClick(
-  event: MouseEvent,
-  item: (typeof primaryNavigationItems)[number],
-) {
-  if (item.tone !== 'home') return;
-
-  event.preventDefault();
+async function handleHomeNavigation() {
   await openDashboardHome(Boolean(appStore.session), {
     leaveActiveLesson: () => appStore.returnToLessonChoice(),
     showHome: async () => {
