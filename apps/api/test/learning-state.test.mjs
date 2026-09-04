@@ -206,6 +206,25 @@ describe('learning state service', () => {
     assert.equal(duplicateSync.acknowledgements[0]?.status, 'duplicate');
   });
 
+  it('returns completed lesson statistics to another client through student state', async () => {
+    const stamp = Date.now();
+    const sessionId = `session-cross-device-statistics-${stamp}`;
+    const event = {
+      id: `event-cross-device-statistics-${stamp}`, studentId: 'demo-student', sessionId,
+      lessonId: `lesson-cross-device-statistics-${stamp}`, exerciseId: 'exercise-speaking',
+      type: 'exercise-finished', occurredAt: '2026-09-04T09:00:00.000Z',
+    };
+    await learningStateService.synchronize([event], [{
+      id: `result-cross-device-statistics-${stamp}`, studentId: 'demo-student', sessionId,
+      lessonId: event.lessonId, exerciseId: event.exerciseId, exerciseType: 'repeat-speaking',
+      targetSkill: 'speaking', correct: true, attempts: 1, responseTimeMs: 2_000,
+      completionState: 'completed', evidenceEventIds: [event.id], completedAt: '2026-09-04T09:00:02.000Z',
+    }]);
+
+    const stateSeenBySecondClient = await learningStateService.getStudentState();
+    assert.equal(stateSeenBySecondClient.statisticsSnapshots.some((snapshot) => snapshot.sessionId === sessionId), true);
+  });
+
   it('analyzes delayed offline lessons as separate session snapshots', async () => {
     const createdAt = Date.now();
     const firstEvent = {

@@ -36,6 +36,7 @@ export const learningStateService = {
       student: state.student,
       studentModel: state.studentModel,
       recommendation: state.recommendations.at(-1) ?? createRecommendationFromModel(state.studentModel, now()),
+      statisticsSnapshots: state.statisticsSnapshots.filter((snapshot) => snapshot.studentId === state.student.id),
     };
   },
 

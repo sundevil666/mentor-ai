@@ -28,6 +28,7 @@ interface StudentStateResponse {
   student: Student;
   studentModel: StudentModel;
   recommendation: Recommendation;
+  statisticsSnapshots?: StatisticsSnapshot[];
 }
 
 interface SynchronizationResponse {

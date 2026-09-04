@@ -1041,6 +1041,7 @@ export const useAppStore = defineStore('app', {
         );
 
         await this.applySharedStudentState(result.studentModel, result.recommendation);
+        await this.mergeStatisticsSnapshots(result.statisticsSnapshots);
 
         for (const acknowledgement of result.acknowledgements) {
           const queuedEvent = pendingEvents.find((event) => event.id === acknowledgement.eventId);
@@ -1117,6 +1118,7 @@ export const useAppStore = defineStore('app', {
         this.studentId = state.student.id;
         this.studentDisplayName = state.student.displayName;
         await this.applySharedStudentState(state.studentModel, state.recommendation);
+        await this.mergeStatisticsSnapshots(state.statisticsSnapshots ?? []);
       } catch {
         return;
       }
@@ -1130,6 +1132,17 @@ export const useAppStore = defineStore('app', {
       this.studentModel = studentModel;
       this.latestRecommendation = recommendation;
       await this.persistStudentModel();
+    },
+
+    async mergeStatisticsSnapshots(snapshots: StatisticsSnapshot[]) {
+      const merged = new Map(this.statisticsSnapshots.map((snapshot) => [snapshot.id, snapshot]));
+      const db = await mentorDb;
+      for (const snapshot of snapshots) {
+        if (snapshot.studentId !== this.studentId || !snapshot.id) continue;
+        merged.set(snapshot.id, snapshot);
+        await db.put('statistics', toStorageRecord(snapshot));
+      }
+      this.statisticsSnapshots = [...merged.values()].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
     },
 
     async refreshSessionHandoffs() {

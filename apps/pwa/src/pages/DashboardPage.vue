@@ -1241,10 +1241,12 @@ const homeMetrics = computed(() => {
     activeSeconds: summary.activeSeconds + (snapshot.activeSeconds ?? 0),
     spokenWords: summary.spokenWords + (snapshot.spokenWords ?? 0),
   }), { listeningSeconds: 0, activeSeconds: 0, spokenWords: 0 });
+  const synchronizedListeningSeconds = Math.max(totals.listeningSeconds, levelActivity.value.listeningSeconds);
+  const synchronizedActiveSeconds = Math.max(totals.activeSeconds, levelActivity.value.totalSeconds);
   return [
-    { icon: 'headphones', value: formatHours(totals.listeningSeconds), label: 'listened' },
+    { icon: 'headphones', value: formatHours(synchronizedListeningSeconds), label: 'listened' },
     { icon: 'record_voice_over', value: totals.spokenWords.toLocaleString(), label: 'words spoken' },
-    { icon: 'timer', value: formatDuration(totals.activeSeconds), label: 'active practice' },
+    { icon: 'timer', value: formatDuration(synchronizedActiveSeconds), label: 'active practice' },
     { icon: 'task_alt', value: String(appStore.completedLessonsCount), label: 'lessons done' },
   ];
 });

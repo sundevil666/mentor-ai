@@ -30,6 +30,7 @@ describe('learning state controllers', () => {
     await getCurrentLesson({ body: {} }, lesson.res, throwNext);
 
     assert.equal(studentState.res.body.data.student.id, 'demo-student');
+    assert.equal(Array.isArray(studentState.res.body.data.statisticsSnapshots), true);
     assert.equal(lesson.res.body.data.exercises.length > 0, true);
     assert.equal(typeof lesson.res.body.data.exercises[0].microLesson, 'string');
   });
