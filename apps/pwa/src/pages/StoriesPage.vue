@@ -226,6 +226,7 @@
                       'personal-reader__word--selected': token.wordIndex === selectedReaderWordIndex,
                       'personal-reader__word--marker': token.wordIndex === readerMarkerWordIndex,
                       'personal-reader__word--spoken': token.wordIndex !== undefined && spokenReaderWordIndexes.has(token.wordIndex),
+                      'personal-reader__word--provisional': token.wordIndex !== undefined && provisionalReaderWordIndexes.has(token.wordIndex) && !spokenReaderWordIndexes.has(token.wordIndex),
                     }"
                     :data-reader-word="token.text"
                     :data-reader-word-index="token.wordIndex"
@@ -472,7 +473,7 @@ import { getAuthToken } from 'src/services/auth';
 import { findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { annualReadingPace, annualReadingPaceMessage as getAnnualReadingPaceMessage, createDailyReadingProgress, dailyReadingGoalWords, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, readingGoalMessage, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
-import { alignReadingSpeech, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
+import { alignReadingSpeech, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, previewBrowserReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
@@ -528,6 +529,7 @@ const readingSpeechMessage = ref('Tap the microphone to request access and start
 const readingSpeechPermissionBlocked = ref(false);
 const readingSpeechCaptureUnavailable = ref(false);
 const spokenReaderWordIndexes = ref(new Set<number>());
+const provisionalReaderWordIndexes = ref(new Set<number>());
 const readingSpeechAcceptedWords = ref(0);
 const readingSpeechSpokenWords = ref(0);
 const readingSpeechDebugEntries = ref<string[]>(['Waiting for microphone start.']);
@@ -846,6 +848,7 @@ function closeBook() {
   readerPageStride.value = 1;
   chapterPageIndexes.value = [];
   spokenReaderWordIndexes.value = new Set();
+  provisionalReaderWordIndexes.value = new Set();
   readingSpeechFurthestWordIndex = -1;
   selectedReaderWordIndex.value = null;
   readerMarkerWordIndex.value = null;
@@ -863,6 +866,7 @@ function goToBookPage(pageIndex: number | null) {
   scrollToReaderPage();
   persistBookProgress();
   readingSpeechAnchor = getVisibleReaderWordAnchor();
+  provisionalReaderWordIndexes.value = new Set();
   void readingActivityTimer.checkpoint();
 }
 function goToBookChapter(pageIndex: number | null) {
@@ -1184,6 +1188,7 @@ async function startReadingSpeech() {
   startReadingSpeechDebug(useLocalRecognition ? 'device-whisper' : 'browser-speech');
   readingSpeechLocalTranscriptWindow = [];
   readingSpeechPositionLocked = false;
+  provisionalReaderWordIndexes.value = new Set();
   resetReadingSpeechPace();
   if (!navigator.mediaDevices?.getUserMedia) {
     appendReadingSpeechDebug('ERROR: getUserMedia is unavailable.');
@@ -1253,8 +1258,15 @@ async function startReadingSpeech() {
       onInterim: (transcript) => {
         updateReadingSpeechPace(transcript);
         appendReadingSpeechDebug(`Interim text: "${transcript}"`);
+        if (!shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
+        const previewWordIndexes = previewBrowserReadingWordIndexes(readerReferenceWords.value, transcript, readingSpeechAnchor);
+        if (previewWordIndexes.length) provisionalReaderWordIndexes.value = new Set(previewWordIndexes);
       },
-      onFinal: (transcript) => handleReadingSpeechTranscript(transcript, 'browser'),
+      onFinal: (transcript) => {
+        provisionalReaderWordIndexes.value = new Set();
+        if (!shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
+        handleReadingSpeechTranscript(transcript, 'browser');
+      },
       onListeningChange: (listening) => {
         appendReadingSpeechDebug(listening ? 'Browser recognition listening.' : 'Browser recognition reconnecting.');
         if (!readingSpeechRecognition && !listening) return;

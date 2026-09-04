@@ -325,7 +325,7 @@ body .q-menu {
 .app-detail-header > .app-back-button {
   flex: 0 0 auto;
   left: auto;
-  position: static;
+  position: relative;
   top: auto;
 }
 
@@ -2231,6 +2231,12 @@ html.mentor-theme-dark .personal-reader {
   color: #30250e;
 }
 
+.personal-reader__word--provisional {
+  background: color-mix(in srgb, #f6d982 38%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, #d49f1f 10%, transparent);
+  color: #4a3a18;
+}
+
 .personal-reader__word--selected {
   background: #f6d982;
   box-shadow: 0 0 0 3px rgba(212, 159, 31, 0.2);
@@ -2402,6 +2408,11 @@ body.body--dark .personal-reader--focus {
 body.body--dark .personal-reader__word--spoken {
   background: color-mix(in srgb, #d6ae42 42%, transparent);
   color: #fff4c7;
+}
+
+body.body--dark .personal-reader__word--provisional {
+  background: color-mix(in srgb, #d6ae42 26%, transparent);
+  color: #f5e8b7;
 }
 
 body.body--dark .personal-reader__paper {

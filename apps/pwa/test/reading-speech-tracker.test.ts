@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, recoverReadingSpeechPosition, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
+import { alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, previewBrowserReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
 import { localReadingChunkDurationMs, normalizeReadingAudio, startLocalReadingTranscriber } from '../src/services/local-reading-transcriber.js';
 
 const reference = tokenizeReadingSpeech('Alice was beginning to get very tired of sitting by her sister on the bank. She read the sentence again because practice matters.');
@@ -47,6 +47,18 @@ describe('reading speech tracking', () => {
 
     assert.equal(alignReadingSpeech(browserReference, 'the browser finds this exact spoken sentence', 0).accepted, false);
     assert.equal(alignReadingSpeech(browserReference, 'the browser finds this exact spoken sentence', 0, { maxForwardWords: 360 }).accepted, true);
+  });
+
+  it('turns an interim browser transcript into a continuous live highlight', () => {
+    const browserReference = tokenizeReadingSpeech('Camila walks to the front door and slowly puts on her jacket');
+    const preview = previewBrowserReadingWordIndexes(browserReference, 'front door slowly puts on her jacket', 0);
+
+    assert.deepEqual(preview, [4, 5, 6, 7, 8, 9, 10, 11]);
+  });
+
+  it('does not preview unrelated or one-word interim browser noise', () => {
+    assert.deepEqual(previewBrowserReadingWordIndexes(reference, 'television kitchen noise', 0), []);
+    assert.deepEqual(previewBrowserReadingWordIndexes(reference, 'Alice', 0), []);
   });
 
   it('lets tablet speech recover a dense phrase farther ahead of a stale visible anchor', () => {

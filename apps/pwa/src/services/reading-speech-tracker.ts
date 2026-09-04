@@ -119,6 +119,23 @@ export function matchReadingSpeechAtAnchor(referenceWords: readonly string[], tr
   };
 }
 
+export function previewBrowserReadingWordIndexes(referenceWords: readonly string[], transcript: string, anchorIndex: number): number[] {
+  const match = alignReadingSpeech(referenceWords, transcript, anchorIndex, {
+    maxForwardWords: 360,
+    minCoverage: 0.5,
+    minMatchedWords: 2,
+    minSpokenWords: 2,
+  });
+  if (!match.accepted) return [];
+  const firstIndex = match.matchedWordIndexes[0];
+  const lastIndex = match.matchedWordIndexes.at(-1);
+  if (firstIndex === undefined || lastIndex === undefined) return [];
+  // Interim browser transcripts are rewritten continuously and commonly omit
+  // small words. Paint the coherent recognized span so the live highlight does
+  // not visibly flicker or leave holes; only final results are persisted.
+  return Array.from({ length: lastIndex - firstIndex + 1 }, (_, offset) => firstIndex + offset);
+}
+
 export function boundTabletReadingProgress(matchedWordIndexes: readonly number[], anchorIndex: number, spokenWordCount: number): number[] {
   if (!matchedWordIndexes.length || spokenWordCount <= 0) return [];
   const nearby = matchedWordIndexes.filter((wordIndex) => wordIndex >= Math.max(0, anchorIndex - 8));
