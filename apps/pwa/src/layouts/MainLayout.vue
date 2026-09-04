@@ -38,7 +38,7 @@
           <q-tooltip>{{ appStore.isOnline ? 'Online' : 'Offline' }}</q-tooltip>
         </q-btn>
         <span class="level-trend header-level-trend">
-          {{ levelTrend.level }} · {{ levelTrend.daysLabel }}
+          {{ levelTrend.currentLevel }}→{{ levelTrend.nextLevel }} · {{ levelTrend.daysLabel }}
           <q-tooltip>{{ levelTrend.tooltip }}</q-tooltip>
         </span>
         <q-btn
@@ -348,7 +348,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ConceptLevel, StudentModel, TranslationUsage } from '@mentor-ai/shared';
+import type { LearningActivityTotals, TranslationUsage } from '@mentor-ai/shared';
 import { Dark, Notify } from 'quasar';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { personalBookSyncControl } from 'src/services/personal-book-sync-control';
@@ -369,6 +369,8 @@ import { buildAnalysisFindings, calculateAnalysisReadiness, type AnalysisFinding
 import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
 import { formatDisplayDate } from 'src/services/date-format';
 import { cleanupExpiredOfflineLessons } from 'src/services/offline-library';
+import { loadLearningActivityTotals } from 'src/services/learning-activity';
+import { calculateLevelJourney } from 'src/services/level-journey';
 import {
   getOfflineLessonUpdateState,
   subscribeOfflineLessonUpdates,
@@ -438,7 +440,8 @@ const googleClientId = ref<string | null>(null);
 const googleSignInButton = ref<HTMLElement | null>(null);
 const showGoogleSignIn = ref(false);
 const routeTransitionName = ref('route-slide-forward');
-const levelTrend = computed(() => createLevelTrend(appStore.studentModel));
+const levelActivity = ref<LearningActivityTotals>({ listeningSeconds: 0, readingSeconds: 0, speakingSeconds: 0, totalSeconds: 0, updatedAt: null });
+const levelTrend = computed(() => calculateLevelJourney(appStore.studentModel, levelActivity.value, appStore.statisticsSnapshots));
 const deferredInstallPrompt = ref<BeforeInstallPromptEvent | null>(null);
 const isPwaInstalled = ref(false);
 const showInstallHelp = ref(false);
@@ -614,6 +617,7 @@ onMounted(async () => {
   window.addEventListener('offline', handleApplicationOffline);
   window.addEventListener('translation-usage-updated', loadTranslationUsage);
   window.addEventListener('mentor-analysis-data-updated', refreshAnalysis);
+  window.addEventListener('mentor-learning-activity-updated', refreshLevelActivity);
   window.addEventListener('error', handleRuntimeError);
   window.addEventListener('unhandledrejection', handleUnhandledRejection);
   document.addEventListener('visibilitychange', handleOfflineLessonVisibility);
@@ -627,6 +631,7 @@ onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();
   }
+  await refreshLevelActivity();
   await recordApplicationTelemetry({ studentId: appStore.studentId, type: 'app-opened', route: String(route.name ?? 'unknown') });
   await refreshAnalysis();
   if (appStore.isOnline) void syncApplicationTelemetry().catch(() => undefined);
@@ -642,6 +647,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('offline', handleApplicationOffline);
   window.removeEventListener('translation-usage-updated', loadTranslationUsage);
   window.removeEventListener('mentor-analysis-data-updated', refreshAnalysis);
+  window.removeEventListener('mentor-learning-activity-updated', refreshLevelActivity);
   window.removeEventListener('error', handleRuntimeError);
   window.removeEventListener('unhandledrejection', handleUnhandledRejection);
   document.removeEventListener('visibilitychange', handleOfflineLessonVisibility);
@@ -718,6 +724,7 @@ async function refreshAnalysis() {
   analysisReadiness.value = calculateAnalysisReadiness(learningEvents, technicalEvents);
   analysisFindings.value = buildAnalysisFindings(learningEvents, technicalEvents);
 }
+async function refreshLevelActivity() { levelActivity.value = await loadLearningActivityTotals(); }
 function handleRuntimeError(event: ErrorEvent) {
   void recordApplicationTelemetry({
     studentId: appStore.studentId,
@@ -900,29 +907,4 @@ function readSavedTheme() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
-function createLevelTrend(studentModel: StudentModel) {
-  const learningState = studentModel.conceptLevels.learning;
-  const practicedAt = learningState.lastPracticedAt ?? studentModel.teacherDecision.createdAt;
-  const daysInProcess = Math.max(
-    0,
-    Math.floor((Date.now() - Date.parse(practicedAt)) / 86_400_000),
-  );
-
-  return {
-    level: conceptLevelToCefr(learningState.level),
-    daysLabel: `${daysInProcess}d`,
-    tooltip: `${studentModel.teacherDecision.reason} Days in this level process: ${daysInProcess}.`,
-  };
-}
-
-function conceptLevelToCefr(level: ConceptLevel): string {
-  switch (level) {
-    case 'foundation':
-      return 'A1';
-    case 'developing':
-      return 'A2';
-    case 'confident':
-      return 'B1';
-  }
-}
 </script>

@@ -28,17 +28,17 @@
             <article class="level-card">
               <div class="level-card__copy">
                 <span>Your level</span>
-                <strong>{{ levelProgress.level }}</strong>
-                <small>{{ levelProgress.percent }}% of {{ levelProgress.level }}</small>
+                <strong>{{ levelProgress.currentLevel }} → {{ levelProgress.nextLevel }}</strong>
+                <small>{{ levelProgress.progressPercent }}% · {{ levelProgress.paceLabel }}</small>
               </div>
               <q-circular-progress
-                :value="levelProgress.percent"
+                :value="levelProgress.progressPercent"
                 size="82px"
                 :thickness="0.13"
                 color="primary"
                 track-color="grey-3"
                 show-value
-              >{{ levelProgress.percent }}%</q-circular-progress>
+              >{{ levelProgress.progressPercent }}%</q-circular-progress>
             </article>
             <div class="home-metrics">
               <article v-for="metric in homeMetrics" :key="metric.label" class="home-metric">
@@ -687,7 +687,7 @@
 </template>
 
 <script setup lang="ts">
-import type { LearningContext, LearningMode, PreferredLessonDevice } from '@mentor-ai/shared';
+import type { LearningActivityTotals, LearningContext, LearningMode, PreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { synchronizeDashboardLessonRoute } from 'src/services/navigation-category';
@@ -753,6 +753,8 @@ import {
   replaceOfflineSpeechLesson,
 } from 'src/services/offline-library';
 import { fetchCurrentLesson } from 'src/services/api-client';
+import { loadLearningActivityTotals } from 'src/services/learning-activity';
+import { calculateLevelJourney } from 'src/services/level-journey';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import {
   loadContentEngagementSummaries,
@@ -1231,26 +1233,8 @@ function wasLessonCompleted(session: typeof appStore.pausedSessions[number]) {
 const isRecommendedLessonPinned = computed(() =>
   pinnedHomeLessonKey.value === recommendedHomeLesson.value.templateKey,
 );
-const levelProgress = computed(() => {
-  const evidence = appStore.studentModel.vocabulary.evidenceCount
-    + appStore.studentModel.grammar.evidenceCount
-    + appStore.studentModel.listening.evidenceCount
-    + appStore.studentModel.speaking.evidenceCount;
-  const average = evidence === 0 ? 0 : (
-    appStore.studentModel.vocabulary.score.value
-    + appStore.studentModel.grammar.score.value
-    + appStore.studentModel.listening.score.value
-    + appStore.studentModel.speaking.score.value
-  ) / 4;
-  const a0Threshold = 0.5;
-  if (average >= a0Threshold) {
-    return {
-      level: 'A1',
-      percent: Math.min(100, Math.round(((average - a0Threshold) / (1 - a0Threshold)) * 100)),
-    };
-  }
-  return { level: 'A0', percent: Math.round((average / a0Threshold) * 100) };
-});
+const levelActivity = ref<LearningActivityTotals>({ listeningSeconds: 0, readingSeconds: 0, speakingSeconds: 0, totalSeconds: 0, updatedAt: null });
+const levelProgress = computed(() => calculateLevelJourney(appStore.studentModel, levelActivity.value, appStore.statisticsSnapshots));
 const homeMetrics = computed(() => {
   const totals = appStore.statisticsSnapshots.reduce((summary, snapshot) => ({
     listeningSeconds: summary.listeningSeconds + (snapshot.listeningSeconds ?? 0),
@@ -1426,6 +1410,7 @@ onMounted(async () => {
     await appStore.hydrate();
   }
   await refreshLessonProgressStates();
+  await refreshLevelActivity();
   void syncContentEngagement()
     .then(refreshLessonProgressStates)
     .catch(() => undefined);
@@ -1440,6 +1425,7 @@ onMounted(async () => {
   window.addEventListener('pagehide', handlePageExit);
   window.addEventListener('mentor-ai:prepare-app-update', handlePrepareAppUpdate);
   window.addEventListener('mentor-content-engagement', handleLessonEngagementChange);
+  window.addEventListener('mentor-learning-activity-updated', refreshLevelActivity);
 });
 
 onUnmounted(() => {
@@ -1452,7 +1438,10 @@ onUnmounted(() => {
   window.removeEventListener('pagehide', handlePageExit);
   window.removeEventListener('mentor-ai:prepare-app-update', handlePrepareAppUpdate);
   window.removeEventListener('mentor-content-engagement', handleLessonEngagementChange);
+  window.removeEventListener('mentor-learning-activity-updated', refreshLevelActivity);
 });
+
+async function refreshLevelActivity() { levelActivity.value = await loadLearningActivityTotals(); }
 
 watch(
   () => route.query.training,
