@@ -684,7 +684,7 @@ export const useAppStore = defineStore('app', {
       savePreferredWorkShift('unknown');
 
       const db = await mentorDb;
-      await db.put('student-models', this.studentModel);
+      await db.put('student-models', toStorageRecord(this.studentModel));
       await db.clear('learning-sessions');
       await db.clear('statistics');
       await db.clear('activity-snapshots');
@@ -853,14 +853,15 @@ export const useAppStore = defineStore('app', {
       this.studentModel = updatedModel;
       this.latestRecommendation = recommendation;
 
-      await this.persistSession(completedSession);
-      await this.persistStudentModel();
-      await this.persistStatistics(completedAt, completedSession);
-      await this.persistSyncQueue(completedSession);
-
       if (this.session?.id === completedSession.id) {
         this.session = completedSession;
       }
+
+      const statisticsPersistence = this.persistStatistics(completedAt, completedSession);
+      await this.persistSession(completedSession);
+      await this.persistStudentModel();
+      await statisticsPersistence;
+      await this.persistSyncQueue(completedSession);
 
       await this.pruneLocalStorage();
 
@@ -902,7 +903,7 @@ export const useAppStore = defineStore('app', {
 
     async persistStudentModel() {
       const db = await mentorDb;
-      await db.put('student-models', this.studentModel);
+      await db.put('student-models', toStorageRecord(this.studentModel));
     },
 
     async persistStatistics(createdAt: string, completedSession?: LearningSessionState) {
@@ -953,9 +954,14 @@ export const useAppStore = defineStore('app', {
         createdAt,
       };
 
+      this.statisticsSnapshots = [
+        ...this.statisticsSnapshots.filter((item) => item.id !== snapshot.id),
+        snapshot,
+      ];
+
       const db = await mentorDb;
-      await db.put('statistics', { ...snapshot, userId: this.studentId });
-      await db.put('concept-evidence', {
+      await db.put('statistics', toStorageRecord({ ...snapshot, userId: this.studentId }));
+      await db.put('concept-evidence', toStorageRecord({
         id: `concept-${sourceSession.id}-${createdAt}`,
         studentId: this.studentId,
         lessonId: sourceSession.lesson.id,
@@ -964,8 +970,7 @@ export const useAppStore = defineStore('app', {
         teacherDecision: sourceSession.lesson.teacherDecision,
         results: sourceSession.results,
         createdAt,
-      });
-      this.statisticsSnapshots = [...this.statisticsSnapshots, snapshot];
+      }));
       await this.persistActivitySnapshot({
         ...createActivitySnapshot(this.studentId, sourceSession.context, sourceSession.id, createdAt),
         lessonCompleted: true,
@@ -977,7 +982,7 @@ export const useAppStore = defineStore('app', {
 
     async persistActivitySnapshot(snapshot: ActivitySnapshot) {
       const db = await mentorDb;
-      await db.put('activity-snapshots', snapshot);
+      await db.put('activity-snapshots', toStorageRecord(snapshot));
       this.activitySnapshots = [...this.activitySnapshots.filter((item) => item.id !== snapshot.id), snapshot]
         .sort((left, right) => left.observedAt.localeCompare(right.observedAt))
         .slice(-80);
@@ -992,12 +997,12 @@ export const useAppStore = defineStore('app', {
       const db = await mentorDb;
 
       for (const event of sourceSession.events) {
-        await db.put('sync-queue', {
+        await db.put('sync-queue', toStorageRecord({
           ...event,
           status: 'pending',
           exerciseResults: sourceSession.results,
           speechResults: sourceSession.speechResults,
-        });
+        }));
       }
 
       const queuedEvents = await db.getAll('sync-queue');
