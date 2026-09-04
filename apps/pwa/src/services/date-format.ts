@@ -11,3 +11,16 @@ export function formatDisplayDate(value: string | Date): string {
     date.getFullYear(),
   ].join('.');
 }
+
+export function formatDisplayDateTime(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return typeof value === 'string' ? value : '';
+  }
+
+  return `${formatDisplayDate(date)}, ${[
+    String(date.getHours()).padStart(2, '0'),
+    String(date.getMinutes()).padStart(2, '0'),
+  ].join(':')}`;
+}

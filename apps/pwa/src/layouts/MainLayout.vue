@@ -147,7 +147,7 @@
                   <q-item-section>
                     <q-item-label>{{ notification.title }}</q-item-label>
                     <q-item-label caption>
-                      {{ notification.kind === 'lessons' ? 'Offline lessons' : `Version ${notification.version}` }} · {{ formatDate(notification.createdAt) }}
+                      {{ notification.kind === 'lessons' ? 'Offline lessons' : `Version ${notification.version}` }} · {{ formatDateTime(notification.createdAt) }}
                     </q-item-label>
                     <q-item-label caption>
                       {{ notification.message }}
@@ -367,7 +367,7 @@ import { loadAllContentEngagement } from 'src/services/content-engagement';
 import { loadApplicationTelemetry, recordApplicationTelemetry, syncApplicationTelemetry } from 'src/services/application-telemetry';
 import { buildAnalysisFindings, calculateAnalysisReadiness, type AnalysisFinding, type AnalysisReadiness } from 'src/services/analysis-readiness';
 import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
-import { formatDisplayDate } from 'src/services/date-format';
+import { formatDisplayDateTime } from 'src/services/date-format';
 import { cleanupExpiredOfflineLessons } from 'src/services/offline-library';
 import { loadLearningActivityTotals } from 'src/services/learning-activity';
 import { calculateLevelJourney } from 'src/services/level-journey';
@@ -690,8 +690,8 @@ onBeforeRouteUpdate((to, from) => {
     getRouteOrder(to) < getRouteOrder(from) ? 'route-slide-back' : 'route-slide-forward';
 });
 
-function formatDate(value: string) {
-  return formatDisplayDate(value);
+function formatDateTime(value: string) {
+  return formatDisplayDateTime(value);
 }
 
 function getRouteOrder(route: RouteLocationNormalizedLoaded) {
