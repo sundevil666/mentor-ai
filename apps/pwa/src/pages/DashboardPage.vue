@@ -690,6 +690,7 @@
 import type { LearningContext, LearningMode, PreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { synchronizeDashboardLessonRoute } from 'src/services/navigation-category';
 import {
   chooseRecommendedTraining,
   createCurrentActivitySuggestion,
@@ -1323,6 +1324,7 @@ async function beginLibraryLesson(lesson: TrainingLibraryLesson, context: Learni
   answer.value = '';
   setForwardTransition();
   await appStore.startLesson(context);
+  await syncActiveLessonNavigation();
 }
 
 async function installPendingLessonUpdate() {
@@ -1456,6 +1458,11 @@ watch(
   () => route.query.training,
   (training) => {
     if (training === 'listening' || training === 'speaking') {
+      if (appStore.session?.context.mode === training) {
+        selectedLessonLibrary.value = training;
+        return;
+      }
+
       void openTrainingLibrary(training);
       return;
     }
@@ -1557,6 +1564,7 @@ async function startWithMode(mode: LearningMode) {
   isLessonLibraryVisible.value = false;
   setForwardTransition();
   await appStore.startLesson(createLearningContext(currentSuggestion.value, { mode }));
+  await syncActiveLessonNavigation();
 }
 
 async function startHomeLesson(lesson: HomeLesson) {
@@ -1575,6 +1583,7 @@ async function startRecommendedHomeLesson() {
 async function resumePausedLesson(sessionId: string) {
   setForwardTransition();
   await appStore.resumePausedLesson(sessionId);
+  await syncActiveLessonNavigation();
 }
 
 async function finishRepeatedLesson(sessionId: string) {
@@ -1614,6 +1623,22 @@ async function continueFromDevice(handoffId: string) {
   isLessonLibraryVisible.value = false;
   setForwardTransition();
   await appStore.continueSessionHandoff(handoff);
+  await syncActiveLessonNavigation();
+}
+
+async function syncActiveLessonNavigation() {
+  const training = await synchronizeDashboardLessonRoute(
+    appStore.session?.context.mode,
+    route.query.training,
+    async (nextTraining) => {
+      await router.replace({
+        name: 'dashboard',
+        query: { ...route.query, training: nextTraining },
+      });
+    },
+  );
+
+  if (training) selectedLessonLibrary.value = training;
 }
 
 async function submit() {

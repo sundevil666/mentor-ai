@@ -7,6 +7,8 @@ type DashboardHomeNavigationActions = {
   showHome: () => Promise<void>;
 };
 
+type ReplaceDashboardTraining = (training: DashboardTrainingCategory) => Promise<void>;
+
 export function resolveDashboardTrainingCategory(
   routeTraining: unknown,
   sessionMode?: LearningMode,
@@ -25,4 +27,18 @@ export async function openDashboardHome(
   }
 
   await actions.showHome();
+}
+
+export async function synchronizeDashboardLessonRoute(
+  sessionMode: LearningMode | undefined,
+  routeTraining: unknown,
+  replaceTraining: ReplaceDashboardTraining,
+) {
+  const training = sessionMode === 'listening' || sessionMode === 'speaking'
+    ? sessionMode
+    : undefined;
+
+  if (!training) return undefined;
+  if (routeTraining !== training) await replaceTraining(training);
+  return training;
 }

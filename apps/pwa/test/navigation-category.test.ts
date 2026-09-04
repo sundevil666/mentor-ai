@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import {
   openDashboardHome,
   resolveDashboardTrainingCategory,
+  synchronizeDashboardLessonRoute,
 } from '../src/services/navigation-category.js';
 
 describe('dashboard navigation category', () => {
@@ -47,5 +48,31 @@ describe('dashboard navigation category', () => {
     });
 
     assert.deepEqual(actions, ['show-home']);
+  });
+
+  it('replaces the Home route with the category of the lesson started there', async () => {
+    const replacements: string[] = [];
+
+    const speaking = await synchronizeDashboardLessonRoute('speaking', 'home', async (training) => {
+      replacements.push(training);
+    });
+    const listening = await synchronizeDashboardLessonRoute('listening', 'home', async (training) => {
+      replacements.push(training);
+    });
+
+    assert.equal(speaking, 'speaking');
+    assert.equal(listening, 'listening');
+    assert.deepEqual(replacements, ['speaking', 'listening']);
+  });
+
+  it('does not replace an already matching lesson category route', async () => {
+    let replacements = 0;
+
+    const training = await synchronizeDashboardLessonRoute('speaking', 'speaking', async () => {
+      replacements += 1;
+    });
+
+    assert.equal(training, 'speaking');
+    assert.equal(replacements, 0);
   });
 });
