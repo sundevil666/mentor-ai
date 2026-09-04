@@ -340,6 +340,10 @@ export const useAppStore = defineStore('app', {
       this.myShiftLastSyncAt = myShiftCache?.synchronizedAt ?? null;
       this.isOnline = navigator.onLine;
       this.authSession = readAuthSession();
+      if (this.authSession) {
+        this.studentId = this.authSession.user.id;
+        this.studentDisplayName = this.authSession.user.displayName;
+      }
       this.isHydrated = true;
 
       logDiagnostic('app.hydrated', {
@@ -1115,15 +1119,29 @@ export const useAppStore = defineStore('app', {
 
     async refreshSharedStudentState() {
       try {
-        const sharedStatistics = await synchronizeStatisticsSnapshots(this.statisticsSnapshots);
         const state = await fetchStudentState();
         this.studentId = state.student.id;
         this.studentDisplayName = state.student.displayName;
+        const localStatisticsForAccount = this.statisticsSnapshots
+          .filter((snapshot) => snapshot.studentId === this.studentId || snapshot.studentId === demoStudent.id)
+          .map((snapshot) => ({ ...snapshot, studentId: this.studentId }));
+        const sharedStatistics = await synchronizeStatisticsSnapshots(localStatisticsForAccount);
         await this.applySharedStudentState(state.studentModel, state.recommendation);
-        await this.mergeStatisticsSnapshots([...sharedStatistics, ...(state.statisticsSnapshots ?? [])]);
+        await this.replaceStatisticsSnapshotsFromServer([...sharedStatistics, ...(state.statisticsSnapshots ?? [])]);
       } catch {
         return;
       }
+    },
+
+    async replaceStatisticsSnapshotsFromServer(snapshots: StatisticsSnapshot[]) {
+      const merged = new Map<string, StatisticsSnapshot>();
+      for (const snapshot of snapshots) {
+        if (snapshot.studentId === this.studentId && snapshot.id) merged.set(snapshot.id, snapshot);
+      }
+      const db = await mentorDb;
+      await db.clear('statistics');
+      for (const snapshot of merged.values()) await db.put('statistics', toStorageRecord(snapshot));
+      this.statisticsSnapshots = [...merged.values()].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
     },
 
     async applySharedStudentState(studentModel: StudentModel, recommendation: Recommendation) {
