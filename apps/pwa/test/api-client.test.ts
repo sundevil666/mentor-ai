@@ -49,7 +49,7 @@ describe('PWA API client', () => {
       id: 'activity-1', studentId: 'demo-student', kind: 'listening', contentId: 'audio-1', activeSeconds: 60,
       sourceDeviceId: 'phone', startedAt: '2026-09-04T08:00:00.000Z', endedAt: '2026-09-04T08:01:00.000Z',
     }]);
-    assert.equal(calls[0]?.url, 'http://localhost:4000/api/learning-activity-synchronize');
+    assert.equal(calls[0]?.url, 'http://localhost:4000/api/synchronization');
     assert.equal(result.totals.listeningSeconds, 60);
   });
 
@@ -116,7 +116,7 @@ describe('PWA API client', () => {
 
     const result = await synchronizeContentProgress([]);
 
-    assert.equal(calls[0]?.url, 'http://localhost:4000/api/content-progress-synchronize');
+    assert.equal(calls[0]?.url, 'http://localhost:4000/api/synchronization');
     assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { progress: [] });
     assert.equal(result[0]?.furthestPosition, 120);
   });

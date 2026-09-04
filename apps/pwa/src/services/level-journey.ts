@@ -26,7 +26,8 @@ export function calculateLevelJourney(
       ? { currentLevel: 'A1', nextLevel: 'A2', start: 0.5, end: 0.72, guidedHours: 120 }
       : { currentLevel: 'A2', nextLevel: 'B1', start: 0.72, end: 0.9, guidedHours: 200 };
   const skillProgress = clamp((averageSkill - stage.start) / (stage.end - stage.start));
-  const totalHours = Math.max(0, activity.totalSeconds) / 3_600;
+  const snapshotSeconds = statistics.reduce((sum, snapshot) => sum + Math.max(0, snapshot.activeSeconds ?? 0), 0);
+  const totalHours = Math.max(0, activity.totalSeconds, snapshotSeconds) / 3_600;
   const practiceProgress = clamp(totalHours / stage.guidedHours);
   // Quality evidence remains primary, while real listening/reading/speaking
   // makes the route visibly move even between completed assessments.
@@ -34,8 +35,17 @@ export function calculateLevelJourney(
   const progressPercent = Math.min(99, Math.round(progress * 100));
   const firstEvidenceAt = earliestEvidenceDate(studentModel, statistics, now);
   const elapsedDays = Math.max(1, (now.getTime() - firstEvidenceAt.getTime()) / dayMs + 1);
-  const hoursPerDay = Math.min(4, totalHours / elapsedDays);
-  const lastActivityAt = activity.updatedAt ? Date.parse(activity.updatedAt) : Number.NaN;
+  const recentSnapshots = statistics.filter((snapshot) => {
+    const timestamp = Date.parse(snapshot.createdAt);
+    return Number.isFinite(timestamp) && now.getTime() - timestamp <= 14 * dayMs;
+  });
+  const recentActiveDays = new Set(recentSnapshots.map((snapshot) => snapshot.createdAt.slice(0, 10))).size;
+  const recentHoursPerActiveDay = recentActiveDays === 0 ? 0 : recentSnapshots.reduce(
+    (sum, snapshot) => sum + Math.max(0, snapshot.activeSeconds ?? 0),
+    0,
+  ) / 3_600 / recentActiveDays;
+  const hoursPerDay = Math.min(4, Math.max(totalHours / elapsedDays, recentHoursPerActiveDay));
+  const lastActivityAt = latestActivityTimestamp(activity.updatedAt, statistics);
   const isInactive = !Number.isFinite(lastActivityAt) || now.getTime() - lastActivityAt > inactiveAfterDays * dayMs;
   const remainingHours = Math.max(0, stage.guidedHours * (1 - progress));
   const daysRemaining = isInactive || hoursPerDay < 0.05 ? null : Math.max(1, Math.ceil(remainingHours / hoursPerDay));
@@ -63,6 +73,14 @@ function earliestEvidenceDate(model: StudentModel, statistics: readonly Statisti
     .map(Date.parse)
     .filter(Number.isFinite);
   return new Date(timestamps.length ? Math.min(...timestamps) : now.getTime());
+}
+
+function latestActivityTimestamp(updatedAt: string | null, statistics: readonly StatisticsSnapshot[]) {
+  const timestamps = [updatedAt, ...statistics.map((snapshot) => snapshot.createdAt)]
+    .filter((value): value is string => Boolean(value))
+    .map(Date.parse)
+    .filter(Number.isFinite);
+  return timestamps.length ? Math.max(...timestamps) : Number.NaN;
 }
 
 function clamp(value: number) { return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0)); }

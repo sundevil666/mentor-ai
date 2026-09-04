@@ -196,7 +196,7 @@ export async function upsertSessionHandoff(handoff: LearningSessionHandoff): Pro
 }
 
 export async function synchronizeContentProgress(progress: ContentProgress[]): Promise<ContentProgress[]> {
-  const response = await fetch(`${apiBaseUrl}/api/content-progress-synchronize`, {
+  const response = await fetch(`${apiBaseUrl}/api/synchronization`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ progress }),
@@ -208,7 +208,7 @@ export async function synchronizeContentProgress(progress: ContentProgress[]): P
 export async function synchronizeContentEngagement(
   engagementEvents: ContentEngagementEvent[],
 ): Promise<ContentEngagementEvent[]> {
-  const response = await fetch(`${apiBaseUrl}/api/content-engagement-synchronize`, {
+  const response = await fetch(`${apiBaseUrl}/api/synchronization`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ engagementEvents }),
@@ -220,7 +220,7 @@ export async function synchronizeContentEngagement(
 export async function synchronizeLearningActivity(
   activityEvents: LearningActivityEvent[],
 ): Promise<LearningActivitySyncResult> {
-  const response = await fetch(`${apiBaseUrl}/api/learning-activity-synchronize`, {
+  const response = await fetch(`${apiBaseUrl}/api/synchronization`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ activityEvents }),

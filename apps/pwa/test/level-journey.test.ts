@@ -28,4 +28,15 @@ describe('level journey forecast', () => {
     }, [], new Date('2026-09-04T12:00:00Z'));
     assert.equal(journey.daysRemaining, null);
   });
+
+  it('uses a recent synchronized lesson instead of falsely showing paused', () => {
+    const now = new Date('2026-09-04T12:00:00Z');
+    const journey = calculateLevelJourney(initialStudentModel, emptyActivity, [{
+      id: 'statistics-remote', studentId: 'demo-student', sessionId: 'session-remote', lessonId: 'lesson-remote',
+      accuracy: 0.8, averageResponseTimeMs: 2_000, attempts: 3, completedExercises: 3, audioReplays: 0,
+      speechAttempts: 2, pronunciationIssueCount: 0, pronunciationFocus: [], activeSeconds: 24 * 60,
+      fatigueSignal: { value: 0, confidence: 0 }, createdAt: '2026-09-04T10:00:00Z',
+    }], now);
+    assert.notEqual(journey.daysRemaining, null);
+  });
 });

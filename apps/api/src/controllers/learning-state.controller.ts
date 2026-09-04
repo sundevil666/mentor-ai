@@ -50,6 +50,18 @@ export const mergeApplicationTelemetryEvents: RequestHandler = sendData((req) =>
 
 export const synchronizeLearningEvents: RequestHandler = async (req, res, next) => {
   try {
+    if (Array.isArray(req.body?.progress)) {
+      res.json({ data: await learningStateService.mergeContentProgress(req.body.progress as ContentProgress[], req.authUser) });
+      return;
+    }
+    if (Array.isArray(req.body?.engagementEvents)) {
+      res.json({ data: await learningStateService.mergeContentEngagementEvents(req.body.engagementEvents as ContentEngagementEvent[], req.authUser) });
+      return;
+    }
+    if (Array.isArray(req.body?.activityEvents)) {
+      res.json({ data: await learningStateService.mergeLearningActivityEvents(req.body.activityEvents as LearningActivityEvent[], req.authUser) });
+      return;
+    }
     const events = Array.isArray(req.body?.events) ? (req.body.events as LearningEvent[]) : [];
     const exerciseResults = Array.isArray(req.body?.exerciseResults)
       ? (req.body.exerciseResults as ExerciseResult[])
