@@ -1058,6 +1058,8 @@ async function loadReaderPhonetic(text: string, requestId: number) {
   try {
     const phonetic = await fetchReaderPhonetic(text);
     if (requestId === readerLookupRequestId) readerPhonetic.value = phonetic;
+  } catch (error) {
+    appendReadingSpeechDebug(`Optional phonetic lookup unavailable: ${error instanceof Error ? error.message : String(error)}.`);
   } finally {
     if (requestId === readerLookupRequestId) readerPhoneticLoading.value = false;
   }
