@@ -159,6 +159,7 @@ onMounted(async () => {
     await appStore.hydrate();
   }
   await refreshActivityTotals();
+  appStore.markStatisticsSeen();
   if (appStore.isOnline) void refreshFromServer();
   window.addEventListener('online', refreshFromServer);
   window.addEventListener('mentor-learning-activity-updated', refreshActivityTotals);
@@ -177,6 +178,7 @@ async function refreshFromServer() {
   if (!navigator.onLine) return;
   await appStore.refreshRemoteLearningState();
   activityTotals.value = await syncLearningActivity().catch(() => loadLearningActivityTotals());
+  appStore.markStatisticsSeen();
 }
 
 async function refreshActivityTotals() { activityTotals.value = await loadLearningActivityTotals(); }

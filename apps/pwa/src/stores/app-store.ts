@@ -114,6 +114,7 @@ interface AppState {
   pausedSessions: LearningSessionState[];
   latestRecommendation: Recommendation | null;
   statisticsSnapshots: StatisticsSnapshot[];
+  seenStatisticsIds: string[];
   activitySnapshots: ActivitySnapshot[];
   preferredWorkShift: WorkShift;
   myShiftActivity: MyShiftActivity | null;
@@ -133,6 +134,7 @@ interface AppState {
 
 const sessionStoreKey = 'active-session';
 const pausedSessionStoreKey = 'paused-session';
+const seenStatisticsKeyPrefix = 'mentor-ai-seen-statistics:';
 const pausedSessionStoreKeyPrefix = 'paused-session:';
 const sessionCheckpointKey = 'mentor-ai:active-session-checkpoint';
 const updateResumeSessionKey = 'mentor-ai:resume-session-after-update';
@@ -210,6 +212,25 @@ function clearUpdateResumeSessionId() {
   }
 }
 
+function readSeenStatisticsIds(studentId: string): string[] {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const value = JSON.parse(localStorage.getItem(`${seenStatisticsKeyPrefix}${studentId}`) ?? '[]') as unknown;
+    return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSeenStatisticsIds(studentId: string, ids: string[]) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(`${seenStatisticsKeyPrefix}${studentId}`, JSON.stringify(ids.slice(-500)));
+  } catch {
+    // The badge remains correct for the current session when storage is unavailable.
+  }
+}
+
 export const useAppStore = defineStore('app', {
   state: (): AppState => ({
     storageMode: 'demo',
@@ -223,6 +244,7 @@ export const useAppStore = defineStore('app', {
     pausedSessions: [],
     latestRecommendation: null,
     statisticsSnapshots: [],
+    seenStatisticsIds: [],
     activitySnapshots: [],
     preferredWorkShift: 'unknown',
     myShiftActivity: null,
@@ -258,6 +280,10 @@ export const useAppStore = defineStore('app', {
     },
     completedLessonsCount: (state): number => state.statisticsSnapshots.length,
     latestStatistics: (state): StatisticsSnapshot | null => state.statisticsSnapshots[state.statisticsSnapshots.length - 1] ?? null,
+    unreadStatisticsCount: (state): number => {
+      const seen = new Set(state.seenStatisticsIds);
+      return state.statisticsSnapshots.filter((snapshot) => !seen.has(snapshot.id)).length;
+    },
     latestActivitySnapshot: (state): ActivitySnapshot | null => state.activitySnapshots[state.activitySnapshots.length - 1] ?? null,
     unreadUpdateNotificationCount: (state): number =>
       state.updateNotifications.filter((notification) => notification.readAt === null).length,
@@ -344,6 +370,7 @@ export const useAppStore = defineStore('app', {
         this.studentId = this.authSession.user.id;
         this.studentDisplayName = this.authSession.user.displayName;
       }
+      this.seenStatisticsIds = readSeenStatisticsIds(this.studentId);
       this.isHydrated = true;
 
       logDiagnostic('app.hydrated', {
@@ -704,6 +731,7 @@ export const useAppStore = defineStore('app', {
       this.authSession = session;
       this.studentId = session.user.id;
       this.studentDisplayName = session.user.displayName;
+      this.seenStatisticsIds = readSeenStatisticsIds(this.studentId);
       await this.refreshRemoteLearningState();
     },
 
@@ -712,6 +740,12 @@ export const useAppStore = defineStore('app', {
       this.authSession = null;
       this.studentId = demoStudent.id;
       this.studentDisplayName = demoStudent.displayName;
+      this.seenStatisticsIds = readSeenStatisticsIds(this.studentId);
+    },
+
+    markStatisticsSeen() {
+      this.seenStatisticsIds = this.statisticsSnapshots.map((snapshot) => snapshot.id);
+      writeSeenStatisticsIds(this.studentId, this.seenStatisticsIds);
     },
 
     async recordUpdateNotification(version: string, message?: string) {

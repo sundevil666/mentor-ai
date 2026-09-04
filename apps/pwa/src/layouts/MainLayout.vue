@@ -68,43 +68,18 @@
         </q-btn>
         <q-btn
           class="analysis-status-button"
-          :aria-label="analysisStatusLabel"
-          :color="analysisReadiness.ready ? (analysisReadiness.errorCount > 0 ? 'warning' : 'positive') : 'primary'"
+          aria-label="Open statistics"
+          color="primary"
           flat
           icon="query_stats"
           round
+          :to="{ name: 'statistics' }"
+          @click="appStore.markStatisticsSeen()"
         >
-          <q-badge v-if="analysisReadiness.ready" color="deep-orange-7" floating>!</q-badge>
-          <q-tooltip>{{ analysisStatusLabel }}</q-tooltip>
-          <q-menu anchor="bottom right" self="top right" class="analysis-menu">
-            <section class="analysis-center">
-              <div class="analysis-center__heading">
-                <q-icon name="query_stats" color="primary" size="28px" />
-                <div>
-                  <strong>Analysis center</strong>
-                  <span>{{ analysisStatusLabel }}</span>
-                </div>
-              </div>
-              <q-linear-progress rounded size="8px" :value="analysisReadiness.progress" color="primary" />
-              <div class="analysis-center__metrics">
-                <span><strong>{{ analysisReadiness.learningEventCount }}</strong> learning signals</span>
-                <span><strong>{{ analysisReadiness.technicalEventCount }}</strong> app signals</span>
-                <span><strong>{{ analysisReadiness.daysCovered }}</strong> days</span>
-              </div>
-              <q-list separator>
-                <q-item v-for="finding in analysisFindings" :key="`${finding.area}:${finding.title}`">
-                  <q-item-section avatar>
-                    <q-icon :name="finding.area === 'application' ? 'build_circle' : finding.area === 'learning' ? 'school' : 'verified'" />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label>{{ finding.title }}</q-item-label>
-                    <q-item-label caption>{{ finding.detail }}</q-item-label>
-                  </q-item-section>
-                </q-item>
-              </q-list>
-              <q-btn v-close-popup :to="{ name: 'statistics' }" color="primary" label="Open statistics" no-caps unelevated />
-            </section>
-          </q-menu>
+          <q-badge v-if="appStore.unreadStatisticsCount > 0" color="deep-orange-7" floating>
+            {{ appStore.unreadStatisticsCount }}
+          </q-badge>
+          <q-tooltip>Statistics</q-tooltip>
         </q-btn>
         <q-btn class="update-log-button" flat icon="notifications" round>
           <q-badge v-if="appStore.unreadUpdateNotificationCount > 0" color="red-7" floating>
@@ -179,12 +154,6 @@
               <q-item clickable :to="{ name: 'storage' }">
                 <q-item-section avatar><q-icon name="storage" /></q-item-section>
                 <q-item-section>Storage</q-item-section>
-              </q-item>
-              <q-item clickable :to="{ name: 'statistics' }">
-                <q-item-section avatar>
-                  <q-icon name="query_stats" />
-                </q-item-section>
-                <q-item-section>Statistics</q-item-section>
               </q-item>
               <q-item clickable :to="{ name: 'settings' }">
                 <q-item-section avatar>
@@ -363,9 +332,7 @@ import {
 import { useAppStore } from 'src/stores/app-store';
 import { fetchAuthConfiguration, signInWithGoogleCredential } from 'src/services/auth';
 import { fetchTranslationUsage } from 'src/services/api-client';
-import { loadAllContentEngagement } from 'src/services/content-engagement';
-import { loadApplicationTelemetry, recordApplicationTelemetry, syncApplicationTelemetry } from 'src/services/application-telemetry';
-import { buildAnalysisFindings, calculateAnalysisReadiness, type AnalysisFinding, type AnalysisReadiness } from 'src/services/analysis-readiness';
+import { recordApplicationTelemetry, syncApplicationTelemetry } from 'src/services/application-telemetry';
 import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
 import { formatDisplayDateTime } from 'src/services/date-format';
 import { cleanupExpiredOfflineLessons } from 'src/services/offline-library';
@@ -447,8 +414,6 @@ const isPwaInstalled = ref(false);
 const showInstallHelp = ref(false);
 const offlineLessonState = ref<OfflineLessonUpdateState>(getOfflineLessonUpdateState());
 const translationUsage = ref<TranslationUsage | null>(null);
-const analysisReadiness = ref<AnalysisReadiness>(calculateAnalysisReadiness([], []));
-const analysisFindings = ref<AnalysisFinding[]>(buildAnalysisFindings([], []));
 let unsubscribeOfflineLessonUpdates: (() => void) | undefined;
 let offlineLessonUpdateTimer: number | undefined;
 const showInstallButton = computed(() => !isPwaInstalled.value);
@@ -536,12 +501,6 @@ const syncStatusTooltip = computed(() => {
 
   return 'Learning progress is synchronized.';
 });
-const analysisStatusLabel = computed(() => {
-  if (analysisReadiness.value.reason === 'repeated-errors') return 'Repeated application problem detected. Analysis is ready.';
-  if (analysisReadiness.value.reason === 'monthly') return 'Monthly learning and application analysis is ready.';
-  if (analysisReadiness.value.reason === 'volume') return 'Enough evidence has accumulated for analysis.';
-  return 'Collecting reliable learning and application evidence.';
-});
 const activeDashboardTraining = computed(() => {
   return resolveDashboardTrainingCategory(route.query.training, appStore.session?.context.mode);
 });
@@ -616,7 +575,6 @@ onMounted(async () => {
   window.addEventListener('online', handleApplicationOnline);
   window.addEventListener('offline', handleApplicationOffline);
   window.addEventListener('translation-usage-updated', loadTranslationUsage);
-  window.addEventListener('mentor-analysis-data-updated', refreshAnalysis);
   window.addEventListener('mentor-learning-activity-updated', refreshLevelActivity);
   window.addEventListener('error', handleRuntimeError);
   window.addEventListener('unhandledrejection', handleUnhandledRejection);
@@ -633,7 +591,6 @@ onMounted(async () => {
   }
   await refreshLevelActivity();
   await recordApplicationTelemetry({ studentId: appStore.studentId, type: 'app-opened', route: String(route.name ?? 'unknown') });
-  await refreshAnalysis();
   if (appStore.isOnline) void syncApplicationTelemetry().catch(() => undefined);
   if (appStore.isOnline) void checkOfflineLessons(false);
   if (appStore.isOnline) void loadTranslationUsage();
@@ -646,7 +603,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('online', handleApplicationOnline);
   window.removeEventListener('offline', handleApplicationOffline);
   window.removeEventListener('translation-usage-updated', loadTranslationUsage);
-  window.removeEventListener('mentor-analysis-data-updated', refreshAnalysis);
   window.removeEventListener('mentor-learning-activity-updated', refreshLevelActivity);
   window.removeEventListener('error', handleRuntimeError);
   window.removeEventListener('unhandledrejection', handleUnhandledRejection);
@@ -715,14 +671,6 @@ function handleApplicationOnline() {
 }
 function handleApplicationOffline() {
   void recordApplicationTelemetry({ studentId: appStore.studentId, type: 'offline', severity: 'warning' });
-}
-async function refreshAnalysis() {
-  const [learningEvents, technicalEvents] = await Promise.all([
-    loadAllContentEngagement(),
-    loadApplicationTelemetry(),
-  ]);
-  analysisReadiness.value = calculateAnalysisReadiness(learningEvents, technicalEvents);
-  analysisFindings.value = buildAnalysisFindings(learningEvents, technicalEvents);
 }
 async function refreshLevelActivity() { levelActivity.value = await loadLearningActivityTotals(); }
 function handleRuntimeError(event: ErrorEvent) {
