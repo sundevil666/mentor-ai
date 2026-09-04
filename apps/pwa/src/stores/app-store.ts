@@ -857,14 +857,15 @@ export const useAppStore = defineStore('app', {
       await this.persistStudentModel();
       await this.persistStatistics(completedAt, completedSession);
       await this.persistSyncQueue(completedSession);
-      await this.pruneLocalStorage();
-
-      if (navigator.onLine) {
-        await this.syncPendingEvents();
-      }
 
       if (this.session?.id === completedSession.id) {
         this.session = completedSession;
+      }
+
+      await this.pruneLocalStorage();
+
+      if (navigator.onLine) {
+        void this.syncPendingEvents();
       }
 
       logDiagnostic('lesson.completed', {
