@@ -139,6 +139,21 @@ export const learningStateService = {
     return { acknowledgedIds, totals: summarizeLearningActivity(learningActivityTotals, state.contentProgress, state.statisticsSnapshots) };
   },
 
+  async mergeStatisticsSnapshots(incoming: StatisticsSnapshot[], user?: AuthenticatedUser) {
+    const state = await learningStateRepository.read(user);
+    const merged = new Map(state.statisticsSnapshots.map((snapshot) => [snapshot.id, snapshot]));
+    let changed = false;
+    for (const snapshot of incoming) {
+      if (snapshot?.studentId === state.student.id && snapshot.id && Number.isFinite(Date.parse(snapshot.createdAt))) {
+        if (!merged.has(snapshot.id)) changed = true;
+        merged.set(snapshot.id, snapshot);
+      }
+    }
+    const statisticsSnapshots = [...merged.values()].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+    if (changed) await learningStateRepository.write({ ...state, statisticsSnapshots }, user);
+    return statisticsSnapshots.filter((snapshot) => snapshot.studentId === state.student.id);
+  },
+
   async mergeApplicationTelemetryEvents(incoming: ApplicationTelemetryEvent[], user?: AuthenticatedUser) {
     const state = await learningStateRepository.read(user);
     const merged = new Map(state.applicationTelemetryEvents.map((event) => [event.id, event]));

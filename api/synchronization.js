@@ -42,6 +42,10 @@ module.exports = async (request, response) => {
       sendJson(response, 200, await learningStateService.mergeLearningActivityEvents(body.activityEvents, user));
       return;
     }
+    if (Array.isArray(body?.statisticsSnapshots)) {
+      sendJson(response, 200, await learningStateService.mergeStatisticsSnapshots(body.statisticsSnapshots, user));
+      return;
+    }
     const events = Array.isArray(body?.events) ? body.events : [];
     const exerciseResults = Array.isArray(body?.exerciseResults) ? body.exerciseResults : [];
     const speechResults = Array.isArray(body?.speechResults) ? body.speechResults : [];

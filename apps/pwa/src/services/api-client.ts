@@ -229,6 +229,16 @@ export async function synchronizeLearningActivity(
   return ((await response.json()) as ApiResponse<LearningActivitySyncResult>).data;
 }
 
+export async function synchronizeStatisticsSnapshots(statisticsSnapshots: StatisticsSnapshot[]): Promise<StatisticsSnapshot[]> {
+  const response = await fetch(`${apiBaseUrl}/api/synchronization`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ statisticsSnapshots }),
+  });
+  if (!response.ok) throw new Error('Statistics synchronization failed.');
+  return ((await response.json()) as ApiResponse<StatisticsSnapshot[]>).data;
+}
+
 export async function synchronizeApplicationTelemetry(
   telemetryEvents: ApplicationTelemetryEvent[],
 ): Promise<ApplicationTelemetryEvent[]> {

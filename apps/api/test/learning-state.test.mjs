@@ -225,6 +225,22 @@ describe('learning state service', () => {
     assert.equal(stateSeenBySecondClient.statisticsSnapshots.some((snapshot) => snapshot.sessionId === sessionId), true);
   });
 
+  it('merges a previously local statistics snapshot into shared state', async () => {
+    const stamp = Date.now();
+    const snapshot = {
+      id: `statistics-local-${stamp}`, studentId: 'demo-student', sessionId: `session-local-${stamp}`,
+      lessonId: `lesson-local-${stamp}`, accuracy: 0.8, averageResponseTimeMs: 2_000, attempts: 3,
+      completedExercises: 3, audioReplays: 0, speechAttempts: 2, pronunciationIssueCount: 0,
+      pronunciationFocus: [], activeSeconds: 24 * 60, spokenWords: 526, listeningSeconds: 300,
+      fatigueSignal: { value: 0, confidence: 0 }, createdAt: '2026-09-04T09:00:00.000Z',
+    };
+
+    const merged = await learningStateService.mergeStatisticsSnapshots([snapshot]);
+    const stateSeenBySecondClient = await learningStateService.getStudentState();
+    assert.equal(merged.some((item) => item.id === snapshot.id), true);
+    assert.equal(stateSeenBySecondClient.statisticsSnapshots.some((item) => item.id === snapshot.id), true);
+  });
+
   it('analyzes delayed offline lessons as separate session snapshots', async () => {
     const createdAt = Date.now();
     const firstEvent = {

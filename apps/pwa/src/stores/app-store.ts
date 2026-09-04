@@ -31,6 +31,7 @@ import {
   fetchSessionHandoffs,
   fetchStudentState,
   synchronizeLearningEvidence,
+  synchronizeStatisticsSnapshots,
   upsertSessionHandoff,
 } from 'src/services/api-client';
 import { createActivityReason, inferActivitySuggestion } from 'src/services/activity-suggestion';
@@ -1114,11 +1115,12 @@ export const useAppStore = defineStore('app', {
 
     async refreshSharedStudentState() {
       try {
+        const sharedStatistics = await synchronizeStatisticsSnapshots(this.statisticsSnapshots);
         const state = await fetchStudentState();
         this.studentId = state.student.id;
         this.studentDisplayName = state.student.displayName;
         await this.applySharedStudentState(state.studentModel, state.recommendation);
-        await this.mergeStatisticsSnapshots(state.statisticsSnapshots ?? []);
+        await this.mergeStatisticsSnapshots([...sharedStatistics, ...(state.statisticsSnapshots ?? [])]);
       } catch {
         return;
       }

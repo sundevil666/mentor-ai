@@ -29,6 +29,7 @@ import {
 import { config } from '../config/env.js';
 import { resolvePersonalStoragePath } from '../utils/storage-path.js';
 import type { AuthenticatedUser } from '../services/auth.service.js';
+import { getPostgresPool } from './postgres-client.js';
 
 interface LearningStateRecord {
   student: Student;
@@ -79,6 +80,19 @@ const demoState: LearningStateRecord = {
 
 export const learningStateRepository = {
   async read(user?: AuthenticatedUser): Promise<LearningStateRecord> {
+    if (user && getPostgresPool()) {
+      const pool = getPostgresPool()!;
+      await ensureLearningStatesTable();
+      const result = await pool.query<{ state: Partial<LearningStateRecord> }>(
+        'SELECT state FROM learning_states WHERE student_id = $1',
+        [user.id],
+      );
+      if (result.rows[0]?.state) return normalizeState(result.rows[0].state, user);
+      const initialState = createStateForUser(user);
+      await writeDatabaseState(user.id, initialState);
+      return initialState;
+    }
+
     if (config.storageMode === 'demo') {
       return createStateForUser(user);
     }
@@ -100,6 +114,12 @@ export const learningStateRepository = {
   },
 
   async write(state: LearningStateRecord, user?: AuthenticatedUser): Promise<void> {
+    if (user && getPostgresPool()) {
+      await ensureLearningStatesTable();
+      await writeDatabaseState(user.id, state);
+      return;
+    }
+
     if (config.storageMode === 'demo') {
       Object.assign(demoState, cloneState(state));
       return;
@@ -110,6 +130,34 @@ export const learningStateRepository = {
     await writeFile(filePath, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
   },
 };
+
+let ensureTablePromise: Promise<void> | undefined;
+
+function ensureLearningStatesTable(): Promise<void> {
+  ensureTablePromise ??= (async () => {
+    const pool = getPostgresPool();
+    if (!pool) return;
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS learning_states (
+        student_id TEXT PRIMARY KEY,
+        state JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
+  })();
+  return ensureTablePromise;
+}
+
+async function writeDatabaseState(studentId: string, state: LearningStateRecord): Promise<void> {
+  const pool = getPostgresPool();
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO learning_states (student_id, state, updated_at)
+     VALUES ($1, $2::jsonb, now())
+     ON CONFLICT (student_id) DO UPDATE SET state = EXCLUDED.state, updated_at = now()`,
+    [studentId, JSON.stringify(state)],
+  );
+}
 
 function stateFilePath(user?: AuthenticatedUser): string {
   if (!user) {

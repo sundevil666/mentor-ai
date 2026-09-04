@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-import { saveReadingTranscript, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, upsertSessionHandoff } from '../src/services/api-client.js';
+import { saveReadingTranscript, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, synchronizeStatisticsSnapshots, upsertSessionHandoff } from '../src/services/api-client.js';
 
 describe('PWA API client', () => {
   beforeEach(() => {
@@ -51,6 +51,17 @@ describe('PWA API client', () => {
     }]);
     assert.equal(calls[0]?.url, 'http://localhost:4000/api/synchronization');
     assert.equal(result.totals.listeningSeconds, 60);
+  });
+
+  it('uploads local statistics so an existing device can seed shared storage', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url: String(url), init });
+      return jsonResponse([]);
+    };
+    await synchronizeStatisticsSnapshots([]);
+    assert.equal(calls[0]?.url, 'http://localhost:4000/api/synchronization');
+    assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { statisticsSnapshots: [] });
   });
 
   it('uses PUT when publishing a session handoff', async () => {
