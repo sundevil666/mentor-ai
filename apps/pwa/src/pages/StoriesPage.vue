@@ -11,27 +11,29 @@
       },
     ]"
   >
-    <section class="videos-shell" :class="{ 'videos-shell--detail': selectedStory || selectedBook, 'videos-shell--book-detail': selectedBook }">
-      <header
-        v-if="!readingMode"
-        class="videos-header"
-        :class="{ 'videos-header--book-detail': selectedBook, 'app-detail-header': selectedStory || selectedBook }"
-      >
-        <q-btn
-          v-if="selectedStory || selectedBook"
-          aria-label="Back to library"
-          class="app-back-button"
-          color="primary"
-          flat
-          icon="arrow_back"
-          round
-          @click="closeDetail"
-        />
-        <div>
-          <p>{{ isAudioLibrary ? 'English audio library' : 'Your private English library' }}</p>
-          <h1>{{ selectedStory?.title ?? selectedBook?.title ?? (isAudioLibrary ? 'Audio stories' : 'Reading') }}</h1>
-        </div>
-      </header>
+    <AppDetailLayout class="videos-shell" :class="{ 'videos-shell--detail': selectedStory || selectedBook, 'videos-shell--book-detail': selectedBook }" :active="Boolean(selectedStory || selectedBook)">
+      <template #header>
+        <header
+          v-if="!readingMode"
+          class="videos-header"
+          :class="{ 'videos-header--book-detail': selectedBook }"
+        >
+          <q-btn
+            v-if="selectedStory || selectedBook"
+            aria-label="Back to library"
+            class="app-back-button"
+            color="primary"
+            flat
+            icon="arrow_back"
+            round
+            @click="closeDetail"
+          />
+          <div>
+            <p>{{ isAudioLibrary ? 'English audio library' : 'Your private English library' }}</p>
+            <h1>{{ selectedStory?.title ?? selectedBook?.title ?? (isAudioLibrary ? 'Audio stories' : 'Reading') }}</h1>
+          </div>
+        </header>
+      </template>
 
       <AudioLibraryTabs
         v-if="isAudioLibrary && !selectedStory"
@@ -134,21 +136,6 @@
           <p>{{ selectedStory.description }}</p>
           <p class="story-source">{{ selectedStory.sourceLabel }}. The recording is bundled with the app for reliable offline listening.</p>
         </div>
-        <AppAudioDock
-          :current-time="currentTime"
-          :duration="duration"
-          :fallback-duration="selectedStory.durationSeconds"
-          :playback-rate="playbackRate"
-          :playing="playing"
-          :repeat="repeat"
-          :speed-preference-key="`story:${selectedStory.id}`"
-          progress-label="Story progress"
-          show-repeat
-          @seek="seek"
-          @toggle-playback="togglePlayback"
-          @update:playback-rate="setPlaybackRate"
-          @update:repeat="repeat = $event"
-        />
       </section>
 
       <section v-else-if="!isAudioLibrary && !selectedBook && activeReadingCategory === 'fiction'" class="personal-books" aria-label="Fiction books">
@@ -421,7 +408,24 @@
       </section>
 
       <p v-if="isAudioLibrary && !selectedStory" class="video-storage-note">{{ offlineSummary }} Every public-domain recording is bundled with the app in 30–40 minute listening parts.</p>
-    </section>
+      <template v-if="selectedStory" #controls>
+        <AppAudioDock
+          :current-time="currentTime"
+          :duration="duration"
+          :fallback-duration="selectedStory.durationSeconds"
+          :playback-rate="playbackRate"
+          :playing="playing"
+          :repeat="repeat"
+          :speed-preference-key="`story:${selectedStory.id}`"
+          progress-label="Story progress"
+          show-repeat
+          @seek="seek"
+          @toggle-playback="togglePlayback"
+          @update:playback-rate="setPlaybackRate"
+          @update:repeat="repeat = $event"
+        />
+      </template>
+    </AppDetailLayout>
 
     <q-btn
       v-if="!isAudioLibrary && !selectedBook && activeReadingCategory === 'fiction'"
@@ -458,6 +462,7 @@ import { Dialog, Notify } from 'quasar';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { ReaderTextLookup, ReadingChapter, ReadingPage } from '@mentor-ai/shared';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
+import AppDetailLayout from 'src/components/AppDetailLayout.vue';
 import AppAudioDock from 'src/components/AppAudioDock.vue';
 import AudioLibraryTabs from 'src/components/AudioLibraryTabs.vue';
 import { loadContentEngagementSummaries, recordContentEngagement, syncContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';

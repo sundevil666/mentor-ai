@@ -1,13 +1,35 @@
 <template>
   <q-page class="patterns-page category-theme--patterns" :class="{ 'patterns-page--detail': patternSelected }">
-    <section class="patterns-shell">
-      <header
-        v-if="!patternSelected"
-        class="patterns-header"
-      >
-        <p>Reusable English</p><h1>Patterns</h1>
-        <span>Choose one phrase pattern and train it until it becomes automatic.</span>
-      </header>
+    <AppDetailLayout class="patterns-shell" :active="patternSelected">
+      <template #header>
+        <header
+          v-if="!patternSelected"
+          class="patterns-header"
+        >
+          <p>Reusable English</p><h1>Patterns</h1>
+          <span>Choose one phrase pattern and train it until it becomes automatic.</span>
+        </header>
+
+        <header
+          v-else
+          class="patterns-detail-header"
+        >
+          <q-btn
+            aria-label="Back to pattern library"
+            class="app-back-button"
+            color="primary"
+            flat
+            icon="arrow_back"
+            round
+            @click="closePattern"
+          />
+          <div>
+            <p>Pattern practice</p>
+            <h1>{{ selectedPattern?.title }}</h1>
+            <span>{{ selectedPattern?.description }}</span>
+          </div>
+        </header>
+      </template>
 
       <section
         v-if="!patternSelected"
@@ -35,26 +57,6 @@
           <q-icon name="chevron_right" />
         </button>
       </section>
-
-      <header
-        v-else
-        class="patterns-detail-header app-detail-header"
-      >
-        <q-btn
-          aria-label="Back to pattern library"
-          class="app-back-button"
-          color="primary"
-          flat
-          icon="arrow_back"
-          round
-          @click="closePattern"
-        />
-        <div>
-          <p>Pattern practice</p>
-          <h1>{{ selectedPattern?.title }}</h1>
-          <span>{{ selectedPattern?.description }}</span>
-        </div>
-      </header>
 
       <article
         v-if="patternSelected"
@@ -146,21 +148,6 @@
             class="pattern-playlist__offline"
           ><q-icon name="check_circle" /> Downloaded. This playlist works without internet.</span>
         </section>
-        <AppAudioDock
-          :current-time="playlistCurrentTime"
-          :disabled="playlistPreparing"
-          :duration="playlistDuration"
-          :playback-rate="playbackRate"
-          :playing="isLessonPlaying"
-          :repeat="repeatEnabled"
-          :speed-preference-key="selectedPattern ? `pattern:${selectedPattern.id}` : null"
-          progress-label="Pattern playlist progress"
-          show-repeat
-          @seek="seekPlaylist"
-          @toggle-playback="togglePlaylist"
-          @update:playback-rate="setPlaybackRate"
-          @update:repeat="setRepeat"
-        />
       </article>
 
       <section
@@ -230,7 +217,24 @@
       >
         <q-icon name="tips_and_updates" /> <span>Do not memorize separate sentences. Memorize <strong>{{ selectedPattern?.title }}</strong> and put a new action in the middle.</span>
       </p>
-    </section>
+      <template v-if="patternSelected" #controls>
+        <AppAudioDock
+          :current-time="playlistCurrentTime"
+          :disabled="playlistPreparing"
+          :duration="playlistDuration"
+          :playback-rate="playbackRate"
+          :playing="isLessonPlaying"
+          :repeat="repeatEnabled"
+          :speed-preference-key="selectedPattern ? `pattern:${selectedPattern.id}` : null"
+          progress-label="Pattern playlist progress"
+          show-repeat
+          @seek="seekPlaylist"
+          @toggle-playback="togglePlaylist"
+          @update:playback-rate="setPlaybackRate"
+          @update:repeat="setRepeat"
+        />
+      </template>
+    </AppDetailLayout>
     <q-dialog v-model="showPlaylistUpdateDialog" persistent>
       <q-card>
         <q-card-section>
@@ -254,6 +258,7 @@ import { speakWithPreferredVoice, stopSpeech } from 'src/services/speech-synthes
 import { deleteOutdatedPatternPlaylists, deletePatternPlaylist, getCachedPatternPlaylist, hasOutdatedPatternPlaylist, preparePatternPlaylist } from 'src/services/pattern-playlist';
 import { configurePlaybackAudioSession } from 'src/services/audio-session';
 import AppAudioDock from 'src/components/AppAudioDock.vue';
+import AppDetailLayout from 'src/components/AppDetailLayout.vue';
 
 const route = useRoute();
 const router = useRouter();

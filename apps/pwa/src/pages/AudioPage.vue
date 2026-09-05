@@ -1,23 +1,25 @@
 <template>
   <q-page class="audio-page category-theme--audio" :class="{ 'audio-page--detail': selectedAudio }">
-    <section class="audio-shell">
-      <header class="audio-header" :class="{ 'audio-header--detail app-detail-header': selectedAudio }">
-        <q-btn
-          v-if="selectedAudio"
-          aria-label="Back to audio library"
-          class="app-back-button"
-          color="primary"
-          flat
-          icon="arrow_back"
-          round
-          @click="closeAudio"
-        />
-        <div>
-          <p>{{ selectedAudio ? 'Podcast episode' : 'English audio library' }}</p>
-          <h1>{{ selectedAudio?.title ?? 'Audio' }}</h1>
-          <span v-if="!selectedAudio">Complete 30-minute programs in clear, slower American English.</span>
-        </div>
-      </header>
+    <AppDetailLayout class="audio-shell" :active="Boolean(selectedAudio)">
+      <template #header>
+        <header class="audio-header" :class="{ 'audio-header--detail': selectedAudio }">
+          <q-btn
+            v-if="selectedAudio"
+            aria-label="Back to audio library"
+            class="app-back-button"
+            color="primary"
+            flat
+            icon="arrow_back"
+            round
+            @click="closeAudio"
+          />
+          <div>
+            <p>{{ selectedAudio ? 'Podcast episode' : 'English audio library' }}</p>
+            <h1>{{ selectedAudio?.title ?? 'Audio' }}</h1>
+            <span v-if="!selectedAudio">Complete 30-minute programs in clear, slower American English.</span>
+          </div>
+        </header>
+      </template>
 
       <AudioLibraryTabs
         v-if="!selectedAudio"
@@ -95,24 +97,25 @@
         </div>
       </article>
 
-      <AppAudioDock
-        v-if="selectedAudio"
-        :current-time="currentTime"
-        :duration="duration"
-        :fallback-duration="selectedAudio.durationSeconds"
-        :playback-rate="playbackRate"
-        :playing="isPlaying"
-        :repeat="repeatEnabled"
-        :speed-preference-key="`audio:${selectedAudio.id}`"
-        show-repeat
-        @seek="seek"
-        @toggle-playback="togglePlayback"
-        @update:playback-rate="setPlaybackRate"
-        @update:repeat="setRepeat"
-      />
-
       <p class="audio-credit">Audio and program descriptions: VOA Learning English, public domain. Offline copies stay on this device.</p>
-    </section>
+
+      <template v-if="selectedAudio" #controls>
+        <AppAudioDock
+          :current-time="currentTime"
+          :duration="duration"
+          :fallback-duration="selectedAudio.durationSeconds"
+          :playback-rate="playbackRate"
+          :playing="isPlaying"
+          :repeat="repeatEnabled"
+          :speed-preference-key="`audio:${selectedAudio.id}`"
+          show-repeat
+          @seek="seek"
+          @toggle-playback="togglePlayback"
+          @update:playback-rate="setPlaybackRate"
+          @update:repeat="setRepeat"
+        />
+      </template>
+    </AppDetailLayout>
   </q-page>
 </template>
 
@@ -122,6 +125,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { audioLibrary, deleteOfflineAudio, formatAudioDuration, formatAudioSize, getCachedAudioUrls, resolveAudioPlaybackUrl, saveAudioOffline, type LibraryAudio } from 'src/services/audio-library';
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineAudio } from 'src/services/offline-library';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
+import AppDetailLayout from 'src/components/AppDetailLayout.vue';
 import { loadContentEngagementSummaries, recordContentEngagement, syncContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
 import { useAppStore } from 'src/stores/app-store';
 import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';

@@ -1,22 +1,24 @@
 <template>
-  <q-page class="settings-page">
-    <section class="settings-shell">
-      <div class="settings-header app-detail-header">
-        <q-btn
-          class="app-back-button"
-          color="primary"
-          flat
-          icon="arrow_back"
-          round
-          @click="returnToDashboard"
-        >
-          <q-tooltip>Back to learning</q-tooltip>
-        </q-btn>
-        <div>
-          <p>Settings</p>
-          <h1>Preferences</h1>
+  <q-page class="settings-page settings-page--detail">
+    <AppDetailLayout class="settings-shell">
+      <template #header>
+        <div class="settings-header">
+          <q-btn
+            class="app-back-button"
+            color="primary"
+            flat
+            icon="arrow_back"
+            round
+            @click="returnToDashboard"
+          >
+            <q-tooltip>Back to learning</q-tooltip>
+          </q-btn>
+          <div>
+            <p>Settings</p>
+            <h1>Preferences</h1>
+          </div>
         </div>
-      </div>
+      </template>
 
       <section class="settings-section">
         <div class="settings-section__heading">
@@ -135,7 +137,7 @@
           <span>{{ voiceStatus }}</span>
         </div>
       </section>
-    </section>
+    </AppDetailLayout>
   </q-page>
 </template>
 
@@ -161,6 +163,7 @@ import { clearLastRoutePreference } from 'src/services/user-preferences';
 import { useAppStore } from 'src/stores/app-store';
 import { fetchAppConfiguration } from 'src/services/api-client';
 import { formatDisplayDate } from 'src/services/date-format';
+import AppDetailLayout from 'src/components/AppDetailLayout.vue';
 import {
   beginMyShiftConnection,
   completeMyShiftConnection,

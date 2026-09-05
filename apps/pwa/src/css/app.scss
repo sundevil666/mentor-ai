@@ -314,21 +314,6 @@ body .q-menu {
   z-index: 6;
 }
 
-.app-detail-header {
-  background: var(--app-bg);
-  justify-content: flex-start;
-  position: sticky;
-  top: calc(55px + env(safe-area-inset-top));
-  z-index: 5;
-}
-
-.app-detail-header > .app-back-button {
-  flex: 0 0 auto;
-  left: auto;
-  position: relative;
-  top: auto;
-}
-
 .lesson-nav__status {
   margin-left: auto;
 }
@@ -554,6 +539,13 @@ body .q-menu {
   min-height: calc(100vh - 51px);
   padding: 18px max(24px, env(safe-area-inset-right)) calc(112px + env(safe-area-inset-bottom))
     max(24px, env(safe-area-inset-left));
+}
+
+.settings-page--detail {
+  box-sizing: border-box;
+  height: calc(100dvh - 55px - env(safe-area-inset-top));
+  min-height: 0 !important;
+  overflow: hidden;
 }
 
 .learning-shell {
@@ -4348,25 +4340,23 @@ p.lesson-complete__eyebrow,
 }
 
 .audio-page--detail {
-  overflow: visible;
-  padding-bottom: calc(260px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  height: calc(100dvh - 55px - env(safe-area-inset-top));
+  min-height: 0 !important;
+  overflow: hidden;
 }
 
 .patterns-page--detail {
-  overflow: visible;
-  padding-bottom: calc(220px + env(safe-area-inset-bottom));
-}
-
-.videos-page--audio-detail .video-detail {
-  overflow-y: auto;
-  padding-bottom: 152px;
+  box-sizing: border-box;
+  height: calc(100dvh - 55px - env(safe-area-inset-top));
+  min-height: 0 !important;
+  overflow: hidden;
 }
 
 @media (max-width: 520px) {
   .audio-page { padding: 18px 12px 116px; }
   .patterns-page { padding: 18px 12px 116px; }
-  .audio-page--detail { padding-bottom: calc(260px + env(safe-area-inset-bottom)); }
-  .patterns-page--detail { padding-bottom: calc(220px + env(safe-area-inset-bottom)); }
+  .audio-page--detail, .patterns-page--detail { padding-bottom: 12px; }
   .pattern-card { padding: 16px; }
   .pattern-card__body { grid-template-columns: 48px 1fr; }
   .pattern-card__icon { border-radius: 13px; height: 48px; width: 48px; }
