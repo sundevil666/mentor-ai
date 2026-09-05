@@ -7,7 +7,6 @@
           class="patterns-header"
         >
           <p>Reusable English</p><h1>Patterns</h1>
-          <span>Choose one phrase pattern and train it until it becomes automatic.</span>
         </header>
 
         <header

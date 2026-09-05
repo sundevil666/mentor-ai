@@ -113,7 +113,6 @@
               <div>
                 <p class="learning-start__eyebrow">{{ activeTrainingLibrary.label }}</p>
                 <h1>{{ activeTrainingLibrary.title }}</h1>
-                <p>{{ activeTrainingLibrary.description }}</p>
               </div>
               <q-icon :name="activeTrainingLibrary.icon" size="42px" color="primary" />
             </div>
@@ -1115,14 +1114,12 @@ const remoteContinueOptions = computed(() =>
 const trainingLibraries: Record<'listening' | 'speaking', {
   label: string;
   title: string;
-  description: string;
   icon: string;
   lessons: TrainingLibraryLesson[];
 }> = {
   listening: {
     label: 'Listen',
     title: 'Listening lessons',
-    description: 'Choose a lesson to begin, or download its audio before you go offline.',
     icon: 'headphones',
     lessons: [
       { templateKey: 'commute-listening', title: 'Commute listening', focus: 'A complete listening session for the journey', mode: 'listening', minutes: 10 },
@@ -1132,7 +1129,6 @@ const trainingLibraries: Record<'listening' | 'speaking', {
   speaking: {
     label: 'Speak',
     title: 'Speaking lessons',
-    description: 'Choose a speaking practice, or download its voice examples for offline use.',
     icon: 'record_voice_over',
     lessons: [
       { templateKey: 'weekly-weak-spots-dialogue', title: 'Work conversation', focus: 'Say five complete phrases for a real workday', mode: 'speaking', minutes: 9 },

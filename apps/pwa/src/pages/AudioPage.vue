@@ -16,7 +16,6 @@
           <div>
             <p>{{ selectedAudio ? 'Podcast episode' : 'English audio library' }}</p>
             <h1>{{ selectedAudio?.title ?? 'Audio' }}</h1>
-            <span v-if="!selectedAudio">Complete 30-minute programs in clear, slower American English.</span>
           </div>
         </header>
       </template>
