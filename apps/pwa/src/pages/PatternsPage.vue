@@ -112,16 +112,6 @@
               :loading="playlistPreparing"
               @click="togglePlaylist"
             />
-            <div class="pattern-playlist__repeat">
-              <span><strong>Repeat</strong><small>Play the complete list again</small></span>
-              <q-toggle
-                v-model="repeatEnabled"
-                color="primary"
-                icon="repeat"
-                aria-label="Repeat playlist"
-                @update:model-value="saveRepeatPreference"
-              />
-            </div>
             <q-btn
               v-if="playlistOffline"
               color="negative"
