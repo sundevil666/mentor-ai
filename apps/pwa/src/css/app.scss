@@ -4150,7 +4150,6 @@ body.body--dark .personal-reader__lookup-error {
 .pattern-example--done { border-color: rgba(33, 186, 69, .55); }
 .pattern-example__content { background: transparent; border: 0; color: inherit; cursor: pointer; display: grid; gap: 8px; padding: 14px; text-align: left; }
 .pattern-example__situation { color: var(--app-text-strong); font-weight: 800; line-height: 1.35; }
-.pattern-example__prompt { color: var(--app-muted); font-size: .85rem; }
 .pattern-example__answer { color: var(--app-text-strong); font-size: 1.02rem; font-weight: 700; line-height: 1.5; }
 .pattern-example__answer mark { background: #f2c94c; border-radius: 5px; color: #10201d; padding: 2px 4px; }
 .pattern-example__answer small { color: var(--app-muted); display: block; font-size: .8rem; font-weight: 500; }
@@ -4266,7 +4265,6 @@ body.body--dark .personal-reader__lookup-error {
 .app-copy--action,
 .recommended-action > span,
 .voice-actions > span,
-.pattern-example__prompt,
 .pattern-playlist__heading small,
 .training-library-card__offline > span {
   color: var(--app-copy-action);

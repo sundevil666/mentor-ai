@@ -160,8 +160,8 @@
             >{{ selectedPattern?.prefix }} <mark>{{ example.slotValue }}</mark>{{ selectedPattern?.suffix }}<small>{{ example.translation }}</small></span>
             <span
               v-else
-              class="pattern-example__prompt"
-            >Скажи вслух, затем открой ответ</span>
+              class="pattern-example__answer"
+            >{{ example.phrase }}</span>
           </button>
           <div class="pattern-example__actions">
             <q-btn
