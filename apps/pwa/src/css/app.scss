@@ -3281,7 +3281,7 @@ body.body--dark .personal-reader__lookup-error {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
-.content-mentor-feedback__actions > :only-child {
+.content-mentor-feedback__actions > .q-btn:only-child {
   grid-column: 2;
 }
 
