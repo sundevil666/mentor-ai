@@ -270,6 +270,9 @@ export async function getSpeechBatchSize(texts: string[]) {
 }
 
 export async function deleteSpeechBatch(texts: string[]) {
+  for (const text of uniqueSpeechTexts(texts)) {
+    generatedSpeechCache.delete(JSON.stringify(parseSpeechSegments(text)));
+  }
   if (typeof window === 'undefined' || !('caches' in window)) return;
   const cache = await caches.open(SPEECH_CACHE_NAME);
   await Promise.all(uniqueSpeechTexts(texts).map(async (text) => {

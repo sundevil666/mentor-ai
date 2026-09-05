@@ -78,7 +78,7 @@
               <small>Phrase → 4-second pause to repeat → next phrase</small>
             </div>
             <q-icon
-              :name="playlistOffline ? 'offline_pin' : 'cloud_download'"
+              :name="patternOffline ? 'offline_pin' : 'cloud_download'"
               size="28px"
             />
           </div>
@@ -113,7 +113,7 @@
               @click="togglePlaylist"
             />
             <q-btn
-              v-if="playlistOffline"
+              v-if="patternOffline"
               color="negative"
               flat
               icon="delete_outline"
@@ -133,9 +133,9 @@
             />
           </div>
           <span
-            v-if="playlistOffline"
+            v-if="patternOffline"
             class="pattern-playlist__offline"
-          ><q-icon name="check_circle" /> Downloaded. This playlist works without internet.</span>
+          ><q-icon name="check_circle" /> Downloaded. The playlist and all phrases work without internet.</span>
         </section>
       </article>
 
@@ -243,7 +243,7 @@ import { Notify } from 'quasar';
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { patternLibrary, type PhrasePatternExample } from 'src/services/pattern-library';
-import { speakWithPreferredVoice, stopSpeech } from 'src/services/speech-synthesis';
+import { deleteSpeechBatch, isSpeechBatchCached, preloadSpeechBatch, speakWithPreferredVoice, stopSpeech } from 'src/services/speech-synthesis';
 import { deleteOutdatedPatternPlaylists, deletePatternPlaylist, getCachedPatternPlaylist, hasOutdatedPatternPlaylist, preparePatternPlaylist } from 'src/services/pattern-playlist';
 import { configurePlaybackAudioSession } from 'src/services/audio-session';
 import AppAudioDock from 'src/components/AppAudioDock.vue';
@@ -263,6 +263,7 @@ const playlistDuration = ref(0);
 const playlistAudio = ref<HTMLAudioElement | null>(null);
 const playlistUrl = ref('');
 const playlistOffline = ref(false);
+const examplesOffline = ref(false);
 const playlistPreparing = ref(false);
 const playlistCompleted = ref(0);
 const showPlaylistUpdateDialog = ref(false);
@@ -271,6 +272,7 @@ const playbackRate = ref(1);
 const completedCount = computed(() => completedIds.value.size);
 const progress = computed(() => completedCount.value / (selectedPattern.value?.examples.length ?? 1));
 const playlistProgress = computed(() => playlistCompleted.value / (selectedPattern.value?.examples.length ?? 1));
+const patternOffline = computed(() => playlistOffline.value && examplesOffline.value);
 
 watch(selectedPattern, async (nextPattern) => {
   stopPlaylist();
@@ -279,6 +281,7 @@ watch(selectedPattern, async (nextPattern) => {
   stopSpeech();
   revokePlaylistUrl();
   playingId.value = null;
+  examplesOffline.value = false;
   revealedIds.value = new Set();
   completedIds.value = nextPattern ? readCompletedIds(nextPattern.id) : new Set();
   repeatEnabled.value = nextPattern
@@ -287,6 +290,8 @@ watch(selectedPattern, async (nextPattern) => {
   if (!nextPattern) return;
   const cached = await getCachedPatternPlaylist(nextPattern);
   if (selectedPattern.value?.id === nextPattern.id && cached) setPlaylistBlob(cached);
+  const phrasesCached = await isSpeechBatchCached(nextPattern.examples.map((example) => example.phrase));
+  if (selectedPattern.value?.id === nextPattern.id) examplesOffline.value = phrasesCached;
   if (selectedPattern.value?.id === nextPattern.id && !cached && await hasOutdatedPatternPlaylist(nextPattern)) {
     showPlaylistUpdateDialog.value = true;
   }
@@ -382,15 +387,35 @@ async function togglePlaylist() {
 
 async function updatePlaylist() {
   const pattern = selectedPattern.value;
-  if (!pattern || !(await ensurePlaylist())) return;
+  if (!pattern || !(await ensurePatternOffline())) return;
   await deleteOutdatedPatternPlaylists(pattern);
   showPlaylistUpdateDialog.value = false;
-  Notify.create({ type: 'positive', icon: 'offline_pin', message: `${pattern.title} updated and ready offline.` });
+  Notify.create({ type: 'positive', icon: 'offline_pin', message: `${pattern.title} and all phrases updated and ready offline.` });
 }
 
 async function downloadPlaylist() {
   const pattern = selectedPattern.value;
-  if (pattern && await ensurePlaylist()) Notify.create({ type: 'positive', icon: 'offline_pin', message: `${pattern.title} playlist downloaded for offline practice.` });
+  if (pattern && await ensurePatternOffline()) Notify.create({ type: 'positive', icon: 'offline_pin', message: `${pattern.title} playlist and all phrases downloaded for offline practice.` });
+}
+
+async function ensurePatternOffline() {
+  const pattern = selectedPattern.value;
+  if (!pattern || !(await ensurePlaylist())) return false;
+  if (examplesOffline.value) return true;
+  playlistPreparing.value = true;
+  playlistCompleted.value = 0;
+  try {
+    const phrases = pattern.examples.map((example) => example.phrase);
+    const result = await preloadSpeechBatch(phrases, (completed) => { playlistCompleted.value = completed; });
+    examplesOffline.value = result.failed === 0 && await isSpeechBatchCached(phrases);
+    if (!examplesOffline.value) throw new Error('Some pattern phrases could not be saved offline.');
+    return true;
+  } catch {
+    showOfflineError();
+    return false;
+  } finally {
+    playlistPreparing.value = false;
+  }
 }
 
 async function ensurePlaylist() {
@@ -412,9 +437,11 @@ async function removePlaylist() {
   if (!pattern) return;
   stopPlaylist();
   await deletePatternPlaylist(pattern.id);
+  await deleteSpeechBatch(pattern.examples.map((example) => example.phrase));
   revokePlaylistUrl();
   playlistOffline.value = false;
-  Notify.create({ type: 'positive', message: 'Offline playlist removed from this device.' });
+  examplesOffline.value = false;
+  Notify.create({ type: 'positive', message: 'Offline playlist and phrases removed from this device.' });
 }
 
 function setPlaylistBlob(blob: Blob) {
@@ -462,5 +489,10 @@ function saveRepeatPreference() {
 function showAudioError() {
   playingId.value = null; isLessonPlaying.value = false; playlistPreparing.value = false;
   Notify.create({ type: 'negative', icon: 'volume_off', message: 'Could not play this phrase', caption: 'Check the connection and try again.' });
+}
+
+function showOfflineError() {
+  playlistPreparing.value = false;
+  Notify.create({ type: 'negative', icon: 'cloud_off', message: 'Could not download all pattern audio', caption: 'Check the connection and try again.' });
 }
 </script>
