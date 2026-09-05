@@ -170,6 +170,7 @@
           v-else-if="!appStore.isLessonComplete && currentExercise"
           key="exercise"
           class="lesson-stage"
+          :reserve-bottom-navigation="false"
         >
           <template #header>
             <div class="lesson-nav">

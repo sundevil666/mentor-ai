@@ -4,6 +4,7 @@
     :class="{
       'app-detail-layout--active': active,
       'app-detail-layout--with-controls': active && Boolean($slots.controls),
+      'app-detail-layout--with-bottom-navigation-inset': active && reserveBottomNavigation && Boolean($slots.controls),
     }"
   >
     <div class="app-detail-layout__header">
@@ -26,8 +27,10 @@
 <script setup lang="ts">
 withDefaults(defineProps<{
   active?: boolean;
+  reserveBottomNavigation?: boolean;
 }>(), {
   active: true,
+  reserveBottomNavigation: true,
 });
 </script>
 
@@ -39,6 +42,10 @@ withDefaults(defineProps<{
   height: 100%;
   min-height: 0;
   overflow: hidden;
+}
+
+.app-detail-layout--with-bottom-navigation-inset {
+  height: calc(100% - 80px - env(safe-area-inset-bottom));
 }
 
 .app-detail-layout:not(.app-detail-layout--active) > .app-detail-layout__header,
@@ -80,7 +87,6 @@ withDefaults(defineProps<{
 }
 
 .app-detail-layout--active > .app-detail-layout__controls {
-  padding-bottom: calc(80px + env(safe-area-inset-bottom));
   min-height: 0;
   position: relative;
   z-index: 5;
