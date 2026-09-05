@@ -67,6 +67,8 @@ withDefaults(defineProps<{
   display: grid;
   gap: inherit;
   grid-auto-rows: max-content;
+  height: 100%;
+  max-height: 100%;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -84,7 +86,7 @@ withDefaults(defineProps<{
   z-index: 5;
 }
 
-.app-detail-layout--active > .app-detail-layout__controls :deep(.app-audio-dock) {
+.app-detail-layout--active > .app-detail-layout__controls :deep(> *) {
   bottom: auto;
   left: auto;
   position: relative;

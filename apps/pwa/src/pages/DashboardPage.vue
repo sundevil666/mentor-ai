@@ -1,5 +1,11 @@
 <template>
-  <q-page class="learning-page" :class="`category-theme--${selectedLessonLibrary}`">
+  <q-page
+    class="learning-page"
+    :class="[
+      `category-theme--${selectedLessonLibrary}`,
+      { 'learning-page--lesson': appStore.session && !appStore.isLessonComplete && currentExercise },
+    ]"
+  >
     <section class="learning-shell">
       <transition :name="learningTransitionName">
         <section v-if="!appStore.isHydrated" key="hydrating" class="learning-start">
@@ -160,12 +166,13 @@
           </section>
         </section>
 
-        <section
+        <AppDetailLayout
           v-else-if="!appStore.isLessonComplete && currentExercise"
           key="exercise"
           class="lesson-stage"
         >
-          <div class="lesson-nav">
+          <template #header>
+            <div class="lesson-nav">
             <q-btn
               class="app-back-button"
               color="primary"
@@ -225,7 +232,8 @@
                 </q-menu>
               </q-btn>
             </div>
-          </div>
+            </div>
+          </template>
 
           <div
             class="lesson-time-progress"
@@ -559,88 +567,51 @@
                 </div>
               </div>
 
-              <div class="listening-player__controls">
-                <q-btn
-                  color="primary"
-                  flat
-                  icon="keyboard_double_arrow_left"
-                  round
-                  @click="jumpSentence(-1)"
-                >
-                  <q-tooltip>Previous sentence</q-tooltip>
-                </q-btn>
-                <q-btn
-                  color="blue-7"
-                  class="app-play-button listening-player__play-button"
-                  unelevated
-                  :icon="
-                    isListeningPaused
-                      ? 'play_arrow'
-                      : isListeningStarting || isListeningSpeaking
-                        ? 'pause'
-                        : 'play_arrow'
-                  "
-                  round
-                  @click="toggleListeningPlayback"
-                >
-                  <q-tooltip>{{
-                    isListeningPaused
-                      ? 'Resume'
-                      : isListeningStarting || isListeningSpeaking
-                        ? 'Pause'
-                        : 'Play'
-                  }}</q-tooltip>
-                </q-btn>
-                <q-btn
-                  :color="isListeningRepeatEnabled ? 'secondary' : 'primary'"
-                  :flat="!isListeningRepeatEnabled"
-                  :unelevated="isListeningRepeatEnabled"
-                  icon="repeat"
-                  round
-                  @click="toggleListeningRepeat"
-                >
-                  <q-tooltip>{{
-                    isListeningRepeatEnabled ? 'Repeat is on' : 'Repeat selected text'
-                  }}</q-tooltip>
-                </q-btn>
-                <q-btn
-                  color="primary"
-                  flat
-                  icon="keyboard_double_arrow_right"
-                  round
-                  @click="jumpSentence(1)"
-                >
-                  <q-tooltip>Next sentence</q-tooltip>
-                </q-btn>
-                <q-btn
-                  class="listening-player__word-control"
-                  color="primary"
-                  flat
-                  icon="skip_previous"
-                  round
-                  @click="jumpWord(-1)"
-                >
-                  <q-tooltip>Previous word</q-tooltip>
-                </q-btn>
-                <q-btn
-                  class="listening-player__word-control"
-                  color="primary"
-                  flat
-                  icon="skip_next"
-                  round
-                  @click="jumpWord(1)"
-                >
-                  <q-tooltip>Next word</q-tooltip>
-                </q-btn>
-                <AudioPlaybackSpeedMenu
-                  :model-value="listeningPlaybackRate"
-                  :persistence-key="listeningProgressKey ? `listening:${listeningProgressKey}` : null"
-                  @update:model-value="setListeningPlaybackRate"
-                />
-              </div>
             </div>
           </transition>
-        </section>
+
+          <template v-if="isListeningPlayer" #controls>
+            <div class="listening-player__controls">
+              <q-btn color="primary" flat icon="keyboard_double_arrow_left" round @click="jumpSentence(-1)">
+                <q-tooltip>Previous sentence</q-tooltip>
+              </q-btn>
+              <q-btn
+                color="blue-7"
+                class="app-play-button listening-player__play-button"
+                unelevated
+                :icon="isListeningPaused ? 'play_arrow' : isListeningStarting || isListeningSpeaking ? 'pause' : 'play_arrow'"
+                round
+                @click="toggleListeningPlayback"
+              >
+                <q-tooltip>{{ isListeningPaused ? 'Resume' : isListeningStarting || isListeningSpeaking ? 'Pause' : 'Play' }}</q-tooltip>
+              </q-btn>
+              <q-btn
+                :color="isListeningRepeatEnabled ? 'secondary' : 'primary'"
+                :flat="!isListeningRepeatEnabled"
+                :unelevated="isListeningRepeatEnabled"
+                icon="repeat"
+                round
+                @click="toggleListeningRepeat"
+              >
+                <q-tooltip>{{ isListeningRepeatEnabled ? 'Repeat is on' : 'Repeat selected text' }}</q-tooltip>
+              </q-btn>
+              <q-btn color="primary" flat icon="keyboard_double_arrow_right" round @click="jumpSentence(1)">
+                <q-tooltip>Next sentence</q-tooltip>
+              </q-btn>
+              <q-btn class="listening-player__word-control" color="primary" flat icon="skip_previous" round @click="jumpWord(-1)">
+                <q-tooltip>Previous word</q-tooltip>
+              </q-btn>
+              <q-btn class="listening-player__word-control" color="primary" flat icon="skip_next" round @click="jumpWord(1)">
+                <q-tooltip>Next word</q-tooltip>
+              </q-btn>
+              <AudioPlaybackSpeedMenu
+                :model-value="listeningPlaybackRate"
+                :persistence-key="listeningProgressKey ? `listening:${listeningProgressKey}` : null"
+                @update:model-value="setListeningPlaybackRate"
+              />
+            </div>
+          </template>
+        </AppDetailLayout>
 
         <section v-else key="complete" class="lesson-complete">
           <p class="lesson-complete__eyebrow">Lesson complete</p>
@@ -716,6 +687,7 @@ import {
   stopSpeech,
 } from 'src/services/speech-synthesis';
 import AudioPlaybackSpeedMenu from 'src/components/AudioPlaybackSpeedMenu.vue';
+import AppDetailLayout from 'src/components/AppDetailLayout.vue';
 import {
   type ContinuousSpeechRecognition,
   isSpeechRecognitionAvailable,

@@ -532,6 +532,19 @@ body .q-menu {
     max(24px, env(safe-area-inset-left));
 }
 
+.learning-page--lesson {
+  box-sizing: border-box;
+  height: calc(100dvh - 55px - env(safe-area-inset-top));
+  min-height: 0 !important;
+  overflow: hidden;
+  padding-bottom: 12px;
+}
+
+.learning-page--lesson .learning-shell {
+  height: 100%;
+  min-height: 0;
+}
+
 .settings-page,
 .statistics-page {
   align-items: flex-start;
