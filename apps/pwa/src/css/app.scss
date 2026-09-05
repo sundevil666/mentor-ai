@@ -4138,7 +4138,6 @@ body.body--dark .personal-reader__lookup-error {
 .pattern-playlist__heading span { color: var(--app-accent); font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .pattern-playlist__heading strong { color: var(--app-text-strong); font-size: 1.05rem; }
 .pattern-playlist__heading small { color: var(--app-muted); }
-.pattern-playlist__heading > .q-icon { color: var(--app-accent); }
 .pattern-playlist audio { display: block; width: 100%; }
 .pattern-playlist__actions { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; }
 .pattern-playlist__actions > .q-btn:first-child { min-height: 48px; }

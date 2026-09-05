@@ -77,10 +77,17 @@
               <strong>{{ selectedPattern?.title }} · {{ selectedPattern?.examples.length }} phrases</strong>
               <small>Phrase → 4-second pause to repeat → next phrase</small>
             </div>
-            <q-icon
-              :name="patternOffline ? 'offline_pin' : 'cloud_download'"
-              size="28px"
-            />
+            <q-btn
+              :aria-label="patternOffline ? 'Remove offline pattern audio' : 'Download pattern audio for offline use'"
+              :color="patternOffline ? 'negative' : 'primary'"
+              flat
+              :icon="patternOffline ? 'delete_outline' : 'download_for_offline'"
+              :loading="playlistPreparing"
+              round
+              @click="togglePatternOffline"
+            >
+              <q-tooltip>{{ patternOffline ? 'Remove offline audio' : 'Download all audio for offline use' }}</q-tooltip>
+            </q-btn>
           </div>
           <audio
             v-if="playlistUrl"
@@ -111,25 +118,6 @@
               no-caps
               :loading="playlistPreparing"
               @click="togglePlaylist"
-            />
-            <q-btn
-              v-if="patternOffline"
-              color="negative"
-              flat
-              icon="delete_outline"
-              label="Remove download"
-              no-caps
-              @click="removePlaylist"
-            />
-            <q-btn
-              v-else
-              color="primary"
-              flat
-              icon="download_for_offline"
-              label="Download offline"
-              no-caps
-              :loading="playlistPreparing"
-              @click="downloadPlaylist"
             />
           </div>
           <span
@@ -396,6 +384,11 @@ async function updatePlaylist() {
 async function downloadPlaylist() {
   const pattern = selectedPattern.value;
   if (pattern && await ensurePatternOffline()) Notify.create({ type: 'positive', icon: 'offline_pin', message: `${pattern.title} playlist and all phrases downloaded for offline practice.` });
+}
+
+function togglePatternOffline() {
+  if (patternOffline.value) void removePlaylist();
+  else void downloadPlaylist();
 }
 
 async function ensurePatternOffline() {
