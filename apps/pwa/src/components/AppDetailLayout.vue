@@ -35,9 +35,10 @@ withDefaults(defineProps<{
 .app-detail-layout--active {
   display: grid;
   gap: 12px;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 .app-detail-layout:not(.app-detail-layout--active) > .app-detail-layout__header,
@@ -72,8 +73,19 @@ withDefaults(defineProps<{
   width: 100%;
 }
 
-.app-detail-layout--with-controls > .app-detail-layout__content {
-  padding-bottom: 152px;
+.app-detail-layout--active > .app-detail-layout__controls {
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  min-height: 0;
+  position: relative;
+  z-index: 5;
+}
+
+.app-detail-layout--active > .app-detail-layout__controls :deep(.app-audio-dock) {
+  bottom: auto;
+  left: auto;
+  position: relative;
+  transform: none;
+  width: 100%;
 }
 
 .app-detail-layout__header :deep(.app-back-button) {
