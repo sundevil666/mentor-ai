@@ -57,12 +57,19 @@ withDefaults(defineProps<{
 }
 
 .app-detail-layout--active > .app-detail-layout__content {
+  align-content: start;
+  align-items: start;
   display: grid;
   gap: inherit;
+  grid-auto-rows: max-content;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior-y: contain;
+}
+
+.app-detail-layout--active > .app-detail-layout__content :deep(> *) {
+  width: 100%;
 }
 
 .app-detail-layout--with-controls > .app-detail-layout__content {
