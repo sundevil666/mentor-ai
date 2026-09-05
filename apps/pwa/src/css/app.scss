@@ -3037,6 +3037,21 @@ body.body--dark .personal-reader__lookup-error {
   height: calc(100dvh - 190px);
   min-height: 520px;
   overflow: hidden;
+  position: relative;
+}
+
+.video-detail > .audio-program-card__art {
+  color: var(--category-accent);
+  opacity: 0.08;
+  pointer-events: none;
+  position: absolute;
+  right: 18px;
+  top: 12px;
+  z-index: 0;
+}
+
+.video-detail > .audio-program-card__art .q-icon {
+  font-size: 118px !important;
 }
 
 .video-detail__body {
@@ -3255,7 +3270,19 @@ body.body--dark .personal-reader__lookup-error {
 }
 
 .content-mentor-feedback__select {
+  min-width: 0;
   width: 100%;
+}
+
+.content-mentor-feedback__actions {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.content-mentor-feedback__actions > :only-child {
+  grid-column: 2;
 }
 
 .content-mentor-feedback--selection-hidden {
@@ -4158,12 +4185,12 @@ body.body--dark .personal-reader__lookup-error {
 .audio-card__meta .q-btn { margin-left: auto; }
 .audio-header--detail { display: flex; align-items: flex-start; gap: 6px; }
 .audio-header--detail h1 { font-size: clamp(1.55rem, 6vw, 2.4rem); }
-.audio-detail { overflow: hidden; }
+.audio-detail { overflow: hidden; position: relative; }
 .audio-detail__summary { display: grid; gap: 14px; padding: 22px; }
 .audio-detail__summary p { margin: 0; color: var(--app-muted); font-size: 1rem; line-height: 1.55; }
-.audio-detail__heading { display: flex; align-items: center; justify-content: space-between; }
-.audio-detail__icon { display: grid; width: 68px; height: 68px; border-radius: 20px; color: var(--q-primary); background: var(--app-surface-active); place-items: center; }
-.audio-detail__icon .q-icon { font-size: 38px; }
+.audio-detail__heading { pointer-events: none; position: absolute; right: 18px; top: 12px; }
+.audio-detail__icon { color: var(--category-accent); opacity: .08; }
+.audio-detail__icon .q-icon { font-size: 118px; }
 .audio-detail__meta { padding-left: 0; margin-top: 0; flex-wrap: wrap; }
 .audio-detail__meta span:last-child { margin-left: auto; }
 .audio-player { display: grid; gap: 18px; padding: 22px; border-block: 1px solid var(--app-border); background: var(--app-surface-soft); }

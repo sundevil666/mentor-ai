@@ -7,18 +7,21 @@
     <span class="content-mentor-feedback__statistics">
       <q-icon name="insights" /> {{ statisticsLabel }}
     </span>
-    <q-select
-      v-if="showSelect"
-      class="content-mentor-feedback__select"
-      dense
-      emit-value
-      label="Tell my mentor"
-      map-options
-      outlined
-      :model-value="summary.feedback ?? null"
-      :options="feedbackOptions"
-      @update:model-value="saveFeedback"
-    />
+    <div v-if="showSelect || $slots.action" class="content-mentor-feedback__actions">
+      <q-select
+        v-if="showSelect"
+        class="content-mentor-feedback__select"
+        dense
+        emit-value
+        label="Tell my mentor"
+        map-options
+        outlined
+        :model-value="summary.feedback ?? null"
+        :options="feedbackOptions"
+        @update:model-value="saveFeedback"
+      />
+      <slot name="action" />
+    </div>
   </div>
 </template>
 

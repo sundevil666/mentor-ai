@@ -45,10 +45,13 @@
             <span><q-icon name="school" /> {{ item.level }}</span>
             <span><q-icon name="schedule" /> {{ formatAudioDuration(item.durationSeconds) }}</span>
             <span><q-icon name="storage" /> {{ formatAudioSize(item.sizeBytes) }}</span>
-            <q-btn v-if="cachedUrls.has(item.sourceUrl)" :aria-label="`Delete ${item.title} from offline storage`" color="negative" flat icon="delete_outline" round :loading="busyId === item.id" @click="removeAudio(item)" />
-            <q-btn v-else :aria-label="`Save ${item.title} offline`" color="primary" flat icon="download_for_offline" round :disable="!isOnline" :loading="busyId === item.id" @click="downloadAudio(item)" />
+            <q-btn v-if="!cachedUrls.has(item.sourceUrl)" :aria-label="`Save ${item.title} offline`" color="primary" flat icon="download_for_offline" round :disable="!isOnline" :loading="busyId === item.id" @click="downloadAudio(item)" />
           </div>
-          <ContentMentorFeedback category="audio" :content-id="item.id" hide-select-after-feedback />
+          <ContentMentorFeedback category="audio" :content-id="item.id" hide-select-after-feedback>
+            <template v-if="cachedUrls.has(item.sourceUrl)" #action>
+              <q-btn :aria-label="`Delete ${item.title} from offline storage`" color="negative" flat icon="delete_outline" round :loading="busyId === item.id" @click="removeAudio(item)" />
+            </template>
+          </ContentMentorFeedback>
         </article>
       </section>
 
@@ -56,16 +59,6 @@
         <div class="audio-detail__summary">
           <div class="audio-detail__heading">
             <div class="audio-detail__icon"><q-icon name="headphones" /></div>
-            <q-btn
-              v-if="cachedUrls.has(selectedAudio.sourceUrl)"
-              aria-label="Remove offline copy"
-              color="negative"
-              flat
-              icon="delete_outline"
-              round
-              :loading="busyId === selectedAudio.id"
-              @click="removeAudio(selectedAudio)"
-            />
           </div>
           <p>{{ selectedAudio.description }}</p>
           <div class="audio-card__meta audio-detail__meta">
@@ -74,7 +67,11 @@
             <span><q-icon name="storage" /> {{ formatAudioSize(selectedAudio.sizeBytes) }}</span>
             <span><q-icon :name="playbackIsOffline ? 'offline_pin' : 'cloud_queue'" /> {{ playbackIsOffline ? 'Available offline' : 'Streaming' }}</span>
           </div>
-          <ContentMentorFeedback category="audio" :content-id="selectedAudio.id" />
+          <ContentMentorFeedback category="audio" :content-id="selectedAudio.id">
+            <template v-if="cachedUrls.has(selectedAudio.sourceUrl)" #action>
+              <q-btn aria-label="Remove offline copy" color="negative" flat icon="delete_outline" round :loading="busyId === selectedAudio.id" @click="removeAudio(selectedAudio)" />
+            </template>
+          </ContentMentorFeedback>
         </div>
 
         <section class="audio-player" aria-label="Audio player">

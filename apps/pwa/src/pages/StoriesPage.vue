@@ -121,17 +121,20 @@
               class="video-card__feedback"
               category="audio"
               :content-id="selectedStory.id"
-            />
-            <q-btn
-              :aria-label="isSaved(selectedStory) ? 'Delete offline story' : 'Save story offline'"
-              class="video-detail__offline-action"
-              :color="isSaved(selectedStory) ? 'negative' : 'primary'"
-              flat
-              :icon="isSaved(selectedStory) ? 'delete_outline' : 'download_for_offline'"
-              round
-              :loading="busy"
-              @click="toggleOffline(selectedStory)"
-            />
+            >
+              <template #action>
+                <q-btn
+                  :aria-label="isSaved(selectedStory) ? 'Delete offline story' : 'Save story offline'"
+                  class="video-detail__offline-action"
+                  :color="isSaved(selectedStory) ? 'negative' : 'primary'"
+                  flat
+                  :icon="isSaved(selectedStory) ? 'delete_outline' : 'download_for_offline'"
+                  round
+                  :loading="busy"
+                  @click="toggleOffline(selectedStory)"
+                />
+              </template>
+            </ContentMentorFeedback>
           </div>
           <p>{{ selectedStory.description }}</p>
           <p class="story-source">{{ selectedStory.sourceLabel }}. The recording is bundled with the app for reliable offline listening.</p>
