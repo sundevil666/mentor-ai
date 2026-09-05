@@ -48,7 +48,7 @@
           </div>
           <ContentMentorFeedback category="audio" :content-id="item.id" hide-select-after-feedback>
             <template v-if="cachedUrls.has(item.sourceUrl)" #action>
-              <q-btn :aria-label="`Delete ${item.title} from offline storage`" color="negative" flat icon="delete_outline" round :loading="busyId === item.id" @click="removeAudio(item)" />
+              <q-btn :aria-label="`Delete ${item.title} from offline storage`" color="primary" flat icon="delete_outline" round :loading="busyId === item.id" @click="removeAudio(item)" />
             </template>
           </ContentMentorFeedback>
         </article>
@@ -68,7 +68,7 @@
           </div>
           <ContentMentorFeedback category="audio" :content-id="selectedAudio.id">
             <template v-if="cachedUrls.has(selectedAudio.sourceUrl)" #action>
-              <q-btn aria-label="Remove offline copy" color="negative" flat icon="delete_outline" round :loading="busyId === selectedAudio.id" @click="removeAudio(selectedAudio)" />
+              <q-btn aria-label="Remove offline copy" color="primary" flat icon="delete_outline" round :loading="busyId === selectedAudio.id" @click="removeAudio(selectedAudio)" />
             </template>
           </ContentMentorFeedback>
         </div>

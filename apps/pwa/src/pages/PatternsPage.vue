@@ -79,7 +79,7 @@
             </div>
             <q-btn
               :aria-label="patternOffline ? 'Remove offline pattern audio' : 'Download pattern audio for offline use'"
-              :color="patternOffline ? 'negative' : 'primary'"
+              color="primary"
               flat
               :icon="patternOffline ? 'delete_outline' : 'download_for_offline'"
               :loading="playlistPreparing"
@@ -120,10 +120,6 @@
               @click="togglePlaylist"
             />
           </div>
-          <span
-            v-if="patternOffline"
-            class="pattern-playlist__offline"
-          ><q-icon name="check_circle" /> Downloaded. The playlist and all phrases work without internet.</span>
         </section>
       </article>
 

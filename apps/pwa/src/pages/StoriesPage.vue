@@ -126,7 +126,7 @@
                 <q-btn
                   :aria-label="isSaved(selectedStory) ? 'Delete offline story' : 'Save story offline'"
                   class="video-detail__offline-action"
-                  :color="isSaved(selectedStory) ? 'negative' : 'primary'"
+                  color="primary"
                   flat
                   :icon="isSaved(selectedStory) ? 'delete_outline' : 'download_for_offline'"
                   round
