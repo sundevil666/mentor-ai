@@ -1,5 +1,32 @@
 <template>
+  <q-list
+    v-if="optionsOnly"
+    class="audio-playback-speed-menu__list"
+    dense
+  >
+    <q-item
+      v-for="rate in audioPlaybackRates"
+      :key="rate"
+      v-close-popup
+      clickable
+      :active="modelValue === rate"
+      active-class="audio-playback-speed-menu__option--active"
+      @click="selectRate(rate)"
+    >
+      <q-item-section>{{ rate }}×</q-item-section>
+      <q-item-section
+        v-if="modelValue === rate"
+        avatar
+      >
+        <q-icon
+          color="primary"
+          name="check"
+        />
+      </q-item-section>
+    </q-item>
+  </q-list>
   <q-btn
+    v-else
     :aria-label="`Playback speed: ${modelValue} times`"
     class="audio-playback-speed-menu"
     color="primary"
@@ -51,9 +78,11 @@ import { audioPlaybackRates, type AudioPlaybackRate, readAudioPlaybackRate, save
 const props = withDefaults(defineProps<{
   disabled?: boolean;
   modelValue: number;
+  optionsOnly?: boolean;
   persistenceKey?: string | null;
 }>(), {
   disabled: false,
+  optionsOnly: false,
   persistenceKey: null,
 });
 

@@ -1371,6 +1371,10 @@ body.body--dark .training-library-card--completed .training-library-card__status
   text-align: right;
 }
 
+.listening-player__options-menu {
+  min-width: 230px;
+}
+
 .lesson-nav {
   align-items: center;
   border-bottom: 1px solid var(--app-border);

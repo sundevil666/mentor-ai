@@ -585,16 +585,6 @@
               >
                 <q-tooltip>Start from the beginning</q-tooltip>
               </q-btn>
-              <q-btn
-                :color="isListeningRepeatEnabled ? 'secondary' : 'primary'"
-                :flat="!isListeningRepeatEnabled"
-                :unelevated="isListeningRepeatEnabled"
-                icon="repeat"
-                round
-                @click="toggleListeningRepeat"
-              >
-                <q-tooltip>{{ isListeningRepeatEnabled ? 'Repeat is on' : 'Repeat selected text' }}</q-tooltip>
-              </q-btn>
               <q-btn color="primary" flat icon="keyboard_double_arrow_right" round @click="jumpSentence(1)">
                 <q-tooltip>Next sentence</q-tooltip>
               </q-btn>
@@ -604,11 +594,35 @@
               <q-btn class="listening-player__word-control" color="primary" flat icon="skip_next" round @click="jumpWord(1)">
                 <q-tooltip>Next word</q-tooltip>
               </q-btn>
-              <AudioPlaybackSpeedMenu
-                :model-value="listeningPlaybackRate"
-                :persistence-key="listeningProgressKey ? `listening:${listeningProgressKey}` : null"
-                @update:model-value="setListeningPlaybackRate"
-              />
+              <q-btn aria-label="More playback options" color="primary" flat icon="more_vert" round>
+                <q-tooltip>More playback options</q-tooltip>
+                <q-menu anchor="top right" self="bottom right">
+                  <q-list class="listening-player__options-menu">
+                    <q-item>
+                      <q-item-section avatar><q-icon color="primary" name="repeat" /></q-item-section>
+                      <q-item-section>
+                        <q-item-label>Repeat selected text</q-item-label>
+                      </q-item-section>
+                      <q-item-section side>
+                        <q-toggle
+                          :model-value="isListeningRepeatEnabled"
+                          color="primary"
+                          aria-label="Repeat selected text"
+                          @update:model-value="toggleListeningRepeat"
+                        />
+                      </q-item-section>
+                    </q-item>
+                    <q-separator />
+                    <q-item-label header>Playback speed</q-item-label>
+                    <AudioPlaybackSpeedMenu
+                      options-only
+                      :model-value="listeningPlaybackRate"
+                      :persistence-key="listeningProgressKey ? `listening:${listeningProgressKey}` : null"
+                      @update:model-value="setListeningPlaybackRate"
+                    />
+                  </q-list>
+                </q-menu>
+              </q-btn>
             </div>
           </template>
         </AppDetailLayout>
