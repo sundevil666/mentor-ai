@@ -491,18 +491,6 @@
                     />
                   </div>
                   <q-btn
-                    v-if="!isRepeatedLesson"
-                    class="listening-player__start-over-button"
-                    color="primary"
-                    flat
-                    icon="restart_alt"
-                    label="Start"
-                    no-caps
-                    @click="resetListeningToBeginning"
-                  >
-                    <q-tooltip>Go to the beginning</q-tooltip>
-                  </q-btn>
-                  <q-btn
                     class="listening-player__translate-button"
                     :color="isListeningTranslationVisible ? 'secondary' : 'primary'"
                     flat
@@ -585,6 +573,17 @@
                 @click="toggleListeningPlayback"
               >
                 <q-tooltip>{{ isListeningPaused ? 'Resume' : isListeningStarting || isListeningSpeaking ? 'Pause' : 'Play' }}</q-tooltip>
+              </q-btn>
+              <q-btn
+                v-if="!isRepeatedLesson"
+                aria-label="Start from the beginning"
+                color="primary"
+                flat
+                icon="restart_alt"
+                round
+                @click="resetListeningToBeginning"
+              >
+                <q-tooltip>Start from the beginning</q-tooltip>
               </q-btn>
               <q-btn
                 :color="isListeningRepeatEnabled ? 'secondary' : 'primary'"
