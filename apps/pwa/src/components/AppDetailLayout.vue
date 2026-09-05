@@ -57,6 +57,10 @@ withDefaults(defineProps<{
   margin-bottom: 0;
 }
 
+.app-detail-layout--active > .app-detail-layout__header :deep(h1) {
+  font-size: clamp(1.25rem, 5vw, 1.75rem);
+}
+
 .app-detail-layout--active > .app-detail-layout__content {
   align-content: start;
   align-items: start;
