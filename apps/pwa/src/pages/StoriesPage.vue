@@ -512,6 +512,7 @@ const readerPaper = ref<HTMLElement | null>(null);
 const readerPageCount = ref(1);
 const readerPageStride = ref(1);
 const chapterPageIndexes = ref<number[]>([]);
+const selectedBookChapterIndex = ref(0);
 const selectedReaderText = ref('');
 const selectedReaderWordIndex = ref<number | null>(null);
 const readerMarkerWordIndex = ref<number | null>(null);
@@ -625,13 +626,14 @@ watch(
   },
   { immediate: true },
 );
-const currentBookChapterIndex = computed(() => {
+function resolveBookChapterIndex(pageIndex: number) {
   let activeIndex = 0;
-  chapterPageIndexes.value.forEach((pageIndex, chapterIndex) => {
-    if (pageIndex <= currentBookPageIndex.value) activeIndex = chapterIndex;
+  chapterPageIndexes.value.forEach((chapterPageIndex, chapterIndex) => {
+    if (chapterPageIndex <= pageIndex) activeIndex = chapterIndex;
   });
   return activeIndex;
-});
+}
+const currentBookChapterIndex = computed(() => selectedBookChapterIndex.value);
 const readerLookupKind = computed(() => /\s/.test(selectedReaderText.value) ? 'phrase' : 'word');
 const bookPageOptions = computed(() => selectedBookPages.value.map((page, index) => ({
   label: formatBookPartLabel(index, selectedBookChapters.value.find((chapter) => chapter.id === page.chapterId)?.title),
@@ -830,6 +832,7 @@ async function openBook(bookId: string) {
   selectedBookChapters.value = loaded.chapters;
   selectedBookPages.value = loaded.pages;
   currentBookPageIndex.value = 0;
+  selectedBookChapterIndex.value = 0;
   readerPageCount.value = 1;
   readerPageStride.value = 1;
   chapterPageIndexes.value = loaded.pages.map(() => 0);
@@ -852,6 +855,7 @@ function closeBook() {
   selectedBookChapters.value = [];
   selectedBookPages.value = [];
   currentBookPageIndex.value = 0;
+  selectedBookChapterIndex.value = 0;
   readerPageCount.value = 1;
   readerPageStride.value = 1;
   chapterPageIndexes.value = [];
@@ -872,6 +876,7 @@ function goToBookPage(pageIndex: number | null) {
   if (destinationPageIndex > currentBookPageIndex.value) recordCompletedReaderPage(currentBookPageIndex.value);
   persistBookProgress();
   currentBookPageIndex.value = destinationPageIndex;
+  selectedBookChapterIndex.value = resolveBookChapterIndex(destinationPageIndex);
   scrollToReaderPage();
   persistBookProgress();
   readingSpeechAnchor = getVisibleReaderWordAnchor();
@@ -881,9 +886,10 @@ function goToBookPage(pageIndex: number | null) {
 }
 async function goToBookChapter(chapterIndex: number | null) {
   if (chapterIndex === null || !Number.isInteger(chapterIndex) || chapterIndex < 0 || chapterIndex >= selectedBookPages.value.length) return;
+  selectedBookChapterIndex.value = chapterIndex;
   persistBookProgress();
   await repaginateReader({ legacyChapterIndex: chapterIndex });
-  await persistReaderNavigationProgress();
+  await persistReaderNavigationProgress(getReaderChapterWordAnchor(chapterIndex));
 }
 function formatBookPartLabel(index: number, title?: string) {
   const normalizedTitle = title?.replace(/\s+/g, ' ').trim();
@@ -1701,10 +1707,10 @@ async function persistSpokenReadingProgress(furthestWordIndex: number) {
     updatedAt: new Date().toISOString(),
   });
 }
-async function persistReaderNavigationProgress() {
+async function persistReaderNavigationProgress(preferredWordIndex?: number) {
   const book = selectedBook.value;
   if (!book) return;
-  const wordIndex = getReaderPageWordAnchor(currentBookPageIndex.value);
+  const wordIndex = preferredWordIndex ?? getReaderPageWordAnchor(currentBookPageIndex.value);
   if (wordIndex < 0) return;
   const wordCount = readerReferenceWords.value.length;
   await saveContentProgress({
@@ -1827,12 +1833,15 @@ async function repaginateReader(position: BookReaderProgress = { progressRatio: 
   viewport.style.setProperty('--reader-end-gutter', `${columnGap}px`);
   chapterPageIndexes.value = selectedBookPages.value.map((_, chapterIndex) => {
     const chapter = paper.querySelector<HTMLElement>(`[data-book-chapter-index="${chapterIndex}"]`);
-    return Math.max(0, Math.min(readerPageCount.value - 1, Math.floor(((chapter?.offsetLeft ?? 0) + 1) / readerPageStride.value)));
+    const anchor = chapter?.querySelector<HTMLElement>('[data-reader-word-index]') ?? chapter;
+    return Math.max(0, Math.min(readerPageCount.value - 1, Math.floor(((anchor?.offsetLeft ?? 0) + 1) / readerPageStride.value)));
   });
   if (position.legacyChapterIndex !== undefined) {
     currentBookPageIndex.value = chapterPageIndexes.value[position.legacyChapterIndex] ?? 0;
+    selectedBookChapterIndex.value = position.legacyChapterIndex;
   } else {
     currentBookPageIndex.value = Math.round(clampProgressRatio(position.progressRatio) * Math.max(0, readerPageCount.value - 1));
+    selectedBookChapterIndex.value = resolveBookChapterIndex(currentBookPageIndex.value);
   }
   scrollToReaderPage(false);
   persistBookProgress();
@@ -1842,6 +1851,8 @@ function goToSyncedReaderPosition() {
   const word = readerPaper.value?.querySelector<HTMLElement>(`[data-reader-word-index="${syncedReaderPositionWordIndex}"]`);
   if (!word) return;
   currentBookPageIndex.value = Math.max(0, Math.min(readerPageCount.value - 1, Math.floor((word.offsetLeft + 1) / readerPageStride.value)));
+  const chapterIndex = Number(word.closest<HTMLElement>('[data-book-chapter-index]')?.dataset.bookChapterIndex);
+  selectedBookChapterIndex.value = Number.isInteger(chapterIndex) ? chapterIndex : resolveBookChapterIndex(currentBookPageIndex.value);
   scrollToReaderPage(false);
   persistBookProgress();
 }
@@ -1851,6 +1862,12 @@ function getReaderPageWordAnchor(pageIndex: number) {
   const word = Array.from(paper.querySelectorAll<HTMLElement>('[data-reader-word-index]')).find((candidate) => (
     Math.floor((candidate.offsetLeft + 1) / readerPageStride.value) === pageIndex
   ));
+  const wordIndex = Number(word?.dataset.readerWordIndex);
+  return Number.isInteger(wordIndex) ? wordIndex : -1;
+}
+function getReaderChapterWordAnchor(chapterIndex: number) {
+  const word = readerPaper.value
+    ?.querySelector<HTMLElement>(`[data-book-chapter-index="${chapterIndex}"] [data-reader-word-index]`);
   const wordIndex = Number(word?.dataset.readerWordIndex);
   return Number.isInteger(wordIndex) ? wordIndex : -1;
 }
