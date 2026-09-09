@@ -1,8 +1,11 @@
 import type { ContentProgress, ContentProgressCategory } from '@mentor-ai/shared';
 import { mentorDb } from './indexed-db';
 import { synchronizeContentProgress } from './api-client';
+import { mergeContentProgressForStorage } from './content-progress-merge';
 
 const deviceKey = 'mentor-ai-device-id';
+let contentProgressSyncPromise: Promise<void> | null = null;
+let contentProgressSyncRequested = false;
 
 export async function loadContentProgress(category: ContentProgressCategory, contentId: string) {
   const db = await mentorDb;
@@ -26,10 +29,25 @@ export async function saveContentProgress(input: Omit<ContentProgress, 'id' | 's
 
 export async function syncAllContentProgress() {
   if (!navigator.onLine) return;
-  const db = await mentorDb;
-  const local = await db.getAll('content-progress') as ContentProgress[];
-  const merged = await synchronizeContentProgress(local);
-  for (const progress of merged) await db.put('content-progress', progress);
+  contentProgressSyncRequested = true;
+  if (contentProgressSyncPromise) return contentProgressSyncPromise;
+
+  contentProgressSyncPromise = (async () => {
+    const db = await mentorDb;
+    while (contentProgressSyncRequested && navigator.onLine) {
+      contentProgressSyncRequested = false;
+      const local = await db.getAll('content-progress') as ContentProgress[];
+      const merged = await synchronizeContentProgress(local);
+      for (const remoteProgress of merged) {
+        const current = await db.get('content-progress', remoteProgress.id) as ContentProgress | undefined;
+        await db.put('content-progress', mergeContentProgressForStorage(current, remoteProgress));
+      }
+    }
+  })().finally(() => {
+    contentProgressSyncPromise = null;
+  });
+
+  return contentProgressSyncPromise;
 }
 
 function getDeviceId() {

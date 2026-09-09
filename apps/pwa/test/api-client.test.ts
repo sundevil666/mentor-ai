@@ -128,6 +128,7 @@ describe('PWA API client', () => {
     const result = await synchronizeContentProgress([]);
 
     assert.equal(calls[0]?.url, 'http://localhost:4000/api/synchronization');
+    assert.equal(calls[0]?.init?.keepalive, true);
     assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { progress: [] });
     assert.equal(result[0]?.furthestPosition, 120);
   });
