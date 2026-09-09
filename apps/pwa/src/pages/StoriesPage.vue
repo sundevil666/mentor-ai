@@ -412,7 +412,7 @@
         </nav>
       </section>
 
-      <p v-if="isAudioLibrary && !selectedStory" class="video-storage-note">{{ offlineSummary }} Every public-domain recording is bundled with the app in 30–40 minute listening parts.</p>
+      <p v-if="isAudioLibrary && !selectedStory" class="video-storage-note">{{ offlineSummary }} Public-domain recordings stream from their archive and can be saved on this device for offline listening.</p>
       <template v-if="selectedStory" #controls>
         <AppAudioDock
           :current-time="currentTime"

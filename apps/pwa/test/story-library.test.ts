@@ -8,8 +8,17 @@ describe('audio story library', () => {
     for (const story of storyLibrary) {
       assert.ok(story.durationSeconds >= 30 * 60, `${story.title} is shorter than 30 minutes`);
       assert.ok(story.durationSeconds <= 40 * 60, `${story.title} is longer than 40 minutes`);
-      assert.match(story.sourceUrl, /^\/audio-stories\/.+\.mp3$/);
+      assert.match(story.sourceUrl, /^https:\/\/archive\.org\/download\/.+_64kb\.mp3$/);
     }
+  });
+
+  it('keeps immutable catalog sizes aligned with the external recordings', () => {
+    assert.deepEqual(storyLibrary.map((story) => story.sizeBytes), [
+      16_854_050,
+      17_180_082,
+      17_101_287,
+      17_900_842,
+    ]);
   });
 
   it('keeps the long Mark Twain story split into ordered parts', () => {
