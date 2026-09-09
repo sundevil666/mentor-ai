@@ -10,3 +10,9 @@ export function mergeContentProgressForStorage(current: ContentProgress | undefi
     completed: current.completed || remote.completed,
   };
 }
+
+export function shouldUseSyncedReaderPosition(localUpdatedAt: string | undefined, remoteUpdatedAt: string | undefined) {
+  if (!remoteUpdatedAt) return false;
+  if (!localUpdatedAt) return true;
+  return remoteUpdatedAt >= localUpdatedAt;
+}

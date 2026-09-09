@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { ContentProgress } from '@mentor-ai/shared';
-import { mergeContentProgressForStorage } from '../src/services/content-progress-merge.js';
+import { mergeContentProgressForStorage, shouldUseSyncedReaderPosition } from '../src/services/content-progress-merge.js';
 
 function progress(position: number, updatedAt: string): ContentProgress {
   return {
@@ -33,4 +33,9 @@ test('a newer synchronized position replaces an older local position', () => {
   const remote = progress(420, '2026-09-09T10:00:01.000Z');
 
   assert.equal(mergeContentProgressForStorage(oldLocal, remote).position, 420);
+});
+
+test('reader restoration uses the most recently changed position', () => {
+  assert.equal(shouldUseSyncedReaderPosition('2026-09-09T10:00:01.000Z', '2026-09-09T10:00:00.000Z'), false);
+  assert.equal(shouldUseSyncedReaderPosition('2026-09-09T10:00:00.000Z', '2026-09-09T10:00:01.000Z'), true);
 });

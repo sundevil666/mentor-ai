@@ -470,6 +470,7 @@ import AppAudioDock from 'src/components/AppAudioDock.vue';
 import AudioLibraryTabs from 'src/components/AudioLibraryTabs.vue';
 import { loadContentEngagementSummaries, recordContentEngagement, syncContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
 import { loadContentProgress, saveContentProgress, syncAllContentProgress } from 'src/services/content-progress';
+import { shouldUseSyncedReaderPosition } from 'src/services/content-progress-merge';
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineStory } from 'src/services/offline-library';
 import { deleteOfflineStory, formatStoryDuration, formatStorySize, getCachedStoryUrls, saveStoryOffline, storyLibrary, type LibraryStory } from 'src/services/story-library';
 import { useAppStore } from 'src/stores/app-store';
@@ -545,6 +546,7 @@ const readingSpeechDebugEntries = ref<string[]>(['Waiting for microphone start.'
 let readingSpeechAnchor = 0;
 let readingSpeechFurthestWordIndex = -1;
 let syncedReaderPositionWordIndex = -1;
+let syncedReaderPositionUpdatedAt: string | undefined;
 let readingSpeechLocalTranscriptWindow: string[] = [];
 let readingSpeechPositionLocked = false;
 let readingSpeechRecognition: ContinuousSpeechRecognition | null = null;
@@ -836,13 +838,18 @@ async function openBook(bookId: string) {
   readerPageCount.value = 1;
   readerPageStride.value = 1;
   chapterPageIndexes.value = loaded.pages.map(() => 0);
+  const localBookProgress = readBookProgress(loaded.book.id, loaded.pages.length);
   await restoreSpokenReadingProgress(loaded.book.id);
   readerMarkerWordIndex.value = readReaderMarker(loaded.book.id);
   await markPersonalBookOpened(loaded.book);
   personalBooks.value = await listPersonalBooks();
   await nextTick();
-  await repaginateReader(readBookProgress(loaded.book.id, loaded.pages.length));
-  goToSyncedReaderPosition();
+  await repaginateReader(localBookProgress);
+  if (shouldUseSyncedReaderPosition(localBookProgress.updatedAt, syncedReaderPositionUpdatedAt)) {
+    goToSyncedReaderPosition();
+  } else if (localBookProgress.updatedAt) {
+    void persistReaderNavigationProgress(undefined, localBookProgress.updatedAt);
+  }
   startReaderPagination();
   readingActivityTimer.start();
 }
@@ -863,6 +870,7 @@ function closeBook() {
   provisionalReaderWordIndexes.value = new Set();
   readingSpeechFurthestWordIndex = -1;
   syncedReaderPositionWordIndex = -1;
+  syncedReaderPositionUpdatedAt = undefined;
   selectedReaderWordIndex.value = null;
   readerMarkerWordIndex.value = null;
   readingSpeechAcceptedWords.value = 0;
@@ -889,6 +897,7 @@ async function goToBookChapter(chapterIndex: number | null) {
   selectedBookChapterIndex.value = chapterIndex;
   persistBookProgress();
   await repaginateReader({ legacyChapterIndex: chapterIndex });
+  persistBookProgress();
   await persistReaderNavigationProgress(getReaderChapterWordAnchor(chapterIndex));
 }
 function formatBookPartLabel(index: number, title?: string) {
@@ -1641,7 +1650,7 @@ function handleReaderKeydown(event: KeyboardEvent) {
   if (event.key === 'ArrowLeft') goToBookPage(currentBookPageIndex.value - 1);
   if (event.key === 'ArrowRight') goToBookPage(currentBookPageIndex.value + 1);
 }
-function persistBookProgress() {
+function persistBookProgress(updatedAt = new Date().toISOString()) {
   const book = selectedBook.value;
   if (!book || typeof localStorage === 'undefined') return;
   const previous = readBookProgress(book.id, selectedBookPages.value.length);
@@ -1653,7 +1662,7 @@ function persistBookProgress() {
     progressRatio,
     furthestProgressRatio: Math.max(previous.furthestProgressRatio ?? 0, progressRatio),
     chapterId: selectedBookPages.value[currentBookChapterIndex.value]?.chapterId,
-    updatedAt: new Date().toISOString(),
+    updatedAt,
   }));
 }
 function bookProgressKey(bookId: string) { return `mentor-ai:personal-book-progress:${bookId}`; }
@@ -1684,6 +1693,7 @@ async function restoreSpokenReadingProgress(bookId: string) {
   await syncAllContentProgress().catch(() => undefined);
   const progress = await loadContentProgress('reading', bookId);
   syncedReaderPositionWordIndex = Math.max(-1, Math.floor(progress?.position ?? 0) - 1);
+  syncedReaderPositionUpdatedAt = progress?.updatedAt;
   const furthestWordIndex = Math.max(-1, Math.floor(progress?.furthestPosition ?? 0) - 1);
   readingSpeechFurthestWordIndex = furthestWordIndex;
   if (furthestWordIndex < 0) return;
@@ -1707,7 +1717,7 @@ async function persistSpokenReadingProgress(furthestWordIndex: number) {
     updatedAt: new Date().toISOString(),
   });
 }
-async function persistReaderNavigationProgress(preferredWordIndex?: number) {
+async function persistReaderNavigationProgress(preferredWordIndex?: number, updatedAt = new Date().toISOString()) {
   const book = selectedBook.value;
   if (!book) return;
   const wordIndex = preferredWordIndex ?? getReaderPageWordAnchor(currentBookPageIndex.value);
@@ -1721,7 +1731,7 @@ async function persistReaderNavigationProgress(preferredWordIndex?: number) {
     furthestPosition: wordIndex + 1,
     duration: wordCount,
     completed: wordCount > 0 && wordIndex >= wordCount - 1,
-    updatedAt: new Date().toISOString(),
+    updatedAt,
   });
 }
 function recordDailySpokenMatch(wordIndexes: readonly number[]) {
@@ -1748,15 +1758,17 @@ interface BookReaderProgress {
   progressRatio?: number;
   furthestProgressRatio?: number;
   legacyChapterIndex?: number;
+  updatedAt?: string;
 }
 function readBookProgress(bookId: string, chapterCount: number): BookReaderProgress {
   if (typeof localStorage === 'undefined') return { progressRatio: 0, furthestProgressRatio: 0 };
   try {
-    const parsed = JSON.parse(localStorage.getItem(bookProgressKey(bookId)) ?? 'null') as { version?: number; currentPageIndex?: number; progressRatio?: number; furthestProgressRatio?: number } | null;
+    const parsed = JSON.parse(localStorage.getItem(bookProgressKey(bookId)) ?? 'null') as { version?: number; currentPageIndex?: number; progressRatio?: number; furthestProgressRatio?: number; updatedAt?: string } | null;
     if (parsed?.version === 2) {
       return {
         progressRatio: clampProgressRatio(parsed.progressRatio),
         furthestProgressRatio: clampProgressRatio(parsed.furthestProgressRatio),
+        updatedAt: Number.isFinite(Date.parse(parsed.updatedAt ?? '')) ? parsed.updatedAt : undefined,
       };
     }
     return {
@@ -1844,7 +1856,6 @@ async function repaginateReader(position: BookReaderProgress = { progressRatio: 
     selectedBookChapterIndex.value = resolveBookChapterIndex(currentBookPageIndex.value);
   }
   scrollToReaderPage(false);
-  persistBookProgress();
 }
 function goToSyncedReaderPosition() {
   if (syncedReaderPositionWordIndex < 0 || readerPageStride.value <= 0) return;
@@ -1854,7 +1865,7 @@ function goToSyncedReaderPosition() {
   const chapterIndex = Number(word.closest<HTMLElement>('[data-book-chapter-index]')?.dataset.bookChapterIndex);
   selectedBookChapterIndex.value = Number.isInteger(chapterIndex) ? chapterIndex : resolveBookChapterIndex(currentBookPageIndex.value);
   scrollToReaderPage(false);
-  persistBookProgress();
+  persistBookProgress(syncedReaderPositionUpdatedAt);
 }
 function getReaderPageWordAnchor(pageIndex: number) {
   const paper = readerPaper.value;
