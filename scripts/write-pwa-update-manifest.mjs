@@ -41,7 +41,9 @@ function detectAffectedRoutes() {
     ['apps/pwa/src/pages/DashboardPage.vue', '/'],
     ['apps/pwa/src/pages/PatternsPage.vue', '/patterns'],
     ['apps/pwa/src/pages/AudioPage.vue', '/audio'],
-    ['apps/pwa/src/pages/StoriesPage.vue', '/stories'],
+    // StoriesPage serves the legacy Stories route, Audio stories, and Reading.
+    // A change to the shared page must therefore wake every currently open route.
+    ['apps/pwa/src/pages/StoriesPage.vue', '*'],
     ['apps/pwa/src/pages/StoragePage.vue', '/storage'],
     ['apps/pwa/src/pages/StatisticsPage.vue', '/statistics'],
     ['apps/pwa/src/pages/SettingsPage.vue', '/settings'],
