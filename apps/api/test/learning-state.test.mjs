@@ -358,7 +358,7 @@ describe('learning state service', () => {
     }), /Invalid reading transcript/);
   });
 
-  it('keeps the furthest processed progress when a newer device reports less', async () => {
+  it('keeps furthest progress while using the newest device as the resume position', async () => {
     const base = {
       id: 'video:conflict-test', studentId: 'demo-student', category: 'video', contentId: 'conflict-test',
       duration: 600, completed: false,
@@ -370,7 +370,7 @@ describe('learning state service', () => {
       ...base, position: 30, furthestPosition: 30, sourceDeviceId: 'laptop', updatedAt: '2026-01-01T11:00:00.000Z',
     }]);
     const progress = merged.find((item) => item.id === base.id);
-    assert.equal(progress.position, 420);
+    assert.equal(progress.position, 30);
     assert.equal(progress.furthestPosition, 420);
   });
 

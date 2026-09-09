@@ -543,6 +543,7 @@ const readingSpeechSpokenWords = ref(0);
 const readingSpeechDebugEntries = ref<string[]>(['Waiting for microphone start.']);
 let readingSpeechAnchor = 0;
 let readingSpeechFurthestWordIndex = -1;
+let syncedReaderPositionWordIndex = -1;
 let readingSpeechLocalTranscriptWindow: string[] = [];
 let readingSpeechPositionLocked = false;
 let readingSpeechRecognition: ContinuousSpeechRecognition | null = null;
@@ -839,7 +840,7 @@ async function openBook(bookId: string) {
   personalBooks.value = await listPersonalBooks();
   await nextTick();
   await repaginateReader(readBookProgress(loaded.book.id, loaded.pages.length));
-  goToSyncedSpokenPosition();
+  goToSyncedReaderPosition();
   startReaderPagination();
   readingActivityTimer.start();
 }
@@ -858,6 +859,7 @@ function closeBook() {
   spokenReaderWordIndexes.value = new Set();
   provisionalReaderWordIndexes.value = new Set();
   readingSpeechFurthestWordIndex = -1;
+  syncedReaderPositionWordIndex = -1;
   selectedReaderWordIndex.value = null;
   readerMarkerWordIndex.value = null;
   readingSpeechAcceptedWords.value = 0;
@@ -875,14 +877,16 @@ function goToBookPage(pageIndex: number | null) {
   persistBookProgress();
   readingSpeechAnchor = getVisibleReaderWordAnchor();
   provisionalReaderWordIndexes.value = new Set();
+  void persistReaderNavigationProgress();
   void readingActivityTimer.checkpoint();
 }
-function goToBookChapter(pageIndex: number | null) {
+async function goToBookChapter(pageIndex: number | null) {
   if (pageIndex === null || !Number.isInteger(pageIndex)) return;
   const chapterIndex = chapterPageIndexes.value.findIndex((chapterPageIndex) => chapterPageIndex === pageIndex);
   if (chapterIndex < 0) return;
   persistBookProgress();
-  void repaginateReader({ legacyChapterIndex: chapterIndex });
+  await repaginateReader({ legacyChapterIndex: chapterIndex });
+  await persistReaderNavigationProgress();
 }
 function formatBookPartLabel(index: number, title?: string) {
   const normalizedTitle = title?.replace(/\s+/g, ' ').trim();
@@ -1676,6 +1680,7 @@ async function restoreSpokenReadingProgress(bookId: string) {
   restoreDailySpokenWords(bookId);
   await syncAllContentProgress().catch(() => undefined);
   const progress = await loadContentProgress('reading', bookId);
+  syncedReaderPositionWordIndex = Math.max(-1, Math.floor(progress?.position ?? 0) - 1);
   const furthestWordIndex = Math.max(-1, Math.floor(progress?.furthestPosition ?? 0) - 1);
   readingSpeechFurthestWordIndex = furthestWordIndex;
   if (furthestWordIndex < 0) return;
@@ -1696,6 +1701,23 @@ async function persistSpokenReadingProgress(furthestWordIndex: number) {
     furthestPosition: furthestWordIndex + 1,
     duration: wordCount,
     completed: wordCount > 0 && furthestWordIndex >= wordCount - 1,
+    updatedAt: new Date().toISOString(),
+  });
+}
+async function persistReaderNavigationProgress() {
+  const book = selectedBook.value;
+  if (!book) return;
+  const wordIndex = getReaderPageWordAnchor(currentBookPageIndex.value);
+  if (wordIndex < 0) return;
+  const wordCount = readerReferenceWords.value.length;
+  await saveContentProgress({
+    studentId: appStore.studentId,
+    category: 'reading',
+    contentId: book.id,
+    position: wordIndex + 1,
+    furthestPosition: wordIndex + 1,
+    duration: wordCount,
+    completed: wordCount > 0 && wordIndex >= wordCount - 1,
     updatedAt: new Date().toISOString(),
   });
 }
@@ -1818,15 +1840,22 @@ async function repaginateReader(position: BookReaderProgress = { progressRatio: 
   scrollToReaderPage(false);
   persistBookProgress();
 }
-function goToSyncedSpokenPosition() {
-  if (readingSpeechFurthestWordIndex < 0 || readerPageStride.value <= 0) return;
-  const word = readerPaper.value?.querySelector<HTMLElement>(`[data-reader-word-index="${readingSpeechFurthestWordIndex}"]`);
+function goToSyncedReaderPosition() {
+  if (syncedReaderPositionWordIndex < 0 || readerPageStride.value <= 0) return;
+  const word = readerPaper.value?.querySelector<HTMLElement>(`[data-reader-word-index="${syncedReaderPositionWordIndex}"]`);
   if (!word) return;
-  const spokenPageIndex = Math.max(0, Math.min(readerPageCount.value - 1, Math.floor((word.offsetLeft + 1) / readerPageStride.value)));
-  if (spokenPageIndex <= currentBookPageIndex.value) return;
-  currentBookPageIndex.value = spokenPageIndex;
+  currentBookPageIndex.value = Math.max(0, Math.min(readerPageCount.value - 1, Math.floor((word.offsetLeft + 1) / readerPageStride.value)));
   scrollToReaderPage(false);
   persistBookProgress();
+}
+function getReaderPageWordAnchor(pageIndex: number) {
+  const paper = readerPaper.value;
+  if (!paper || readerPageStride.value <= 0) return -1;
+  const word = Array.from(paper.querySelectorAll<HTMLElement>('[data-reader-word-index]')).find((candidate) => (
+    Math.floor((candidate.offsetLeft + 1) / readerPageStride.value) === pageIndex
+  ));
+  const wordIndex = Number(word?.dataset.readerWordIndex);
+  return Number.isInteger(wordIndex) ? wordIndex : -1;
 }
 function scrollToReaderPage(smooth = true) {
   const viewport = readerContent.value;

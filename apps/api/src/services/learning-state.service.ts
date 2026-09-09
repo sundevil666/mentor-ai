@@ -889,14 +889,10 @@ function sanitizePersonalReadingBook(archive: PersonalReadingBookArchive): Perso
 
 export function mergeProgress(current: ContentProgress, incoming: ContentProgress): ContentProgress {
   const furthestPosition = Math.max(current.furthestPosition, incoming.furthestPosition);
-  const winner = incoming.furthestPosition > current.furthestPosition
-    ? incoming
-    : incoming.furthestPosition < current.furthestPosition
-      ? current
-      : incoming.updatedAt >= current.updatedAt ? incoming : current;
+  const winner = incoming.updatedAt >= current.updatedAt ? incoming : current;
   return {
     ...winner,
-    position: furthestPosition,
+    position: winner.position,
     furthestPosition,
     duration: Math.max(current.duration ?? 0, incoming.duration ?? 0) || undefined,
     completed: current.completed || incoming.completed,
