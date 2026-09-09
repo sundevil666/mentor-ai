@@ -174,7 +174,7 @@
             map-options
             outlined
             label="Chapter / part"
-            :model-value="currentBookChapterPageIndex"
+            :model-value="currentBookChapterIndex"
             :options="bookPageOptions"
             @update:model-value="goToBookChapter"
           />
@@ -389,7 +389,7 @@
               map-options
               outlined
               label="Chapter / part"
-              :model-value="currentBookChapterPageIndex"
+              :model-value="currentBookChapterIndex"
               :options="bookPageOptions"
               @update:model-value="goToBookChapter"
             />
@@ -632,11 +632,10 @@ const currentBookChapterIndex = computed(() => {
   });
   return activeIndex;
 });
-const currentBookChapterPageIndex = computed(() => chapterPageIndexes.value[currentBookChapterIndex.value] ?? 0);
 const readerLookupKind = computed(() => /\s/.test(selectedReaderText.value) ? 'phrase' : 'word');
 const bookPageOptions = computed(() => selectedBookPages.value.map((page, index) => ({
   label: formatBookPartLabel(index, selectedBookChapters.value.find((chapter) => chapter.id === page.chapterId)?.title),
-  value: chapterPageIndexes.value[index] ?? 0,
+  value: index,
 })));
 const dailyReadingWords = computed(() => dailyWordsRead(dailyReadingProgress.value));
 const dailyReadingTarget = computed(() => dailyReadingTargetWords(dailyReadingProgress.value));
@@ -880,10 +879,8 @@ function goToBookPage(pageIndex: number | null) {
   void persistReaderNavigationProgress();
   void readingActivityTimer.checkpoint();
 }
-async function goToBookChapter(pageIndex: number | null) {
-  if (pageIndex === null || !Number.isInteger(pageIndex)) return;
-  const chapterIndex = chapterPageIndexes.value.findIndex((chapterPageIndex) => chapterPageIndex === pageIndex);
-  if (chapterIndex < 0) return;
+async function goToBookChapter(chapterIndex: number | null) {
+  if (chapterIndex === null || !Number.isInteger(chapterIndex) || chapterIndex < 0 || chapterIndex >= selectedBookPages.value.length) return;
   persistBookProgress();
   await repaginateReader({ legacyChapterIndex: chapterIndex });
   await persistReaderNavigationProgress();
