@@ -2256,6 +2256,21 @@ html.mentor-theme-dark .personal-reader {
   color: #4a3a18;
 }
 
+.personal-reader__word--resume-sentence {
+  background: color-mix(in srgb, var(--category-accent) 14%, transparent);
+}
+
+.personal-reader__word--resume {
+  background: color-mix(in srgb, var(--category-accent) 34%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--category-accent) 28%, transparent);
+  font-weight: 800;
+}
+
+.book-resume-dialog {
+  max-width: 520px;
+  width: calc(100vw - 32px);
+}
+
 .personal-reader__word--selected {
   background: #f6d982;
   box-shadow: 0 0 0 3px rgba(212, 159, 31, 0.2);

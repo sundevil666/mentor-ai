@@ -19,7 +19,7 @@ export async function saveContentProgress(input: Omit<ContentProgress, 'id' | 's
   const progress: ContentProgress = {
     ...input,
     id,
-    sourceDeviceId: getDeviceId(),
+    sourceDeviceId: getContentProgressDeviceId(),
     furthestPosition: Math.max(previous?.furthestPosition ?? 0, input.furthestPosition, input.position),
   };
   await db.put('content-progress', progress);
@@ -50,7 +50,7 @@ export async function syncAllContentProgress() {
   return contentProgressSyncPromise;
 }
 
-function getDeviceId() {
+export function getContentProgressDeviceId() {
   let id = localStorage.getItem(deviceKey);
   if (!id) {
     id = crypto.randomUUID();

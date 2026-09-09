@@ -15,6 +15,8 @@ import type {
   ReaderTextLookup,
   ReaderVocabularyItem,
   ReadingTranscriptChunk,
+  ReadingDeviceSession,
+  ReadingResumeSnapshot,
   SpeechResult,
   StatisticsSnapshot,
   Student,
@@ -204,6 +206,26 @@ export async function synchronizeContentProgress(progress: ContentProgress[]): P
   });
   if (!response.ok) throw new Error('Content progress synchronization failed.');
   return ((await response.json()) as ApiResponse<ContentProgress[]>).data;
+}
+
+export async function fetchReadingResumeSnapshot(bookId: string): Promise<ReadingResumeSnapshot> {
+  const response = await fetch(`${apiBaseUrl}/api/reading-resume?bookId=${encodeURIComponent(bookId)}`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+  });
+  if (!response.ok) throw new Error('Reading device synchronization check failed.');
+  return ((await response.json()) as ApiResponse<ReadingResumeSnapshot>).data;
+}
+
+export async function updateReadingDeviceSession(session: ReadingDeviceSession): Promise<ReadingResumeSnapshot> {
+  const response = await fetch(`${apiBaseUrl}/api/reading-resume`, {
+    method: 'PUT',
+    keepalive: true,
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(session),
+  });
+  if (!response.ok) throw new Error('Reading device synchronization update failed.');
+  return ((await response.json()) as ApiResponse<ReadingResumeSnapshot>).data;
 }
 
 export async function synchronizeContentEngagement(

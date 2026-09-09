@@ -516,6 +516,31 @@ export interface ContentProgress {
   updatedAt: string;
 }
 
+export type ReadingDeviceSessionStatus = 'reading' | 'closed';
+
+/** Per-device reader presence retained by the server. A stale `reading` session
+ * means that device disappeared before it confirmed a clean close, so another
+ * device must not silently assume that the server has its final position. */
+export interface ReadingDeviceSession {
+  id: string;
+  studentId: string;
+  bookId: string;
+  deviceId: string;
+  deviceLabel: string;
+  position: number;
+  sentenceStartPosition: number;
+  sentenceEndPosition: number;
+  status: ReadingDeviceSessionStatus;
+  progressUpdatedAt: string;
+  lastSeenAt: string;
+}
+
+export interface ReadingResumeSnapshot {
+  progress?: ContentProgress;
+  devices: ReadingDeviceSession[];
+  serverTime: string;
+}
+
 export type ContentFeedbackValue =
   | 'clear'
   | 'mostly-clear'

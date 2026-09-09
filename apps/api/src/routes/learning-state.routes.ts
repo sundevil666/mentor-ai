@@ -3,6 +3,7 @@ import {
   getConfiguration,
   getCurrentLesson,
   getRecommendations,
+  getReadingResumeSnapshot,
   getStudentState,
   listSessionHandoffs,
   listContentProgress,
@@ -12,6 +13,7 @@ import {
   mergeApplicationTelemetryEvents,
   synchronizeLearningEvents,
   upsertSessionHandoff,
+  upsertReadingDeviceSession,
 } from '../controllers/learning-state.controller.js';
 import { requireLearningIdentity } from '../middleware/auth-context.js';
 
@@ -27,6 +29,8 @@ learningStateRouter.get('/session-handoffs', listSessionHandoffs);
 learningStateRouter.put('/session-handoffs', upsertSessionHandoff);
 learningStateRouter.get('/content-progress', listContentProgress);
 learningStateRouter.post('/content-progress-synchronize', mergeContentProgress);
+learningStateRouter.get('/reading-resume', getReadingResumeSnapshot);
+learningStateRouter.put('/reading-resume', upsertReadingDeviceSession);
 learningStateRouter.post('/content-engagement-synchronize', mergeContentEngagementEvents);
 learningStateRouter.post('/learning-activity-synchronize', mergeLearningActivityEvents);
 learningStateRouter.post('/application-telemetry-synchronize', mergeApplicationTelemetryEvents);

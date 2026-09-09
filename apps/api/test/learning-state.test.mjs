@@ -374,6 +374,24 @@ describe('learning state service', () => {
     assert.equal(progress.furthestPosition, 420);
   });
 
+  it('retains a separate reading session for every device on the account', async () => {
+    const stamp = Date.now();
+    const bookId = `device-book-${stamp}`;
+    const base = {
+      studentId: 'demo-student', bookId, position: 420, sentenceStartPosition: 416,
+      sentenceEndPosition: 428, status: 'reading', progressUpdatedAt: '2026-09-09T10:00:00.000Z',
+      lastSeenAt: new Date().toISOString(),
+    };
+    await learningStateService.upsertReadingDeviceSession({
+      ...base, id: `tablet:${bookId}`, deviceId: 'tablet', deviceLabel: 'iPad',
+    });
+    const snapshot = await learningStateService.upsertReadingDeviceSession({
+      ...base, id: `laptop:${bookId}`, deviceId: 'laptop', deviceLabel: 'Mac', status: 'closed',
+    });
+    assert.deepEqual(snapshot.devices.map((device) => device.deviceLabel).sort(), ['Mac', 'iPad']);
+    assert.equal(snapshot.devices.find((device) => device.deviceId === 'tablet')?.sentenceStartPosition, 416);
+  });
+
   it('merges engagement evidence once and rejects another student data', async () => {
     const timestamp = Date.now();
     const valid = {

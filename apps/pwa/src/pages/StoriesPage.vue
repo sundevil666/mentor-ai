@@ -137,7 +137,7 @@
             </ContentMentorFeedback>
           </div>
           <p>{{ selectedStory.description }}</p>
-          <p class="story-source">{{ selectedStory.sourceLabel }}. The recording is bundled with the app for reliable offline listening.</p>
+          <p class="story-source">{{ selectedStory.sourceLabel }}. Save the recording on this device for reliable offline listening.</p>
         </div>
       </section>
 
@@ -215,6 +215,8 @@
                       'personal-reader__word--loading': readerLookupLoading && token.text.toLocaleLowerCase('en') === selectedReaderText.toLocaleLowerCase('en'),
                       'personal-reader__word--selected': token.wordIndex === selectedReaderWordIndex,
                       'personal-reader__word--marker': token.wordIndex === readerMarkerWordIndex,
+                      'personal-reader__word--resume': token.wordIndex === resumeWordIndex,
+                      'personal-reader__word--resume-sentence': token.wordIndex !== undefined && token.wordIndex >= resumeSentenceStartIndex && token.wordIndex <= resumeSentenceEndIndex,
                       'personal-reader__word--spoken': token.wordIndex !== undefined && spokenReaderWordIndexes.has(token.wordIndex),
                       'personal-reader__word--provisional': token.wordIndex !== undefined && provisionalReaderWordIndexes.has(token.wordIndex) && !spokenReaderWordIndexes.has(token.wordIndex),
                     }"
@@ -457,19 +459,41 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <q-dialog v-model="bookResumeDialog" persistent>
+      <q-card class="book-resume-dialog">
+        <q-card-section>
+          <div class="text-h6">Checking reading progress</div>
+          <p v-if="bookResumeLoading" class="q-mb-none">Checking every signed-in device before opening the book…</p>
+          <template v-else-if="bookResumeWaitingDevices.length">
+            <p class="text-weight-bold text-negative">Another device has not confirmed its final reading position.</p>
+            <p v-for="device in bookResumeWaitingDevices" :key="device.id">
+              Turn on {{ device.deviceLabel }} and open Mentor AI so it can finish synchronization. Last response: {{ formatReadingDeviceTime(device.lastSeenAt) }}.
+            </p>
+          </template>
+          <p v-else-if="bookResumeError" class="text-negative text-weight-bold q-mb-none">{{ bookResumeError }}</p>
+          <p v-else class="text-positive text-weight-bold q-mb-none">Everything is synchronized. Opening the newest confirmed position.</p>
+        </q-card-section>
+        <q-linear-progress v-if="bookResumeLoading" indeterminate color="primary" />
+        <q-card-actions v-if="!bookResumeLoading && (bookResumeWaitingDevices.length || bookResumeError)" align="right">
+          <q-btn flat label="Check again" no-caps @click="retryPendingBookOpen" />
+          <q-btn color="primary" label="Use confirmed position" no-caps unelevated @click="continuePendingBookOpen" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup lang="ts">
 import { Dialog, Notify } from 'quasar';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import type { ReaderTextLookup, ReadingChapter, ReadingPage } from '@mentor-ai/shared';
+import type { ReaderTextLookup, ReadingChapter, ReadingDeviceSession, ReadingPage } from '@mentor-ai/shared';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import AppDetailLayout from 'src/components/AppDetailLayout.vue';
 import AppAudioDock from 'src/components/AppAudioDock.vue';
 import AudioLibraryTabs from 'src/components/AudioLibraryTabs.vue';
 import { loadContentEngagementSummaries, recordContentEngagement, syncContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
-import { loadContentProgress, saveContentProgress, syncAllContentProgress } from 'src/services/content-progress';
+import { getContentProgressDeviceId, loadContentProgress, saveContentProgress, syncAllContentProgress } from 'src/services/content-progress';
 import { shouldUseSyncedReaderPosition } from 'src/services/content-progress-merge';
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineStory } from 'src/services/offline-library';
 import { deleteOfflineStory, formatStoryDuration, formatStorySize, getCachedStoryUrls, saveStoryOffline, storyLibrary, type LibraryStory } from 'src/services/story-library';
@@ -477,12 +501,13 @@ import { useAppStore } from 'src/stores/app-store';
 import { configureCaptureAudioSession, configurePlaybackAudioSession, isAppleMobileDevice, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 import { deletePersonalBook, importPersonalBook, listPersonalBookArchives, listPersonalBooks, loadPersonalBook, markPersonalBookOpened, mergePersonalBookArchives, type PersonalBook } from 'src/services/personal-book-library';
 import { personalBookSyncControl } from 'src/services/personal-book-sync-control';
-import { fetchReaderPhonetic, fetchReaderTextLookup, saveReadingTranscript, synchronizePersonalReadingBooks, synchronizeReaderVocabulary } from 'src/services/api-client';
+import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot, saveReadingTranscript, synchronizePersonalReadingBooks, synchronizeReaderVocabulary, updateReadingDeviceSession } from 'src/services/api-client';
 import { getAuthToken } from 'src/services/auth';
 import { findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { annualReadingPace, annualReadingPaceMessage as getAnnualReadingPaceMessage, createDailyReadingProgress, dailyReadingGoalWords, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, readingGoalMessage, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { alignReadingSpeech, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, previewBrowserReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
+import { chooseReadingResumeState, readingDeviceHeartbeatMs, readingDeviceLabel } from 'src/services/reading-device-sync';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
@@ -515,6 +540,17 @@ const readerPageStride = ref(1);
 const chapterPageIndexes = ref<number[]>([]);
 const selectedBookChapterIndex = ref(0);
 let stableReaderWordPosition = -1;
+const resumeWordIndex = ref(-1);
+const resumeSentenceStartIndex = ref(-1);
+const resumeSentenceEndIndex = ref(-1);
+const bookResumeDialog = ref(false);
+const bookResumeLoading = ref(false);
+const bookResumeWaitingDevices = ref<ReadingDeviceSession[]>([]);
+const bookResumeError = ref('');
+let pendingBookOpenId: string | null = null;
+let readingDeviceHeartbeat: ReturnType<typeof setInterval> | null = null;
+let allowUnconfirmedBookOpen = false;
+let readingDeviceProgressUpdatedAt = '';
 const selectedReaderText = ref('');
 const selectedReaderWordIndex = ref<number | null>(null);
 const readerMarkerWordIndex = ref<number | null>(null);
@@ -732,6 +768,8 @@ onUnmounted(() => {
   personalBookSyncControl.trigger = null;
   persistProgress();
   persistBookProgress();
+  void publishReadingDeviceSession('closed').catch(() => undefined);
+  stopReadingDeviceHeartbeat();
   applyReadingMode(false);
   stopReaderPagination();
   clearMediaSession();
@@ -819,11 +857,71 @@ function syncPersonalBooks(): Promise<void> {
 
 function handleBookSyncWakeup() { void syncPersonalBooks().catch(() => undefined); }
 function retryPersonalBookSync() { void syncPersonalBooks().catch(() => undefined); }
+function retryPendingBookOpen() {
+  const bookId = pendingBookOpenId;
+  if (!bookId) return;
+  if (selectedBook.value?.id === bookId) {
+    bookResumeLoading.value = true;
+    void publishReadingDeviceSession('reading').finally(() => { bookResumeLoading.value = false; });
+    return;
+  }
+  void openBook(bookId);
+}
+function continuePendingBookOpen() {
+  const bookId = pendingBookOpenId;
+  if (!bookId) return;
+  if (selectedBook.value?.id === bookId) {
+    bookResumeDialog.value = false;
+    pendingBookOpenId = null;
+    return;
+  }
+  allowUnconfirmedBookOpen = true;
+  void openBook(bookId);
+}
+function formatReadingDeviceTime(value: string) {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toLocaleString() : value;
+}
 async function openBook(bookId: string) {
   const loaded = await loadPersonalBook(bookId);
   if (!loaded || loaded.pages.length === 0) {
     Notify.create({ type: 'negative', message: 'This book has no readable pages.' });
     return;
+  }
+  let checkedPosition: { position: number; sentenceStartPosition: number; sentenceEndPosition: number; updatedAt?: string } | undefined;
+  if (getAuthToken() && navigator.onLine) {
+    bookResumeDialog.value = true;
+    bookResumeLoading.value = true;
+    bookResumeWaitingDevices.value = [];
+    bookResumeError.value = '';
+    try {
+      await syncAllContentProgress();
+      const decision = chooseReadingResumeState(await fetchReadingResumeSnapshot(bookId), getContentProgressDeviceId());
+      checkedPosition = decision;
+      bookResumeWaitingDevices.value = decision.waitingDevices;
+      if (decision.waitingDevices.length && !allowUnconfirmedBookOpen) {
+        pendingBookOpenId = bookId;
+        bookResumeLoading.value = false;
+        return;
+      }
+      const checkedLabels = decision.synchronizedDevices.map((device) => device.deviceLabel).join(', ');
+      Notify.create({
+        type: 'positive',
+        message: checkedLabels
+          ? `Everything is synchronized with ${checkedLabels}. Opening the newest position.`
+          : 'Everything is synchronized. Opening the newest confirmed position.',
+      });
+    } catch (error) {
+      bookResumeLoading.value = false;
+      bookResumeWaitingDevices.value = [];
+      bookResumeError.value = error instanceof Error ? error.message : 'Could not verify other devices.';
+      pendingBookOpenId = bookId;
+      if (!allowUnconfirmedBookOpen) return;
+    } finally {
+      if ((!bookResumeWaitingDevices.value.length && !bookResumeError.value) || allowUnconfirmedBookOpen) bookResumeDialog.value = false;
+      bookResumeLoading.value = false;
+      allowUnconfirmedBookOpen = false;
+    }
   }
   // Apply this book's visual settings before selectedBook makes the reader
   // visible. Otherwise the previous/default font is painted for one frame and
@@ -841,6 +939,16 @@ async function openBook(bookId: string) {
   readerPageStride.value = 1;
   chapterPageIndexes.value = loaded.pages.map(() => 0);
   const localBookProgress = readBookProgress(loaded.book.id, loaded.pages.length);
+  if (checkedPosition?.updatedAt && (!localBookProgress.updatedAt || checkedPosition.updatedAt >= localBookProgress.updatedAt)) {
+    localBookProgress.wordPosition = Math.max(0, checkedPosition.position - 1);
+    localBookProgress.updatedAt = checkedPosition.updatedAt;
+    resumeWordIndex.value = localBookProgress.wordPosition;
+    resumeSentenceStartIndex.value = Math.max(0, checkedPosition.sentenceStartPosition - 1);
+    resumeSentenceEndIndex.value = Math.max(resumeSentenceStartIndex.value, checkedPosition.sentenceEndPosition - 1);
+  } else if (localBookProgress.wordPosition !== undefined) {
+    setResumeHighlight(localBookProgress.wordPosition);
+  }
+  readingDeviceProgressUpdatedAt = checkedPosition?.updatedAt ?? localBookProgress.updatedAt ?? new Date().toISOString();
   await restoreSpokenReadingProgress(loaded.book.id);
   readerMarkerWordIndex.value = readReaderMarker(loaded.book.id);
   await markPersonalBookOpened(loaded.book);
@@ -853,9 +961,12 @@ async function openBook(bookId: string) {
     void persistReaderNavigationProgress(localBookProgress.wordPosition, localBookProgress.updatedAt);
   }
   startReaderPagination();
+  startReadingDeviceHeartbeat();
   readingActivityTimer.start();
 }
 function closeBook() {
+  void publishReadingDeviceSession('closed');
+  stopReadingDeviceHeartbeat();
   void readingActivityTimer.stop();
   persistBookProgress();
   stopReaderPagination();
@@ -866,6 +977,10 @@ function closeBook() {
   currentBookPageIndex.value = 0;
   selectedBookChapterIndex.value = 0;
   stableReaderWordPosition = -1;
+  resumeWordIndex.value = -1;
+  resumeSentenceStartIndex.value = -1;
+  resumeSentenceEndIndex.value = -1;
+  readingDeviceProgressUpdatedAt = '';
   readerPageCount.value = 1;
   readerPageStride.value = 1;
   chapterPageIndexes.value = [];
@@ -893,6 +1008,7 @@ function goToBookPage(pageIndex: number | null) {
   readingSpeechAnchor = getVisibleReaderWordAnchor();
   provisionalReaderWordIndexes.value = new Set();
   void persistReaderNavigationProgress();
+  markReadingDevicePositionChanged();
   void readingActivityTimer.checkpoint();
 }
 async function goToBookChapter(chapterIndex: number | null) {
@@ -902,6 +1018,7 @@ async function goToBookChapter(chapterIndex: number | null) {
   await repaginateReader({ legacyChapterIndex: chapterIndex });
   persistBookProgress();
   await persistReaderNavigationProgress(getReaderChapterWordAnchor(chapterIndex));
+  markReadingDevicePositionChanged();
 }
 function formatBookPartLabel(index: number, title?: string) {
   const normalizedTitle = title?.replace(/\s+/g, ' ').trim();
@@ -1803,6 +1920,83 @@ function getStableReaderWordPosition() {
   else if (stableReaderWordPosition < 0 && chapterWordIndex >= 0) stableReaderWordPosition = chapterWordIndex;
   return Math.max(0, stableReaderWordPosition >= 0 ? stableReaderWordPosition : chapterWordIndex);
 }
+function getReaderSentenceBounds(wordIndex: number) {
+  const tokens = renderedBookPages.value.flatMap((page) => page.paragraphs.flat());
+  const tokenIndex = tokens.findIndex((token) => token.wordIndex === wordIndex);
+  if (tokenIndex < 0) return { start: wordIndex, end: wordIndex };
+  let start = wordIndex;
+  let end = wordIndex;
+  for (let index = tokenIndex - 1; index >= 0; index -= 1) {
+    const token = tokens[index]!;
+    if (!token.isWord && /[.!?]/.test(token.text)) break;
+    if (token.wordIndex !== undefined) start = token.wordIndex;
+  }
+  for (let index = tokenIndex + 1; index < tokens.length; index += 1) {
+    const token = tokens[index]!;
+    if (token.wordIndex !== undefined) end = token.wordIndex;
+    if (!token.isWord && /[.!?]/.test(token.text)) break;
+  }
+  return { start, end };
+}
+function setResumeHighlight(wordIndex: number) {
+  const sentence = getReaderSentenceBounds(wordIndex);
+  resumeWordIndex.value = wordIndex;
+  resumeSentenceStartIndex.value = sentence.start;
+  resumeSentenceEndIndex.value = sentence.end;
+}
+async function publishReadingDeviceSession(status: 'reading' | 'closed') {
+  const book = selectedBook.value;
+  if (!book || !getAuthToken() || !navigator.onLine) return;
+  const wordIndex = getStableReaderWordPosition();
+  const sentence = getReaderSentenceBounds(wordIndex);
+  const now = new Date().toISOString();
+  const snapshot = await updateReadingDeviceSession({
+    id: `${getContentProgressDeviceId()}:${book.id}`,
+    studentId: appStore.studentId,
+    bookId: book.id,
+    deviceId: getContentProgressDeviceId(),
+    deviceLabel: readingDeviceLabel(navigator.userAgent),
+    position: wordIndex + 1,
+    sentenceStartPosition: sentence.start + 1,
+    sentenceEndPosition: sentence.end + 1,
+    status,
+    progressUpdatedAt: readingDeviceProgressUpdatedAt || now,
+    lastSeenAt: now,
+  });
+  if (status !== 'reading') return;
+  const decision = chooseReadingResumeState(snapshot, getContentProgressDeviceId());
+  if (decision.waitingDevices.length) {
+    bookResumeWaitingDevices.value = decision.waitingDevices;
+    pendingBookOpenId = book.id;
+    bookResumeLoading.value = false;
+    bookResumeDialog.value = true;
+    return;
+  }
+  if (!decision.updatedAt || decision.updatedAt <= readingDeviceProgressUpdatedAt || decision.position <= 0) return;
+  readingDeviceProgressUpdatedAt = decision.updatedAt;
+  const remoteWordIndex = decision.position - 1;
+  stableReaderWordPosition = remoteWordIndex;
+  resumeWordIndex.value = remoteWordIndex;
+  resumeSentenceStartIndex.value = Math.max(0, decision.sentenceStartPosition - 1);
+  resumeSentenceEndIndex.value = Math.max(resumeSentenceStartIndex.value, decision.sentenceEndPosition - 1);
+  await repaginateReader({ wordPosition: remoteWordIndex, updatedAt: decision.updatedAt });
+  persistBookProgress(decision.updatedAt);
+  Notify.create({ type: 'positive', message: 'Reading position updated from your other device.' });
+}
+function markReadingDevicePositionChanged() {
+  readingDeviceProgressUpdatedAt = new Date().toISOString();
+  setResumeHighlight(getStableReaderWordPosition());
+  void publishReadingDeviceSession('reading').catch(() => undefined);
+}
+function startReadingDeviceHeartbeat() {
+  stopReadingDeviceHeartbeat();
+  void publishReadingDeviceSession('reading').catch(() => undefined);
+  readingDeviceHeartbeat = setInterval(() => { void publishReadingDeviceSession('reading').catch(() => undefined); }, readingDeviceHeartbeatMs);
+}
+function stopReadingDeviceHeartbeat() {
+  if (readingDeviceHeartbeat) clearInterval(readingDeviceHeartbeat);
+  readingDeviceHeartbeat = null;
+}
 function startReaderPagination() {
   stopReaderPagination();
   if (typeof ResizeObserver === 'undefined' || !readerContent.value) return;
@@ -1887,6 +2081,7 @@ function goToSyncedReaderPosition() {
   const word = readerPaper.value?.querySelector<HTMLElement>(`[data-reader-word-index="${syncedReaderPositionWordIndex}"]`);
   if (!word) return;
   stableReaderWordPosition = syncedReaderPositionWordIndex;
+  setResumeHighlight(syncedReaderPositionWordIndex);
   currentBookPageIndex.value = Math.max(0, Math.min(readerPageCount.value - 1, Math.floor((word.offsetLeft + 1) / readerPageStride.value)));
   const chapterIndex = Number(word.closest<HTMLElement>('[data-book-chapter-index]')?.dataset.bookChapterIndex);
   selectedBookChapterIndex.value = Number.isInteger(chapterIndex) ? chapterIndex : resolveBookChapterIndex(currentBookPageIndex.value);

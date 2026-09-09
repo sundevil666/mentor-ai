@@ -15,6 +15,8 @@ import {
   type PersonalReadingBookArchive,
   type ReaderVocabularyItem,
   type ReadingTranscriptChunk,
+  type ReadingDeviceSession,
+  type ReadingResumeSnapshot,
   type SpeechResult,
   type StatisticsSnapshot,
   type SyncStatus,
@@ -100,6 +102,29 @@ export const learningStateService = {
     const contentProgress = [...merged.values()];
     await learningStateRepository.write({ ...state, contentProgress }, user);
     return contentProgress;
+  },
+
+  async getReadingResumeSnapshot(bookId: string, user?: AuthenticatedUser): Promise<ReadingResumeSnapshot> {
+    const state = await learningStateRepository.read(user);
+    return {
+      progress: state.contentProgress.find((item) => item.studentId === state.student.id && item.category === 'reading' && item.contentId === bookId),
+      devices: state.readingDeviceSessions.filter((item) => item.studentId === state.student.id && item.bookId === bookId),
+      serverTime: new Date().toISOString(),
+    };
+  },
+
+  async upsertReadingDeviceSession(candidate: ReadingDeviceSession, user?: AuthenticatedUser): Promise<ReadingResumeSnapshot> {
+    const state = await learningStateRepository.read(user);
+    const safe = sanitizeReadingDeviceSession(candidate, state.student.id);
+    if (safe) {
+      const sessions = new Map(state.readingDeviceSessions.map((item) => [item.id, item]));
+      const current = sessions.get(safe.id);
+      if (!current || safe.lastSeenAt >= current.lastSeenAt) sessions.set(safe.id, safe);
+      state.readingDeviceSessions = [...sessions.values()]
+        .filter((item) => Date.now() - Date.parse(item.lastSeenAt) < 30 * 24 * 60 * 60 * 1_000);
+      await learningStateRepository.write(state, user);
+    }
+    return this.getReadingResumeSnapshot(candidate.bookId, user);
   },
 
   async mergeContentEngagementEvents(incoming: ContentEngagementEvent[], user?: AuthenticatedUser) {
@@ -814,6 +839,33 @@ function sanitizeContentProgress(progress: ContentProgress): ContentProgress {
     furthestPosition: Math.max(position, progress.furthestPosition || 0),
     duration,
     completed: Boolean(progress.completed),
+  };
+}
+
+function sanitizeReadingDeviceSession(session: ReadingDeviceSession, studentId: string): ReadingDeviceSession | undefined {
+  if (
+    session.studentId !== studentId ||
+    !session.bookId ||
+    !session.deviceId ||
+    !Number.isFinite(session.position) ||
+    !Number.isFinite(Date.parse(session.progressUpdatedAt)) ||
+    (session.status !== 'reading' && session.status !== 'closed')
+  ) return undefined;
+  const position = Math.max(0, Math.floor(session.position));
+  const sentenceStartPosition = Math.max(0, Math.min(position, Math.floor(session.sentenceStartPosition || position)));
+  const sentenceEndPosition = Math.max(position, Math.floor(session.sentenceEndPosition || position));
+  return {
+    id: `${session.deviceId.slice(0, 160)}:${session.bookId.slice(0, 160)}`,
+    studentId,
+    bookId: session.bookId.slice(0, 160),
+    deviceId: session.deviceId.slice(0, 160),
+    deviceLabel: (session.deviceLabel || 'Unknown device').replace(/\s+/g, ' ').trim().slice(0, 80),
+    position,
+    sentenceStartPosition,
+    sentenceEndPosition,
+    status: session.status,
+    progressUpdatedAt: session.progressUpdatedAt,
+    lastSeenAt: new Date().toISOString(),
   };
 }
 
