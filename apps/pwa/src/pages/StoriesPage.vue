@@ -199,6 +199,7 @@
           @touchmove="handleReaderTouchMove"
           @touchend="handleReaderTouchEnd"
           @touchcancel="resetReaderTouch"
+          @wheel="handleReaderWheel"
         >
           <article ref="readerPaper" class="personal-reader__paper" :style="{ fontSize: `${readerFontSize}px` }" @click="handleReaderTextTap">
             <section
@@ -505,7 +506,7 @@ import { chooseReadingResumeState, readingDeviceHeartbeatMs, readingDeviceLabel 
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
-import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, type ReaderSwipePoint } from 'src/services/reader-swipe';
+import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerWheelDestination, type ReaderSwipePoint } from 'src/services/reader-swipe';
 import { beginReaderLookupInteraction, shouldProcessReadingTranscript } from 'src/services/reader-lookup-interaction';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
 
@@ -621,6 +622,11 @@ let readerSelectionTimer = 0;
 let readerLookupRequestId = 0;
 let readerTouchStart: ReaderSwipePoint | null = null;
 let readerTouchStartScrollLeft = 0;
+let readerWheelStartPageIndex = 0;
+let readerWheelStartScrollLeft = 0;
+let readerWheelDeltaX = 0;
+let readerWheelSettleTimer = 0;
+let readerScrollAnimationFrame = 0;
 let suppressReaderTapUntil = 0;
 let personalBookSyncPromise: Promise<void> | null = null;
 const selectedStory = computed(() => storyLibrary.find((story) => story.id === selectedStoryId.value) ?? null);
@@ -772,6 +778,8 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleReaderKeydown);
   document.removeEventListener('selectionchange', handleReaderSelectionChange);
   window.clearTimeout(readerSelectionTimer);
+  window.clearTimeout(readerWheelSettleTimer);
+  cancelAnimationFrame(readerScrollAnimationFrame);
   stopReadingSpeech('idle');
 });
 
@@ -1045,10 +1053,53 @@ function handleReaderTextTap(event: MouseEvent) {
   if (word) void selectReaderText(word, true, Number.isInteger(targetWordIndex) ? targetWordIndex : null);
 }
 function handleReaderTouchStart(event: TouchEvent) {
+  cancelReaderScrollAnimation();
+  resetReaderWheel();
   const touch = event.touches.length === 1 ? event.touches[0] : undefined;
   readerTouchStart = touch ? { clientX: touch.clientX, clientY: touch.clientY } : null;
   readerTouchStartScrollLeft = readerContent.value?.scrollLeft ?? 0;
   readerDragging.value = false;
+}
+
+function handleReaderWheel(event: WheelEvent) {
+  const viewport = readerContent.value;
+  if (!readingMode.value || !viewport || !isReaderHorizontalWheel(event, viewport.clientHeight)) return;
+  event.preventDefault();
+  cancelReaderScrollAnimation();
+  if (!readerWheelSettleTimer) {
+    readerWheelStartPageIndex = currentBookPageIndex.value;
+    readerWheelStartScrollLeft = readerWheelStartPageIndex * readerPageStride.value;
+    readerWheelDeltaX = 0;
+  }
+  const { deltaX } = normalizeReaderWheelDelta(event, viewport.clientHeight);
+  readerWheelDeltaX += deltaX;
+  const canGoPrevious = readerWheelStartPageIndex > 0;
+  const canGoNext = readerWheelStartPageIndex < readerPageCount.value - 1;
+  const blocked = (readerWheelDeltaX < 0 && !canGoPrevious) || (readerWheelDeltaX > 0 && !canGoNext);
+  const visibleDelta = readerWheelDeltaX * (blocked ? 0.16 : 1);
+  const maximumTravel = readerPageStride.value * 0.72;
+  viewport.scrollLeft = readerWheelStartScrollLeft + Math.max(-maximumTravel, Math.min(maximumTravel, visibleDelta));
+  readerDragging.value = true;
+  window.clearTimeout(readerWheelSettleTimer);
+  readerWheelSettleTimer = window.setTimeout(settleReaderWheel, 90);
+}
+
+function settleReaderWheel() {
+  readerWheelSettleTimer = 0;
+  const destination = readerWheelDestination(readerWheelStartPageIndex, readerPageCount.value, readerWheelDeltaX);
+  readerDragging.value = false;
+  readerWheelDeltaX = 0;
+  if (destination === currentBookPageIndex.value) {
+    scrollToReaderPage();
+    return;
+  }
+  goToBookPage(destination);
+}
+
+function resetReaderWheel() {
+  window.clearTimeout(readerWheelSettleTimer);
+  readerWheelSettleTimer = 0;
+  readerWheelDeltaX = 0;
 }
 function handleReaderTouchMove(event: TouchEvent) {
   const start = readerTouchStart;
@@ -2102,15 +2153,50 @@ function getReaderChapterWordAnchor(chapterIndex: number) {
   const wordIndex = Number(word?.dataset.readerWordIndex);
   return Number.isInteger(wordIndex) ? wordIndex : -1;
 }
+function cancelReaderScrollAnimation() {
+  if (readerScrollAnimationFrame) cancelAnimationFrame(readerScrollAnimationFrame);
+  readerScrollAnimationFrame = 0;
+}
+function animateReaderScroll(targetLeft: number) {
+  const viewport = readerContent.value;
+  if (!viewport) return;
+  cancelReaderScrollAnimation();
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    viewport.scrollLeft = targetLeft;
+    return;
+  }
+  const startLeft = viewport.scrollLeft;
+  const distance = targetLeft - startLeft;
+  if (Math.abs(distance) < 1) {
+    viewport.scrollLeft = targetLeft;
+    return;
+  }
+  const startedAt = performance.now();
+  const duration = Math.max(180, Math.min(320, 190 + Math.abs(distance) / Math.max(1, readerPageStride.value) * 100));
+  const step = (now: number) => {
+    const progress = Math.min(1, (now - startedAt) / duration);
+    const eased = 1 - Math.pow(1 - progress, 4);
+    viewport.scrollLeft = startLeft + distance * eased;
+    if (progress < 1) readerScrollAnimationFrame = requestAnimationFrame(step);
+    else readerScrollAnimationFrame = 0;
+  };
+  readerScrollAnimationFrame = requestAnimationFrame(step);
+}
 function scrollToReaderPage(smooth = true) {
   const viewport = readerContent.value;
   if (!viewport) return;
   if (!readingMode.value) {
     const chapter = readerPaper.value?.querySelector<HTMLElement>(`[data-book-chapter-index="${currentBookChapterIndex.value}"]`);
+    cancelReaderScrollAnimation();
     viewport.scrollTo({ left: 0, top: chapter?.offsetTop ?? 0, behavior: smooth ? 'smooth' : 'auto' });
     return;
   }
-  viewport.scrollTo({ left: currentBookPageIndex.value * readerPageStride.value, top: 0, behavior: smooth ? 'smooth' : 'auto' });
+  const targetLeft = currentBookPageIndex.value * readerPageStride.value;
+  if (smooth) animateReaderScroll(targetLeft);
+  else {
+    cancelReaderScrollAnimation();
+    viewport.scrollTo({ left: targetLeft, top: 0, behavior: 'auto' });
+  }
 }
 function confirmDeleteBook(book: PersonalBook) {
   Dialog.create({

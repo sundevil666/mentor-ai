@@ -2083,6 +2083,7 @@ html.mentor-theme-dark .personal-reader {
 
 .personal-reader__content--dragging {
   cursor: grabbing;
+  scroll-behavior: auto;
   -webkit-user-select: none;
   user-select: none;
 }
