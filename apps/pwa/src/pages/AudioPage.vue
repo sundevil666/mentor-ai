@@ -1,6 +1,6 @@
 <template>
   <q-page class="audio-page category-theme--audio" :class="{ 'audio-page--detail': selectedAudio }">
-    <AppDetailLayout class="audio-shell" :active="Boolean(selectedAudio)">
+    <AppDetailLayout class="audio-shell">
       <template #header>
         <header class="audio-header" :class="{ 'audio-header--detail': selectedAudio }">
           <q-btn
@@ -20,10 +20,9 @@
         </header>
       </template>
 
-      <AudioLibraryTabs
-        v-if="!selectedAudio"
-        active-tab="podcasts"
-      />
+      <template v-if="!selectedAudio" #navigation>
+        <AudioLibraryTabs active-tab="podcasts" />
+      </template>
 
       <section v-if="!selectedAudio" class="audio-library" aria-label="Podcasts library">
         <article

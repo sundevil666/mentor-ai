@@ -3,12 +3,20 @@
     class="app-detail-layout"
     :class="{
       'app-detail-layout--active': active,
+      'app-detail-layout--with-navigation': active && Boolean($slots.navigation),
       'app-detail-layout--with-controls': active && Boolean($slots.controls),
       'app-detail-layout--with-bottom-navigation-inset': active && reserveBottomNavigation && Boolean($slots.controls),
     }"
   >
     <div class="app-detail-layout__header">
       <slot name="header" />
+    </div>
+
+    <div
+      v-if="$slots.navigation"
+      class="app-detail-layout__navigation"
+    >
+      <slot name="navigation" />
     </div>
 
     <div class="app-detail-layout__content">
@@ -44,11 +52,16 @@ withDefaults(defineProps<{
   overflow: hidden;
 }
 
+.app-detail-layout--active.app-detail-layout--with-navigation {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
 .app-detail-layout--with-bottom-navigation-inset {
   height: calc(100% - 80px - env(safe-area-inset-bottom));
 }
 
 .app-detail-layout:not(.app-detail-layout--active) > .app-detail-layout__header,
+.app-detail-layout:not(.app-detail-layout--active) > .app-detail-layout__navigation,
 .app-detail-layout:not(.app-detail-layout--active) > .app-detail-layout__content,
 .app-detail-layout:not(.app-detail-layout--active) > .app-detail-layout__controls {
   display: contents;
@@ -59,6 +72,16 @@ withDefaults(defineProps<{
   position: sticky;
   top: 0;
   z-index: 5;
+}
+
+.app-detail-layout--active > .app-detail-layout__navigation {
+  min-height: 0;
+  position: relative;
+  z-index: 4;
+}
+
+.app-detail-layout--active > .app-detail-layout__navigation :deep(> *) {
+  width: 100%;
 }
 
 .app-detail-layout--active > .app-detail-layout__header :deep(> :first-child) {

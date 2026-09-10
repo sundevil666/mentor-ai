@@ -11,7 +11,7 @@
       },
     ]"
   >
-    <AppDetailLayout class="videos-shell" :class="{ 'videos-shell--detail': selectedStory || selectedBook, 'videos-shell--book-detail': selectedBook }" :active="Boolean(selectedStory || selectedBook)">
+    <AppDetailLayout class="videos-shell" :class="{ 'videos-shell--detail': selectedStory || selectedBook, 'videos-shell--book-detail': selectedBook }">
       <template #header>
         <header
           v-if="!readingMode"
@@ -35,28 +35,30 @@
         </header>
       </template>
 
-      <AudioLibraryTabs
-        v-if="isAudioLibrary && !selectedStory"
-        active-tab="stories"
-      />
-
-      <q-tabs
-        v-if="!isAudioLibrary && !selectedBook"
-        v-model="activeReadingCategory"
-        class="story-library-tabs"
-        active-color="primary"
-        align="justify"
-        indicator-color="primary"
-        no-caps
-      >
-        <q-tab
-          v-for="category in readingCategories"
-          :key="category.id"
-          :icon="category.icon"
-          :label="category.label"
-          :name="category.id"
+      <template v-if="(isAudioLibrary && !selectedStory) || (!isAudioLibrary && !selectedBook)" #navigation>
+        <AudioLibraryTabs
+          v-if="isAudioLibrary"
+          active-tab="stories"
         />
-      </q-tabs>
+
+        <q-tabs
+          v-else
+          v-model="activeReadingCategory"
+          class="story-library-tabs"
+          active-color="primary"
+          align="justify"
+          indicator-color="primary"
+          no-caps
+        >
+          <q-tab
+            v-for="category in readingCategories"
+            :key="category.id"
+            :icon="category.icon"
+            :label="category.label"
+            :name="category.id"
+          />
+        </q-tabs>
+      </template>
 
       <section v-if="isAudioLibrary && !selectedStory" class="video-library" aria-label="Audio stories library">
         <article
