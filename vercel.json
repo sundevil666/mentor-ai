@@ -21,6 +21,10 @@
       "dest": "/api/synchronization?action=reading-transcript"
     },
     {
+      "src": "^/api/reading-resume$",
+      "dest": "/api/synchronization?action=reading-resume"
+    },
+    {
       "src": "^/app-update\\.json$",
       "headers": {
         "Cache-Control": "no-store, max-age=0"

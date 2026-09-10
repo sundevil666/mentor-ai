@@ -30,6 +30,18 @@ module.exports = async (request, response) => {
     }
 
     const { learningStateService } = await import('../apps/api/src/services/learning-state.service.js');
+    if (request.query?.action === 'reading-resume') {
+      if (request.method === 'GET') {
+        sendJson(response, 200, await learningStateService.getReadingResumeSnapshot(String(request.query?.bookId || ''), user));
+        return;
+      }
+      if (request.method === 'PUT') {
+        sendJson(response, 200, await learningStateService.upsertReadingDeviceSession(body, user));
+        return;
+      }
+      sendJson(response, 405, { message: 'Method not allowed.' });
+      return;
+    }
     if (Array.isArray(body?.progress)) {
       sendJson(response, 200, await learningStateService.mergeContentProgress(body.progress, user));
       return;
