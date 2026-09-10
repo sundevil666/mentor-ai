@@ -378,14 +378,6 @@
             />
           </section>
 
-          <section class="personal-reader__speech-debug" aria-label="Microphone debug log">
-            <div class="personal-reader__speech-debug-heading">
-              <strong>Microphone debug</strong>
-              <q-btn aria-label="Copy microphone debug log" dense flat icon="content_copy" label="Copy" no-caps @click="copyReadingSpeechDebugLog" />
-            </div>
-            <pre>{{ readingSpeechDebugText }}</pre>
-          </section>
-
           <div class="personal-reader__sidebar-navigation">
             <q-select
               dense
@@ -708,7 +700,6 @@ const renderedBookPages = computed(() => {
 });
 const readerReferenceWords = computed(() => renderedBookPages.value.flatMap((page) => page.paragraphs.flatMap((paragraph) => paragraph.filter((token) => token.isWord).map((token) => token.text))));
 const readingSpeechActive = computed(() => readingSpeechStatus.value === 'listening' || readingSpeechStatus.value === 'noise' || readingSpeechStatus.value === 'requesting');
-const readingSpeechDebugText = computed(() => readingSpeechDebugEntries.value.join('\n'));
 const readingSpeechHasSignal = computed(() => readingSpeechLevel.value >= 0.035);
 const readerSpeechFrameStyle = computed(() => {
   const energy = readingSpeechActive.value ? Math.max(0.04, readingSpeechLevel.value) : 0;
@@ -1703,23 +1694,6 @@ function appendReadingSpeechDebug(message: string) {
   readingSpeechDebugEntries.value = [...readingSpeechDebugEntries.value.slice(-119), `[+${elapsed}s] ${message}`];
 }
 
-async function copyReadingSpeechDebugLog() {
-  const text = `Mentor AI microphone debug\n${readingSpeechDebugText.value}`;
-  try {
-    await navigator.clipboard.writeText(text);
-    Notify.create({ type: 'positive', icon: 'content_copy', message: 'Microphone debug log copied.' });
-  } catch {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-    const copied = document.execCommand('copy');
-    textarea.remove();
-    Notify.create({ type: copied ? 'positive' : 'negative', message: copied ? 'Microphone debug log copied.' : 'Could not copy the debug log.' });
-  }
-}
 async function setReadingMode(value: boolean) {
   const wordPosition = getStableReaderWordPosition();
   stopReaderPagination();
