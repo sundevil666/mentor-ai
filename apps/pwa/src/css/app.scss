@@ -2114,22 +2114,22 @@ html.mentor-theme-dark .personal-reader {
 
 .personal-reader__speech-frame-base {
   background:
-    linear-gradient(to bottom, rgba(41, 214, 179, .42), rgba(58, 229, 197, .1) 36%, transparent 100%) top / 100% 24px no-repeat,
-    linear-gradient(to top, rgba(41, 214, 179, .42), rgba(58, 229, 197, .1) 36%, transparent 100%) bottom / 100% 24px no-repeat,
-    linear-gradient(to right, rgba(41, 214, 179, .42), rgba(58, 229, 197, .1) 36%, transparent 100%) left / 24px 100% no-repeat,
-    linear-gradient(to left, rgba(41, 214, 179, .42), rgba(58, 229, 197, .1) 36%, transparent 100%) right / 24px 100% no-repeat;
+    linear-gradient(to bottom, rgba(72, 184, 178, .36), rgba(105, 197, 194, .09) 42%, transparent 100%) top / 100% 22px no-repeat,
+    linear-gradient(to top, rgba(72, 184, 178, .36), rgba(105, 197, 194, .09) 42%, transparent 100%) bottom / 100% 22px no-repeat,
+    linear-gradient(to right, rgba(72, 184, 178, .36), rgba(105, 197, 194, .09) 42%, transparent 100%) left / 22px 100% no-repeat,
+    linear-gradient(to left, rgba(72, 184, 178, .36), rgba(105, 197, 194, .09) 42%, transparent 100%) right / 22px 100% no-repeat;
   animation: reader-listening-frame var(--reader-speech-frame-duration, 8s) linear infinite;
   will-change: filter, opacity;
 }
 
 .personal-reader__speech-frame-wave {
   background:
-    linear-gradient(to bottom, rgba(98, 242, 210, .28), transparent 100%) top / 100% 16px no-repeat,
-    linear-gradient(to top, rgba(98, 242, 210, .28), transparent 100%) bottom / 100% 16px no-repeat,
-    linear-gradient(to right, rgba(98, 242, 210, .28), transparent 100%) left / 16px 100% no-repeat,
-    linear-gradient(to left, rgba(98, 242, 210, .28), transparent 100%) right / 16px 100% no-repeat;
-  opacity: .42;
-  transition: opacity 420ms ease;
+    linear-gradient(to bottom, rgba(102, 175, 202, .24), transparent 100%) top / 100% 15px no-repeat,
+    linear-gradient(to top, rgba(102, 175, 202, .24), transparent 100%) bottom / 100% 15px no-repeat,
+    linear-gradient(to right, rgba(102, 175, 202, .24), transparent 100%) left / 15px 100% no-repeat,
+    linear-gradient(to left, rgba(102, 175, 202, .24), transparent 100%) right / 15px 100% no-repeat;
+  opacity: .36;
+  transition: opacity 900ms ease;
   transform-origin: center;
   will-change: filter, opacity, transform;
 }
@@ -2140,43 +2140,34 @@ html.mentor-theme-dark .personal-reader {
 
 @keyframes reader-listening-frame {
   0% {
-    filter: brightness(.98) saturate(1.02) hue-rotate(0deg);
-    opacity: .42;
+    filter: brightness(.98) saturate(.94) hue-rotate(0deg);
+    opacity: .46;
   }
-  42% {
-    filter: brightness(1.14) saturate(1.5) hue-rotate(195deg);
-    opacity: .92;
-  }
-  72% {
-    filter: brightness(1.16) saturate(1.46) hue-rotate(115deg);
-    opacity: .84;
+  50% {
+    filter: brightness(1.07) saturate(1.08) hue-rotate(16deg);
+    opacity: .76;
   }
   100% {
-    filter: brightness(.98) saturate(1.02) hue-rotate(0deg);
-    opacity: .42;
+    filter: brightness(.98) saturate(.94) hue-rotate(0deg);
+    opacity: .46;
   }
 }
 
 @keyframes reader-listening-wave {
   0% {
-    filter: brightness(.98) saturate(1.04) hue-rotate(0deg);
-    opacity: .2;
-    transform: scale(.985);
+    filter: brightness(.99) saturate(.96) hue-rotate(0deg);
+    opacity: .24;
+    transform: scale(.992);
   }
-  42% {
-    filter: brightness(1.2) saturate(1.58) hue-rotate(195deg);
-    opacity: .88;
-    transform: scale(1.006);
-  }
-  72% {
-    filter: brightness(1.22) saturate(1.52) hue-rotate(115deg);
-    opacity: .76;
-    transform: scale(.994);
+  50% {
+    filter: brightness(1.08) saturate(1.1) hue-rotate(14deg);
+    opacity: .62;
+    transform: scale(1.003);
   }
   100% {
-    filter: brightness(.98) saturate(1.04) hue-rotate(0deg);
-    opacity: .2;
-    transform: scale(.985);
+    filter: brightness(.99) saturate(.96) hue-rotate(0deg);
+    opacity: .24;
+    transform: scale(.992);
   }
 }
 
@@ -2733,7 +2724,7 @@ body.body--dark .personal-reader__sidebar {
 }
 
 .personal-reader__speech-orb::after {
-  animation: reader-speech-pulse 1.8s ease-out infinite;
+  animation: reader-speech-pulse 3.2s ease-in-out infinite;
   inset: 0;
 }
 
@@ -2743,6 +2734,7 @@ body.body--dark .personal-reader__sidebar {
   height: calc(5px + var(--reader-speech-level) * (8px + var(--speech-bar) * 2px));
   margin: 0 2px;
   opacity: .62;
+  transition: height 280ms ease-out, opacity 420ms ease;
   width: 3px;
 }
 
@@ -2767,7 +2759,7 @@ body.body--dark .personal-reader__sidebar {
 }
 
 .personal-reader__speech-orb--active::after {
-  animation-duration: 1.15s;
+  animation-duration: 2.8s;
   border-color: color-mix(in srgb, var(--q-positive) 64%, transparent);
 }
 
@@ -2853,8 +2845,8 @@ body.body--dark .personal-reader__sidebar {
 }
 
 @keyframes reader-speech-pulse {
-  0% { opacity: .55; transform: scale(.76); }
-  75%, 100% { opacity: 0; transform: scale(1); }
+  0%, 100% { opacity: .2; transform: scale(.9); }
+  50% { opacity: .48; transform: scale(1); }
 }
 
 .personal-reader__daily-goal p {

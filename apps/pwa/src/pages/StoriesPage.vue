@@ -708,9 +708,9 @@ const readerSpeechFrameStyle = computed(() => {
     ? Math.max(0, Math.min(1, (readingSpeechWordsPerMinute.value - 45) / 55))
     : 0;
   return {
-    '--reader-speech-frame-duration': `${8 - paceRatio * 6.4}s`,
-    '--reader-speech-wave-duration': `${4.8 - paceRatio * 4}s`,
-    '--reader-speech-reactivity': String(0.62 + paceRatio * 0.3 + energyRatio * 0.08),
+    '--reader-speech-frame-duration': `${10 - paceRatio * 3}s`,
+    '--reader-speech-wave-duration': `${7.2 - paceRatio * 2.2}s`,
+    '--reader-speech-reactivity': String(0.58 + paceRatio * 0.16 + energyRatio * 0.06),
   };
 });
 const readingSpeechActionLabel = computed(() => {
