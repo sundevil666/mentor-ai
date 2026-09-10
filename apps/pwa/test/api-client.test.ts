@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-import { saveReadingTranscript, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, synchronizeStatisticsSnapshots, upsertSessionHandoff } from '../src/services/api-client.js';
+import { fetchReadingResumeSnapshot, saveReadingTranscript, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, synchronizeStatisticsSnapshots, upsertSessionHandoff } from '../src/services/api-client.js';
 
 describe('PWA API client', () => {
   beforeEach(() => {
@@ -137,6 +137,17 @@ describe('PWA API client', () => {
     globalThis.fetch = async () => new Response('', { status: 500 });
 
     await assert.rejects(() => synchronizeLearningEvidence([], [], []), /Synchronization failed/);
+  });
+
+  it('loads the reading resume snapshot as JSON', async () => {
+    globalThis.fetch = async () => jsonResponse({ devices: [], serverTime: '2026-09-10T12:00:00.000Z' });
+    const snapshot = await fetchReadingResumeSnapshot('book-1');
+    assert.equal(snapshot.serverTime, '2026-09-10T12:00:00.000Z');
+  });
+
+  it('reports an unavailable reader sync endpoint instead of exposing an HTML parse error', async () => {
+    globalThis.fetch = async () => new Response('<!doctype html>', { status: 200, headers: { 'Content-Type': 'text/html' } });
+    await assert.rejects(() => fetchReadingResumeSnapshot('book-1'), /temporarily unavailable/);
   });
 });
 

@@ -213,7 +213,9 @@ export async function fetchReadingResumeSnapshot(bookId: string): Promise<Readin
     headers: authHeaders(),
     cache: 'no-store',
   });
-  if (!response.ok) throw new Error('Reading device synchronization check failed.');
+  if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+    throw new Error('Reading device synchronization is temporarily unavailable.');
+  }
   return ((await response.json()) as ApiResponse<ReadingResumeSnapshot>).data;
 }
 
@@ -224,7 +226,9 @@ export async function updateReadingDeviceSession(session: ReadingDeviceSession):
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(session),
   });
-  if (!response.ok) throw new Error('Reading device synchronization update failed.');
+  if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+    throw new Error('Reading device synchronization update failed.');
+  }
   return ((await response.json()) as ApiResponse<ReadingResumeSnapshot>).data;
 }
 
