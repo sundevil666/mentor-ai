@@ -56,7 +56,8 @@ withDefaults(defineProps<{
 
 .app-detail-layout--active > .app-detail-layout__header {
   min-height: 0;
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 5;
 }
 
