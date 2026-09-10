@@ -346,11 +346,11 @@ describe('learning state service', () => {
       pageIndex: 3,
       text: '  I   am reading aloud.  ',
       capturedAt: '2026-08-29T12:00:00.000Z',
-      recognitionEngine: 'device-whisper',
+      recognitionEngine: 'sherpa-onnx',
     });
 
     assert.equal(saved.text, 'I am reading aloud.');
-    assert.equal(saved.recognitionEngine, 'device-whisper');
+    assert.equal(saved.recognitionEngine, 'sherpa-onnx');
     await assert.rejects(() => learningStateService.saveReadingTranscriptChunk({
       ...saved,
       id: `${saved.id}-wrong-user`,

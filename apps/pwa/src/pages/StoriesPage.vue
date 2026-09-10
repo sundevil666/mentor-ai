@@ -507,6 +507,7 @@ import { activeReadingHighlightIndexes, alignReadingSpeech, confirmTabletReading
 import { chooseReadingResumeState, readingDeviceHeartbeatMs, readingDeviceLabel } from 'src/services/reading-device-sync';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
+import { isSherpaReaderExperiment, startSherpaReadingTranscriber, type SherpaReadingTranscriber } from 'src/services/sherpa-reading-transcriber';
 import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
 import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerWheelDestination, shouldCommitReaderWheel, type ReaderSwipePoint } from 'src/services/reader-swipe';
 import { beginReaderLookupInteraction, shouldProcessReadingTranscript } from 'src/services/reader-lookup-interaction';
@@ -586,6 +587,7 @@ let readingSpeechLocalTranscriptWindow: string[] = [];
 let readingSpeechPositionLocked = false;
 let readingSpeechRecognition: ContinuousSpeechRecognition | null = null;
 let localReadingTranscriber: LocalReadingTranscriber | null = null;
+let sherpaReadingTranscriber: SherpaReadingTranscriber | null = null;
 let readingSpeechStream: MediaStream | null = null;
 let readingSpeechAudioContext: AudioContext | null = null;
 let readingSpeechAnimationFrame = 0;
@@ -1395,8 +1397,9 @@ async function toggleReadingSpeech() {
 async function startReadingSpeech() {
   if (readingSpeechRecognition || readingSpeechStream || !readingMode.value) return;
   const sessionId = ++readingSpeechSessionId;
+  const useSherpaRecognition = isSherpaReaderExperiment();
   const useLocalRecognition = isAppleMobileDevice();
-  startReadingSpeechDebug(useLocalRecognition ? 'device-whisper' : 'browser-speech');
+  startReadingSpeechDebug(useSherpaRecognition ? 'sherpa-onnx' : useLocalRecognition ? 'device-whisper' : 'browser-speech');
   readingSpeechLocalTranscriptWindow = [];
   readingSpeechPositionLocked = false;
   provisionalReaderWordIndexes.value = new Set();
@@ -1432,7 +1435,42 @@ async function startReadingSpeech() {
     readingSpeechAnchor = getVisibleReaderWordAnchor();
     appendReadingSpeechDebug(`Reading anchor: word ${readingSpeechAnchor}.`);
     appendReadingSpeechDebug(`Expected nearby text: "${readerReferenceWords.value.slice(readingSpeechAnchor, readingSpeechAnchor + 18).join(' ')}"`);
-    if (useLocalRecognition) {
+    if (useSherpaRecognition) {
+      sherpaReadingTranscriber = startSherpaReadingTranscriber(readingSpeechStream, {
+        onInterim: (transcript) => {
+          if (sessionId !== readingSpeechSessionId || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
+          updateReadingSpeechPace(transcript);
+          appendReadingSpeechDebug(`Sherpa interim: "${transcript}"`);
+          provisionalReaderWordIndexes.value = new Set(previewBrowserReadingWordIndexes(readerReferenceWords.value, transcript, readingSpeechAnchor));
+        },
+        onFinal: (transcript) => {
+          if (sessionId !== readingSpeechSessionId || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
+          provisionalReaderWordIndexes.value = new Set();
+          handleReadingSpeechTranscript(transcript, 'sherpa-onnx');
+        },
+        onDebug: (message) => appendReadingSpeechDebug(message),
+        onReady: () => {
+          if (sessionId !== readingSpeechSessionId) return;
+          readingSpeechStatus.value = 'listening';
+          readingSpeechMessage.value = 'Sherpa is ready. Read naturally.';
+          readingSpeechTransitioning.value = false;
+          appendReadingSpeechDebug('Sherpa streaming recognizer ready.');
+        },
+        onProgress: (message) => {
+          if (sessionId !== readingSpeechSessionId) return;
+          readingSpeechStatus.value = 'requesting';
+          readingSpeechMessage.value = message;
+          appendReadingSpeechDebug(message);
+        },
+        onError: (message) => {
+          if (sessionId !== readingSpeechSessionId) return;
+          appendReadingSpeechDebug(`ERROR: Sherpa: ${message}`);
+          stopReadingSpeech('error');
+          readingSpeechMessage.value = `Sherpa recognition stopped: ${message}`;
+          readingSpeechTransitioning.value = false;
+        },
+      });
+    } else if (useLocalRecognition) {
       const handleWhisperTranscript = (transcript: string) => {
         if (sessionId !== readingSpeechSessionId || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) {
           appendReadingSpeechDebug('Ignoring a recognition result while translation has priority.');
@@ -1514,7 +1552,7 @@ async function startReadingSpeech() {
       },
       });
     }
-    if (!useLocalRecognition) {
+    if (!useSherpaRecognition && !useLocalRecognition) {
       readingSpeechStatus.value = 'listening';
       readingSpeechMessage.value = 'Read naturally. Matching words are highlighted as you speak.';
     }
@@ -1574,7 +1612,7 @@ function isMicrophonePermissionError(error: unknown) {
     ? error.name === 'NotAllowedError' || error.name === 'SecurityError'
     : error instanceof Error && /denied|allowed|permission/i.test(error.message);
 }
-function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'device-whisper' | 'browser' = 'browser') {
+function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'device-whisper' | 'browser' | 'sherpa-onnx' = 'browser') {
   const whisperRecognition = recognitionEngine !== 'browser';
   const rawHeardWords = tokenizeReadingSpeech(transcript);
   if (whisperRecognition) updateReadingSpeechChunkPace(rawHeardWords.length);
@@ -1732,6 +1770,8 @@ function stopReadingSpeech(status: ReadingSpeechStatus) {
   readingSpeechRecognition = null;
   localReadingTranscriber?.stop();
   localReadingTranscriber = null;
+  sherpaReadingTranscriber?.stop();
+  sherpaReadingTranscriber = null;
   readingSpeechSuppressedForLookup = false;
   readingSpeechStream?.getTracks().forEach((track) => track.stop());
   readingSpeechStream = null;

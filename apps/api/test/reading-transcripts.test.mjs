@@ -6,10 +6,10 @@ describe('reading transcript storage', () => {
   it('normalizes device text and binds it to the authenticated student', () => {
     const saved = sanitizeReadingTranscript({
       id: 'reading-transcript-1', studentId: 'student-1', bookId: 'book-1', pageIndex: 2,
-      text: '  I   am reading. ', capturedAt: '2026-08-29T12:00:00.000Z', recognitionEngine: 'device-whisper',
+      text: '  I   am reading. ', capturedAt: '2026-08-29T12:00:00.000Z', recognitionEngine: 'sherpa-onnx',
     }, 'student-1');
     assert.equal(saved?.text, 'I am reading.');
-    assert.equal(saved?.recognitionEngine, 'device-whisper');
+    assert.equal(saved?.recognitionEngine, 'sherpa-onnx');
   });
 
   it('rejects a transcript claiming another student identity', () => {

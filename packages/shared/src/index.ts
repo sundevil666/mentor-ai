@@ -348,7 +348,7 @@ export interface ReadingTranscriptChunk {
   pageIndex: number;
   text: string;
   capturedAt: string;
-  recognitionEngine: 'device-whisper' | 'browser';
+  recognitionEngine: 'device-whisper' | 'browser' | 'sherpa-onnx';
 }
 
 export interface ReadingAttempt {

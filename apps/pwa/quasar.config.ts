@@ -38,6 +38,9 @@ export default configure(() => ({
     extendPWACustomSWConf(cfg) {
       cfg.target = 'es2022';
     },
+    extendInjectManifestOptions(cfg) {
+      cfg.globIgnores = [...(cfg.globIgnores ?? []), 'sherpa/**'];
+    },
     injectPwaMetaTags: true,
     swFilename: 'sw.js',
     manifestFilename: 'manifest.json',

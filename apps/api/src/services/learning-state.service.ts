@@ -907,7 +907,7 @@ function sanitizeReadingTranscriptChunk(item: ReadingTranscriptChunk, studentId:
     !Number.isInteger(item.pageIndex) ||
     item.pageIndex < 0 ||
     !Number.isFinite(Date.parse(item.capturedAt)) ||
-    (item.recognitionEngine !== 'device-whisper' && item.recognitionEngine !== 'browser')
+    (item.recognitionEngine !== 'device-whisper' && item.recognitionEngine !== 'browser' && item.recognitionEngine !== 'sherpa-onnx')
   ) return undefined;
   return {
     id: item.id.slice(0, 180),

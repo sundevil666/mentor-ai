@@ -1,0 +1,6 @@
+sherpa-onnx is Copyright (c) 2023 Xiaomi Corporation and contributors.
+Licensed under the Apache License, Version 2.0.
+Source: https://github.com/k2-fsa/sherpa-onnx
+
+The bundled English Zipformer model is distributed by the sherpa-onnx project:
+sherpa-onnx-streaming-zipformer-en-20M-2023-02-17

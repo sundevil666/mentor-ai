@@ -5,10 +5,18 @@ const rootDir = resolve(import.meta.dirname, '..');
 const outputDir = resolve(rootDir, 'apps/pwa/dist/pwa');
 const maximumStaticBytes = 10 * 1024 * 1024;
 const forbiddenExtensions = new Set(['.mp3', '.wasm']);
+const sherpaAssetNames = new Set([
+  'sherpa/LICENSE.txt',
+  'sherpa/sherpa-onnx-asr.js',
+  'sherpa/sherpa-onnx-wasm-main-asr.data',
+  'sherpa/sherpa-onnx-wasm-main-asr.js',
+  'sherpa/sherpa-onnx-wasm-main-asr.wasm',
+]);
 
 const files = walk(outputDir);
-const totalBytes = files.reduce((total, file) => total + statSync(file).size, 0);
-const forbiddenFiles = files.filter((file) => forbiddenExtensions.has(extname(file)));
+const ordinaryFiles = files.filter((file) => !sherpaAssetNames.has(relative(outputDir, file)));
+const totalBytes = ordinaryFiles.reduce((total, file) => total + statSync(file).size, 0);
+const forbiddenFiles = ordinaryFiles.filter((file) => forbiddenExtensions.has(extname(file)));
 
 if (forbiddenFiles.length > 0) {
   throw new Error(`Deployment output contains externally hosted assets:\n${forbiddenFiles.map(formatPath).join('\n')}`);
@@ -18,7 +26,7 @@ if (totalBytes > maximumStaticBytes) {
   throw new Error(`Static deployment output is ${formatBytes(totalBytes)}; budget is ${formatBytes(maximumStaticBytes)}.`);
 }
 
-console.log(`Deployment output verified: ${files.length} files, ${formatBytes(totalBytes)}, no bundled MP3 or WASM.`);
+console.log(`Deployment output verified: ${files.length} files, ${formatBytes(totalBytes)} ordinary assets, no unexpected MP3 or WASM.`);
 
 function walk(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
