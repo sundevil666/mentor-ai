@@ -177,6 +177,18 @@ export function confirmTabletReadingWordIndexes(matchedWordIndexes: readonly num
   return [...confirmed].sort((left, right) => left - right);
 }
 
+export function activeReadingHighlightIndexes(confirmedWordIndexes: readonly number[], maximumWords = 12): number[] {
+  const ordered = [...new Set(confirmedWordIndexes)].sort((left, right) => left - right);
+  if (!ordered.length || maximumWords <= 0) return [];
+  const active: number[] = [ordered.at(-1)!];
+  for (let index = ordered.length - 2; index >= 0 && active.length < maximumWords; index -= 1) {
+    const wordIndex = ordered[index]!;
+    if (active[0]! - wordIndex > 2) break;
+    active.unshift(wordIndex);
+  }
+  return active;
+}
+
 function rejected(anchorIndex: number): ReadingSpeechMatch {
   return { accepted: false, matchedWordIndexes: [], coverage: 0, anchorIndex };
 }

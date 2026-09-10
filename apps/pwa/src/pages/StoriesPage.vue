@@ -222,6 +222,8 @@
                       'personal-reader__word--resume-sentence': token.wordIndex !== undefined && token.wordIndex >= resumeSentenceStartIndex && token.wordIndex <= resumeSentenceEndIndex,
                       'personal-reader__word--spoken': token.wordIndex !== undefined && spokenReaderWordIndexes.has(token.wordIndex),
                       'personal-reader__word--provisional': token.wordIndex !== undefined && provisionalReaderWordIndexes.has(token.wordIndex) && !spokenReaderWordIndexes.has(token.wordIndex),
+                      'personal-reader__word--active': token.wordIndex !== undefined && activeReaderWordIndexes.has(token.wordIndex),
+                      'personal-reader__word--current': token.wordIndex === currentReaderHighlightWordIndex,
                     }"
                     :data-reader-word="token.text"
                     :data-reader-word-index="token.wordIndex"
@@ -501,7 +503,7 @@ import { getAuthToken } from 'src/services/auth';
 import { findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { annualReadingPace, annualReadingPaceMessage as getAnnualReadingPaceMessage, createDailyReadingProgress, dailyReadingGoalWords, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, readingGoalMessage, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
-import { alignReadingSpeech, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, previewBrowserReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
+import { activeReadingHighlightIndexes, alignReadingSpeech, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, previewBrowserReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { chooseReadingResumeState, readingDeviceHeartbeatMs, readingDeviceLabel } from 'src/services/reading-device-sync';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
@@ -572,6 +574,7 @@ const readingSpeechPermissionBlocked = ref(false);
 const readingSpeechCaptureUnavailable = ref(false);
 const spokenReaderWordIndexes = ref(new Set<number>());
 const provisionalReaderWordIndexes = ref(new Set<number>());
+const activeReaderWordIndexes = ref(new Set<number>());
 const readingSpeechAcceptedWords = ref(0);
 const readingSpeechSpokenWords = ref(0);
 const readingSpeechDebugEntries = ref<string[]>(['Waiting for microphone start.']);
@@ -706,6 +709,10 @@ const renderedBookPages = computed(() => {
   }));
 });
 const readerReferenceWords = computed(() => renderedBookPages.value.flatMap((page) => page.paragraphs.flatMap((paragraph) => paragraph.filter((token) => token.isWord).map((token) => token.text))));
+const currentReaderHighlightWordIndex = computed(() => {
+  const provisional = [...provisionalReaderWordIndexes.value].at(-1);
+  return provisional ?? [...activeReaderWordIndexes.value].at(-1) ?? -1;
+});
 const readingSpeechActive = computed(() => readingSpeechStatus.value === 'listening' || readingSpeechStatus.value === 'noise' || readingSpeechStatus.value === 'requesting');
 const readingSpeechHasSignal = computed(() => readingSpeechLevel.value >= 0.035);
 const readerSpeechFrameStyle = computed(() => {
@@ -988,6 +995,7 @@ function closeBook() {
   chapterPageIndexes.value = [];
   spokenReaderWordIndexes.value = new Set();
   provisionalReaderWordIndexes.value = new Set();
+  activeReaderWordIndexes.value = new Set();
   readingSpeechFurthestWordIndex = -1;
   syncedReaderPositionWordIndex = -1;
   syncedReaderPositionUpdatedAt = undefined;
@@ -1009,6 +1017,7 @@ function goToBookPage(pageIndex: number | null) {
   persistBookProgress();
   readingSpeechAnchor = getVisibleReaderWordAnchor();
   provisionalReaderWordIndexes.value = new Set();
+  activeReaderWordIndexes.value = new Set();
   void persistReaderNavigationProgress();
   markReadingDevicePositionChanged();
   void readingActivityTimer.checkpoint();
@@ -1379,6 +1388,7 @@ async function startReadingSpeech() {
   readingSpeechLocalTranscriptWindow = [];
   readingSpeechPositionLocked = false;
   provisionalReaderWordIndexes.value = new Set();
+  activeReaderWordIndexes.value = new Set();
   resetReadingSpeechPace();
   if (!navigator.mediaDevices?.getUserMedia) {
     appendReadingSpeechDebug('ERROR: getUserMedia is unavailable.');
@@ -1647,6 +1657,7 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
   readingSpeechSpokenWords.value += spokenCount;
   const nextSpoken = new Set(spokenReaderWordIndexes.value);
   confirmedWordIndexes.forEach((wordIndex) => nextSpoken.add(wordIndex));
+  activeReaderWordIndexes.value = new Set(activeReadingHighlightIndexes(confirmedWordIndexes));
   const furthestMatchedWord = confirmedLastWord;
   if (furthestMatchedWord > readingSpeechFurthestWordIndex) {
     readingSpeechFurthestWordIndex = furthestMatchedWord;

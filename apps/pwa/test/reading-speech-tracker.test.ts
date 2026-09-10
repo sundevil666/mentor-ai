@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, previewBrowserReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
+import { activeReadingHighlightIndexes, alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, previewBrowserReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
 import { localReadingChunkDurationMs, normalizeReadingAudio, startLocalReadingTranscriber } from '../src/services/local-reading-transcriber.js';
 
 const reference = tokenizeReadingSpeech('Alice was beginning to get very tired of sitting by her sister on the bank. She read the sentence again because practice matters.');
@@ -182,6 +182,17 @@ describe('reading speech tracking', () => {
     });
     assert.equal(live.accepted, true);
     assert.deepEqual(confirmTabletReadingWordIndexes(live.matchedWordIndexes, 4, 2, 2), [4, 5]);
+  });
+
+  it('keeps the latest nearby spoken phrase visually active', () => {
+    assert.deepEqual(activeReadingHighlightIndexes([10, 11, 12, 14, 15]), [10, 11, 12, 14, 15]);
+    assert.deepEqual(activeReadingHighlightIndexes([2, 3, 20, 21]), [20, 21]);
+  });
+
+  it('bounds the active phrase without changing confirmed reading history', () => {
+    const confirmed = Array.from({ length: 20 }, (_, index) => index + 5);
+    assert.deepEqual(activeReadingHighlightIndexes(confirmed), confirmed.slice(-12));
+    assert.deepEqual(confirmed, Array.from({ length: 20 }, (_, index) => index + 5));
   });
 
   it('touches only the nearby window in a very large book', () => {
