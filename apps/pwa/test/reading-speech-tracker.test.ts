@@ -219,11 +219,12 @@ describe('tablet reading audio preparation', () => {
     assert.equal(result.gain, 1);
   });
 
-  it('keeps the loaded Whisper worker ready across pause and restart', async () => {
+  it('keeps the loaded Whisper worker ready across pause and restart without delivering late results', async () => {
     const originalWorker = globalThis.Worker;
     const originalWindow = globalThis.window;
     let workerCount = 0;
     let initializationCount = 0;
+    let cancellationCount = 0;
     const fakeWorkers: FakeWorker[] = [];
     class FakeWorker {
       onmessage: ((event: MessageEvent<{ type: string }>) => void) | null = null;
@@ -232,6 +233,7 @@ describe('tablet reading audio preparation', () => {
         fakeWorkers.push(this);
       }
       postMessage(message: { type?: string }) {
+        if (message.type === 'cancel') cancellationCount += 1;
         if (message.type !== 'init') return;
         initializationCount += 1;
         queueMicrotask(() => this.onmessage?.({ data: { type: 'ready' } } as MessageEvent<{ type: string }>));
@@ -260,9 +262,10 @@ describe('tablet reading audio preparation', () => {
       second.stop();
       assert.equal(workerCount, 1);
       assert.equal(initializationCount, 1);
+      assert.equal(cancellationCount, 2);
       assert.equal(readyCount, 2);
       fakeWorkers[0]!.onmessage?.({ data: { type: 'result', id: 1, text: 'final partial words' } } as unknown as MessageEvent<{ type: string }>);
-      assert.equal(transcriptCount, 1);
+      assert.equal(transcriptCount, 0);
     } finally {
       Object.assign(globalThis, { Worker: originalWorker, window: originalWindow });
     }

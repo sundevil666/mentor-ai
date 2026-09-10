@@ -1,6 +1,6 @@
 import { env, pipeline } from '@huggingface/transformers';
 
-type WorkerRequest = { type?: 'init'; id?: number; audio?: Float32Array };
+type WorkerRequest = { type?: 'init' | 'cancel'; id?: number; beforeId?: number; audio?: Float32Array };
 type TranscriptionResult = { text?: string };
 
 env.allowLocalModels = false;
@@ -8,6 +8,7 @@ env.useBrowserCache = true;
 
 let transcriberPromise: Promise<(audio: Float32Array, options?: Record<string, unknown>) => Promise<TranscriptionResult>> | null = null;
 let transcribing = false;
+let cancelBeforeId = 0;
 const pendingRequests: Array<{ id: number; audio: Float32Array }> = [];
 const maximumWhisperSamples = 28 * 16_000;
 const maximumPendingSamples = 6 * 16_000;
@@ -34,6 +35,13 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
     void transcriberPromise
       .then(() => self.postMessage({ type: 'ready' }))
       .catch((error) => self.postMessage({ type: 'error', message: error instanceof Error ? error.message : String(error) }));
+    return;
+  }
+  if (event.data.type === 'cancel') {
+    cancelBeforeId = Math.max(cancelBeforeId, event.data.beforeId ?? 0);
+    for (let index = pendingRequests.length - 1; index >= 0; index -= 1) {
+      if (pendingRequests[index]!.id < cancelBeforeId) pendingRequests.splice(index, 1);
+    }
     return;
   }
   if (!event.data.audio || event.data.id === undefined) return;
@@ -65,7 +73,7 @@ async function transcribe(request: { id: number; audio: Float32Array }) {
     // Transformers.js rejects language/task overrides for this model.
     const result = await transcriber(request.audio);
     self.postMessage({ type: 'debug', message: `Worker finished chunk #${request.id} in ${((performance.now() - startedAt) / 1_000).toFixed(1)}s.` });
-    self.postMessage({ type: 'result', id: request.id, text: result.text?.trim() ?? '' });
+    if (request.id >= cancelBeforeId) self.postMessage({ type: 'result', id: request.id, text: result.text?.trim() ?? '' });
   } catch (error) {
     self.postMessage({ type: 'error', id: request.id, message: error instanceof Error ? error.message : String(error) });
   } finally {
@@ -76,6 +84,7 @@ async function transcribe(request: { id: number; audio: Float32Array }) {
 }
 
 function takePendingBatch(): { id: number; audio: Float32Array } | null {
+  while (pendingRequests.length && pendingRequests[0]!.id < cancelBeforeId) pendingRequests.shift();
   if (!pendingRequests.length) return null;
   const batch: Array<{ id: number; audio: Float32Array }> = [];
   let sampleCount = 0;

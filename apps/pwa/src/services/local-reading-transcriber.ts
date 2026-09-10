@@ -52,7 +52,7 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
   const firstSessionRequestId = sharedRequestId + 1;
   options.onDebug?.(sharedWorkerReady ? 'Reusing ready offline speech model.' : sharedWorkerInitializing ? 'Waiting for offline speech model already loading.' : 'Creating offline transcription worker.');
 
-  worker.onmessage = (event: MessageEvent<{ type: string; id?: number; text?: string; progress?: number; message?: string }>) => {
+  const handleWorkerMessage = (event: MessageEvent<{ type: string; id?: number; text?: string; progress?: number; message?: string }>) => {
     if (event.data.type === 'ready') {
       sharedWorkerReady = true;
       sharedWorkerInitializing = false;
@@ -64,14 +64,15 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
       worker.terminate();
     }
     if (event.data.id !== undefined && event.data.id < firstSessionRequestId) return;
+    // A stopped reader session must not retain callbacks or accept a late
+    // Whisper result. The shared worker/model stays warm, but the session is
+    // completely detached from it.
+    if (stopped) return;
     if (event.data.type === 'debug' && event.data.message) options.onDebug?.(event.data.message);
     if (event.data.type === 'result') {
       options.onDebug?.(`Worker result #${event.data.id ?? '?'}: ${event.data.text ? 'text received' : 'empty text'}.`);
       if (event.data.text) options.onTranscript(event.data.text);
     }
-    // A result from the final partial chunk is intentionally delivered after
-    // Pause. Other lifecycle callbacks must not restart or alter the session.
-    if (stopped) return;
     if (event.data.type === 'ready') {
       options.onReady();
       void startCapture().catch((error) => options.onError(error instanceof Error ? error.message : String(error)));
@@ -84,6 +85,7 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
       options.onError(event.data.message ?? 'Offline speech recognition failed.');
     }
   };
+  worker.onmessage = handleWorkerMessage;
   if (sharedWorkerReady) {
     queueMicrotask(() => {
       if (stopped) return;
@@ -139,6 +141,21 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
   return {
     stop() {
       stopped = true;
+      worker.postMessage({ type: 'cancel', beforeId: sharedRequestId + 1 });
+      if (worker.onmessage === handleWorkerMessage) {
+        // Release the page/session callbacks while retaining only the bounded,
+        // reusable worker and its already-loaded model.
+        worker.onmessage = (event: MessageEvent<{ type: string }>) => {
+          if (event.data.type === 'ready') {
+            sharedWorkerReady = true;
+            sharedWorkerInitializing = false;
+          }
+          if (event.data.type === 'error') {
+            sharedWorkerReady = false;
+            sharedWorkerInitializing = false;
+          }
+        };
+      }
       window.clearInterval(timer);
       processor && (processor.port.onmessage = null);
       processor?.disconnect();

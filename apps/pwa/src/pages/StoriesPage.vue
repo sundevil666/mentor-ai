@@ -585,6 +585,7 @@ let localReadingTranscriber: LocalReadingTranscriber | null = null;
 let readingSpeechStream: MediaStream | null = null;
 let readingSpeechAudioContext: AudioContext | null = null;
 let readingSpeechAnimationFrame = 0;
+let readingSpeechSessionId = 0;
 let readingSpeechDebugStartedAt = 0;
 let readingSpeechLastSignalState = false;
 let readingSpeechPaceWordCount = 0;
@@ -1321,6 +1322,7 @@ async function toggleReadingSpeech() {
 }
 async function startReadingSpeech() {
   if (readingSpeechRecognition || readingSpeechStream || !readingMode.value) return;
+  const sessionId = ++readingSpeechSessionId;
   const useLocalRecognition = isAppleMobileDevice();
   startReadingSpeechDebug(useLocalRecognition ? 'device-whisper' : 'browser-speech');
   readingSpeechLocalTranscriptWindow = [];
@@ -1343,41 +1345,50 @@ async function startReadingSpeech() {
   try {
     configureCaptureAudioSession();
     appendReadingSpeechDebug('Audio session configured for capture.');
-    readingSpeechStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    const acquiredStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    if (sessionId !== readingSpeechSessionId || !readingMode.value) {
+      acquiredStream.getTracks().forEach((track) => track.stop());
+      appendReadingSpeechDebug('Discarded microphone stream from an obsolete start request.');
+      return;
+    }
+    readingSpeechStream = acquiredStream;
     const audioTrack = readingSpeechStream.getAudioTracks()[0];
     const settings = audioTrack?.getSettings();
     appendReadingSpeechDebug(`Microphone granted: track=${audioTrack?.readyState ?? 'missing'}, enabled=${audioTrack?.enabled ?? false}, muted=${audioTrack?.muted ?? false}, sampleRate=${settings?.sampleRate ?? 'unknown'}, channels=${settings?.channelCount ?? 'unknown'}.`);
-    void startReadingSpeechMeter(readingSpeechStream);
+    void startReadingSpeechMeter(readingSpeechStream, sessionId);
     readingSpeechAnchor = getVisibleReaderWordAnchor();
     appendReadingSpeechDebug(`Reading anchor: word ${readingSpeechAnchor}.`);
     appendReadingSpeechDebug(`Expected nearby text: "${readerReferenceWords.value.slice(readingSpeechAnchor, readingSpeechAnchor + 18).join(' ')}"`);
     if (useLocalRecognition) {
       const handleWhisperTranscript = (transcript: string) => {
-        if (!shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) {
+        if (sessionId !== readingSpeechSessionId || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) {
           appendReadingSpeechDebug('Ignoring a recognition result while translation has priority.');
           return;
         }
         handleReadingSpeechTranscript(transcript, 'device-whisper');
       };
       const startOfflineRecognition = () => {
-        if (!readingSpeechStream || localReadingTranscriber) return;
+        if (sessionId !== readingSpeechSessionId || !readingSpeechStream || localReadingTranscriber) return;
         localReadingTranscriber = startLocalReadingTranscriber(readingSpeechStream, {
         onTranscript: (transcript) => {
           handleWhisperTranscript(transcript);
         },
         onDebug: (message) => appendReadingSpeechDebug(message),
         onReady: () => {
+          if (sessionId !== readingSpeechSessionId) return;
           appendReadingSpeechDebug('Offline model ready. Start reading aloud.');
           readingSpeechStatus.value = 'listening';
           readingSpeechMessage.value = 'Read aloud. Recognition is ready.';
           readingSpeechTransitioning.value = false;
         },
         onProgress: (message) => {
+          if (sessionId !== readingSpeechSessionId) return;
           appendReadingSpeechDebug(message);
           readingSpeechStatus.value = 'requesting';
           readingSpeechMessage.value = message;
         },
         onError: (message) => {
+          if (sessionId !== readingSpeechSessionId) return;
           appendReadingSpeechDebug(`ERROR: ${message}`);
           stopReadingSpeech('error');
           readingSpeechMessage.value = `Offline speech recognition stopped: ${message}`;
@@ -1393,6 +1404,7 @@ async function startReadingSpeech() {
       readingSpeechRecognition = startContinuousSpeechRecognition({
       lang: 'en-US',
       onInterim: (transcript) => {
+        if (sessionId !== readingSpeechSessionId) return;
         updateReadingSpeechPace(transcript);
         appendReadingSpeechDebug(`Interim text: "${transcript}"`);
         if (!readingSpeechRecognition || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
@@ -1400,11 +1412,13 @@ async function startReadingSpeech() {
         provisionalReaderWordIndexes.value = new Set(previewWordIndexes);
       },
       onFinal: (transcript) => {
+        if (sessionId !== readingSpeechSessionId) return;
         provisionalReaderWordIndexes.value = new Set();
         if (!readingSpeechRecognition || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
         handleReadingSpeechTranscript(transcript, 'browser');
       },
       onListeningChange: (listening) => {
+        if (sessionId !== readingSpeechSessionId) return;
         appendReadingSpeechDebug(listening ? 'Browser recognition listening.' : 'Browser recognition reconnecting.');
         if (!readingSpeechRecognition && !listening) return;
         readingSpeechStatus.value = listening ? 'listening' : 'requesting';
@@ -1412,6 +1426,7 @@ async function startReadingSpeech() {
         if (listening) readingSpeechTransitioning.value = false;
       },
       onError: (message) => {
+        if (sessionId !== readingSpeechSessionId) return;
         appendReadingSpeechDebug(`ERROR: browser recognition: ${message}`);
         stopReadingSpeech('error');
         readingSpeechCaptureUnavailable.value = isMicrophoneCaptureUnavailable(message);
@@ -1431,6 +1446,7 @@ async function startReadingSpeech() {
       readingSpeechMessage.value = 'Read naturally. Matching words are highlighted as you speak.';
     }
   } catch (error) {
+    if (sessionId !== readingSpeechSessionId) return;
     stopReadingSpeech('error');
     readingSpeechCaptureUnavailable.value = isMicrophoneCaptureUnavailable(error);
     readingSpeechPermissionBlocked.value = !readingSpeechCaptureUnavailable.value && isMicrophonePermissionError(error);
@@ -1603,20 +1619,26 @@ function getVisibleReaderWordAnchor() {
   const wordIndex = Number(visibleWord?.dataset.readerWordIndex);
   return Number.isInteger(wordIndex) ? wordIndex : readingSpeechAnchor;
 }
-async function startReadingSpeechMeter(stream: MediaStream) {
+async function startReadingSpeechMeter(stream: MediaStream, sessionId: number) {
   const AudioContextConstructor = window.AudioContext;
   if (!AudioContextConstructor) {
     appendReadingSpeechDebug('Audio meter unavailable: AudioContext missing.');
     return;
   }
-  readingSpeechAudioContext = new AudioContextConstructor();
-  await readingSpeechAudioContext.resume().catch(() => undefined);
-  const analyser = readingSpeechAudioContext.createAnalyser();
+  const context = new AudioContextConstructor();
+  readingSpeechAudioContext = context;
+  await context.resume().catch(() => undefined);
+  if (sessionId !== readingSpeechSessionId || readingSpeechAudioContext !== context) {
+    void context.close();
+    return;
+  }
+  const analyser = context.createAnalyser();
   analyser.fftSize = 256;
   analyser.smoothingTimeConstant = 0.76;
-  readingSpeechAudioContext.createMediaStreamSource(stream).connect(analyser);
+  context.createMediaStreamSource(stream).connect(analyser);
   const samples = new Uint8Array(analyser.frequencyBinCount);
   const update = () => {
+    if (sessionId !== readingSpeechSessionId || readingSpeechAudioContext !== context) return;
     analyser.getByteFrequencyData(samples);
     const average = samples.reduce((sum, value) => sum + value, 0) / Math.max(1, samples.length);
     readingSpeechLevel.value = Math.min(1, average / 72);
@@ -1630,6 +1652,7 @@ async function startReadingSpeechMeter(stream: MediaStream) {
   update();
 }
 function stopReadingSpeech(status: ReadingSpeechStatus) {
+  readingSpeechSessionId += 1;
   appendReadingSpeechDebug(`Stopping microphone: status=${status}.`);
   readingSpeechRecognition?.stop();
   readingSpeechRecognition = null;
