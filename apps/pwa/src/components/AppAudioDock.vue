@@ -5,6 +5,17 @@
   >
     <div class="app-audio-dock__buttons">
       <q-btn
+        aria-label="Start from the beginning"
+        color="primary"
+        flat
+        icon="restart_alt"
+        round
+        :disable="disabled"
+        @click="$emit('seek', 0)"
+      >
+        <q-tooltip>Start from the beginning</q-tooltip>
+      </q-btn>
+      <q-btn
         aria-label="Rewind 10 seconds"
         color="primary"
         flat
