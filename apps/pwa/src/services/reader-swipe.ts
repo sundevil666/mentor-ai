@@ -66,3 +66,7 @@ export function readerWheelDestination(
   if (Math.abs(accumulatedDeltaX) < minimumDistance) return pageIndex;
   return Math.max(0, Math.min(pageCount - 1, pageIndex + (accumulatedDeltaX > 0 ? 1 : -1)));
 }
+
+export function shouldCommitReaderWheel(accumulatedDeltaX: number, minimumDistance = 42) {
+  return Math.abs(accumulatedDeltaX) >= minimumDistance;
+}

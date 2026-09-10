@@ -508,7 +508,7 @@ import { chooseReadingResumeState, readingDeviceHeartbeatMs, readingDeviceLabel 
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
-import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerWheelDestination, type ReaderSwipePoint } from 'src/services/reader-swipe';
+import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerWheelDestination, shouldCommitReaderWheel, type ReaderSwipePoint } from 'src/services/reader-swipe';
 import { beginReaderLookupInteraction, shouldProcessReadingTranscript } from 'src/services/reader-lookup-interaction';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
 
@@ -629,6 +629,7 @@ let readerWheelStartPageIndex = 0;
 let readerWheelStartScrollLeft = 0;
 let readerWheelDeltaX = 0;
 let readerWheelSettleTimer = 0;
+let readerWheelGestureLocked = false;
 let readerScrollAnimationFrame = 0;
 let suppressReaderTapUntil = 0;
 let personalBookSyncPromise: Promise<void> | null = null;
@@ -1074,6 +1075,11 @@ function handleReaderWheel(event: WheelEvent) {
   const viewport = readerContent.value;
   if (!readingMode.value || !viewport || !isReaderHorizontalWheel(event, viewport.clientHeight)) return;
   event.preventDefault();
+  if (readerWheelGestureLocked) {
+    window.clearTimeout(readerWheelSettleTimer);
+    readerWheelSettleTimer = window.setTimeout(resetReaderWheel, 140);
+    return;
+  }
   cancelReaderScrollAnimation();
   if (!readerWheelSettleTimer) {
     readerWheelStartPageIndex = currentBookPageIndex.value;
@@ -1090,25 +1096,31 @@ function handleReaderWheel(event: WheelEvent) {
   viewport.scrollLeft = readerWheelStartScrollLeft + Math.max(-maximumTravel, Math.min(maximumTravel, visibleDelta));
   readerDragging.value = true;
   window.clearTimeout(readerWheelSettleTimer);
-  readerWheelSettleTimer = window.setTimeout(settleReaderWheel, 90);
+  if (shouldCommitReaderWheel(readerWheelDeltaX)) {
+    readerWheelGestureLocked = true;
+    readerDragging.value = false;
+    const destination = readerWheelDestination(readerWheelStartPageIndex, readerPageCount.value, readerWheelDeltaX);
+    readerWheelDeltaX = 0;
+    if (destination === currentBookPageIndex.value) scrollToReaderPage();
+    else goToBookPage(destination);
+    readerWheelSettleTimer = window.setTimeout(resetReaderWheel, 140);
+    return;
+  }
+  readerWheelSettleTimer = window.setTimeout(settleReaderWheel, 110);
 }
 
 function settleReaderWheel() {
   readerWheelSettleTimer = 0;
-  const destination = readerWheelDestination(readerWheelStartPageIndex, readerPageCount.value, readerWheelDeltaX);
   readerDragging.value = false;
   readerWheelDeltaX = 0;
-  if (destination === currentBookPageIndex.value) {
-    scrollToReaderPage();
-    return;
-  }
-  goToBookPage(destination);
+  scrollToReaderPage();
 }
 
 function resetReaderWheel() {
   window.clearTimeout(readerWheelSettleTimer);
   readerWheelSettleTimer = 0;
   readerWheelDeltaX = 0;
+  readerWheelGestureLocked = false;
 }
 function handleReaderTouchMove(event: TouchEvent) {
   const start = readerTouchStart;

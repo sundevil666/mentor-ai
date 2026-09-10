@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerWheelDestination } from '../src/services/reader-swipe.js';
+import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerWheelDestination, shouldCommitReaderWheel } from '../src/services/reader-swipe.js';
 
 test('a horizontal swipe left advances exactly one reader page', () => {
   assert.equal(detectReaderSwipe({ clientX: 300, clientY: 200 }, { clientX: 190, clientY: 205 }), 'next');
@@ -45,4 +45,10 @@ test('one trackpad gesture turns at most one page and respects book edges', () =
   assert.equal(readerWheelDestination(4, 10, -80), 3);
   assert.equal(readerWheelDestination(9, 10, 500), 9);
   assert.equal(readerWheelDestination(0, 10, -500), 0);
+});
+
+test('a trackpad gesture commits as soon as it crosses the paging threshold', () => {
+  assert.equal(shouldCommitReaderWheel(41.9), false);
+  assert.equal(shouldCommitReaderWheel(42), true);
+  assert.equal(shouldCommitReaderWheel(-90), true);
 });
