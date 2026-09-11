@@ -3,7 +3,7 @@ import { lookupReaderPhonetic, lookupReaderText } from '../services/reader-looku
 import type { PersonalReadingBookArchive, ReaderVocabularyItem, ReadingTranscriptChunk } from '@mentor-ai/shared';
 import { learningStateService } from '../services/learning-state.service.js';
 import { getTranslationUsage, synchronizeTranslationUsageDevice, TranslationLimitError } from '../services/translation-usage.service.js';
-import { storeReadingTranscript } from '../services/reading-transcripts.service.js';
+import { storeReadingTranscripts } from '../services/reading-transcripts.service.js';
 
 export const translateReaderText: RequestHandler = async (req, res, _next) => {
   try {
@@ -59,9 +59,12 @@ export const synchronizePersonalReadingBooks: RequestHandler = async (req, res, 
 
 export const saveReadingTranscript: RequestHandler = async (req, res, next) => {
   try {
+    const chunks = Array.isArray(req.body?.chunks)
+      ? req.body.chunks as ReadingTranscriptChunk[]
+      : [req.body as ReadingTranscriptChunk];
     const data = req.authUser
-      ? await storeReadingTranscript(req.body as ReadingTranscriptChunk, req.authUser)
-      : await learningStateService.saveReadingTranscriptChunk(req.body as ReadingTranscriptChunk, req.authUser);
+      ? await storeReadingTranscripts(chunks, req.authUser)
+      : await learningStateService.saveReadingTranscriptChunks(chunks, req.authUser);
     res.json({ data });
   } catch (error) {
     next(error);

@@ -339,7 +339,7 @@ describe('learning state service', () => {
   });
 
   it('stores only a bounded normalized reading transcript chunk', async () => {
-    const saved = await learningStateService.saveReadingTranscriptChunk({
+    const [saved] = await learningStateService.saveReadingTranscriptChunks([{
       id: `reading-transcript-${Date.now()}`,
       studentId: 'demo-student',
       bookId: 'book-1',
@@ -347,15 +347,15 @@ describe('learning state service', () => {
       text: '  I   am reading aloud.  ',
       capturedAt: '2026-08-29T12:00:00.000Z',
       recognitionEngine: 'sherpa-onnx',
-    });
+    }]);
 
     assert.equal(saved.text, 'I am reading aloud.');
     assert.equal(saved.recognitionEngine, 'sherpa-onnx');
-    await assert.rejects(() => learningStateService.saveReadingTranscriptChunk({
+    await assert.rejects(() => learningStateService.saveReadingTranscriptChunks([{
       ...saved,
       id: `${saved.id}-wrong-user`,
       studentId: 'another-student',
-    }), /Invalid reading transcript/);
+    }]), /Invalid reading transcript/);
   });
 
   it('keeps furthest progress while using the newest device as the resume position', async () => {

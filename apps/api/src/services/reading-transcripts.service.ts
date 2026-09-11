@@ -2,15 +2,19 @@ import type { ReadingTranscriptChunk } from '@mentor-ai/shared';
 import { getPostgresPool } from '../repositories/postgres-client.js';
 import type { AuthenticatedUser } from './auth.service.js';
 
-export async function storeReadingTranscript(
-  candidate: ReadingTranscriptChunk,
+let transcriptTableReady: Promise<void> | null = null;
+
+export async function storeReadingTranscripts(
+  candidates: ReadingTranscriptChunk[],
   user: AuthenticatedUser,
-): Promise<ReadingTranscriptChunk> {
+): Promise<ReadingTranscriptChunk[]> {
   const pool = getPostgresPool();
   if (!pool) throw new Error('Reading transcript storage is unavailable because DATABASE_URL is not configured.');
-  const safe = sanitizeReadingTranscript(candidate, user.id);
-  if (!safe) throw new Error('Invalid reading transcript.');
-  await pool.query(`
+  const safe = candidates.slice(0, 100).map((candidate) => sanitizeReadingTranscript(candidate, user.id));
+  if (safe.some((chunk) => !chunk)) throw new Error('Invalid reading transcript.');
+  const chunks = safe as ReadingTranscriptChunk[];
+  if (chunks.length === 0) return [];
+  transcriptTableReady ??= pool.query(`
     CREATE TABLE IF NOT EXISTS reading_transcript_chunks (
       id TEXT PRIMARY KEY,
       student_id TEXT NOT NULL,
@@ -21,15 +25,28 @@ export async function storeReadingTranscript(
       captured_at TIMESTAMPTZ NOT NULL,
       stored_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
-  `);
-  await pool.query(
-    `INSERT INTO reading_transcript_chunks
+  `).then(() => undefined).catch((error: unknown) => {
+    transcriptTableReady = null;
+    throw error;
+  });
+  await transcriptTableReady;
+  await pool.query(`
+    INSERT INTO reading_transcript_chunks
       (id, student_id, book_id, page_index, transcript_text, recognition_engine, captured_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     ON CONFLICT (id) DO NOTHING`,
-    [safe.id, safe.studentId, safe.bookId, safe.pageIndex, safe.text, safe.recognitionEngine, safe.capturedAt],
-  );
-  return safe;
+    SELECT * FROM UNNEST(
+      $1::text[], $2::text[], $3::text[], $4::integer[], $5::text[], $6::text[], $7::timestamptz[]
+    )
+    ON CONFLICT (id) DO NOTHING
+  `, [
+    chunks.map((chunk) => chunk.id),
+    chunks.map((chunk) => chunk.studentId),
+    chunks.map((chunk) => chunk.bookId),
+    chunks.map((chunk) => chunk.pageIndex),
+    chunks.map((chunk) => chunk.text),
+    chunks.map((chunk) => chunk.recognitionEngine),
+    chunks.map((chunk) => chunk.capturedAt),
+  ]);
+  return chunks;
 }
 
 export function sanitizeReadingTranscript(

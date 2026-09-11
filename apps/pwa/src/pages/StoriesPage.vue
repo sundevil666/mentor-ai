@@ -515,13 +515,14 @@ import { useAppStore } from 'src/stores/app-store';
 import { configureCaptureAudioSession, configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 import { deletePersonalBook, importPersonalBook, listPersonalBookArchives, listPersonalBooks, loadPersonalBook, markPersonalBookOpened, mergePersonalBookArchives, type PersonalBook } from 'src/services/personal-book-library';
 import { personalBookSyncControl } from 'src/services/personal-book-sync-control';
-import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot, saveReadingTranscript, synchronizePersonalReadingBooks, synchronizeReaderVocabulary, updateReadingDeviceSession } from 'src/services/api-client';
+import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot, synchronizePersonalReadingBooks, synchronizeReaderVocabulary, updateReadingDeviceSession } from 'src/services/api-client';
 import { getAuthToken } from 'src/services/auth';
 import { findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { annualReadingPace, annualReadingPaceMessage as getAnnualReadingPaceMessage, createDailyReadingProgress, dailyReadingGoalWords, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, readingGoalMessage, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { activeReadingHighlightIndexes, alignReadingSpeech, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, previewBrowserReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { chooseReadingResumeState, readingDeviceHeartbeatMs, readingDeviceLabel } from 'src/services/reading-device-sync';
+import { queueReadingTranscript, syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { isSherpaReaderExperiment, startSherpaReadingTranscriber, type SherpaReadingTranscriber } from 'src/services/sherpa-reading-transcriber';
@@ -768,6 +769,7 @@ onMounted(async () => {
   } else {
     personalBooks.value = await listPersonalBooks();
     await syncPersonalBooks().catch(() => undefined);
+    void syncReadingTranscripts().catch(() => undefined);
   }
   document.addEventListener('visibilitychange', handleVisibilityChange);
   window.addEventListener('online', handleBookSyncWakeup);
@@ -876,7 +878,10 @@ function syncPersonalBooks(): Promise<void> {
   return personalBookSyncPromise;
 }
 
-function handleBookSyncWakeup() { void syncPersonalBooks().catch(() => undefined); }
+function handleBookSyncWakeup() {
+  void syncPersonalBooks().catch(() => undefined);
+  void syncReadingTranscripts().catch(() => undefined);
+}
 function retryPersonalBookSync() { void syncPersonalBooks().catch(() => undefined); }
 function retryPendingBookOpen() {
   const bookId = pendingBookOpenId;
@@ -1731,7 +1736,7 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     readingSpeechLocalTranscriptWindow = [...readingSpeechLocalTranscriptWindow, transcript].slice(-3);
   }
   const book = selectedBook.value;
-  if (book) void saveReadingTranscript({
+  if (book) void queueReadingTranscript({
     id: `reading-transcript-${crypto.randomUUID()}`,
     studentId: appStore.studentId,
     bookId: book.id,
@@ -1739,9 +1744,7 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     text: transcript,
     capturedAt: new Date().toISOString(),
     recognitionEngine,
-  }).catch(() => {
-    Notify.create({ type: 'warning', message: 'Words were recognized, but could not be saved for analysis.', timeout: 3_000 });
-  });
+  }).catch(() => undefined);
   const spokenCount = rawHeardWords.length;
   const lockedSingleWordMatch = whisperRecognition && readingSpeechPositionLocked
     ? matchReadingSpeechAtAnchor(readerReferenceWords.value, transcript, readingSpeechAnchor)

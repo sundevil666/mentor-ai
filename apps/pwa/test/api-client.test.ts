@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-import { fetchLearningActivityTotals, fetchReaderTextLookup, fetchReadingResumeSnapshot, fetchTranslationUsage, saveReadingTranscript, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, synchronizeStatisticsSnapshots, upsertSessionHandoff } from '../src/services/api-client.js';
+import { fetchLearningActivityTotals, fetchReaderTextLookup, fetchReadingResumeSnapshot, fetchTranslationUsage, saveReadingTranscripts, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, synchronizeStatisticsSnapshots, upsertSessionHandoff } from '../src/services/api-client.js';
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
@@ -152,14 +152,14 @@ describe('PWA API client', () => {
     };
     globalThis.fetch = async (url, init) => {
       calls.push({ url: String(url), init });
-      return jsonResponse(chunk);
+      return jsonResponse([chunk]);
     };
 
-    await saveReadingTranscript(chunk);
+    await saveReadingTranscripts([chunk]);
 
     assert.equal(calls[0]?.url, 'http://localhost:4000/api/reader/reading-transcripts');
     assert.equal(calls[0]?.init?.method, 'POST');
-    assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), chunk);
+    assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { chunks: [chunk] });
     assert.equal(String(calls[0]?.init?.body).includes('audio'), false);
   });
 

@@ -382,14 +382,14 @@ export async function synchronizeApplicationTelemetry(
   return ((await response.json()) as ApiResponse<ApplicationTelemetryEvent[]>).data;
 }
 
-export async function saveReadingTranscript(chunk: ReadingTranscriptChunk): Promise<ReadingTranscriptChunk> {
+export async function saveReadingTranscripts(chunks: ReadingTranscriptChunk[]): Promise<ReadingTranscriptChunk[]> {
   const response = await fetch(`${apiBaseUrl}/api/reader/reading-transcripts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify(chunk),
+    body: JSON.stringify({ chunks }),
   });
   if (!response.ok) throw new Error('Reading transcript could not be saved.');
-  return ((await response.json()) as ApiResponse<ReadingTranscriptChunk>).data;
+  return ((await response.json()) as ApiResponse<ReadingTranscriptChunk[]>).data;
 }
 
 export async function synchronizeLearningEvidence(

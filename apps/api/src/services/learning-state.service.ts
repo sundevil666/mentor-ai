@@ -262,16 +262,18 @@ export const learningStateService = {
     return personalReadingBooks;
   },
 
-  async saveReadingTranscriptChunk(candidate: ReadingTranscriptChunk, user?: AuthenticatedUser) {
+  async saveReadingTranscriptChunks(candidates: ReadingTranscriptChunk[], user?: AuthenticatedUser) {
     const state = await learningStateRepository.read(user);
-    const safe = sanitizeReadingTranscriptChunk(candidate, state.student.id);
-    if (!safe) throw new Error('Invalid reading transcript.');
+    const safe = candidates.slice(0, 100).map((candidate) => sanitizeReadingTranscriptChunk(candidate, state.student.id));
+    if (safe.some((chunk) => !chunk)) throw new Error('Invalid reading transcript.');
+    const chunks = safe as ReadingTranscriptChunk[];
+    const incomingIds = new Set(chunks.map((chunk) => chunk.id));
     const readingTranscriptChunks = [
-      ...state.readingTranscriptChunks.filter((chunk) => chunk.id !== safe.id),
-      safe,
+      ...state.readingTranscriptChunks.filter((chunk) => !incomingIds.has(chunk.id)),
+      ...chunks,
     ].sort((left, right) => left.capturedAt.localeCompare(right.capturedAt)).slice(-2_000);
     await learningStateRepository.write({ ...state, readingTranscriptChunks }, user);
-    return safe;
+    return chunks;
   },
 
   async upsertSessionHandoff(handoff: LearningSessionHandoff, user?: AuthenticatedUser) {
