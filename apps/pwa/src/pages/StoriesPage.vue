@@ -324,6 +324,7 @@
 
           <section
             class="personal-reader__lookup"
+            :class="{ 'personal-reader__lookup--empty': !selectedReaderText && !readerLookupLoading && !readerLookupError }"
             aria-live="polite"
             aria-label="Selected text helper"
             :style="{ fontSize: `${readerFontSize}px` }"

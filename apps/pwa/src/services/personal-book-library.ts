@@ -253,7 +253,8 @@ function buildRecords(input: { title: string; author?: string; fileName: string;
 function normalizeText(value: string): string {
   return value
     .replace(/\r\n?/g, '\n')
-    .replace(/[\t\f\v ]+/g, ' ')
+    .replace(/[\u00ad\u200b-\u200d\u2060\ufeff]/gu, '')
+    .replace(/[^\S\n]+/gu, ' ')
     .replace(/ *\n */g, '\n')
     .replace(/\n{2,}/g, '\n')
     .trim();

@@ -24,7 +24,7 @@ describe('personal book library', () => {
   });
 
   it('removes empty paragraphs from new imports', () => {
-    const imported = buildPlainTextBook('First.\r\n\r\n \t \r\n   Second.\n\nThird.', 'spacing.txt');
+    const imported = buildPlainTextBook('First.\r\n\u200b\r\n\u00a0\t\r\n   Second.\n\u2060\nThird.', 'spacing.txt');
     assert.equal(imported.pages[0]?.text, 'First.\nSecond.\nThird.');
   });
 
@@ -33,7 +33,7 @@ describe('personal book library', () => {
     const legacy = {
       ...imported,
       book: { ...imported.book, wordCount: 99, updatedAt: '2026-01-01T00:00:00.000Z' },
-      pages: [{ ...imported.pages[0]!, text: 'First.\n\n \t \nSecond.', wordCount: 99 }],
+      pages: [{ ...imported.pages[0]!, text: 'First.\n\u200b\n\u00a0\t\nSecond.', wordCount: 99 }],
     };
     const normalized = normalizePersonalBookArchive(legacy);
     assert.equal(normalized.pages[0]?.text, 'First.\nSecond.');
