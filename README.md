@@ -35,6 +35,9 @@ batched into the shared once-per-day maintenance window whenever possible.
 - Keep only requests required for an explicit user action or live safety feature
   outside the daily batch (for example sign-in, a requested translation, manual
   refresh, lesson generation, or active cross-device reader coordination).
+- During active product testing, application-version checks are the deliberate
+  exception: they run every minute while the PWA is visible so a new build is
+  installed automatically. Revisit this exception when the testing phase ends.
 - Before adding an automatic request, document its trigger, minimum interval,
   deduplication/in-flight guard, offline fallback, retention bound, and test.
 - Prefer extending an existing batch endpoint over adding another polling loop.

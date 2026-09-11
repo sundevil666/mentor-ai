@@ -65,6 +65,7 @@ import {
   checkForAppUpdate,
   isAppUpdateRouteAffected,
   rememberPendingAppUpdate,
+  startAppUpdatePolling,
   showSystemUpdateNotification,
   type AppUpdateCheckResult,
 } from 'src/services/app-update';
@@ -82,6 +83,7 @@ import { fetchTranslationUsage } from 'src/services/api-client';
 const appStore = useAppStore();
 const router = useRouter();
 const route = useRoute();
+let stopUpdatePolling: (() => void) | undefined;
 let removeRouteGuard: (() => void) | undefined;
 let isReloadingForUpdate = false;
 let pendingManifest: AppUpdateCheckResult['manifest'] | null = null;
@@ -100,6 +102,7 @@ onMounted(async () => {
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
   navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
+  stopUpdatePolling = startAppUpdatePolling(handleServerUpdateAvailable);
   void runDailyServerMaintenance();
   await showCompletedUpdateNotification();
 });
@@ -111,6 +114,7 @@ onUnmounted(() => {
   document.removeEventListener('visibilitychange', handleVisibilitySync);
   removeRouteGuard?.();
   navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
+  stopUpdatePolling?.();
   window.removeEventListener('online', handleServerMaintenanceWakeup);
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
@@ -410,7 +414,6 @@ async function runDailyServerMaintenance() {
         }
       }),
       fetchTranslationUsage(),
-      checkForAppUpdate().then((update) => { if (update) handleServerUpdateAvailable(update); }),
     ]);
     window.dispatchEvent(new Event('mentor-ai:daily-server-maintenance-finished'));
   }).catch(() => undefined);
