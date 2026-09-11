@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   collectSpeechRecognitionResult,
+  startContinuousSpeechRecognition,
   shouldRestartSpeechRecognition,
   speechRecognitionErrorMessage,
 } from '../src/services/speech-recognition.js';
@@ -57,5 +58,71 @@ describe('speech recognition results', () => {
     );
 
     assert.equal(result.transcript, 'please repeat');
+  });
+
+  it('detaches every callback and cancels a pending restart when stopped', () => {
+    const originalWindow = globalThis.window;
+    const instances: MockRecognition[] = [];
+    const scheduled = new Map<number, () => void>();
+    let nextTimer = 1;
+
+    class MockRecognition {
+      continuous = false;
+      interimResults = false;
+      lang = '';
+      maxAlternatives = 0;
+      onstart: (() => void) | null = null;
+      onresult: ((event: never) => void) | null = null;
+      onerror: ((event: never) => void) | null = null;
+      onend: (() => void) | null = null;
+      aborted = false;
+
+      constructor() {
+        instances.push(this);
+      }
+
+      start() {}
+      stop() {}
+      abort() { this.aborted = true; }
+    }
+
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        SpeechRecognition: MockRecognition,
+        setTimeout(callback: () => void) {
+          const timer = nextTimer++;
+          scheduled.set(timer, callback);
+          return timer;
+        },
+        clearTimeout(timer: number) {
+          scheduled.delete(timer);
+        },
+      },
+    });
+
+    try {
+      const listening: boolean[] = [];
+      const controller = startContinuousSpeechRecognition({
+        onFinal() {},
+        onListeningChange(value) { listening.push(value); },
+      });
+      const first = instances[0]!;
+      first.onstart?.();
+      assert.deepEqual(listening, [true]);
+
+      first.onend?.();
+      assert.equal(scheduled.size, 1);
+      controller.stop();
+
+      assert.equal(scheduled.size, 0);
+      assert.equal(first.onstart, null);
+      assert.equal(first.onresult, null);
+      assert.equal(first.onerror, null);
+      assert.equal(first.onend, null);
+      assert.deepEqual(listening, [true, false, false]);
+    } finally {
+      Object.defineProperty(globalThis, 'window', { configurable: true, value: originalWindow });
+    }
   });
 });

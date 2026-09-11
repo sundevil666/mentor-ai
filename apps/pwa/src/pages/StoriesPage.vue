@@ -486,7 +486,7 @@ import { shouldUseSyncedReaderPosition } from 'src/services/content-progress-mer
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineStory } from 'src/services/offline-library';
 import { deleteOfflineStory, formatStoryDuration, formatStorySize, getCachedStoryUrls, saveStoryOffline, storyLibrary, type LibraryStory } from 'src/services/story-library';
 import { useAppStore } from 'src/stores/app-store';
-import { configureCaptureAudioSession, configurePlaybackAudioSession, isAppleMobileDevice, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
+import { configureCaptureAudioSession, configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 import { deletePersonalBook, importPersonalBook, listPersonalBookArchives, listPersonalBooks, loadPersonalBook, markPersonalBookOpened, mergePersonalBookArchives, type PersonalBook } from 'src/services/personal-book-library';
 import { personalBookSyncControl } from 'src/services/personal-book-sync-control';
 import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot, saveReadingTranscript, synchronizePersonalReadingBooks, synchronizeReaderVocabulary, updateReadingDeviceSession } from 'src/services/api-client';
@@ -1418,13 +1418,75 @@ async function startReadingSpeech() {
   if (readingSpeechRecognition || readingSpeechStream || !readingMode.value) return;
   const sessionId = ++readingSpeechSessionId;
   const useSherpaRecognition = isSherpaReaderExperiment();
-  const useLocalRecognition = isAppleMobileDevice();
-  startReadingSpeechDebug(useSherpaRecognition ? 'sherpa-onnx' : useLocalRecognition ? 'device-whisper' : 'browser-speech');
+  const useBrowserRecognition = !useSherpaRecognition && isSpeechRecognitionAvailable();
+  const useLocalRecognition = !useSherpaRecognition && !useBrowserRecognition;
+  startReadingSpeechDebug(useSherpaRecognition ? 'sherpa-onnx' : useBrowserRecognition ? 'browser-speech' : 'device-whisper');
   readingSpeechLocalTranscriptWindow = [];
   readingSpeechPositionLocked = false;
   provisionalReaderWordIndexes.value = new Set();
   activeReaderWordIndexes.value = new Set();
   resetReadingSpeechPace();
+  readingSpeechAnchor = getVisibleReaderWordAnchor();
+  appendReadingSpeechDebug(`Reading anchor: word ${readingSpeechAnchor}.`);
+  appendReadingSpeechDebug(`Expected nearby text: "${readerReferenceWords.value.slice(readingSpeechAnchor, readingSpeechAnchor + 18).join(' ')}"`);
+  if (useBrowserRecognition) {
+    readingSpeechStatus.value = 'requesting';
+    readingSpeechPermissionBlocked.value = false;
+    readingSpeechCaptureUnavailable.value = false;
+    readingSpeechMessage.value = 'Starting browser voice recognition…';
+    appendReadingSpeechDebug('Starting browser-managed microphone capture.');
+    try {
+      configureCaptureAudioSession();
+      readingSpeechRecognition = startContinuousSpeechRecognition({
+        lang: 'en-US',
+        onInterim: (transcript) => {
+          if (sessionId !== readingSpeechSessionId) return;
+          updateReadingSpeechPace(transcript);
+          appendReadingSpeechDebug(`Interim text: "${transcript}"`);
+          if (!readingSpeechRecognition || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
+          const previewWordIndexes = previewBrowserReadingWordIndexes(readerReferenceWords.value, transcript, readingSpeechAnchor);
+          provisionalReaderWordIndexes.value = new Set(previewWordIndexes);
+        },
+        onFinal: (transcript) => {
+          if (sessionId !== readingSpeechSessionId) return;
+          provisionalReaderWordIndexes.value = new Set();
+          if (!readingSpeechRecognition || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
+          handleReadingSpeechTranscript(transcript, 'browser');
+        },
+        onListeningChange: (listening) => {
+          if (sessionId !== readingSpeechSessionId) return;
+          appendReadingSpeechDebug(listening ? 'Browser recognition listening.' : 'Browser recognition reconnecting.');
+          if (!readingSpeechRecognition && !listening) return;
+          readingSpeechStatus.value = listening ? 'listening' : 'requesting';
+          readingSpeechMessage.value = listening ? 'Read naturally. Matching words are highlighted as you speak.' : 'Reconnecting voice recognition…';
+          if (listening) readingSpeechTransitioning.value = false;
+        },
+        onError: (message) => {
+          if (sessionId !== readingSpeechSessionId) return;
+          appendReadingSpeechDebug(`ERROR: browser recognition: ${message}`);
+          stopReadingSpeech('error');
+          readingSpeechCaptureUnavailable.value = isMicrophoneCaptureUnavailable(message);
+          readingSpeechPermissionBlocked.value = !readingSpeechCaptureUnavailable.value && /not-allowed|permission|denied/i.test(message);
+          readingSpeechMessage.value = readingSpeechCaptureUnavailable.value
+            ? 'The microphone service is unavailable. Fully close Mentor AI, reopen it, and try again.'
+            : readingSpeechPermissionBlocked.value
+              ? 'Access is blocked. Tap Fix microphone access for the browser or PWA settings.'
+            : `Speech recognition stopped: ${message}`;
+          Notify.create({ type: 'negative', icon: 'mic', message: readingSpeechMessage.value, timeout: 6_000 });
+          readingSpeechTransitioning.value = false;
+        },
+      });
+    } catch (error) {
+      if (sessionId !== readingSpeechSessionId) return;
+      stopReadingSpeech('error');
+      const technicalMessage = microphoneErrorDetails(error);
+      appendReadingSpeechDebug(`ERROR: browser recognition start failed: ${technicalMessage}`);
+      readingSpeechMessage.value = `Speech recognition could not be started: ${technicalMessage}`;
+      readingSpeechTransitioning.value = false;
+      Notify.create({ type: 'negative', icon: 'mic', message: readingSpeechMessage.value, timeout: 8_000 });
+    }
+    return;
+  }
   if (!navigator.mediaDevices?.getUserMedia) {
     appendReadingSpeechDebug('ERROR: getUserMedia is unavailable.');
     readingSpeechStatus.value = 'error';
@@ -1452,9 +1514,6 @@ async function startReadingSpeech() {
     const settings = audioTrack?.getSettings();
     appendReadingSpeechDebug(`Microphone granted: track=${audioTrack?.readyState ?? 'missing'}, enabled=${audioTrack?.enabled ?? false}, muted=${audioTrack?.muted ?? false}, sampleRate=${settings?.sampleRate ?? 'unknown'}, channels=${settings?.channelCount ?? 'unknown'}.`);
     void startReadingSpeechMeter(readingSpeechStream, sessionId);
-    readingSpeechAnchor = getVisibleReaderWordAnchor();
-    appendReadingSpeechDebug(`Reading anchor: word ${readingSpeechAnchor}.`);
-    appendReadingSpeechDebug(`Expected nearby text: "${readerReferenceWords.value.slice(readingSpeechAnchor, readingSpeechAnchor + 18).join(' ')}"`);
     if (useSherpaRecognition) {
       sherpaReadingTranscriber = startSherpaReadingTranscriber(readingSpeechStream, {
         onInterim: (transcript) => {
@@ -1530,51 +1589,6 @@ async function startReadingSpeech() {
         readingSpeechMessage.value = 'Loading offline speech model…';
       };
       startOfflineRecognition();
-    } else {
-      if (!isSpeechRecognitionAvailable()) throw new Error('SpeechRecognition is unavailable after microphone permission was granted.');
-      readingSpeechRecognition = startContinuousSpeechRecognition({
-      lang: 'en-US',
-      onInterim: (transcript) => {
-        if (sessionId !== readingSpeechSessionId) return;
-        updateReadingSpeechPace(transcript);
-        appendReadingSpeechDebug(`Interim text: "${transcript}"`);
-        if (!readingSpeechRecognition || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
-        const previewWordIndexes = previewBrowserReadingWordIndexes(readerReferenceWords.value, transcript, readingSpeechAnchor);
-        provisionalReaderWordIndexes.value = new Set(previewWordIndexes);
-      },
-      onFinal: (transcript) => {
-        if (sessionId !== readingSpeechSessionId) return;
-        provisionalReaderWordIndexes.value = new Set();
-        if (!readingSpeechRecognition || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
-        handleReadingSpeechTranscript(transcript, 'browser');
-      },
-      onListeningChange: (listening) => {
-        if (sessionId !== readingSpeechSessionId) return;
-        appendReadingSpeechDebug(listening ? 'Browser recognition listening.' : 'Browser recognition reconnecting.');
-        if (!readingSpeechRecognition && !listening) return;
-        readingSpeechStatus.value = listening ? 'listening' : 'requesting';
-        readingSpeechMessage.value = listening ? 'Read naturally. Matching words are highlighted as you speak.' : 'Reconnecting voice recognition…';
-        if (listening) readingSpeechTransitioning.value = false;
-      },
-      onError: (message) => {
-        if (sessionId !== readingSpeechSessionId) return;
-        appendReadingSpeechDebug(`ERROR: browser recognition: ${message}`);
-        stopReadingSpeech('error');
-        readingSpeechCaptureUnavailable.value = isMicrophoneCaptureUnavailable(message);
-        readingSpeechPermissionBlocked.value = !readingSpeechCaptureUnavailable.value && /not-allowed|permission|denied/i.test(message);
-        readingSpeechMessage.value = readingSpeechCaptureUnavailable.value
-          ? 'The iPad microphone service is unavailable. Fully close Mentor AI, reopen it, and try again.'
-          : readingSpeechPermissionBlocked.value
-            ? 'Access is blocked. Tap Fix microphone access for the PWA settings.'
-          : `Speech recognition stopped: ${message}`;
-        Notify.create({ type: 'negative', icon: 'mic', message: readingSpeechMessage.value, timeout: 6_000 });
-        readingSpeechTransitioning.value = false;
-      },
-      });
-    }
-    if (!useSherpaRecognition && !useLocalRecognition) {
-      readingSpeechStatus.value = 'listening';
-      readingSpeechMessage.value = 'Read naturally. Matching words are highlighted as you speak.';
     }
   } catch (error) {
     if (sessionId !== readingSpeechSessionId) return;

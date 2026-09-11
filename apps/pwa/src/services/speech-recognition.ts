@@ -12,6 +12,7 @@ type SpeechRecognitionLike = EventTarget & {
   maxAlternatives: number;
   onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
   onresult: ((event: SpeechRecognitionResultEventLike) => void) | null;
+  onstart: (() => void) | null;
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
@@ -91,15 +92,48 @@ export function startContinuousSpeechRecognition(options: ContinuousSpeechRecogn
   let recognition: SpeechRecognitionLike | null = null;
   let restartTimer: number | undefined;
 
+  const stop = () => {
+    if (!shouldRun && !recognition && restartTimer === undefined) return;
+    shouldRun = false;
+    if (restartTimer !== undefined) {
+      window.clearTimeout(restartTimer);
+      restartTimer = undefined;
+    }
+    const current = recognition;
+    recognition = null;
+    if (activeRecognition === current) activeRecognition = null;
+    if (activeRecognitionStop === stop) activeRecognitionStop = null;
+    if (current) {
+      current.onstart = null;
+      current.onresult = null;
+      current.onerror = null;
+      current.onend = null;
+      try {
+        current.abort();
+      } catch {
+        // The browser may already have released the recognition service.
+      }
+    }
+    options.onListeningChange?.(false);
+  };
+
+  activeRecognitionStop = stop;
+
   const start = () => {
     if (!shouldRun) return;
-    recognition = new SpeechRecognition();
-    activeRecognition = recognition;
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = options.lang ?? 'en-US';
-    recognition.maxAlternatives = 1;
-    recognition.onresult = (event) => {
+    restartTimer = undefined;
+    const current = new SpeechRecognition();
+    recognition = current;
+    activeRecognition = current;
+    current.continuous = true;
+    current.interimResults = true;
+    current.lang = options.lang ?? 'en-US';
+    current.maxAlternatives = 1;
+    current.onstart = () => {
+      if (shouldRun && recognition === current) options.onListeningChange?.(true);
+    };
+    current.onresult = (event) => {
+      if (!shouldRun || recognition !== current) return;
       const startIndex = Math.max(0, event.resultIndex ?? 0);
       const interim: string[] = [];
       for (let index = startIndex; index < event.results.length; index += 1) {
@@ -112,36 +146,42 @@ export function startContinuousSpeechRecognition(options: ContinuousSpeechRecogn
       }
       options.onInterim?.(interim.join(' '));
     };
-    recognition.onerror = (event) => {
+    current.onerror = (event) => {
+      if (!shouldRun || recognition !== current) return;
       const error = event.error ?? 'Speech recognition failed.';
+      if (error === 'not-allowed' || error === 'service-not-allowed' || error === 'audio-capture') {
+        shouldRun = false;
+      }
       if (error !== 'no-speech' && error !== 'aborted') options.onError?.(error);
     };
-    recognition.onend = () => {
+    current.onend = () => {
+      if (recognition !== current) return;
+      current.onstart = null;
+      current.onresult = null;
+      current.onerror = null;
+      current.onend = null;
+      recognition = null;
       options.onListeningChange?.(false);
-      if (activeRecognition === recognition) activeRecognition = null;
+      if (activeRecognition === current) activeRecognition = null;
       if (shouldRun) restartTimer = window.setTimeout(start, 300);
+      else if (activeRecognitionStop === stop) activeRecognitionStop = null;
     };
     try {
-      recognition.start();
-      options.onListeningChange?.(true);
+      current.start();
     } catch (error) {
+      current.onstart = null;
+      current.onresult = null;
+      current.onerror = null;
+      current.onend = null;
+      if (recognition === current) recognition = null;
+      if (activeRecognition === current) activeRecognition = null;
       options.onError?.(error instanceof Error ? error.message : 'Speech recognition failed.');
-      restartTimer = window.setTimeout(start, 700);
+      if (shouldRun) restartTimer = window.setTimeout(start, 700);
     }
   };
 
   start();
-  return {
-    stop() {
-      shouldRun = false;
-      if (restartTimer !== undefined) window.clearTimeout(restartTimer);
-      const current = recognition;
-      recognition = null;
-      if (activeRecognition === current) activeRecognition = null;
-      current?.abort();
-      options.onListeningChange?.(false);
-    },
-  };
+  return { stop };
 }
 
 export async function recognizeSpeechOnce(
