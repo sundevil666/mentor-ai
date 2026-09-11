@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateReaderPageCount, calculateReaderPaginationGeometry } from '../src/services/reader-pagination.js';
+import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop } from '../src/services/reader-pagination.js';
 
 test('reader columns advance by exactly one viewport after accounting for nested padding', () => {
   const geometry = calculateReaderPaginationGeometry({
@@ -37,4 +37,17 @@ test('reader page count excludes paper padding from the horizontal column track'
     paperPaddingRight: 15,
     paperScrollWidth: 1_920,
   }), 5);
+});
+
+test('normal reader places the exact resume word near the upper reading line', () => {
+  assert.equal(calculateReaderResumeScrollTop({
+    viewportHeight: 600,
+    wordOffsetTop: 1_200,
+    scrollHeight: 3_000,
+  }), 1_032);
+});
+
+test('normal reader resume scrolling stays inside the document bounds', () => {
+  assert.equal(calculateReaderResumeScrollTop({ viewportHeight: 600, wordOffsetTop: 80, scrollHeight: 3_000 }), 0);
+  assert.equal(calculateReaderResumeScrollTop({ viewportHeight: 600, wordOffsetTop: 2_950, scrollHeight: 3_000 }), 2_400);
 });

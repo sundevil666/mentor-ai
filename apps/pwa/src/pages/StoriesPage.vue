@@ -508,7 +508,7 @@ import { chooseReadingResumeState, readingDeviceHeartbeatMs, readingDeviceLabel 
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { isSherpaReaderExperiment, startSherpaReadingTranscriber, type SherpaReadingTranscriber } from 'src/services/sherpa-reading-transcriber';
-import { calculateReaderPageCount, calculateReaderPaginationGeometry } from 'src/services/reader-pagination';
+import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop } from 'src/services/reader-pagination';
 import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerWheelDestination, shouldCommitReaderWheel, type ReaderSwipePoint } from 'src/services/reader-swipe';
 import { beginReaderLookupInteraction, shouldProcessReadingTranscript } from 'src/services/reader-lookup-interaction';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
@@ -1832,7 +1832,7 @@ function appendReadingSpeechDebug(message: string) {
 }
 
 async function setReadingMode(value: boolean) {
-  const wordPosition = getStableReaderWordPosition();
+  const wordPosition = getReaderRestoreWordPosition();
   stopReaderPagination();
   applyReadingMode(value);
   saveBookReaderSettings();
@@ -1846,7 +1846,7 @@ function applyReadingMode(value: boolean) {
   document.body.classList.toggle('body--book-reading-mode', value);
 }
 function changeReaderFontSize(change: -1 | 1) {
-  const wordPosition = getStableReaderWordPosition();
+  const wordPosition = getReaderRestoreWordPosition();
   readerFontSize.value = Math.max(minReaderFontSize, Math.min(maxReaderFontSize, readerFontSize.value + change));
   saveBookReaderSettings();
   void repaginateReader({ wordPosition });
@@ -1858,7 +1858,7 @@ function readReaderSidebarScale() {
   return Number.isInteger(value) ? Math.max(minReaderSidebarScale, Math.min(maxReaderSidebarScale, value)) : minReaderSidebarScale;
 }
 function changeReaderSidebarScale(change: -1 | 1) {
-  const wordPosition = getStableReaderWordPosition();
+  const wordPosition = getReaderRestoreWordPosition();
   readerSidebarScale.value = Math.max(minReaderSidebarScale, Math.min(maxReaderSidebarScale, readerSidebarScale.value + change));
   if (typeof localStorage !== 'undefined') localStorage.setItem(readerSidebarScaleKey, String(readerSidebarScale.value));
   void repaginateReader({ wordPosition });
@@ -2033,6 +2033,11 @@ function getStableReaderWordPosition() {
   else if (stableReaderWordPosition < 0 && chapterWordIndex >= 0) stableReaderWordPosition = chapterWordIndex;
   return Math.max(0, stableReaderWordPosition >= 0 ? stableReaderWordPosition : chapterWordIndex);
 }
+function getReaderRestoreWordPosition() {
+  if (stableReaderWordPosition >= 0) return stableReaderWordPosition;
+  if (resumeWordIndex.value >= 0) return resumeWordIndex.value;
+  return Math.max(0, getReaderChapterWordAnchor(currentBookChapterIndex.value));
+}
 function getReaderSentenceBounds(wordIndex: number) {
   const tokens = renderedBookPages.value.flatMap((page) => page.paragraphs.flat());
   const tokenIndex = tokens.findIndex((token) => token.wordIndex === wordIndex);
@@ -2122,7 +2127,7 @@ function startReaderPagination() {
     lastReaderViewportWidth = width;
     lastReaderViewportHeight = height;
     cancelAnimationFrame(readerResizeFrame);
-    const wordPosition = getStableReaderWordPosition();
+    const wordPosition = getReaderRestoreWordPosition();
     readerResizeFrame = requestAnimationFrame(() => { void repaginateReader({ wordPosition }); });
   });
   readerResizeObserver.observe(readerContent.value);
@@ -2249,9 +2254,18 @@ function scrollToReaderPage(smooth = true) {
   const viewport = readerContent.value;
   if (!viewport) return;
   if (!readingMode.value) {
+    const wordPosition = getReaderRestoreWordPosition();
+    const word = readerPaper.value?.querySelector<HTMLElement>(`[data-reader-word-index="${wordPosition}"]`);
     const chapter = readerPaper.value?.querySelector<HTMLElement>(`[data-book-chapter-index="${currentBookChapterIndex.value}"]`);
+    const targetTop = word
+      ? calculateReaderResumeScrollTop({
+        viewportHeight: viewport.clientHeight,
+        wordOffsetTop: word.offsetTop,
+        scrollHeight: viewport.scrollHeight,
+      })
+      : chapter?.offsetTop ?? 0;
     cancelReaderScrollAnimation();
-    viewport.scrollTo({ left: 0, top: chapter?.offsetTop ?? 0, behavior: smooth ? 'smooth' : 'auto' });
+    viewport.scrollTo({ left: 0, top: targetTop, behavior: smooth ? 'smooth' : 'auto' });
     return;
   }
   const targetLeft = currentBookPageIndex.value * readerPageStride.value;
