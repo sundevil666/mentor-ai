@@ -27,7 +27,7 @@ export interface PendingAppUpdate {
 
 const manifestUrl = process.env.APP_UPDATE_MANIFEST_URL ?? '/app-update.json';
 const currentVersion = process.env.APP_VERSION ?? '0.1.0';
-const checkIntervalMs = Number(process.env.APP_UPDATE_CHECK_INTERVAL_MS ?? 60 * 1000);
+const checkIntervalMs = Number(process.env.APP_UPDATE_CHECK_INTERVAL_MS ?? 24 * 60 * 60 * 1000);
 const updateReloadRequestKey = 'mentor-ai:update-reload-requested';
 const appUpdatesEnabled = shouldCheckForAppUpdates(Boolean(process.env.DEV));
 

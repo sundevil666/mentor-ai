@@ -671,7 +671,7 @@
 </template>
 
 <script setup lang="ts">
-import type { LearningActivityTotals, LearningContext, LearningMode, PreferredLessonDevice } from '@mentor-ai/shared';
+import type { LearningActivityTotals, LearningContext, PreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { synchronizeDashboardLessonRoute } from 'src/services/navigation-category';
@@ -744,7 +744,6 @@ import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import {
   loadContentEngagementSummaries,
   recordContentEngagement,
-  syncContentEngagement,
   type ContentEngagementSummary,
 } from 'src/services/content-engagement';
 
@@ -1395,10 +1394,6 @@ onMounted(async () => {
   }
   await refreshLessonProgressStates();
   await refreshLevelActivity();
-  void syncContentEngagement()
-    .then(refreshLessonProgressStates)
-    .catch(() => undefined);
-
   if (!appStore.session && (route.query.training === 'listening' || route.query.training === 'speaking')) {
     await openTrainingLibrary(route.query.training);
   }
@@ -1530,15 +1525,6 @@ watch([activeWordIndex, activeWordEndIndex], () => {
   saveListeningPlaybackProgress();
   void scrollActiveListeningPhraseIntoView();
 });
-
-async function startWithMode(mode: LearningMode) {
-  lessonReturnDestination.value = selectedLessonLibrary.value;
-  answer.value = '';
-  isLessonLibraryVisible.value = false;
-  setForwardTransition();
-  await appStore.startLesson(createLearningContext(currentSuggestion.value, { mode }));
-  await syncActiveLessonNavigation();
-}
 
 async function startHomeLesson(lesson: HomeLesson) {
   lessonReturnDestination.value = 'home';

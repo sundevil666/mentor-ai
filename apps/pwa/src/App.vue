@@ -65,21 +65,25 @@ import {
   checkForAppUpdate,
   isAppUpdateRouteAffected,
   rememberPendingAppUpdate,
-  startAppUpdatePolling,
   showSystemUpdateNotification,
   type AppUpdateCheckResult,
 } from 'src/services/app-update';
 import { useAppStore } from 'src/stores/app-store';
 import { syncAllContentProgress } from 'src/services/content-progress';
 import { syncLearningActivity } from 'src/services/learning-activity';
+import { syncContentEngagement } from 'src/services/content-engagement';
+import { syncApplicationTelemetry } from 'src/services/application-telemetry';
+import { syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
+import { runServerMaintenance } from 'src/services/server-maintenance';
+import { syncReaderVocabulary } from 'src/services/reader-vocabulary';
+import { updateOfflineLessons } from 'src/services/offline-lesson-updates';
+import { fetchTranslationUsage } from 'src/services/api-client';
 
 const appStore = useAppStore();
 const router = useRouter();
 const route = useRoute();
-let stopUpdatePolling: (() => void) | undefined;
 let removeRouteGuard: (() => void) | undefined;
 let isReloadingForUpdate = false;
-let remoteSyncPollingTimer: number | undefined;
 let pendingManifest: AppUpdateCheckResult['manifest'] | null = null;
 let activatedBackgroundManifest: AppUpdateCheckResult['manifest'] | null = null;
 let routeUpdateCancelled = false;
@@ -92,12 +96,11 @@ onMounted(async () => {
   window.addEventListener('mentor-ai:check-update', handleManualUpdateCheck);
   document.addEventListener('visibilitychange', handleVisibilitySync);
   removeRouteGuard = router.afterEach(handleRouteChanged);
-  window.addEventListener('online', handleContentProgressSync);
+  window.addEventListener('online', handleServerMaintenanceWakeup);
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
   navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
-  stopUpdatePolling = startAppUpdatePolling(handleServerUpdateAvailable);
-  startRemoteSyncPolling();
+  void runDailyServerMaintenance();
   await showCompletedUpdateNotification();
 });
 
@@ -108,17 +111,10 @@ onUnmounted(() => {
   document.removeEventListener('visibilitychange', handleVisibilitySync);
   removeRouteGuard?.();
   navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
-  stopRemoteSyncPolling();
-  stopUpdatePolling?.();
-  window.removeEventListener('online', handleContentProgressSync);
+  window.removeEventListener('online', handleServerMaintenanceWakeup);
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
 });
-
-function handleContentProgressSync() {
-  void syncAllContentProgress().catch(() => undefined);
-  void syncLearningActivity().catch(() => undefined);
-}
 
 function handleOnline() { appStore.setNetworkStatus(true); }
 function handleOffline() { appStore.setNetworkStatus(false); }
@@ -374,29 +370,9 @@ function removeUpdateReloadParameters() {
   window.history.replaceState(window.history.state, '', url);
 }
 
-function startRemoteSyncPolling() {
-  void refreshRemoteProgress(false);
-  void syncLearningActivity().catch(() => undefined);
-  remoteSyncPollingTimer = window.setInterval(() => {
-    if (document.visibilityState === 'visible' && navigator.onLine) {
-      void refreshRemoteProgress(true);
-      void syncLearningActivity().catch(() => undefined);
-    }
-  }, 30000);
-}
-
-function stopRemoteSyncPolling() {
-  if (remoteSyncPollingTimer !== undefined) {
-    window.clearInterval(remoteSyncPollingTimer);
-    remoteSyncPollingTimer = undefined;
-  }
-}
-
 function handleVisibilitySync() {
   if (document.visibilityState === 'visible') {
-    void appStore.refreshMyShiftActivity(false);
-    void refreshRemoteProgress(true);
-    void syncLearningActivity().catch(() => undefined);
+    void runDailyServerMaintenance();
   } else if (activatedBackgroundManifest) {
     reloadWithBackgroundUpdate(route.fullPath);
   }
@@ -404,34 +380,42 @@ function handleVisibilitySync() {
 
 function handleServiceWorkerMessage(event: MessageEvent) {
   if (event.data?.type === 'mentor-ai:learning-sync-finished') {
-    void refreshRemoteProgress(true);
+    void runDailyServerMaintenance();
   }
 }
 
-async function refreshRemoteProgress(showNotification: boolean) {
-  if (!navigator.onLine) {
-    return;
-  }
+function handleServerMaintenanceWakeup() { void runDailyServerMaintenance(); }
 
-  if (!appStore.isHydrated) {
-    await appStore.hydrate();
-    return;
-  }
-
-  const hasRemoteProgress = await appStore.refreshRemoteLearningState();
-
-  if (!showNotification || !hasRemoteProgress) {
-    return;
-  }
-
-  Notify.create({
-    type: 'info',
-    icon: 'sync',
-    message: 'Learning progress synchronized',
-    caption: 'Mentor AI refreshed the latest progress from your other devices.',
-    timeout: 5000,
-  });
+async function runDailyServerMaintenance() {
+  if (!navigator.onLine) return;
+  await runServerMaintenance(async () => {
+    if (!appStore.isHydrated) await appStore.hydrate();
+    await Promise.allSettled([
+      appStore.refreshMyShiftActivity(false),
+      appStore.refreshRemoteLearningState(),
+      syncAllContentProgress(),
+      syncContentEngagement(),
+      syncLearningActivity(),
+      syncApplicationTelemetry(),
+      syncReadingTranscripts(),
+      syncReaderVocabulary(appStore.studentId),
+      updateOfflineLessons(appStore.loadLesson.bind(appStore)).then(async (offlineUpdate) => {
+        if (offlineUpdate.downloaded > 0) {
+          await appStore.recordLessonUpdateNotification(
+            offlineUpdate.downloadedLessons,
+            offlineUpdate.downloadedStories,
+            offlineUpdate.downloadedAudio,
+            offlineUpdate.eventId,
+          );
+        }
+      }),
+      fetchTranslationUsage(),
+      checkForAppUpdate().then((update) => { if (update) handleServerUpdateAvailable(update); }),
+    ]);
+    window.dispatchEvent(new Event('mentor-ai:daily-server-maintenance-finished'));
+  }).catch(() => undefined);
 }
+
 </script>
 
 <style scoped>

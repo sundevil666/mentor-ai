@@ -23,7 +23,6 @@ export async function saveContentProgress(input: Omit<ContentProgress, 'id' | 's
     furthestPosition: Math.max(previous?.furthestPosition ?? 0, input.furthestPosition, input.position),
   };
   await db.put('content-progress', progress);
-  if (navigator.onLine) void syncAllContentProgress().catch(() => undefined);
   return progress;
 }
 

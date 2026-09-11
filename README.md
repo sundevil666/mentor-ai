@@ -18,6 +18,33 @@ The evidence-first contract for improving both teaching quality and application
 reliability is documented in
 [`docs/20-learning-and-application-observability.md`](docs/20-learning-and-application-observability.md).
 
+## Server Request Budget
+
+Mentor AI is offline-first and treats server requests as a limited resource. New
+features must write user activity to IndexedDB first and must not send one request
+per click, timer tick, progress update, or telemetry event. Background work is
+batched into the shared once-per-day maintenance window whenever possible.
+
+- Keep learning and media usable from local data during outages or rate limiting.
+- Use durable, idempotent local outboxes with stable IDs for data that must reach
+  the server. Remove acknowledged outbox records immediately after the durable
+  server write so device storage cannot grow without bound.
+- Keep failed records in their durable outbox for the next daily window. A
+  failure in one maintenance job must not make every other job repeat on each
+  reload or reconnect.
+- Keep only requests required for an explicit user action or live safety feature
+  outside the daily batch (for example sign-in, a requested translation, manual
+  refresh, lesson generation, or active cross-device reader coordination).
+- Before adding an automatic request, document its trigger, minimum interval,
+  deduplication/in-flight guard, offline fallback, retention bound, and test.
+- Prefer extending an existing batch endpoint over adding another polling loop.
+- Cache stable bootstrap configuration on the device for the same daily interval
+  instead of requesting it on every PWA reload.
+
+Raising a hosting limit is a last resort. The default engineering response is to
+measure request sources, batch compatible work, bound local retention, and keep
+the application correct when the server is unavailable.
+
 ## Current PWA Scope
 
 The PWA can run a complete practical learning session without the API:
@@ -50,11 +77,11 @@ The goal is optional account-based continuity: a student can sign in with Google
 The synchronization contract is:
 
 - every learning action creates append-only evidence with stable IDs;
-- if the device is online and the user has a cloud identity, pending evidence uploads immediately;
+- pending evidence is stored locally first and uploaded in the shared daily maintenance batch (or by an explicit manual/safety-critical action);
 - if upload fails or the device is offline, evidence stays in IndexedDB and the header shows a pending-sync indicator;
-- when network returns, the app retries automatically before refreshing shared state;
-- every online device polls shared state and in-progress session handoffs, shows a short sync notification when newer progress appears, and lets the student continue from the latest remote lesson position;
-- sockets may be added later for faster realtime updates, but polling remains the fallback because mobile PWAs can sleep, lose push channels, or resume after long gaps.
+- when network returns or the app becomes visible, it runs automatic server work only if the daily maintenance window is due;
+- every online device refreshes shared state and session handoffs in that daily batch; explicit cross-device reader/session actions may synchronize immediately;
+- sockets or frequent polling must not be added as a fallback without a measured request budget and a feature that truly requires live coordination.
 
 Merge rules must protect learning evidence rather than overwrite it:
 
@@ -90,7 +117,7 @@ and audio-first, and fresh pre-shift windows favor an interactive lesson or focu
 latest schedule is cached for offline use and refreshed at most once per day automatically; a
 manual sync in Settings always checks immediately for changed shifts.
 
-Safari and iOS background behavior cannot be made 100% reliable with PWA code alone. Web Background Sync is best-effort and may not run while the app is fully suspended. The reliable iOS path is a native shell such as Capacitor with BackgroundTasks, silent/visible push notifications, and the same durable IndexedDB/native queue contract. The PWA must still retry immediately on foreground, `online`, visibility return, and service-worker background sync where supported.
+Safari and iOS background behavior cannot be made 100% reliable with PWA code alone. Web Background Sync is best-effort and may not run while the app is fully suspended. The reliable iOS path is a native shell such as Capacitor with BackgroundTasks, silent/visible push notifications, and the same durable IndexedDB/native queue contract. The PWA checks the shared daily maintenance gate on foreground, `online`, visibility return, and service-worker background sync where supported; these wakeups do not bypass the request budget.
 
 This area is expected to evolve. Bugs should be recorded against the specific synchronization stage: identity, local queue, upload acknowledgement, remote polling, session handoff, analytics merge, or student-facing status.
 

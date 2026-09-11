@@ -1,5 +1,6 @@
 import type { ReaderTextLookup, ReaderVocabularyItem } from '@mentor-ai/shared';
 import { mentorDb } from './indexed-db';
+import { synchronizeReaderVocabulary } from './api-client';
 
 export async function recordReaderVocabularyLookup(input: {
   studentId: string;
@@ -35,6 +36,11 @@ export async function listReaderVocabulary(studentId: string): Promise<ReaderVoc
   return (await db.getAll('vocabulary-practice-items') as ReaderVocabularyItem[])
     .filter((item) => item.studentId === studentId && item.normalizedText)
     .sort((left, right) => right.lastLookedUpAt.localeCompare(left.lastLookedUpAt));
+}
+
+export async function syncReaderVocabulary(studentId: string): Promise<void> {
+  const items = await listReaderVocabulary(studentId);
+  if (items.length > 0) await synchronizeReaderVocabulary(items);
 }
 
 export async function findReaderVocabularyLookup(studentId: string, text: string): Promise<ReaderTextLookup | null> {

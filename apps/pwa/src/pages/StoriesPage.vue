@@ -506,7 +506,7 @@ import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import AppDetailLayout from 'src/components/AppDetailLayout.vue';
 import AppAudioDock from 'src/components/AppAudioDock.vue';
 import AudioLibraryTabs from 'src/components/AudioLibraryTabs.vue';
-import { loadContentEngagementSummaries, recordContentEngagement, syncContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
+import { loadContentEngagementSummaries, recordContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
 import { getContentProgressDeviceId, loadContentProgress, saveContentProgress, syncAllContentProgress } from 'src/services/content-progress';
 import { shouldUseSyncedReaderPosition } from 'src/services/content-progress-merge';
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineStory } from 'src/services/offline-library';
@@ -515,9 +515,9 @@ import { useAppStore } from 'src/stores/app-store';
 import { configureCaptureAudioSession, configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 import { deletePersonalBook, importPersonalBook, listPersonalBookArchives, listPersonalBooks, loadPersonalBook, markPersonalBookOpened, mergePersonalBookArchives, type PersonalBook } from 'src/services/personal-book-library';
 import { personalBookSyncControl } from 'src/services/personal-book-sync-control';
-import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot, synchronizePersonalReadingBooks, synchronizeReaderVocabulary, updateReadingDeviceSession } from 'src/services/api-client';
+import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot, synchronizePersonalReadingBooks, updateReadingDeviceSession } from 'src/services/api-client';
 import { getAuthToken } from 'src/services/auth';
-import { findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
+import { findReaderVocabularyLookup, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { annualReadingPace, annualReadingPaceMessage as getAnnualReadingPaceMessage, createDailyReadingProgress, dailyReadingGoalWords, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, readingGoalMessage, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { activeReadingHighlightIndexes, alignReadingSpeech, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, previewBrowserReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
@@ -768,7 +768,6 @@ onMounted(async () => {
     await refreshCompletedStories();
   } else {
     personalBooks.value = await listPersonalBooks();
-    await syncPersonalBooks().catch(() => undefined);
   }
   document.addEventListener('visibilitychange', handleVisibilityChange);
   window.addEventListener('online', handleBookSyncWakeup);
@@ -1330,14 +1329,6 @@ async function saveReaderLookup(lookup: ReaderTextLookup, requestId: number) {
     chapterId: selectedBookPages.value[currentBookChapterIndex.value]?.chapterId,
     lookup: { ...lookup, phonetic: readerPhonetic.value ?? lookup.phonetic },
   });
-  void syncReaderVocabulary();
-}
-async function syncReaderVocabulary() {
-  try {
-    await synchronizeReaderVocabulary(await listReaderVocabulary(appStore.studentId));
-  } catch {
-    // The local vocabulary record remains available and retries on the next lookup.
-  }
 }
 async function speakReaderText(text: string) {
   appendReadingSpeechDebug(`Pronunciation requested for "${text}".`);
@@ -2029,7 +2020,6 @@ function restoreDailySpokenWords(bookId: string) {
 }
 async function restoreSpokenReadingProgress(bookId: string) {
   restoreDailySpokenWords(bookId);
-  await syncAllContentProgress().catch(() => undefined);
   const progress = await loadContentProgress('reading', bookId);
   syncedReaderPositionWordIndex = Math.max(-1, Math.floor(progress?.position ?? 0) - 1);
   syncedReaderPositionUpdatedAt = progress?.updatedAt;
@@ -2470,7 +2460,7 @@ function persistProgress(completed = false) {
   const audio = audioElement.value;
   if (!story || !audio || !Number.isFinite(audio.currentTime)) return;
   lastProgressSave = Date.now();
-  void saveContentProgress({ studentId: appStore.studentId, category: 'audio', contentId: story.id, position: audio.currentTime, furthestPosition: audio.currentTime, duration: duration.value || story.durationSeconds, completed, updatedAt: new Date().toISOString() }).then(() => syncAllContentProgress());
+  void saveContentProgress({ studentId: appStore.studentId, category: 'audio', contentId: story.id, position: audio.currentTime, furthestPosition: audio.currentTime, duration: duration.value || story.durationSeconds, completed, updatedAt: new Date().toISOString() });
 }
 async function toggleOffline(story: LibraryStory) {
   busy.value = true;
@@ -2485,7 +2475,6 @@ function isSaved(story: LibraryStory) { return cachedUrls.value.has(new URL(stor
 async function recordEngagement(id: string, type: 'started' | 'finished') {
   await recordContentEngagement({ studentId: appStore.studentId, category: 'audio', contentId: id, type });
   engagementSummaries.value = await loadContentEngagementSummaries('audio');
-  void syncContentEngagement();
 }
 function engagementLabel(id: string) { const summary = engagementSummaries.value.get(id); return summary ? `${summary.starts} starts · ${summary.finishes} finished` : 'Not started'; }
 function handleVisibilityChange() {

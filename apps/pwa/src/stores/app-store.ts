@@ -380,16 +380,8 @@ export const useAppStore = defineStore('app', {
         storageMode: this.storageMode,
       });
 
-      if (this.pendingSyncEvents > 0) {
-        await this.registerBackgroundSync();
-      }
-
       await this.pruneLocalStorage();
 
-      if (this.isOnline) {
-        await this.refreshMyShiftActivity(false);
-        await this.refreshRemoteLearningState();
-      }
       })();
 
       try {
@@ -402,10 +394,9 @@ export const useAppStore = defineStore('app', {
     setNetworkStatus(isOnline: boolean) {
       this.isOnline = isOnline;
 
-      if (isOnline) {
-        void this.refreshMyShiftActivity(false);
-        void this.publishLocalProgressAfterReconnect();
-      }
+      // The application-level daily maintenance gate owns automatic server
+      // synchronization. Explicit handoff and manual actions still call their
+      // dedicated methods directly.
     },
 
     async publishLocalProgressAfterReconnect() {
@@ -905,10 +896,6 @@ export const useAppStore = defineStore('app', {
 
       await this.pruneLocalStorage();
 
-      if (navigator.onLine) {
-        void this.syncPendingEvents();
-      }
-
       logDiagnostic('lesson.completed', {
         sessionId: completedSession.id,
         lessonId: completedSession.lesson.id,
@@ -1057,9 +1044,6 @@ export const useAppStore = defineStore('app', {
       const queuedEvents = await db.getAll('sync-queue');
       this.pendingSyncEvents = queuedEvents.filter((event) => event.status === 'pending').length;
 
-      if (this.pendingSyncEvents > 0) {
-        await this.registerBackgroundSync();
-      }
     },
 
     async syncPendingEvents() {
@@ -1085,12 +1069,7 @@ export const useAppStore = defineStore('app', {
         for (const acknowledgement of result.acknowledgements) {
           const queuedEvent = pendingEvents.find((event) => event.id === acknowledgement.eventId);
 
-          if (queuedEvent) {
-            await db.put(
-              'sync-queue',
-              compactAcknowledgedSyncEvent({ ...queuedEvent, status: acknowledgement.status }),
-            );
-          }
+          if (queuedEvent) await db.delete('sync-queue', queuedEvent.id);
         }
 
         await this.pruneLocalStorage();
@@ -1109,7 +1088,6 @@ export const useAppStore = defineStore('app', {
           pendingSyncEvents: pendingEvents.length,
           reason: getErrorMessage(error),
         }, 'warn');
-        await this.registerBackgroundSync();
       }
     },
 

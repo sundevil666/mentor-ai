@@ -29,7 +29,6 @@ export async function recordApplicationTelemetry(input: {
   await db.put('application-telemetry', event);
   await pruneLocalEvents();
   window.dispatchEvent(new Event('mentor-analysis-data-updated'));
-  if (navigator.onLine) void syncApplicationTelemetry().catch(() => undefined);
   return event;
 }
 
@@ -43,9 +42,11 @@ export async function syncApplicationTelemetry() {
   const db = await mentorDb;
   const local = await loadApplicationTelemetry();
   if (!local.length) return;
-  const merged = await synchronizeApplicationTelemetry(local);
-  for (const event of merged) await db.put('application-telemetry', event);
-  await pruneLocalEvents();
+  const saved = await synchronizeApplicationTelemetry(local);
+  const savedIds = new Set(saved.map((event) => event.id));
+  for (const event of local) {
+    if (savedIds.has(event.id)) await db.delete('application-telemetry', event.id);
+  }
 }
 
 function sanitizeLabel(value?: string) {

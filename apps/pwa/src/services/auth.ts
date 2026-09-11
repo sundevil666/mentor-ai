@@ -16,6 +16,8 @@ interface AuthConfiguration {
 }
 
 const sessionStorageKey = 'mentor-ai-auth-session';
+const configurationStorageKey = 'mentor-ai:auth-configuration:v1';
+const configurationCacheMs = 24 * 60 * 60 * 1_000;
 const apiBaseUrl =
   process.env.API_BASE_URL ??
   (process.env.DEV || typeof window === 'undefined' ? 'http://localhost:4000' : '');
@@ -63,6 +65,8 @@ export function getAuthToken(): string | null {
 }
 
 export async function fetchAuthConfiguration(): Promise<AuthConfiguration> {
+  const cached = readAuthConfigurationCache();
+  if (cached && Date.now() - cached.cachedAt < configurationCacheMs) return cached.configuration;
   const response = await fetch(`${apiBaseUrl}/api/auth/configuration`);
 
   if (!response.ok) {
@@ -70,7 +74,24 @@ export async function fetchAuthConfiguration(): Promise<AuthConfiguration> {
   }
 
   const body = (await response.json()) as { data: AuthConfiguration };
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(configurationStorageKey, JSON.stringify({ configuration: body.data, cachedAt: Date.now() }));
+  }
   return body.data;
+}
+
+function readAuthConfigurationCache(): { configuration: AuthConfiguration; cachedAt: number } | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const value = JSON.parse(localStorage.getItem(configurationStorageKey) ?? 'null') as {
+      configuration?: AuthConfiguration;
+      cachedAt?: number;
+    } | null;
+    if (!value?.configuration || !Number.isFinite(value.cachedAt)) return null;
+    return { configuration: value.configuration, cachedAt: value.cachedAt! };
+  } catch {
+    return null;
+  }
 }
 
 export async function signInWithGoogleCredential(credential: string): Promise<AuthSession> {

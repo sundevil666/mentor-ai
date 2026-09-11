@@ -37,7 +37,6 @@ export async function recordLearningActivity(input: {
     chunkEnd = chunkStart;
   }
   window.dispatchEvent(new Event('mentor-learning-activity-updated'));
-  if (navigator.onLine) void syncLearningActivity().catch(() => undefined);
   return latestEvent!;
 }
 

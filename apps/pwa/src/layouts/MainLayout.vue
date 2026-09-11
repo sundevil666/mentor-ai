@@ -332,7 +332,7 @@ import {
 import { useAppStore } from 'src/stores/app-store';
 import { fetchAuthConfiguration, signInWithGoogleCredential } from 'src/services/auth';
 import { fetchTranslationUsage } from 'src/services/api-client';
-import { recordApplicationTelemetry, syncApplicationTelemetry } from 'src/services/application-telemetry';
+import { recordApplicationTelemetry } from 'src/services/application-telemetry';
 import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
 import { formatDisplayDateTime } from 'src/services/date-format';
 import { cleanupExpiredOfflineLessons } from 'src/services/offline-library';
@@ -415,7 +415,6 @@ const showInstallHelp = ref(false);
 const offlineLessonState = ref<OfflineLessonUpdateState>(getOfflineLessonUpdateState());
 const translationUsage = ref<TranslationUsage | null>(null);
 let unsubscribeOfflineLessonUpdates: (() => void) | undefined;
-let offlineLessonUpdateTimer: number | undefined;
 const showInstallButton = computed(() => !isPwaInstalled.value);
 const translationUsageRatio = computed(() => Math.min(1, (translationUsage.value?.percentUsed ?? 0) / 100));
 const translationUsagePercent = computed(() => Math.round(translationUsage.value?.percentUsed ?? 0));
@@ -571,17 +570,13 @@ onMounted(async () => {
   isPwaInstalled.value = isStandalonePwa();
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   window.addEventListener('appinstalled', handleAppInstalled);
-  window.addEventListener('online', handleOfflineLessonReconnect);
   window.addEventListener('online', handleApplicationOnline);
   window.addEventListener('offline', handleApplicationOffline);
   window.addEventListener('translation-usage-updated', loadTranslationUsage);
   window.addEventListener('mentor-learning-activity-updated', refreshLevelActivity);
+  window.addEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyServerMaintenanceFinished);
   window.addEventListener('error', handleRuntimeError);
   window.addEventListener('unhandledrejection', handleUnhandledRejection);
-  document.addEventListener('visibilitychange', handleOfflineLessonVisibility);
-  offlineLessonUpdateTimer = window.setInterval(() => {
-    if (document.visibilityState === 'visible' && navigator.onLine) void checkOfflineLessons(false);
-  }, 60 * 60 * 1000);
   isDarkTheme.value = readSavedTheme();
   applyTheme(isDarkTheme.value);
   await loadAuthConfiguration();
@@ -591,23 +586,19 @@ onMounted(async () => {
   }
   await refreshLevelActivity();
   await recordApplicationTelemetry({ studentId: appStore.studentId, type: 'app-opened', route: String(route.name ?? 'unknown') });
-  if (appStore.isOnline) void syncApplicationTelemetry().catch(() => undefined);
-  if (appStore.isOnline) void checkOfflineLessons(false);
-  if (appStore.isOnline) void loadTranslationUsage();
+  await loadTranslationUsage();
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   window.removeEventListener('appinstalled', handleAppInstalled);
-  window.removeEventListener('online', handleOfflineLessonReconnect);
   window.removeEventListener('online', handleApplicationOnline);
   window.removeEventListener('offline', handleApplicationOffline);
   window.removeEventListener('translation-usage-updated', loadTranslationUsage);
   window.removeEventListener('mentor-learning-activity-updated', refreshLevelActivity);
+  window.removeEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyServerMaintenanceFinished);
   window.removeEventListener('error', handleRuntimeError);
   window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-  document.removeEventListener('visibilitychange', handleOfflineLessonVisibility);
-  if (offlineLessonUpdateTimer) window.clearInterval(offlineLessonUpdateTimer);
   unsubscribeOfflineLessonUpdates?.();
 });
 
@@ -664,10 +655,8 @@ function markAllRead() {
   void appStore.markAllUpdateNotificationsRead();
 }
 
-function handleOfflineLessonReconnect() { void checkOfflineLessons(false); }
 function handleApplicationOnline() {
   void recordApplicationTelemetry({ studentId: appStore.studentId, type: 'online' });
-  void syncApplicationTelemetry().catch(() => undefined);
 }
 function handleApplicationOffline() {
   void recordApplicationTelemetry({ studentId: appStore.studentId, type: 'offline', severity: 'warning' });
@@ -702,8 +691,8 @@ async function loadTranslationUsage() {
 function formatCharacterCount(value: number) {
   return new Intl.NumberFormat('en-US').format(value);
 }
-function handleOfflineLessonVisibility() {
-  if (document.visibilityState === 'visible' && navigator.onLine) void checkOfflineLessons(false);
+function handleDailyServerMaintenanceFinished() {
+  void loadTranslationUsage();
 }
 
 function handleBeforeInstallPrompt(event: Event) {

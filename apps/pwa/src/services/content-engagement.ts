@@ -37,7 +37,6 @@ export async function recordContentEngagement(input: {
   await db.put('content-engagement', event);
   await pruneContentEngagement();
   window.dispatchEvent(new CustomEvent('mentor-content-engagement', { detail: input.contentId }));
-  if (navigator.onLine) void syncContentEngagement().catch(() => undefined);
   return event;
 }
 

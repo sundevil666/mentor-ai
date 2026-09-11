@@ -121,7 +121,7 @@ import { audioLibrary, deleteOfflineAudio, formatAudioDuration, formatAudioSize,
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineAudio } from 'src/services/offline-library';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import AppDetailLayout from 'src/components/AppDetailLayout.vue';
-import { loadContentEngagementSummaries, recordContentEngagement, syncContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
+import { loadContentEngagementSummaries, recordContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
 import { useAppStore } from 'src/stores/app-store';
 import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 import AppAudioDock from 'src/components/AppAudioDock.vue';
@@ -156,7 +156,6 @@ onMounted(async () => {
   window.addEventListener('offline', updateOnlineState);
   configureMediaSession();
   engagementSummaries.value = await loadContentEngagementSummaries('audio');
-  void syncContentEngagement().then(refreshAudioCompletion).catch(() => undefined);
   const requestedAudioId = new URLSearchParams(window.location.search).get('audio');
   const requestedAudio = audioLibrary.find((item) => item.id === requestedAudioId);
   if (requestedAudio) await selectAudio(requestedAudio);
