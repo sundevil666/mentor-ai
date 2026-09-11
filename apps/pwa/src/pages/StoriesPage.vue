@@ -361,16 +361,6 @@
               <p v-else-if="readerLookupError" class="personal-reader__lookup-error">{{ readerLookupError }}</p>
               <p v-else class="personal-reader__lookup-hint">Tap a word, or press and hold to select a phrase.</p>
             </div>
-            <q-btn
-              v-if="readerMarkerWordIndex !== null && readerMarkerWordIndex !== selectedReaderWordIndex"
-              class="personal-reader__marker-return"
-              color="primary"
-              icon="bookmark"
-              label="Return to my marker"
-              no-caps
-              outline
-              @click="goToReaderMarker"
-            />
           </section>
 
           <div class="personal-reader__sidebar-navigation">
@@ -1386,17 +1376,6 @@ function toggleReaderMarker() {
   readerMarkerWordIndex.value = wordIndex;
   localStorage.setItem(readerMarkerKey(book.id), String(wordIndex));
   Notify.create({ type: 'positive', message: 'Your reading place is marked.', icon: 'bookmark' });
-}
-function goToReaderMarker() {
-  const markerIndex = readerMarkerWordIndex.value;
-  const paper = readerPaper.value;
-  if (markerIndex === null || !paper) return;
-  const marker = paper.querySelector<HTMLElement>(`[data-reader-word-index="${markerIndex}"]`);
-  if (!marker) return;
-  currentBookPageIndex.value = Math.max(0, Math.min(readerPageCount.value - 1, Math.floor((marker.offsetLeft + 1) / readerPageStride.value)));
-  scrollToReaderPage();
-  persistBookProgress();
-  marker.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
 }
 async function toggleReadingSpeech() {
   if (readingSpeechTransitioning.value) return;
