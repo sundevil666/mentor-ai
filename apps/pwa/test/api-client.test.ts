@@ -1,13 +1,49 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-import { fetchLearningActivityTotals, fetchReadingResumeSnapshot, saveReadingTranscript, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, synchronizeStatisticsSnapshots, upsertSessionHandoff } from '../src/services/api-client.js';
+import { fetchLearningActivityTotals, fetchReaderTextLookup, fetchReadingResumeSnapshot, fetchTranslationUsage, saveReadingTranscript, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, synchronizeStatisticsSnapshots, upsertSessionHandoff } from '../src/services/api-client.js';
+
+class MemoryStorage implements Storage {
+  private readonly values = new Map<string, string>();
+  get length() { return this.values.size; }
+  clear() { this.values.clear(); }
+  getItem(key: string) { return this.values.get(key) ?? null; }
+  key(index: number) { return [...this.values.keys()][index] ?? null; }
+  removeItem(key: string) { this.values.delete(key); }
+  setItem(key: string, value: string) { this.values.set(key, value); }
+}
 
 describe('PWA API client', () => {
   beforeEach(() => {
+    globalThis.localStorage = new MemoryStorage();
     globalThis.fetch = async () => {
       throw new Error('Unexpected fetch call.');
     };
+  });
+
+  it('counts translations locally and synchronizes one absolute snapshot per day', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url: String(url), init });
+      if (String(url).endsWith('/api/reader/lookup')) {
+        return jsonResponse({ text: 'hello', translation: 'привет', sourceLanguage: 'en', targetLanguage: 'ru' });
+      }
+      return jsonResponse({
+        period: new Date().toISOString().slice(0, 7), usedCharacters: 5, limitCharacters: 450_000,
+        remainingCharacters: 449_995, percentUsed: 0, configured: true, exhausted: false,
+      });
+    };
+
+    await fetchReaderTextLookup('hello');
+    const firstUsage = await fetchTranslationUsage();
+    const secondUsage = await fetchTranslationUsage();
+
+    assert.equal(firstUsage.usedCharacters, 5);
+    assert.equal(secondUsage.usedCharacters, 5);
+    assert.equal(calls.filter((call) => call.url.endsWith('/api/reader/usage')).length, 1);
+    const snapshot = calls.find((call) => call.url.endsWith('/api/reader/usage'))!;
+    assert.equal(snapshot.init?.method, 'POST');
+    assert.equal(JSON.parse(String(snapshot.init?.body)).usedCharacters, 5);
   });
 
   it('sends learning evidence envelopes to synchronization', async () => {

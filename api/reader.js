@@ -13,6 +13,12 @@ module.exports = async (request, response) => {
       return;
     }
 
+    if (action === 'usage' && request.method === 'POST') {
+      const body = await readJsonBody(request);
+      sendJson(response, 200, await usageService.synchronizeTranslationUsageDevice(body ?? {}));
+      return;
+    }
+
     if (action === 'lookup' && request.method === 'POST') {
       const body = await readJsonBody(request);
       const lookupService = await import('../apps/api/src/services/reader-lookup.service.js');

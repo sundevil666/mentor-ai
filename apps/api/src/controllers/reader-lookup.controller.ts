@@ -2,7 +2,7 @@ import type { RequestHandler } from 'express';
 import { lookupReaderPhonetic, lookupReaderText } from '../services/reader-lookup.service.js';
 import type { PersonalReadingBookArchive, ReaderVocabularyItem, ReadingTranscriptChunk } from '@mentor-ai/shared';
 import { learningStateService } from '../services/learning-state.service.js';
-import { getTranslationUsage, TranslationLimitError } from '../services/translation-usage.service.js';
+import { getTranslationUsage, synchronizeTranslationUsageDevice, TranslationLimitError } from '../services/translation-usage.service.js';
 import { storeReadingTranscript } from '../services/reading-transcripts.service.js';
 
 export const translateReaderText: RequestHandler = async (req, res, _next) => {
@@ -18,6 +18,14 @@ export const translateReaderText: RequestHandler = async (req, res, _next) => {
 export const getReaderTranslationUsage: RequestHandler = async (_req, res, next) => {
   try {
     res.json({ data: await getTranslationUsage() });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const synchronizeReaderTranslationUsage: RequestHandler = async (req, res, next) => {
+  try {
+    res.json({ data: await synchronizeTranslationUsageDevice(req.body ?? {}) });
   } catch (error) {
     next(error);
   }

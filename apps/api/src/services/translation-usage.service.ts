@@ -20,13 +20,41 @@ export async function getTranslationUsage(now = new Date()): Promise<Translation
   if (pool) {
     await ensureUsageTable();
     const result = await pool.query<{ used_characters: number | string }>(
-      'SELECT used_characters FROM translation_usage WHERE period = $1',
+      `SELECT COALESCE((SELECT used_characters FROM translation_usage WHERE period = $1), 0)
+            + COALESCE((SELECT SUM(used_characters) FROM translation_usage_devices WHERE period = $1), 0)
+            AS used_characters`,
       [period],
     );
     usedCharacters = Number(result.rows[0]?.used_characters ?? 0);
   }
 
   return createTranslationUsage(period, usedCharacters, Boolean(config.googleTranslateApiKey));
+}
+
+export async function synchronizeTranslationUsageDevice(input: {
+  period: unknown;
+  deviceId: unknown;
+  usedCharacters: unknown;
+}, now = new Date()): Promise<TranslationUsage> {
+  const period = getUsagePeriod(now);
+  const deviceId = typeof input.deviceId === 'string' ? input.deviceId.trim() : '';
+  const usedCharacters = Number(input.usedCharacters);
+  if (input.period !== period || !/^[a-zA-Z0-9:-]{8,100}$/.test(deviceId)
+    || !Number.isInteger(usedCharacters) || usedCharacters < 0 || usedCharacters > translationMonthlyLimit) {
+    throw new Error('Invalid local translation usage snapshot.');
+  }
+  const pool = getPostgresPool();
+  if (!pool) throw new Error('Translation usage tracking is unavailable because DATABASE_URL is not configured.');
+  await ensureUsageTable();
+  await pool.query(
+    `INSERT INTO translation_usage_devices (period, device_id, used_characters, updated_at)
+     VALUES ($1, $2, $3, now())
+     ON CONFLICT (period, device_id) DO UPDATE
+       SET used_characters = GREATEST(translation_usage_devices.used_characters, EXCLUDED.used_characters),
+           updated_at = now()`,
+    [period, deviceId, usedCharacters],
+  );
+  return getTranslationUsage(now);
 }
 
 export async function reserveTranslationCharacters(characters: number, now = new Date()): Promise<TranslationUsage> {
@@ -95,6 +123,15 @@ function ensureUsageTable(): Promise<void> {
         period TEXT PRIMARY KEY,
         used_characters INTEGER NOT NULL DEFAULT 0 CHECK (used_characters >= 0),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS translation_usage_devices (
+        period TEXT NOT NULL,
+        device_id TEXT NOT NULL,
+        used_characters INTEGER NOT NULL DEFAULT 0 CHECK (used_characters >= 0),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (period, device_id)
       )
     `);
   })();

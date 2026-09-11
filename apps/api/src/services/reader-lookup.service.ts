@@ -1,10 +1,5 @@
 import type { ReaderTextLookup } from '@mentor-ai/shared';
 import { config } from '../config/env.js';
-import {
-  countTranslationCharacters,
-  releaseTranslationCharacters,
-  reserveTranslationCharacters,
-} from './translation-usage.service.js';
 
 const googleTranslateUrl = 'https://translation.googleapis.com/language/translate/v2';
 const dictionaryUrl = 'https://api.dictionaryapi.dev/api/v2/entries/en';
@@ -24,9 +19,6 @@ export async function lookupReaderText(rawText: unknown): Promise<ReaderTextLook
     };
   }
 
-  const characterCount = countTranslationCharacters(text);
-  await reserveTranslationCharacters(characterCount);
-
   let translation = '';
   try {
     const response = await fetch(`${googleTranslateUrl}?key=${encodeURIComponent(config.googleTranslateApiKey)}`, {
@@ -39,7 +31,6 @@ export async function lookupReaderText(rawText: unknown): Promise<ReaderTextLook
     translation = decodeHtml(body.data?.translations?.[0]?.translatedText ?? '').trim();
     if (!translation) throw new Error('Google returned an empty translation.');
   } catch (error) {
-    await releaseTranslationCharacters(characterCount);
     if (error instanceof Error && error.message === 'Google returned an empty translation.') throw error;
     throw new Error('Google translation request failed.');
   }

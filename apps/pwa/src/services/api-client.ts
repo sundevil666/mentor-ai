@@ -57,6 +57,18 @@ export interface AppConfiguration {
 const apiBaseUrl =
   process.env.API_BASE_URL ??
   (process.env.DEV || typeof window === 'undefined' ? 'http://localhost:4000' : '');
+const translationUsageStorageKey = 'mentor-ai:translation-usage:v1';
+const translationMonthlyLimit = 450_000;
+const translationUsageSyncIntervalMs = 24 * 60 * 60 * 1_000;
+
+interface LocalTranslationUsageState {
+  period: string;
+  deviceId: string;
+  usedCharacters: number;
+  synchronizedDeviceCharacters: number;
+  serverUsedCharacters: number;
+  lastSyncAttemptAt: string | null;
+}
 
 export async function fetchStudentState(): Promise<StudentStateResponse> {
   const response = await fetch(`${apiBaseUrl}/api/student-state`, {
@@ -86,6 +98,11 @@ export async function fetchAppConfiguration(): Promise<AppConfiguration> {
 }
 
 export async function fetchReaderTextLookup(text: string): Promise<ReaderTextLookup> {
+  const characterCount = Array.from(text).length;
+  const usage = readLocalTranslationUsage();
+  if (usage.usedCharacters + characterCount > translationMonthlyLimit) {
+    throw new Error('The local Google translation limit has been reached. Translation will be available again next month.');
+  }
   const response = await fetch(`${apiBaseUrl}/api/reader/lookup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -99,14 +116,94 @@ export async function fetchReaderTextLookup(text: string): Promise<ReaderTextLoo
     throw new Error(body?.error?.message ?? body?.data?.message ?? 'Translation is unavailable right now.');
   }
   const result = ((await response.json()) as ApiResponse<ReaderTextLookup>).data;
+  writeLocalTranslationUsage({ ...usage, usedCharacters: usage.usedCharacters + characterCount });
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('translation-usage-updated'));
   return result;
 }
 
 export async function fetchTranslationUsage(): Promise<TranslationUsage> {
-  const response = await fetch(`${apiBaseUrl}/api/reader/usage`, { headers: authHeaders() });
-  if (!response.ok) throw new Error('Translation usage request failed.');
-  return ((await response.json()) as ApiResponse<TranslationUsage>).data;
+  let local = readLocalTranslationUsage();
+  const lastAttempt = local.lastSyncAttemptAt ? Date.parse(local.lastSyncAttemptAt) : 0;
+  if (Date.now() - lastAttempt >= translationUsageSyncIntervalMs) {
+    local = { ...local, lastSyncAttemptAt: new Date().toISOString() };
+    writeLocalTranslationUsage(local);
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/reader/usage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ period: local.period, deviceId: local.deviceId, usedCharacters: local.usedCharacters }),
+      });
+      if (response.ok) {
+        const server = ((await response.json()) as ApiResponse<TranslationUsage>).data;
+        local = {
+          ...local,
+          synchronizedDeviceCharacters: local.usedCharacters,
+          serverUsedCharacters: server.usedCharacters,
+        };
+        writeLocalTranslationUsage(local);
+      }
+    } catch {
+      // Keep translation available and retry the accounting snapshot tomorrow.
+    }
+  }
+  const usedCharacters = Math.max(
+    local.usedCharacters,
+    local.serverUsedCharacters + Math.max(0, local.usedCharacters - local.synchronizedDeviceCharacters),
+  );
+  return createLocalTranslationUsage(local.period, usedCharacters);
+}
+
+export function readLocalTranslationUsage(now = new Date()): LocalTranslationUsageState {
+  const period = now.toISOString().slice(0, 7);
+  const fallback = (): LocalTranslationUsageState => ({
+    period,
+    deviceId: getOrCreateTranslationDeviceId(),
+    usedCharacters: 0,
+    synchronizedDeviceCharacters: 0,
+    serverUsedCharacters: 0,
+    lastSyncAttemptAt: null,
+  });
+  if (typeof localStorage === 'undefined') return fallback();
+  try {
+    const stored = JSON.parse(localStorage.getItem(translationUsageStorageKey) ?? 'null') as Partial<LocalTranslationUsageState> | null;
+    if (!stored || stored.period !== period || typeof stored.deviceId !== 'string') return fallback();
+    return {
+      period,
+      deviceId: stored.deviceId,
+      usedCharacters: Math.max(0, Math.floor(stored.usedCharacters ?? 0)),
+      synchronizedDeviceCharacters: Math.max(0, Math.floor(stored.synchronizedDeviceCharacters ?? 0)),
+      serverUsedCharacters: Math.max(0, Math.floor(stored.serverUsedCharacters ?? 0)),
+      lastSyncAttemptAt: typeof stored.lastSyncAttemptAt === 'string' ? stored.lastSyncAttemptAt : null,
+    };
+  } catch {
+    return fallback();
+  }
+}
+
+function writeLocalTranslationUsage(state: LocalTranslationUsageState) {
+  if (typeof localStorage !== 'undefined') localStorage.setItem(translationUsageStorageKey, JSON.stringify(state));
+}
+
+function getOrCreateTranslationDeviceId() {
+  if (typeof localStorage === 'undefined') return 'server-test-device';
+  const existing = localStorage.getItem('mentor-ai-device-id');
+  if (existing) return existing;
+  const id = crypto.randomUUID();
+  localStorage.setItem('mentor-ai-device-id', id);
+  return id;
+}
+
+function createLocalTranslationUsage(period: string, usedCharacters: number): TranslationUsage {
+  const safeUsed = Math.min(translationMonthlyLimit, Math.max(0, Math.floor(usedCharacters)));
+  return {
+    period,
+    usedCharacters: safeUsed,
+    limitCharacters: translationMonthlyLimit,
+    remainingCharacters: translationMonthlyLimit - safeUsed,
+    percentUsed: Number(((safeUsed / translationMonthlyLimit) * 100).toFixed(2)),
+    configured: true,
+    exhausted: safeUsed >= translationMonthlyLimit,
+  };
 }
 
 export async function fetchReaderPhonetic(text: string): Promise<string | undefined> {
