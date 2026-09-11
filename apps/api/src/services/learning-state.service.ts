@@ -105,26 +105,31 @@ export const learningStateService = {
   },
 
   async getReadingResumeSnapshot(bookId: string, user?: AuthenticatedUser): Promise<ReadingResumeSnapshot> {
-    const state = await learningStateRepository.read(user);
+    const state = await learningStateRepository.readReadingResumeState(user);
     return {
-      progress: state.contentProgress.find((item) => item.studentId === state.student.id && item.category === 'reading' && item.contentId === bookId),
-      devices: state.readingDeviceSessions.filter((item) => item.studentId === state.student.id && item.bookId === bookId),
+      progress: state.contentProgress.find((item) => item.studentId === state.studentId && item.category === 'reading' && item.contentId === bookId),
+      devices: state.readingDeviceSessions.filter((item) => item.studentId === state.studentId && item.bookId === bookId),
       serverTime: new Date().toISOString(),
     };
   },
 
   async upsertReadingDeviceSession(candidate: ReadingDeviceSession, user?: AuthenticatedUser): Promise<ReadingResumeSnapshot> {
-    const state = await learningStateRepository.read(user);
-    const safe = sanitizeReadingDeviceSession(candidate, state.student.id);
+    const state = await learningStateRepository.readReadingResumeState(user);
+    const safe = sanitizeReadingDeviceSession(candidate, state.studentId);
+    let readingDeviceSessions = state.readingDeviceSessions;
     if (safe) {
       const sessions = new Map(state.readingDeviceSessions.map((item) => [item.id, item]));
       const current = sessions.get(safe.id);
       if (!current || safe.lastSeenAt >= current.lastSeenAt) sessions.set(safe.id, safe);
-      state.readingDeviceSessions = [...sessions.values()]
+      readingDeviceSessions = [...sessions.values()]
         .filter((item) => Date.now() - Date.parse(item.lastSeenAt) < 30 * 24 * 60 * 60 * 1_000);
-      await learningStateRepository.write(state, user);
+      await learningStateRepository.writeReadingDeviceSessions(readingDeviceSessions, user);
     }
-    return this.getReadingResumeSnapshot(candidate.bookId, user);
+    return {
+      progress: state.contentProgress.find((item) => item.studentId === state.studentId && item.category === 'reading' && item.contentId === candidate.bookId),
+      devices: readingDeviceSessions.filter((item) => item.studentId === state.studentId && item.bookId === candidate.bookId),
+      serverTime: new Date().toISOString(),
+    };
   },
 
   async mergeContentEngagementEvents(incoming: ContentEngagementEvent[], user?: AuthenticatedUser) {

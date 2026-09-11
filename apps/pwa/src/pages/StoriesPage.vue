@@ -530,6 +530,7 @@ let pendingBookOpenId: string | null = null;
 let readingDeviceHeartbeat: ReturnType<typeof setInterval> | null = null;
 let allowUnconfirmedBookOpen = false;
 let readingDeviceProgressUpdatedAt = '';
+let readingDeviceSyncAvailable = true;
 const selectedReaderText = ref('');
 const selectedReaderWordIndex = ref<number | null>(null);
 const readerMarkerWordIndex = ref<number | null>(null);
@@ -883,12 +884,13 @@ async function openBook(bookId: string) {
   }
   let checkedPosition: { position: number; sentenceStartPosition: number; sentenceEndPosition: number; updatedAt?: string } | undefined;
   if (getAuthToken() && navigator.onLine) {
+    readingDeviceSyncAvailable = true;
     bookResumeDialog.value = true;
     bookResumeLoading.value = true;
     bookResumeWaitingDevices.value = [];
     bookResumeError.value = '';
     try {
-      await syncAllContentProgress();
+      void syncAllContentProgress().catch(() => undefined);
       const decision = chooseReadingResumeState(await fetchReadingResumeSnapshot(bookId), getContentProgressDeviceId());
       checkedPosition = decision;
       bookResumeWaitingDevices.value = decision.waitingDevices;
@@ -905,13 +907,18 @@ async function openBook(bookId: string) {
           : 'Everything is synchronized. Opening the newest confirmed position.',
       });
     } catch (error) {
+      readingDeviceSyncAvailable = false;
       bookResumeLoading.value = false;
       bookResumeWaitingDevices.value = [];
       bookResumeError.value = error instanceof Error ? error.message : 'Could not verify other devices.';
-      pendingBookOpenId = bookId;
-      if (!allowUnconfirmedBookOpen) return;
+      pendingBookOpenId = null;
+      bookResumeDialog.value = false;
+      Notify.create({
+        type: 'warning',
+        message: 'Cloud progress is temporarily unavailable. Opened the saved position from this device.',
+      });
     } finally {
-      if ((!bookResumeWaitingDevices.value.length && !bookResumeError.value) || allowUnconfirmedBookOpen) bookResumeDialog.value = false;
+      if ((!bookResumeWaitingDevices.value.length && !bookResumeError.value) || allowUnconfirmedBookOpen || !readingDeviceSyncAvailable) bookResumeDialog.value = false;
       bookResumeLoading.value = false;
       allowUnconfirmedBookOpen = false;
     }
@@ -2036,7 +2043,7 @@ function setResumeHighlight(wordIndex: number) {
 }
 async function publishReadingDeviceSession(status: 'reading' | 'closed') {
   const book = selectedBook.value;
-  if (!book || !getAuthToken() || !navigator.onLine) return;
+  if (!book || !getAuthToken() || !navigator.onLine || !readingDeviceSyncAvailable) return;
   const wordIndex = getStableReaderWordPosition();
   const sentence = getReaderSentenceBounds(wordIndex);
   const now = new Date().toISOString();
@@ -2052,6 +2059,10 @@ async function publishReadingDeviceSession(status: 'reading' | 'closed') {
     status,
     progressUpdatedAt: readingDeviceProgressUpdatedAt || now,
     lastSeenAt: now,
+  }).catch((error) => {
+    readingDeviceSyncAvailable = false;
+    stopReadingDeviceHeartbeat();
+    throw error;
   });
   if (status !== 'reading') return;
   const decision = chooseReadingResumeState(snapshot, getContentProgressDeviceId());

@@ -132,6 +132,57 @@ export const learningStateRepository = {
     await mkdir(path.dirname(filePath), { recursive: true });
     await writeFile(filePath, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
   },
+
+  async readReadingResumeState(user?: AuthenticatedUser): Promise<{
+    studentId: string;
+    contentProgress: ContentProgress[];
+    readingDeviceSessions: ReadingDeviceSession[];
+  }> {
+    if (user && getPostgresPool()) {
+      const pool = getPostgresPool()!;
+      await ensureLearningStatesTable();
+      const result = await pool.query<{
+        content_progress: ContentProgress[] | null;
+        reading_device_sessions: ReadingDeviceSession[] | null;
+      }>(
+        `SELECT state->'contentProgress' AS content_progress,
+                state->'readingDeviceSessions' AS reading_device_sessions
+         FROM learning_states WHERE student_id = $1`,
+        [user.id],
+      );
+      if (result.rows[0]) {
+        return {
+          studentId: user.id,
+          contentProgress: result.rows[0].content_progress ?? [],
+          readingDeviceSessions: result.rows[0].reading_device_sessions ?? [],
+        };
+      }
+    }
+
+    const state = await learningStateRepository.read(user);
+    return {
+      studentId: state.student.id,
+      contentProgress: state.contentProgress,
+      readingDeviceSessions: state.readingDeviceSessions,
+    };
+  },
+
+  async writeReadingDeviceSessions(sessions: ReadingDeviceSession[], user?: AuthenticatedUser): Promise<void> {
+    if (user && getPostgresPool()) {
+      const pool = getPostgresPool()!;
+      await ensureLearningStatesTable();
+      const result = await pool.query(
+        `UPDATE learning_states
+         SET state = jsonb_set(state, '{readingDeviceSessions}', $2::jsonb, true), updated_at = now()
+         WHERE student_id = $1`,
+        [user.id, JSON.stringify(sessions)],
+      );
+      if ((result.rowCount ?? 0) > 0) return;
+    }
+
+    const state = await learningStateRepository.read(user);
+    await learningStateRepository.write({ ...state, readingDeviceSessions: sessions }, user);
+  },
 };
 
 let ensureTablePromise: Promise<void> | undefined;
