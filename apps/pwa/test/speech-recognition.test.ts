@@ -72,7 +72,7 @@ describe('speech recognition results', () => {
       lang = '';
       maxAlternatives = 0;
       onstart: (() => void) | null = null;
-      onresult: ((event: never) => void) | null = null;
+      onresult: ((event: { resultIndex?: number; results: ReturnType<typeof recognitionResults> }) => void) | null = null;
       onerror: ((event: never) => void) | null = null;
       onend: (() => void) | null = null;
       aborted = false;
@@ -103,13 +103,22 @@ describe('speech recognition results', () => {
 
     try {
       const listening: boolean[] = [];
+      const interim: string[] = [];
+      const final: string[] = [];
       const controller = startContinuousSpeechRecognition({
-        onFinal() {},
+        onInterim(value) { interim.push(value); },
+        onFinal(value) { final.push(value); },
         onListeningChange(value) { listening.push(value); },
       });
       const first = instances[0]!;
       first.onstart?.();
       assert.deepEqual(listening, [true]);
+      first.onresult?.({
+        resultIndex: 0,
+        results: recognitionResults([{ transcript: 'Alice was reading', confidence: 0.9, isFinal: true }]),
+      });
+      assert.deepEqual(final, ['Alice was reading']);
+      assert.deepEqual(interim, []);
 
       first.onend?.();
       assert.equal(scheduled.size, 1);

@@ -77,7 +77,12 @@ describe('reading speech tracking', () => {
 
   it('does not preview unrelated or one-word interim browser noise', () => {
     assert.deepEqual(previewBrowserReadingWordIndexes(reference, 'television kitchen noise', 0), []);
-    assert.deepEqual(previewBrowserReadingWordIndexes(reference, 'Alice', 0), []);
+    assert.deepEqual(previewBrowserReadingWordIndexes(reference, 'sister', 0), []);
+  });
+
+  it('starts live highlighting from the first exact word at the reading anchor', () => {
+    assert.deepEqual(previewBrowserReadingWordIndexes(reference, 'Alice', 0), [0]);
+    assert.deepEqual(previewBrowserReadingWordIndexes(reference, 'was', 0), []);
   });
 
   it('lets tablet speech recover a dense phrase farther ahead of a stale visible anchor', () => {

@@ -144,7 +144,10 @@ export function startContinuousSpeechRecognition(options: ContinuousSpeechRecogn
         if (result?.isFinal) options.onFinal(transcript, alternative.confidence || 0);
         else interim.push(transcript);
       }
-      options.onInterim?.(interim.join(' '));
+      // A final-only event has no live hypothesis. Emitting an empty interim
+      // here makes consumers erase the phrase immediately before they render
+      // the confirmed result, which appears as flicker in the reader.
+      if (interim.length) options.onInterim?.(interim.join(' '));
     };
     current.onerror = (event) => {
       if (!shouldRun || recognition !== current) return;

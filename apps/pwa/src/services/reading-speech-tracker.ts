@@ -121,6 +121,10 @@ export function matchReadingSpeechAtAnchor(referenceWords: readonly string[], tr
 
 export function previewBrowserReadingWordIndexes(referenceWords: readonly string[], transcript: string, anchorIndex: number): number[] {
   const spokenWords = tokenizeReadingSpeech(transcript);
+  if (spokenWords.length === 1) {
+    const exactAnchorMatch = matchReadingSpeechAtAnchor(referenceWords, transcript, anchorIndex);
+    return exactAnchorMatch.accepted ? exactAnchorMatch.matchedWordIndexes : [];
+  }
   const match = alignReadingSpeech(referenceWords, transcript, anchorIndex, {
     maxForwardWords: 360,
     minMatchedWords: 2,

@@ -1787,6 +1787,7 @@ function stopReadingSpeech(status: ReadingSpeechStatus) {
   sherpaReadingTranscriber?.stop();
   sherpaReadingTranscriber = null;
   readingSpeechSuppressedForLookup = false;
+  provisionalReaderWordIndexes.value = new Set();
   readingSpeechStream?.getTracks().forEach((track) => track.stop());
   readingSpeechStream = null;
   cancelAnimationFrame(readingSpeechAnimationFrame);
