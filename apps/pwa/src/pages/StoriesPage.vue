@@ -769,7 +769,6 @@ onMounted(async () => {
   } else {
     personalBooks.value = await listPersonalBooks();
     await syncPersonalBooks().catch(() => undefined);
-    void syncReadingTranscripts().catch(() => undefined);
   }
   document.addEventListener('visibilitychange', handleVisibilityChange);
   window.addEventListener('online', handleBookSyncWakeup);
@@ -880,7 +879,6 @@ function syncPersonalBooks(): Promise<void> {
 
 function handleBookSyncWakeup() {
   void syncPersonalBooks().catch(() => undefined);
-  void syncReadingTranscripts().catch(() => undefined);
 }
 function retryPersonalBookSync() { void syncPersonalBooks().catch(() => undefined); }
 function retryPendingBookOpen() {
@@ -1465,6 +1463,7 @@ async function saveReaderStopHere() {
     if (navigator.onLine) {
       await syncAllContentProgress();
       await publishReadingDeviceSession('reading');
+      await syncReadingTranscripts();
       Notify.create({ type: 'positive', icon: 'cloud_done', message: 'Reading place saved on this device and in your account.' });
     } else {
       Notify.create({ type: 'positive', icon: 'bookmark', message: 'Reading place saved on this device. It will sync when you are online.' });
