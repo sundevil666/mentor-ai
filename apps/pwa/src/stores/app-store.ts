@@ -1159,7 +1159,9 @@ export const useAppStore = defineStore('app', {
         const localStatisticsForAccount = this.statisticsSnapshots
           .filter((snapshot) => snapshot.studentId === this.studentId || snapshot.studentId === demoStudent.id)
           .map((snapshot) => ({ ...snapshot, studentId: this.studentId }));
-        const sharedStatistics = await synchronizeStatisticsSnapshots(localStatisticsForAccount);
+        const sharedStatistics = state.statisticsSnapshots?.length === 0 && localStatisticsForAccount.length > 0
+          ? await synchronizeStatisticsSnapshots(localStatisticsForAccount)
+          : [];
         await this.applySharedStudentState(state.studentModel, state.recommendation);
         await this.replaceStatisticsSnapshotsFromServer([...sharedStatistics, ...(state.statisticsSnapshots ?? [])]);
       } catch {

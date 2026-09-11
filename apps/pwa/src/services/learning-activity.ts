@@ -1,5 +1,5 @@
 import type { LearningActivityEvent, LearningActivityKind, LearningActivityTotals } from '@mentor-ai/shared';
-import { synchronizeLearningActivity } from './api-client';
+import { fetchLearningActivityTotals, synchronizeLearningActivity } from './api-client';
 import { mentorDb } from './indexed-db';
 
 const deviceKey = 'mentor-ai-device-id';
@@ -53,6 +53,12 @@ export async function syncLearningActivity(): Promise<LearningActivityTotals> {
   if (!navigator.onLine) return loadLearningActivityTotals();
   const db = await mentorDb;
   const pending = await db.getAll('learning-activity-outbox') as LearningActivityEvent[];
+  if (pending.length === 0) {
+    const totals = await fetchLearningActivityTotals();
+    await db.put('learning-activity-summary', { id: summaryId, ...totals });
+    window.dispatchEvent(new Event('mentor-learning-activity-updated'));
+    return loadLearningActivityTotals();
+  }
   const result = await synchronizeLearningActivity(pending);
   const acknowledged = new Set(result.acknowledgedIds);
   for (const event of pending) if (acknowledged.has(event.id)) await db.delete('learning-activity-outbox', event.id);

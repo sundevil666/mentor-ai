@@ -7,6 +7,7 @@ import type {
   GeneratedLesson,
   LearningContext,
   LearningActivityEvent,
+  LearningActivityTotals,
   LearningActivitySyncResult,
   LearningSessionHandoff,
   LearningEvent,
@@ -254,6 +255,12 @@ export async function synchronizeLearningActivity(
   });
   if (!response.ok) throw new Error('Learning activity synchronization failed.');
   return ((await response.json()) as ApiResponse<LearningActivitySyncResult>).data;
+}
+
+export async function fetchLearningActivityTotals(): Promise<LearningActivityTotals> {
+  const response = await fetch(`${apiBaseUrl}/api/learning-activity-totals`, { headers: authHeaders() });
+  if (!response.ok) throw new Error('Learning activity totals request failed.');
+  return ((await response.json()) as ApiResponse<LearningActivityTotals>).data;
 }
 
 export async function synchronizeStatisticsSnapshots(statisticsSnapshots: StatisticsSnapshot[]): Promise<StatisticsSnapshot[]> {

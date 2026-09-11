@@ -133,6 +133,215 @@ export const learningStateRepository = {
     await writeFile(filePath, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
   },
 
+  async readStudentOverview(user?: AuthenticatedUser): Promise<Pick<LearningStateRecord,
+    'student' | 'studentModel' | 'recommendations' | 'statisticsSnapshots'>> {
+    if (user && getPostgresPool()) {
+      const pool = getPostgresPool()!;
+      await ensureLearningStatesTable();
+      const result = await pool.query<{
+        student: Student | null;
+        student_model: StudentModel | null;
+        recommendations: Recommendation[] | null;
+        statistics_snapshots: StatisticsSnapshot[] | null;
+      }>(
+        `SELECT state->'student' AS student,
+                state->'studentModel' AS student_model,
+                state->'recommendations' AS recommendations,
+                state->'statisticsSnapshots' AS statistics_snapshots
+         FROM learning_states WHERE student_id = $1`,
+        [user.id],
+      );
+      const row = result.rows[0];
+      if (row?.student && row.student_model) {
+        return {
+          student: row.student,
+          studentModel: row.student_model,
+          recommendations: row.recommendations ?? [],
+          statisticsSnapshots: row.statistics_snapshots ?? [],
+        };
+      }
+    }
+
+    const state = await learningStateRepository.read(user);
+    return pickStudentOverview(state);
+  },
+
+  async readSessionHandoffsState(user?: AuthenticatedUser): Promise<{
+    studentId: string;
+    sessionHandoffs: LearningSessionHandoff[];
+  }> {
+    if (user && getPostgresPool()) {
+      const pool = getPostgresPool()!;
+      await ensureLearningStatesTable();
+      const result = await pool.query<{
+        student_id: string | null;
+        session_handoffs: LearningSessionHandoff[] | null;
+      }>(
+        `SELECT state->'student'->>'id' AS student_id,
+                state->'sessionHandoffs' AS session_handoffs
+         FROM learning_states WHERE student_id = $1`,
+        [user.id],
+      );
+      const row = result.rows[0];
+      if (row?.student_id) {
+        return { studentId: row.student_id, sessionHandoffs: row.session_handoffs ?? [] };
+      }
+    }
+
+    const state = await learningStateRepository.read(user);
+    return { studentId: state.student.id, sessionHandoffs: state.sessionHandoffs };
+  },
+
+  async readContentProgressState(user?: AuthenticatedUser): Promise<{
+    studentId: string;
+    contentProgress: ContentProgress[];
+  }> {
+    if (user && getPostgresPool()) {
+      const pool = getPostgresPool()!;
+      await ensureLearningStatesTable();
+      const result = await pool.query<{
+        student_id: string | null;
+        content_progress: ContentProgress[] | null;
+      }>(
+        `SELECT state->'student'->>'id' AS student_id,
+                state->'contentProgress' AS content_progress
+         FROM learning_states WHERE student_id = $1`,
+        [user.id],
+      );
+      const row = result.rows[0];
+      if (row?.student_id) return { studentId: row.student_id, contentProgress: row.content_progress ?? [] };
+    }
+
+    const state = await learningStateRepository.read(user);
+    return { studentId: state.student.id, contentProgress: state.contentProgress };
+  },
+
+  async writeContentProgress(contentProgress: ContentProgress[], user?: AuthenticatedUser): Promise<void> {
+    if (user && getPostgresPool()) {
+      const pool = getPostgresPool()!;
+      await ensureLearningStatesTable();
+      const result = await pool.query(
+        `UPDATE learning_states
+         SET state = jsonb_set(state, '{contentProgress}', $2::jsonb, true), updated_at = now()
+         WHERE student_id = $1`,
+        [user.id, JSON.stringify(contentProgress)],
+      );
+      if ((result.rowCount ?? 0) > 0) return;
+    }
+
+    const state = await learningStateRepository.read(user);
+    await learningStateRepository.write({ ...state, contentProgress }, user);
+  },
+
+  async readLearningActivityState(user?: AuthenticatedUser): Promise<{
+    studentId: string;
+    learningActivityEvents: LearningActivityEvent[];
+    learningActivityTotals: LearningActivityTotals;
+    contentProgress: ContentProgress[];
+    statisticsSnapshots: StatisticsSnapshot[];
+  }> {
+    if (user && getPostgresPool()) {
+      const pool = getPostgresPool()!;
+      await ensureLearningStatesTable();
+      const result = await pool.query<{
+        student_id: string | null;
+        learning_activity_events: LearningActivityEvent[] | null;
+        learning_activity_totals: LearningActivityTotals | null;
+        content_progress: ContentProgress[] | null;
+        statistics_snapshots: StatisticsSnapshot[] | null;
+      }>(
+        `SELECT state->'student'->>'id' AS student_id,
+                state->'learningActivityEvents' AS learning_activity_events,
+                state->'learningActivityTotals' AS learning_activity_totals,
+                state->'contentProgress' AS content_progress,
+                state->'statisticsSnapshots' AS statistics_snapshots
+         FROM learning_states WHERE student_id = $1`,
+        [user.id],
+      );
+      const row = result.rows[0];
+      if (row?.student_id) {
+        return {
+          studentId: row.student_id,
+          learningActivityEvents: row.learning_activity_events ?? [],
+          learningActivityTotals: row.learning_activity_totals ?? { ...demoState.learningActivityTotals },
+          contentProgress: row.content_progress ?? [],
+          statisticsSnapshots: row.statistics_snapshots ?? [],
+        };
+      }
+    }
+
+    const state = await learningStateRepository.read(user);
+    return {
+      studentId: state.student.id,
+      learningActivityEvents: state.learningActivityEvents,
+      learningActivityTotals: state.learningActivityTotals,
+      contentProgress: state.contentProgress,
+      statisticsSnapshots: state.statisticsSnapshots,
+    };
+  },
+
+  async readLearningActivitySummary(user?: AuthenticatedUser): Promise<{
+    learningActivityTotals: LearningActivityTotals;
+    contentProgress: ContentProgress[];
+    statisticsSnapshots: StatisticsSnapshot[];
+  }> {
+    if (user && getPostgresPool()) {
+      const pool = getPostgresPool()!;
+      await ensureLearningStatesTable();
+      const result = await pool.query<{
+        learning_activity_totals: LearningActivityTotals | null;
+        content_progress: ContentProgress[] | null;
+        statistics_snapshots: StatisticsSnapshot[] | null;
+      }>(
+        `SELECT state->'learningActivityTotals' AS learning_activity_totals,
+                state->'contentProgress' AS content_progress,
+                state->'statisticsSnapshots' AS statistics_snapshots
+         FROM learning_states WHERE student_id = $1`,
+        [user.id],
+      );
+      const row = result.rows[0];
+      if (row) {
+        return {
+          learningActivityTotals: row.learning_activity_totals ?? { ...demoState.learningActivityTotals },
+          contentProgress: row.content_progress ?? [],
+          statisticsSnapshots: row.statistics_snapshots ?? [],
+        };
+      }
+    }
+
+    const state = await learningStateRepository.read(user);
+    return {
+      learningActivityTotals: state.learningActivityTotals,
+      contentProgress: state.contentProgress,
+      statisticsSnapshots: state.statisticsSnapshots,
+    };
+  },
+
+  async writeLearningActivityState(
+    learningActivityEvents: LearningActivityEvent[],
+    learningActivityTotals: LearningActivityTotals,
+    user?: AuthenticatedUser,
+  ): Promise<void> {
+    if (user && getPostgresPool()) {
+      const pool = getPostgresPool()!;
+      await ensureLearningStatesTable();
+      const result = await pool.query(
+        `UPDATE learning_states
+         SET state = jsonb_set(
+               jsonb_set(state, '{learningActivityEvents}', $2::jsonb, true),
+               '{learningActivityTotals}', $3::jsonb, true
+             ),
+             updated_at = now()
+         WHERE student_id = $1`,
+        [user.id, JSON.stringify(learningActivityEvents), JSON.stringify(learningActivityTotals)],
+      );
+      if ((result.rowCount ?? 0) > 0) return;
+    }
+
+    const state = await learningStateRepository.read(user);
+    await learningStateRepository.write({ ...state, learningActivityEvents, learningActivityTotals }, user);
+  },
+
   async readReadingResumeState(user?: AuthenticatedUser): Promise<{
     studentId: string;
     contentProgress: ContentProgress[];
@@ -184,6 +393,15 @@ export const learningStateRepository = {
     await learningStateRepository.write({ ...state, readingDeviceSessions: sessions }, user);
   },
 };
+
+function pickStudentOverview(state: LearningStateRecord) {
+  return {
+    student: state.student,
+    studentModel: state.studentModel,
+    recommendations: state.recommendations,
+    statisticsSnapshots: state.statisticsSnapshots,
+  };
+}
 
 let ensureTablePromise: Promise<void> | undefined;
 

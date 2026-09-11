@@ -49,6 +49,10 @@ export const mergeLearningActivityEvents: RequestHandler = sendData((req) =>
   ),
 );
 
+export const getLearningActivityTotals: RequestHandler = sendData((req) =>
+  learningStateService.getLearningActivityTotals(req.authUser),
+);
+
 export const mergeApplicationTelemetryEvents: RequestHandler = sendData((req) =>
   learningStateService.mergeApplicationTelemetryEvents(
     Array.isArray(req.body?.telemetryEvents) ? req.body.telemetryEvents as ApplicationTelemetryEvent[] : [],

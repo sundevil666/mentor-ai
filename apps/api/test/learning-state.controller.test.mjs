@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import {
   getConfiguration,
   getCurrentLesson,
+  getLearningActivityTotals,
   getStudentState,
   synchronizeLearningEvents,
   upsertSessionHandoff,
@@ -33,6 +34,15 @@ describe('learning state controllers', () => {
     assert.equal(Array.isArray(studentState.res.body.data.statisticsSnapshots), true);
     assert.equal(lesson.res.body.data.exercises.length > 0, true);
     assert.equal(typeof lesson.res.body.data.exercises[0].microLesson, 'string');
+  });
+
+  it('returns activity totals through the lightweight endpoint', async () => {
+    const { res } = createMockResponse();
+
+    await getLearningActivityTotals({}, res, throwNext);
+
+    assert.equal(typeof res.body.data.totalSeconds, 'number');
+    assert.equal(res.body.data.totalSeconds >= 0, true);
   });
 
   it('synchronizes speech evidence into pronunciation statistics', async () => {

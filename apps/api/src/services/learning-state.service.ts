@@ -32,7 +32,7 @@ import { aiTeacherService } from './ai-teacher.service.js';
 
 export const learningStateService = {
   async getStudentState(user?: AuthenticatedUser) {
-    const state = await learningStateRepository.read(user);
+    const state = await learningStateRepository.readStudentOverview(user);
 
     return {
       student: state.student,
@@ -79,28 +79,28 @@ export const learningStateService = {
   },
 
   async listSessionHandoffs(user?: AuthenticatedUser) {
-    const state = await learningStateRepository.read(user);
-    return state.sessionHandoffs.filter((handoff) => handoff.studentId === state.student.id);
+    const state = await learningStateRepository.readSessionHandoffsState(user);
+    return state.sessionHandoffs.filter((handoff) => handoff.studentId === state.studentId);
   },
 
   async listContentProgress(user?: AuthenticatedUser) {
-    const state = await learningStateRepository.read(user);
-    return state.contentProgress.filter((progress) => progress.studentId === state.student.id);
+    const state = await learningStateRepository.readContentProgressState(user);
+    return state.contentProgress.filter((progress) => progress.studentId === state.studentId);
   },
 
   async mergeContentProgress(incoming: ContentProgress[], user?: AuthenticatedUser) {
-    const state = await learningStateRepository.read(user);
+    const state = await learningStateRepository.readContentProgressState(user);
     const merged = new Map(state.contentProgress.map((progress) => [progress.id, progress]));
 
     for (const candidate of incoming) {
-      if (candidate.studentId !== state.student.id || !candidate.contentId || !Number.isFinite(candidate.position)) continue;
+      if (candidate.studentId !== state.studentId || !candidate.contentId || !Number.isFinite(candidate.position)) continue;
       const safe = sanitizeContentProgress(candidate);
       const current = merged.get(safe.id);
       merged.set(safe.id, current ? mergeProgress(current, safe) : safe);
     }
 
     const contentProgress = [...merged.values()];
-    await learningStateRepository.write({ ...state, contentProgress }, user);
+    await learningStateRepository.writeContentProgress(contentProgress, user);
     return contentProgress;
   },
 
@@ -147,12 +147,12 @@ export const learningStateService = {
   },
 
   async mergeLearningActivityEvents(incoming: LearningActivityEvent[], user?: AuthenticatedUser) {
-    const state = await learningStateRepository.read(user);
+    const state = await learningStateRepository.readLearningActivityState(user);
     const merged = new Map(state.learningActivityEvents.map((event) => [event.id, event]));
     const learningActivityTotals = { ...state.learningActivityTotals };
     const acknowledgedIds: string[] = [];
     for (const candidate of incoming) {
-      const safe = sanitizeLearningActivityEvent(candidate, state.student.id);
+      const safe = sanitizeLearningActivityEvent(candidate, state.studentId);
       if (!safe) continue;
       acknowledgedIds.push(safe.id);
       if (!merged.has(safe.id)) {
@@ -165,8 +165,13 @@ export const learningStateService = {
     const learningActivityEvents = [...merged.values()]
       .sort((left, right) => left.endedAt.localeCompare(right.endedAt))
       .slice(-50_000);
-    await learningStateRepository.write({ ...state, learningActivityEvents, learningActivityTotals }, user);
+    await learningStateRepository.writeLearningActivityState(learningActivityEvents, learningActivityTotals, user);
     return { acknowledgedIds, totals: summarizeLearningActivity(learningActivityTotals, state.contentProgress, state.statisticsSnapshots) };
+  },
+
+  async getLearningActivityTotals(user?: AuthenticatedUser) {
+    const state = await learningStateRepository.readLearningActivitySummary(user);
+    return summarizeLearningActivity(state.learningActivityTotals, state.contentProgress, state.statisticsSnapshots);
   },
 
   async mergeStatisticsSnapshots(incoming: StatisticsSnapshot[], user?: AuthenticatedUser) {

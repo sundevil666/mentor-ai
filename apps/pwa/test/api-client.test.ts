@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-import { fetchReadingResumeSnapshot, saveReadingTranscript, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, synchronizeStatisticsSnapshots, upsertSessionHandoff } from '../src/services/api-client.js';
+import { fetchLearningActivityTotals, fetchReadingResumeSnapshot, saveReadingTranscript, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, synchronizeStatisticsSnapshots, upsertSessionHandoff } from '../src/services/api-client.js';
 
 describe('PWA API client', () => {
   beforeEach(() => {
@@ -51,6 +51,20 @@ describe('PWA API client', () => {
     }]);
     assert.equal(calls[0]?.url, 'http://localhost:4000/api/synchronization');
     assert.equal(result.totals.listeningSeconds, 60);
+  });
+
+  it('refreshes account activity totals without posting an empty synchronization batch', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url: String(url), init });
+      return jsonResponse({ listeningSeconds: 60, readingSeconds: 120, speakingSeconds: 30, totalSeconds: 210, updatedAt: '2026-09-11T08:01:00.000Z' });
+    };
+
+    const result = await fetchLearningActivityTotals();
+
+    assert.equal(calls[0]?.url, 'http://localhost:4000/api/learning-activity-totals');
+    assert.equal(calls[0]?.init?.method, undefined);
+    assert.equal(result.totalSeconds, 210);
   });
 
   it('uploads local statistics so an existing device can seed shared storage', async () => {

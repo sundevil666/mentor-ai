@@ -4,6 +4,7 @@ import {
   getCurrentLesson,
   getRecommendations,
   getReadingResumeSnapshot,
+  getLearningActivityTotals,
   getStudentState,
   listSessionHandoffs,
   listContentProgress,
@@ -33,6 +34,7 @@ learningStateRouter.get('/reading-resume', getReadingResumeSnapshot);
 learningStateRouter.put('/reading-resume', upsertReadingDeviceSession);
 learningStateRouter.post('/content-engagement-synchronize', mergeContentEngagementEvents);
 learningStateRouter.post('/learning-activity-synchronize', mergeLearningActivityEvents);
+learningStateRouter.get('/learning-activity-totals', getLearningActivityTotals);
 learningStateRouter.post('/application-telemetry-synchronize', mergeApplicationTelemetryEvents);
 learningStateRouter.get('/configuration', getConfiguration);
 learningStateRouter.post('/synchronization', synchronizeLearningEvents);
