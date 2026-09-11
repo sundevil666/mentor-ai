@@ -2666,6 +2666,27 @@ body.body--dark .personal-reader__sidebar {
   border-color: color-mix(in srgb, var(--q-negative) 55%, var(--app-border));
 }
 
+.personal-reader__reading-actions {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  width: 100%;
+}
+
+.personal-reader__stop-here {
+  border-radius: var(--app-radius-md);
+  min-height: 46px;
+  padding-inline: 14px;
+}
+
+.personal-reader__stop-here .q-btn__content {
+  flex-wrap: nowrap;
+  font-size: .82rem;
+  gap: 5px;
+  white-space: nowrap;
+}
+
 .personal-reader__microphone-status {
   align-items: center;
   background: var(--app-surface);

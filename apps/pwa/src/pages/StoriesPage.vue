@@ -289,26 +289,33 @@
           </section>
 
           <section class="personal-reader__speech-coach" :class="`personal-reader__speech-coach--${readingSpeechStatus}`" aria-live="polite" aria-label="Reading pronunciation coach">
-            <button
-              class="personal-reader__speech-orb"
-              :class="{
-                'personal-reader__speech-orb--active': readingSpeechActive,
-                'personal-reader__speech-orb--hearing': readingSpeechActive && readingSpeechHasSignal,
-                'personal-reader__speech-orb--error': readingSpeechStatus === 'error',
-              }"
-              :aria-label="readingSpeechActionLabel"
-              :aria-pressed="readingSpeechActive"
-              :disabled="readingSpeechTransitioning"
-              :style="{ '--reader-speech-level': String(Math.max(0.08, readingSpeechLevel)) }"
-              type="button"
-              @click="toggleReadingSpeech"
-            >
-              <span v-for="bar in 7" :key="bar" :style="{ '--speech-bar': String(bar) }" />
-              <q-icon name="mic" />
-            </button>
-            <div class="personal-reader__microphone-status" :class="`personal-reader__microphone-status--${readingMicrophoneIndicator.tone}`" role="status">
-              <span class="personal-reader__microphone-status-dot" aria-hidden="true" />
-              <strong>{{ readingMicrophoneIndicator.title }}</strong>
+            <div class="personal-reader__reading-actions">
+              <button
+                class="personal-reader__speech-orb"
+                :class="{
+                  'personal-reader__speech-orb--active': readingSpeechActive,
+                  'personal-reader__speech-orb--hearing': readingSpeechActive && readingSpeechHasSignal,
+                  'personal-reader__speech-orb--error': readingSpeechStatus === 'error',
+                }"
+                :aria-label="readingSpeechActionLabel"
+                :aria-pressed="readingSpeechActive"
+                :disabled="readingSpeechTransitioning"
+                :style="{ '--reader-speech-level': String(Math.max(0.08, readingSpeechLevel)) }"
+                type="button"
+                @click="toggleReadingSpeech"
+              >
+                <span v-for="bar in 7" :key="bar" :style="{ '--speech-bar': String(bar) }" />
+                <q-icon name="mic" />
+              </button>
+              <q-btn
+                class="personal-reader__stop-here"
+                color="primary"
+                icon="bookmark_added"
+                label="Stopped here"
+                no-caps
+                :loading="readerStopSaving"
+                @click="saveReaderStopHere"
+              />
             </div>
             <div v-if="readingSpeechPermissionBlocked || readingSpeechCaptureUnavailable" class="personal-reader__speech-actions">
               <q-btn
@@ -526,6 +533,7 @@ const resumeSentenceEndIndex = ref(-1);
 const bookResumeDialog = ref(false);
 const bookResumeLoading = ref(false);
 const bookCleanupRunning = ref(false);
+const readerStopSaving = ref(false);
 const bookResumeWaitingDevices = ref<ReadingDeviceSession[]>([]);
 const bookResumeError = ref('');
 let pendingBookOpenId: string | null = null;
@@ -719,19 +727,6 @@ const readingSpeechActionLabel = computed(() => {
   if (readingSpeechActive.value) return 'Stop microphone';
   if (readingSpeechStatus.value === 'error') return 'Retry microphone';
   return 'Turn microphone on';
-});
-const readingMicrophoneIndicator = computed(() => {
-  if (readingSpeechStatus.value === 'requesting') return {
-    tone: 'requesting',
-    title: readingSpeechMessage.value.startsWith('Loading') ? 'LOADING SPEECH MODEL' : 'REQUESTING MICROPHONE',
-  };
-  if (readingSpeechStatus.value === 'listening' || readingSpeechStatus.value === 'noise') {
-    return readingSpeechHasSignal.value
-      ? { tone: 'hearing', title: 'HEARING YOU' }
-      : { tone: 'listening', title: 'MICROPHONE ON' };
-  }
-  if (readingSpeechStatus.value === 'error') return { tone: 'error', title: 'MICROPHONE BLOCKED' };
-  return { tone: 'off', title: 'MICROPHONE OFF' };
 });
 
 onMounted(async () => {
@@ -1376,6 +1371,47 @@ function toggleReaderMarker() {
   readerMarkerWordIndex.value = wordIndex;
   localStorage.setItem(readerMarkerKey(book.id), String(wordIndex));
   Notify.create({ type: 'positive', message: 'Your reading place is marked.', icon: 'bookmark' });
+}
+async function saveReaderStopHere() {
+  const book = selectedBook.value;
+  if (!book || readerStopSaving.value) return;
+  const wordIndex = currentReaderHighlightWordIndex.value >= 0
+    ? currentReaderHighlightWordIndex.value
+    : getStableReaderWordPosition();
+  const updatedAt = new Date().toISOString();
+
+  readerStopSaving.value = true;
+  stableReaderWordPosition = wordIndex;
+  readingDeviceProgressUpdatedAt = updatedAt;
+  setResumeHighlight(wordIndex);
+  readerMarkerWordIndex.value = wordIndex;
+  let localBackupSaved = false;
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(readerMarkerKey(book.id), String(wordIndex));
+      persistBookProgress(updatedAt);
+      localBackupSaved = true;
+    } catch {
+      // IndexedDB remains available when the small localStorage backup fails.
+    }
+  }
+
+  try {
+    await persistReaderNavigationProgress(wordIndex, updatedAt);
+    if (navigator.onLine) {
+      await syncAllContentProgress();
+      await publishReadingDeviceSession('reading');
+      Notify.create({ type: 'positive', icon: 'cloud_done', message: 'Reading place saved on this device and in your account.' });
+    } else {
+      Notify.create({ type: 'positive', icon: 'bookmark', message: 'Reading place saved on this device. It will sync when you are online.' });
+    }
+  } catch {
+    Notify.create(localBackupSaved
+      ? { type: 'warning', icon: 'cloud_off', message: 'Reading place saved on this device. Cloud sync will retry when available.' }
+      : { type: 'negative', icon: 'error_outline', message: 'Could not save the reading place. Please try again.' });
+  } finally {
+    readerStopSaving.value = false;
+  }
 }
 async function toggleReadingSpeech() {
   if (readingSpeechTransitioning.value) return;
