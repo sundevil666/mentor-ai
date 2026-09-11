@@ -2099,7 +2099,7 @@ html.mentor-theme-dark .personal-reader {
   left: 0;
   pointer-events: none;
   position: absolute;
-  right: min(var(--reader-sidebar-width, 230px), 42vw);
+  right: min(var(--reader-sidebar-width, 280px), 42vw);
   top: 0;
   transition: opacity 700ms ease;
   opacity: var(--reader-speech-reactivity, .78);
@@ -2402,7 +2402,7 @@ body.body--book-reading-mode .mobile-start-dock {
   --reader-focus-background: #d8d0c2;
   background: var(--reader-focus-background);
   gap: 0;
-  grid-template-columns: minmax(0, 1fr) min(var(--reader-sidebar-width, 230px), 42vw);
+  grid-template-columns: minmax(0, 1fr) min(var(--reader-sidebar-width, 280px), 42vw);
   grid-template-rows: minmax(0, 1fr);
   inset: 0;
   padding: 0;
@@ -3878,7 +3878,7 @@ body.body--dark .personal-reader__lookup-error {
   }
 
   .personal-reader--focus {
-    grid-template-columns: minmax(0, 1fr) min(var(--reader-sidebar-mobile-width, 158px), 58vw);
+    grid-template-columns: minmax(0, 1fr) min(var(--reader-sidebar-mobile-width, 208px), 58vw);
   }
 
   .personal-reader--focus .personal-reader__content {
@@ -3886,7 +3886,7 @@ body.body--dark .personal-reader__lookup-error {
   }
 
   .personal-reader__speech-frame {
-    right: min(var(--reader-sidebar-mobile-width, 158px), 58vw);
+    right: min(var(--reader-sidebar-mobile-width, 208px), 58vw);
   }
 
   .personal-reader--focus .personal-reader__paper {

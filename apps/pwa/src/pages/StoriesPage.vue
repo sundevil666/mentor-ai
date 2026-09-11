@@ -168,25 +168,6 @@
       </section>
 
       <section v-else-if="selectedBook && selectedBookPages.length" class="personal-reader" :class="{ 'personal-reader--focus': readingMode }" :style="[readerSidebarStyle, readerSpeechFrameStyle]" aria-label="Book reader">
-        <div v-if="!readingMode" class="personal-reader__toolbar">
-          <q-btn color="primary" icon="fullscreen" label="Reading mode" no-caps outline @click="setReadingMode(true)" />
-          <q-select
-            dense
-            emit-value
-            map-options
-            outlined
-            label="Chapter / part"
-            :model-value="currentBookChapterIndex"
-            :options="bookPageOptions"
-            @update:model-value="goToBookChapter"
-          />
-          <span>{{ currentBookPageIndex + 1 }} / {{ readerPageCount }}</span>
-        </div>
-        <div v-if="!readingMode" class="personal-reader__progress" aria-label="Reading progress">
-          <span>Page {{ currentBookPageIndex + 1 }}</span>
-          <q-linear-progress rounded size="8px" :value="(currentBookPageIndex + 1) / readerPageCount" color="primary" track-color="grey-3" />
-          <span>{{ readerPageCount }} {{ readerPageCount === 1 ? 'page' : 'pages' }}</span>
-        </div>
         <div
           ref="readerContent"
           class="personal-reader__content"
@@ -248,7 +229,7 @@
 
         <aside v-if="readingMode" class="personal-reader__sidebar" aria-label="Reading controls">
           <div class="personal-reader__sidebar-actions">
-            <q-btn class="personal-reader__exit" color="primary" icon="close_fullscreen" label="Exit reading" no-caps outline @click="setReadingMode(false)" />
+            <q-btn class="personal-reader__exit" color="primary" icon="arrow_back" label="Library" no-caps outline @click="closeBook" />
             <q-btn aria-label="Reading settings" icon="more_vert" outline round>
               <q-menu anchor="bottom right" self="top right">
                 <div class="personal-reader__settings-menu">
@@ -698,8 +679,8 @@ const annualReadingPaceBalance = computed(() => annualReadingPaceSummary.value.b
 const annualReadingPaceMessage = computed(() => getAnnualReadingPaceMessage(annualReadingPaceBalance.value, dailyReadingTarget.value));
 const readerSidebarScalePercent = computed(() => 100 + readerSidebarScale.value * 10);
 const readerSidebarStyle = computed(() => ({
-  '--reader-sidebar-width': `${230 + readerSidebarScale.value * 30}px`,
-  '--reader-sidebar-mobile-width': `${158 + readerSidebarScale.value * 16}px`,
+  '--reader-sidebar-width': `${280 + readerSidebarScale.value * 30}px`,
+  '--reader-sidebar-mobile-width': `${208 + readerSidebarScale.value * 16}px`,
   '--reader-sidebar-font-size': `${16 + readerSidebarScale.value * 1.5}px`,
 }));
 const renderedBookPages = computed(() => {
@@ -940,7 +921,7 @@ async function openBook(bookId: string) {
   // then jumps after spoken progress finishes loading.
   const readerSettings = readBookReaderSettings(loaded.book.id);
   readerFontSize.value = readerSettings.fontSize;
-  applyReadingMode(readerSettings.readingMode);
+  applyReadingMode(true);
   selectedBook.value = loaded.book;
   selectedBookChapters.value = loaded.chapters;
   selectedBookPages.value = loaded.pages;
@@ -1831,15 +1812,6 @@ function appendReadingSpeechDebug(message: string) {
   readingSpeechDebugEntries.value = [...readingSpeechDebugEntries.value.slice(-119), `[+${elapsed}s] ${message}`];
 }
 
-async function setReadingMode(value: boolean) {
-  const wordPosition = getReaderRestoreWordPosition();
-  stopReaderPagination();
-  applyReadingMode(value);
-  saveBookReaderSettings();
-  await repaginateReader({ wordPosition });
-  if (selectedBook.value) startReaderPagination();
-  if (!value) stopReadingSpeech('idle');
-}
 function applyReadingMode(value: boolean) {
   readingMode.value = value;
   if (typeof document === 'undefined') return;
@@ -1864,23 +1836,23 @@ function changeReaderSidebarScale(change: -1 | 1) {
   void repaginateReader({ wordPosition });
 }
 function bookReaderSettingsKey(bookId: string) { return `mentor-ai:personal-book-reader-settings:${bookId}`; }
-function readBookReaderSettings(bookId: string): { readingMode: boolean; fontSize: number } {
-  if (typeof localStorage === 'undefined') return { readingMode: false, fontSize: 20 };
+function readBookReaderSettings(bookId: string): { fontSize: number } {
+  if (typeof localStorage === 'undefined') return { fontSize: 20 };
   try {
-    const parsed = JSON.parse(localStorage.getItem(bookReaderSettingsKey(bookId)) ?? 'null') as { readingMode?: boolean; fontSize?: number } | null;
+    const parsed = JSON.parse(localStorage.getItem(bookReaderSettingsKey(bookId)) ?? 'null') as { fontSize?: number } | null;
     const fontSize = Math.max(minReaderFontSize, Math.min(maxReaderFontSize, Number(parsed?.fontSize) || 20));
-    return { readingMode: parsed?.readingMode === true, fontSize };
+    return { fontSize };
   } catch {
-    return { readingMode: false, fontSize: 20 };
+    return { fontSize: 20 };
   }
 }
 function saveBookReaderSettings() {
   const book = selectedBook.value;
   if (!book || typeof localStorage === 'undefined') return;
-  localStorage.setItem(bookReaderSettingsKey(book.id), JSON.stringify({ readingMode: readingMode.value, fontSize: readerFontSize.value }));
+  localStorage.setItem(bookReaderSettingsKey(book.id), JSON.stringify({ fontSize: readerFontSize.value }));
 }
 function handleReaderKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape' && readingMode.value) setReadingMode(false);
+  if (event.key === 'Escape' && readingMode.value) closeBook();
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
   if (event.key === 'ArrowLeft') goToBookPage(currentBookPageIndex.value - 1);
   if (event.key === 'ArrowRight') goToBookPage(currentBookPageIndex.value + 1);
