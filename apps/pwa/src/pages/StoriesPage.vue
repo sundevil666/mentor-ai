@@ -307,15 +307,43 @@
                 <span v-for="bar in 7" :key="bar" :style="{ '--speech-bar': String(bar) }" />
                 <q-icon name="mic" />
               </button>
-              <q-btn
-                class="personal-reader__stop-here"
-                color="primary"
-                icon="bookmark_added"
-                label="Stopped here"
-                no-caps
-                :loading="readerStopSaving"
-                @click="saveReaderStopHere"
-              />
+              <q-btn-group class="personal-reader__stop-group" rounded>
+                <q-btn
+                  class="personal-reader__stop-here"
+                  color="primary"
+                  icon="bookmark_added"
+                  label="Stopped here"
+                  no-caps
+                  :loading="readerStopSaving"
+                  @click="saveReaderStopHere"
+                />
+                <q-btn
+                  v-if="readerStopHistory.length"
+                  aria-label="Saved reading places"
+                  class="personal-reader__stop-history-button"
+                  color="primary"
+                  icon="more_horiz"
+                  padding="sm"
+                >
+                  <q-menu anchor="bottom right" self="top right">
+                    <q-list class="personal-reader__stop-history" aria-label="Saved reading places">
+                      <q-item-label header>Saved places</q-item-label>
+                      <q-item
+                        v-for="entry in readerStopHistory"
+                        :key="entry.id"
+                        clickable
+                        v-close-popup
+                        @click="goToReaderStop(entry)"
+                      >
+                        <q-item-section>
+                          <q-item-label>“{{ entry.word }}”</q-item-label>
+                          <q-item-label caption>{{ formatReaderStopTime(entry.savedAt) }}</q-item-label>
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
+                  </q-menu>
+                </q-btn>
+              </q-btn-group>
             </div>
             <div v-if="readingSpeechPermissionBlocked || readingSpeechCaptureUnavailable" class="personal-reader__speech-actions">
               <q-btn
@@ -501,6 +529,7 @@ import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateR
 import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerWheelDestination, shouldCommitReaderWheel, type ReaderSwipePoint } from 'src/services/reader-swipe';
 import { beginReaderLookupInteraction, shouldProcessReadingTranscript } from 'src/services/reader-lookup-interaction';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
+import { addReadingStopHistoryEntry, parseReadingStopHistory, type ReadingStopHistoryEntry } from 'src/services/reading-stop-history';
 
 const props = withDefaults(defineProps<{
   libraryMode?: 'audio' | 'reading';
@@ -534,6 +563,7 @@ const bookResumeDialog = ref(false);
 const bookResumeLoading = ref(false);
 const bookCleanupRunning = ref(false);
 const readerStopSaving = ref(false);
+const readerStopHistory = ref<ReadingStopHistoryEntry[]>([]);
 const bookResumeWaitingDevices = ref<ReadingDeviceSession[]>([]);
 const bookResumeError = ref('');
 let pendingBookOpenId: string | null = null;
@@ -948,6 +978,7 @@ async function openBook(bookId: string) {
   readingDeviceProgressUpdatedAt = checkedPosition?.updatedAt ?? localBookProgress.updatedAt ?? new Date().toISOString();
   await restoreSpokenReadingProgress(loaded.book.id);
   readerMarkerWordIndex.value = readReaderMarker(loaded.book.id);
+  readerStopHistory.value = readReaderStopHistory(loaded.book.id);
   await markPersonalBookOpened(loaded.book);
   personalBooks.value = await listPersonalBooks();
   await nextTick();
@@ -989,6 +1020,7 @@ function closeBook() {
   syncedReaderPositionUpdatedAt = undefined;
   selectedReaderWordIndex.value = null;
   readerMarkerWordIndex.value = null;
+  readerStopHistory.value = [];
   readingSpeechAcceptedWords.value = 0;
   readingSpeechSpokenWords.value = 0;
   clearReaderLookup();
@@ -1351,6 +1383,25 @@ function clearReaderLookup() {
   readerLookupError.value = '';
 }
 function readerMarkerKey(bookId: string) { return `mentor-ai:personal-book-marker:${bookId}`; }
+function readerStopHistoryKey(bookId: string) { return `mentor-ai:personal-book-stop-history:${bookId}`; }
+function readReaderStopHistory(bookId: string) {
+  if (typeof localStorage === 'undefined') return [];
+  return parseReadingStopHistory(localStorage.getItem(readerStopHistoryKey(bookId)));
+}
+function getReaderWord(wordIndex: number) {
+  return renderedBookPages.value
+    .flatMap((page) => page.paragraphs.flat())
+    .find((token) => token.wordIndex === wordIndex)?.text ?? `Word ${wordIndex + 1}`;
+}
+function formatReaderStopTime(savedAt: string) {
+  return new Date(savedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+}
+async function goToReaderStop(entry: ReadingStopHistoryEntry) {
+  stableReaderWordPosition = entry.wordIndex;
+  setResumeHighlight(entry.wordIndex);
+  readerMarkerWordIndex.value = entry.wordIndex;
+  await repaginateReader({ wordPosition: entry.wordIndex });
+}
 function readReaderMarker(bookId: string): number | null {
   if (typeof localStorage === 'undefined') return null;
   const stored = localStorage.getItem(readerMarkerKey(bookId));
@@ -1388,7 +1439,15 @@ async function saveReaderStopHere() {
   let localBackupSaved = false;
   if (typeof localStorage !== 'undefined') {
     try {
+      const entry: ReadingStopHistoryEntry = {
+        id: crypto.randomUUID(),
+        wordIndex,
+        word: getReaderWord(wordIndex),
+        savedAt: updatedAt,
+      };
+      readerStopHistory.value = addReadingStopHistoryEntry(readerStopHistory.value, entry);
       localStorage.setItem(readerMarkerKey(book.id), String(wordIndex));
+      localStorage.setItem(readerStopHistoryKey(book.id), JSON.stringify(readerStopHistory.value));
       persistBookProgress(updatedAt);
       localBackupSaved = true;
     } catch {
@@ -2336,6 +2395,7 @@ async function removeBook(book: PersonalBook) {
     localStorage.removeItem(bookProgressKey(book.id));
     localStorage.removeItem(bookReaderSettingsKey(book.id));
     localStorage.removeItem(readerMarkerKey(book.id));
+    localStorage.removeItem(readerStopHistoryKey(book.id));
     personalBooks.value = await listPersonalBooks();
     Notify.create({ type: 'positive', message: `${book.title} was removed from this device.` });
   } catch {

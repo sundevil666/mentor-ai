@@ -2674,8 +2674,13 @@ body.body--dark .personal-reader__sidebar {
   width: 100%;
 }
 
-.personal-reader__stop-here {
+.personal-reader__stop-group {
   border-radius: var(--app-radius-md);
+  flex: 0 1 auto;
+  max-width: calc(100% - 82px);
+}
+
+.personal-reader__stop-here {
   min-height: 46px;
   padding-inline: 14px;
 }
@@ -2685,6 +2690,23 @@ body.body--dark .personal-reader__sidebar {
   font-size: .82rem;
   gap: 5px;
   white-space: nowrap;
+}
+
+.personal-reader__stop-history-button {
+  min-height: 46px;
+  min-width: 42px;
+}
+
+.personal-reader__stop-history {
+  min-width: 230px;
+  max-width: min(320px, calc(100vw - 32px));
+  max-height: min(420px, 70vh);
+  overflow-y: auto;
+}
+
+.personal-reader__stop-history .q-item__label:not(.q-item__label--caption) {
+  color: var(--app-text-strong);
+  font-weight: 700;
 }
 
 .personal-reader__microphone-status {
