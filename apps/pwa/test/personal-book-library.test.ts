@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { strToU8, zipSync } from 'fflate';
-import { buildEpubBook, buildPlainTextBook, createFallbackPersonalBookSource, normalizePersonalBookArchive, resolveArchivePath, splitPlainTextIntoChapters } from '../src/services/personal-book-library.js';
+import { buildEpubBook, buildPlainTextBook, createFallbackPersonalBookSource, deriveChapterTitle, normalizePersonalBookArchive, resolveArchivePath, splitPlainTextIntoChapters } from '../src/services/personal-book-library.js';
 
 describe('personal book library', () => {
   it('splits large plain text at paragraph boundaries', () => {
@@ -80,5 +80,31 @@ describe('personal book library', () => {
     assert.deepEqual(imported.chapters.map((chapter) => chapter.title), ['Opening', 'Next']);
     assert.match(imported.pages[0]?.text ?? '', /Hello reader/);
     assert.match(imported.pages[1]?.text ?? '', /story continues/);
+  });
+
+  it('ignores placeholder EPUB titles and derives the real chapter heading from its text', () => {
+    const archive = zipSync({
+      mimetype: strToU8('application/epub+zip'),
+      'META-INF/container.xml': strToU8('<container><rootfiles><rootfile full-path="OPS/content.opf"/></rootfiles></container>'),
+      'OPS/content.opf': strToU8('<package><metadata><title>Story</title></metadata><manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="chapter"/></spine></package>'),
+      'OPS/chapter.xhtml': strToU8('<html><head><title>Unknown</title></head><body><p>readrobe.com</p><p>Chapter 44</p><p>One week later.</p></body></html>'),
+    });
+
+    assert.equal(buildEpubBook(archive, 'story.epub').chapters[0]?.title, 'Chapter 44');
+  });
+
+  it('repairs placeholder chapter titles in an already imported book', () => {
+    const imported = buildPlainTextBook('Chapter 12\nThe story continues.', 'legacy.txt');
+    const legacy = {
+      ...imported,
+      chapters: [{ ...imported.chapters[0]!, title: 'Unknown' }],
+    };
+
+    assert.equal(normalizePersonalBookArchive(legacy).chapters[0]?.title, 'Chapter 12');
+  });
+
+  it('recognizes front matter and day headings without using a publisher watermark', () => {
+    assert.equal(deriveChapterTitle('readrobe.com\nDAY ONE', 5), 'DAY ONE');
+    assert.equal(deriveChapterTitle('readrobe.com\nEpilogue\nOne month earlier', 54), 'Epilogue');
   });
 });

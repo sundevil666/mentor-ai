@@ -109,8 +109,10 @@ export function buildEpubBook(bytes: Uint8Array, fileName: string): ImportedPers
     const document = readArchiveText(archive, contentPath);
     const text = extractDocumentText(document);
     if (!text) continue;
+    const embeddedTitle = firstElementText(document, 'title');
+    const headingTitle = firstElementText(document, 'h1') || firstElementText(document, 'h2');
     sections.push({
-      title: firstElementText(document, 'title') || firstElementText(document, 'h1') || firstElementText(document, 'h2') || `Chapter ${sections.length + 1}`,
+      title: chooseChapterTitle(embeddedTitle, headingTitle, text, sections.length),
       text,
     });
   }
@@ -266,13 +268,43 @@ export function normalizePersonalBookArchive(archive: PersonalReadingBookArchive
     changed = true;
     return { ...page, text, wordCount };
   });
+  const pageByChapterId = new Map(pages.map((page) => [page.chapterId, page]));
+  const chapters = archive.chapters.map((chapter, index) => {
+    if (!isPlaceholderChapterTitle(chapter.title)) return chapter;
+    const page = pageByChapterId.get(chapter.id);
+    const title = deriveChapterTitle(page?.text ?? '', index);
+    if (title === chapter.title) return chapter;
+    changed = true;
+    return { ...chapter, title };
+  });
   const wordCount = pages.reduce((sum, page) => sum + page.wordCount, 0);
   if (!changed && wordCount === archive.book.wordCount) return archive;
   return {
     ...archive,
     book: { ...archive.book, wordCount, updatedAt: new Date().toISOString() },
+    chapters,
     pages,
   };
+}
+
+function chooseChapterTitle(embeddedTitle: string, headingTitle: string, text: string, index: number) {
+  if (headingTitle && !isPlaceholderChapterTitle(headingTitle)) return normalizeText(headingTitle);
+  if (embeddedTitle && !isPlaceholderChapterTitle(embeddedTitle)) return normalizeText(embeddedTitle);
+  return deriveChapterTitle(text, index);
+}
+
+function isPlaceholderChapterTitle(title: string) {
+  return /^(?:unknown|untitled|chapter|section|page)?\s*$/i.test(normalizeText(title));
+}
+
+export function deriveChapterTitle(text: string, index: number) {
+  const lines = normalizeText(text).split('\n').map((line) => line.trim()).filter(Boolean);
+  const meaningfulLines = lines.filter((line) => !/^(?:readrobe\s*\.\s*com|www\.|https?:\/\/)/i.test(line));
+  const semanticTitle = meaningfulLines.slice(0, 8).find((line) => (
+    /^(?:chapter\s+\d+|day\s+(?:\d+|one|two|three|four|five|six|seven)|prologue|epilogue|acknowledg(?:e)?ments?|table of contents)$/i.test(line)
+  ));
+  const shortTitle = meaningfulLines.find((line) => line.length <= 80 && countWords(line) <= 10);
+  return normalizeText(semanticTitle || shortTitle || `Chapter ${index + 1}`);
 }
 
 function countWords(value: string): number {

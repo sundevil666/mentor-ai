@@ -1036,7 +1036,7 @@ async function goToBookChapter(chapterIndex: number | null) {
 }
 function formatBookPartLabel(index: number, title?: string) {
   const normalizedTitle = title?.replace(/\s+/g, ' ').trim();
-  const genericTitle = normalizedTitle && !/^(chapter|part)\s+\d+$/i.test(normalizedTitle) ? normalizedTitle : 'Part';
+  const genericTitle = normalizedTitle && !/^part\s+\d+$/i.test(normalizedTitle) ? normalizedTitle : 'Part';
   return `${index + 1}. ${genericTitle}`;
 }
 function getChapterTitle(chapterId?: string) {
