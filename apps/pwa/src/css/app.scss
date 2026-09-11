@@ -2510,6 +2510,11 @@ body.body--dark .personal-reader__sidebar {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+.personal-reader__cleanup {
+  min-height: 42px;
+  width: 100%;
+}
+
 .personal-reader__settings-menu {
   display: grid;
   gap: 14px;

@@ -253,6 +253,16 @@
             </q-btn>
           </div>
 
+          <q-btn
+            class="personal-reader__cleanup"
+            icon="format_clear"
+            label="Clean book text"
+            no-caps
+            outline
+            :loading="bookCleanupRunning"
+            @click="cleanCurrentBookText"
+          />
+
           <section class="personal-reader__daily-goal" :class="`personal-reader__daily-goal--${dailyReadingGoalState}`" aria-label="Today's reading goal">
             <div class="personal-reader__daily-goal-heading">
               <span>Today</span>
@@ -524,6 +534,7 @@ const resumeSentenceStartIndex = ref(-1);
 const resumeSentenceEndIndex = ref(-1);
 const bookResumeDialog = ref(false);
 const bookResumeLoading = ref(false);
+const bookCleanupRunning = ref(false);
 const bookResumeWaitingDevices = ref<ReadingDeviceSession[]>([]);
 const bookResumeError = ref('');
 let pendingBookOpenId: string | null = null;
@@ -996,6 +1007,27 @@ function closeBook() {
   readingSpeechSpokenWords.value = 0;
   clearReaderLookup();
   stopReadingSpeech('idle');
+}
+async function cleanCurrentBookText() {
+  const book = selectedBook.value;
+  if (!book || bookCleanupRunning.value) return;
+  bookCleanupRunning.value = true;
+  const wordPosition = getStableReaderWordPosition();
+  try {
+    const loaded = await loadPersonalBook(book.id);
+    if (!loaded || loaded.pages.length === 0) throw new Error('This book has no readable pages.');
+    selectedBook.value = loaded.book;
+    selectedBookChapters.value = loaded.chapters;
+    selectedBookPages.value = loaded.pages;
+    personalBooks.value = await listPersonalBooks();
+    await repaginateReader({ wordPosition });
+    void syncPersonalBooks().catch(() => undefined);
+    Notify.create({ type: 'positive', icon: 'format_clear', message: 'Empty paragraphs were removed and the book was saved.' });
+  } catch (error) {
+    Notify.create({ type: 'negative', message: error instanceof Error ? error.message : 'Could not clean this book.' });
+  } finally {
+    bookCleanupRunning.value = false;
+  }
 }
 function goToBookPage(pageIndex: number | null) {
   if (pageIndex === null || !Number.isInteger(pageIndex)) return;
