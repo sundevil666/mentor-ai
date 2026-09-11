@@ -2369,6 +2369,11 @@ body.body--dark .personal-reader__word--selected.personal-reader__word--marker {
   display: flow-root;
 }
 
+.personal-reader--focus .personal-reader__chapter + .personal-reader__chapter {
+  break-before: column;
+  -webkit-column-break-before: always;
+}
+
 .personal-reader__navigation {
   height: 0;
 }
