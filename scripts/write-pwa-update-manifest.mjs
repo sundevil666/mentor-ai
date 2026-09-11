@@ -29,7 +29,9 @@ writeFileSync(
 console.log(`Wrote PWA update manifest ${version}`);
 
 function createBuildVersion(packageVersion) {
-  const commitSha = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA ?? readGitCommitSha();
+  // Prefer the commit that is actually checked out and being built. Vercel can
+  // retain stale Git metadata when a deployment is promoted across branches.
+  const commitSha = readGitCommitSha() ?? process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA;
   const shortSha = commitSha ? commitSha.slice(0, 12) : 'local';
 
   return `${packageVersion}+${shortSha}`;
