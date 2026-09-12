@@ -6,7 +6,7 @@
           v-if="!patternSelected"
           class="patterns-header"
         >
-          <p>Reusable English</p><h1>Patterns</h1>
+          <p>English that works as a whole</p><h1>Phrasebook</h1>
         </header>
 
         <header
@@ -30,8 +30,21 @@
         </header>
       </template>
 
-      <section
+      <q-tabs
         v-if="!patternSelected"
+        v-model="activeLibraryTab"
+        class="phrasebook-tabs"
+        active-color="primary"
+        indicator-color="primary"
+        align="justify"
+        no-caps
+      >
+        <q-tab name="patterns" icon="view_agenda" label="Patterns" />
+        <q-tab name="expressions" icon="forum" label="Expressions" />
+      </q-tabs>
+
+      <section
+        v-if="!patternSelected && activeLibraryTab === 'patterns'"
         class="pattern-library"
         aria-label="Pattern library"
       >
@@ -55,6 +68,58 @@
           </span>
           <q-icon name="chevron_right" />
         </button>
+      </section>
+
+      <section
+        v-if="!patternSelected && activeLibraryTab === 'expressions'"
+        class="expression-library"
+        aria-label="Everyday expression library"
+      >
+        <div class="expression-library__intro">
+          <div>
+            <span>English → situation → meaning</span>
+            <h2>Learn the whole phrase</h2>
+            <p>Hear it, connect it with a real moment, and avoid translating each word separately.</p>
+          </div>
+          <strong>{{ completedExpressionIds.size }}/{{ expressionLibrary.length }}</strong>
+        </div>
+        <q-linear-progress rounded size="8px" color="primary" :value="expressionProgress" />
+        <article
+          v-for="expression in expressionLibrary"
+          :key="expression.id"
+          class="expression-card"
+          :class="{ 'expression-card--done': completedExpressionIds.has(expression.id) }"
+        >
+          <div class="expression-card__copy">
+            <strong>{{ expression.phrase }}</strong>
+            <span class="expression-card__meaning">{{ expression.meaning }}</span>
+            <span class="expression-card__situation"><q-icon name="movie" /> {{ expression.situation }}</span>
+            <small>{{ expression.insight }}</small>
+          </div>
+          <div class="expression-card__actions">
+            <q-btn
+              :aria-label="`Listen: ${expression.phrase}`"
+              color="primary"
+              flat
+              icon="volume_up"
+              round
+              :loading="playingExpressionId === expression.id"
+              @click="playExpression(expression)"
+            >
+              <q-tooltip>Listen</q-tooltip>
+            </q-btn>
+            <q-btn
+              :aria-label="completedExpressionIds.has(expression.id) ? 'Mark as learning' : 'Mark as learned'"
+              :color="completedExpressionIds.has(expression.id) ? 'positive' : 'grey-6'"
+              flat
+              :icon="completedExpressionIds.has(expression.id) ? 'check_circle' : 'radio_button_unchecked'"
+              round
+              @click="toggleExpressionCompleted(expression.id)"
+            >
+              <q-tooltip>{{ completedExpressionIds.has(expression.id) ? 'Learned' : 'Mark as learned' }}</q-tooltip>
+            </q-btn>
+          </div>
+        </article>
       </section>
 
       <article
@@ -227,6 +292,7 @@ import { Notify } from 'quasar';
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { patternLibrary, type PhrasePatternExample } from 'src/services/pattern-library';
+import { expressionLibrary, type EnglishExpression } from 'src/services/expression-library';
 import { deleteSpeechBatch, isSpeechBatchCached, preloadSpeechBatch, speakWithPreferredVoice, stopSpeech } from 'src/services/speech-synthesis';
 import { deleteOutdatedPatternPlaylists, deletePatternPlaylist, getCachedPatternPlaylist, hasOutdatedPatternPlaylist, preparePatternPlaylist } from 'src/services/pattern-playlist';
 import { configurePlaybackAudioSession } from 'src/services/audio-session';
@@ -237,10 +303,20 @@ const route = useRoute();
 const router = useRouter();
 const selectedPattern = computed(() => patternLibrary.find((item) => item.id === route.query.pattern));
 const patternSelected = computed(() => Boolean(selectedPattern.value));
+const activeLibraryTab = computed({
+  get: () => route.query.tab === 'expressions' ? 'expressions' : 'patterns',
+  set: (tab: string) => {
+    stopSpeech();
+    playingExpressionId.value = null;
+    void router.replace({ name: 'patterns', query: tab === 'expressions' ? { tab: 'expressions' } : {} });
+  },
+});
 const completedIds = ref(new Set<string>());
+const completedExpressionIds = ref(readCompletedExpressionIds());
 const completedPatternIds = ref(readCompletedPatternIds());
 const revealedIds = ref(new Set<string>());
 const playingId = ref<string | null>(null);
+const playingExpressionId = ref<string | null>(null);
 const isLessonPlaying = ref(false);
 const playlistCurrentTime = ref(0);
 const playlistDuration = ref(0);
@@ -257,6 +333,7 @@ const completedCount = computed(() => completedIds.value.size);
 const progress = computed(() => completedCount.value / (selectedPattern.value?.examples.length ?? 1));
 const playlistProgress = computed(() => playlistCompleted.value / (selectedPattern.value?.examples.length ?? 1));
 const patternOffline = computed(() => playlistOffline.value && examplesOffline.value);
+const expressionProgress = computed(() => completedExpressionIds.value.size / expressionLibrary.length);
 
 watch(selectedPattern, async (nextPattern) => {
   stopPlaylist();
@@ -303,8 +380,32 @@ function readCompletedPatternIds() {
 
 function isPatternCompleted(patternId: string) { return completedPatternIds.value.has(patternId); }
 
+function readCompletedExpressionIds() {
+  try {
+    const value = JSON.parse(localStorage.getItem('mentor-ai:expression-progress') ?? '[]') as unknown;
+    return new Set(Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []);
+  } catch { return new Set<string>(); }
+}
+
+function toggleExpressionCompleted(id: string) {
+  const next = new Set(completedExpressionIds.value);
+  if (next.has(id)) next.delete(id); else next.add(id);
+  completedExpressionIds.value = next;
+  localStorage.setItem('mentor-ai:expression-progress', JSON.stringify([...next]));
+}
+
+async function playExpression(expression: EnglishExpression) {
+  stopPlaylist(); stopSpeech(); playingId.value = null; playingExpressionId.value = expression.id;
+  const started = await speakWithPreferredVoice(expression.phrase, {
+    mediaTitle: 'Everyday expressions',
+    onEnd: () => { playingExpressionId.value = null; },
+    onError: showAudioError,
+  });
+  if (!started) playingExpressionId.value = null;
+}
+
 function openPattern(id: string) {
-  void router.push({ name: 'patterns', query: { pattern: id } });
+  void router.push({ name: 'patterns', query: { pattern: id, tab: 'patterns' } });
 }
 
 function closePattern() {
@@ -476,7 +577,7 @@ function saveRepeatPreference() {
 }
 
 function showAudioError() {
-  playingId.value = null; isLessonPlaying.value = false; playlistPreparing.value = false;
+  playingId.value = null; playingExpressionId.value = null; isLessonPlaying.value = false; playlistPreparing.value = false;
   Notify.create({ type: 'negative', icon: 'volume_off', message: 'Could not play this phrase', caption: 'Check the connection and try again.' });
 }
 

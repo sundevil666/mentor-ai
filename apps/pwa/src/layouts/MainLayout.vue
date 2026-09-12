@@ -533,8 +533,8 @@ const primaryNavigationItems: Array<{
     isActive: () => route.name === 'dashboard' && activeDashboardTraining.value === 'speaking',
   },
   {
-    label: 'Patterns',
-    icon: 'view_agenda',
+    label: 'Phrases',
+    icon: 'forum',
     tone: 'patterns',
     to: { name: 'patterns' },
     isActive: () => route.name === 'patterns',
