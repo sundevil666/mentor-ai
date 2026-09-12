@@ -28,3 +28,22 @@ export const expressionLibrary: EnglishExpression[] = [
   { id: 'count-on-me', phrase: 'You can count on me.', meaning: 'Ты можешь на меня рассчитывать.', situation: 'Ты обещаешь поддержку или надёжную помощь.', insight: 'Count on someone — доверять и рассчитывать, не считать числа.' },
   { id: 'fair-enough', phrase: 'Fair enough.', meaning: 'Справедливо. / Ладно, принимается.', situation: 'Ты признаёшь, что объяснение или условие разумно.', insight: 'Это спокойное принятие чужой точки зрения, не оценка количества.' },
 ];
+
+export const expressionPractice: PhrasePattern = {
+  id: 'everyday-expressions',
+  title: 'Everyday expressions',
+  frame: 'Learn each expression as one complete meaning.',
+  prefix: '',
+  suffix: '',
+  description: 'Reactions and conversational chunks that cannot be understood reliably word-for-word.',
+  level: 'A2–B1',
+  estimatedMinutes: 18,
+  examples: expressionLibrary.map((expression) => ({
+    id: expression.id,
+    situation: expression.situation,
+    phrase: expression.phrase,
+    translation: expression.meaning,
+    slotValue: expression.phrase,
+  })),
+};
+import type { PhrasePattern } from './pattern-library.js';
