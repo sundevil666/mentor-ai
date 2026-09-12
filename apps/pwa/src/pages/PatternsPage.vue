@@ -1,6 +1,6 @@
 <template>
   <q-page class="patterns-page category-theme--patterns" :class="{ 'patterns-page--detail': patternSelected }">
-    <AppDetailLayout class="patterns-shell" :active="patternSelected">
+    <AppDetailLayout class="patterns-shell">
       <template #header>
         <header
           v-if="!patternSelected"
@@ -30,18 +30,19 @@
         </header>
       </template>
 
-      <q-tabs
-        v-if="!patternSelected"
-        v-model="activeLibraryTab"
-        class="phrasebook-tabs"
-        active-color="primary"
-        indicator-color="primary"
-        align="justify"
-        no-caps
-      >
-        <q-tab name="patterns" icon="view_agenda" label="Patterns" />
-        <q-tab name="expressions" icon="forum" label="Expressions" />
-      </q-tabs>
+      <template v-if="!patternSelected" #navigation>
+        <q-tabs
+          v-model="activeLibraryTab"
+          class="phrasebook-tabs"
+          active-color="primary"
+          indicator-color="primary"
+          align="justify"
+          no-caps
+        >
+          <q-tab name="patterns" icon="view_agenda" label="Patterns" />
+          <q-tab name="expressions" icon="forum" label="Expressions" />
+        </q-tabs>
+      </template>
 
       <section
         v-if="!patternSelected && activeLibraryTab === 'patterns'"
