@@ -1,9 +1,50 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { learningStateService } from '../dist/services/learning-state.service.js';
+import { learningStateService, selectMasteredLessonIds } from '../dist/services/learning-state.service.js';
 
 describe('learning state service', () => {
+  it('keeps strict personal lessons active until a complete accurate attempt is recorded', () => {
+    const createResult = (exerciseId, correct, lessonId = 'personal-english-01-fixed-patterns') => ({
+      id: `result-${exerciseId}`,
+      studentId: 'demo-student',
+      sessionId: 'strict-session',
+      lessonId,
+      exerciseId,
+      exerciseType: 'dialogue-translation',
+      targetSkill: 'grammar',
+      concept: 'learning',
+      activityType: 'guided-lesson',
+      conceptLevel: 'developing',
+      correct,
+      attempts: 1,
+      responseTimeMs: 1_000,
+      hintCount: 0,
+      skipped: false,
+      abandoned: false,
+      repeatedMistake: false,
+      teacherDecision: 'hold',
+      reasonForLevelDecision: 'strict check',
+      completionState: 'completed',
+      evidenceEventIds: [`event-${exerciseId}`],
+      completedAt: '2026-09-12T12:00:00.000Z',
+    });
+    const fourAnswers = ['1', '2', '3', '4'].map((id) => createResult(id, true));
+    assert.equal(selectMasteredLessonIds(fourAnswers).has('personal-english-01-fixed-patterns'), false);
+
+    const focusedPass = [...fourAnswers, createResult('5', false)];
+    assert.equal(selectMasteredLessonIds(focusedPass).has('personal-english-01-fixed-patterns'), true);
+
+    const checkpoint = focusedPass.map((result, index) => ({
+      ...result,
+      id: `checkpoint-${index}`,
+      lessonId: 'personal-english-05-strict-checkpoint',
+    }));
+    assert.equal(selectMasteredLessonIds(checkpoint).has('personal-english-05-strict-checkpoint'), false);
+    checkpoint[4].correct = true;
+    assert.equal(selectMasteredLessonIds(checkpoint).has('personal-english-05-strict-checkpoint'), true);
+  });
+
   it('deduplicates device activity and returns combined account totals', async () => {
     const stamp = Date.now();
     const listening = {

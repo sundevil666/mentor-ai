@@ -54,7 +54,7 @@ export const learningStateService = {
     }
 
     const createdAt = now();
-    const completedLessonIds = new Set(state.exerciseResults.map((result) => result.lessonId));
+    const completedLessonIds = selectMasteredLessonIds(state.exerciseResults);
     const selectedLesson =
       context.lessonTemplateKey
         ? generateLessonFromPlan(aiTeacherService.planLesson(state.studentModel, context, createdAt), createdAt)
@@ -408,6 +408,41 @@ export const learningStateService = {
     };
   },
 };
+
+export function selectMasteredLessonIds(results: ExerciseResult[]): Set<string> {
+  const mastered = new Set(
+    results
+      .filter((result) => !result.lessonId.startsWith('personal-english-'))
+      .map((result) => result.lessonId),
+  );
+  const strictSessions = new Map<string, ExerciseResult[]>();
+
+  for (const result of results.filter((item) => item.lessonId.startsWith('personal-english-'))) {
+    const key = `${result.lessonId}:${result.sessionId}`;
+    strictSessions.set(key, [...(strictSessions.get(key) ?? []), result]);
+  }
+
+  for (const sessionResults of strictSessions.values()) {
+    const lessonId = sessionResults[0]?.lessonId;
+    if (!lessonId) continue;
+    const uniqueExercises = new Set(sessionResults.map((result) => result.exerciseId));
+    const completed = sessionResults.filter(
+      (result) => result.completionState === 'completed' && !result.skipped && !result.abandoned,
+    );
+    const correct = completed.filter((result) => result.correct);
+    const requiredAccuracy = lessonId.endsWith('strict-checkpoint') ? 1 : 0.8;
+
+    if (
+      uniqueExercises.size >= 5
+      && completed.length === uniqueExercises.size
+      && correct.length / completed.length >= requiredAccuracy
+    ) {
+      mastered.add(lessonId);
+    }
+  }
+
+  return mastered;
+}
 
 function sanitizeLearningActivityEvent(candidate: LearningActivityEvent, studentId: string): LearningActivityEvent | null {
   if (!candidate || candidate.studentId !== studentId || typeof candidate.id !== 'string'
