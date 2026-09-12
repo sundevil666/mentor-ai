@@ -57,7 +57,8 @@ export const learningStateService = {
     const completedLessonIds = selectMasteredLessonIds(state.exerciseResults);
     const selectedLesson =
       context.lessonTemplateKey
-        ? generateLessonFromPlan(aiTeacherService.planLesson(state.studentModel, context, createdAt), createdAt)
+        ? (await privateLessonRepository.findByTemplateKey(context.lessonTemplateKey)) ??
+          generateLessonFromPlan(aiTeacherService.planLesson(state.studentModel, context, createdAt), createdAt)
         : context.mode === 'listening' || context.mode === 'speaking'
         ? (await privateLessonRepository.findNextForMode(context.mode, completedLessonIds)) ??
           generateLessonFromPlan(aiTeacherService.planLesson(state.studentModel, context, createdAt), createdAt)

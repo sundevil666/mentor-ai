@@ -3,6 +3,6 @@ import { config } from './config/env.js';
 
 const app = createApp();
 
-app.listen(config.port, () => {
-  console.log(`Mentor AI API listening on port ${config.port}`);
+app.listen(config.port, config.host, () => {
+  console.log(`Mentor AI API listening on ${config.host}:${config.port}`);
 });

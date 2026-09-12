@@ -36,10 +36,12 @@ validateGoogleAuthConfiguration(process.env);
 export const config = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: Number(process.env.PORT ?? 4000),
+  host: process.env.HOST ?? '0.0.0.0',
   storageMode,
   personalStoragePath: process.env.PERSONAL_STORAGE_PATH ?? '.ai/private',
   databaseUrl: process.env.DATABASE_URL,
   lessonImportToken: process.env.LESSON_IMPORT_TOKEN,
+  includeStagedLessons: process.env.INCLUDE_STAGED_LESSONS === 'true',
   googleClientId: process.env.GOOGLE_CLIENT_ID,
   googleAllowedEmails: (process.env.GOOGLE_ALLOWED_EMAILS ?? '')
     .split(',')

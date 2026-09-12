@@ -252,6 +252,8 @@ export interface GeneratedLesson {
   exercises: Exercise[];
   localEvaluation: LocalEvaluationRule[];
   recovery: LessonRecovery;
+  priority?: number;
+  doFirst?: boolean;
   createdAt: string;
 }
 

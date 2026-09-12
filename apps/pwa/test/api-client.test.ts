@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-import { fetchLearningActivityTotals, fetchReaderTextLookup, fetchReadingResumeSnapshot, fetchTranslationUsage, saveReadingTranscripts, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, synchronizeStatisticsSnapshots, upsertSessionHandoff } from '../src/services/api-client.js';
+import { fetchLearningActivityTotals, fetchOfflineLessons, fetchReaderTextLookup, fetchReadingResumeSnapshot, fetchTranslationUsage, saveReadingTranscripts, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, synchronizeStatisticsSnapshots, upsertSessionHandoff } from '../src/services/api-client.js';
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
@@ -73,6 +73,20 @@ describe('PWA API client', () => {
     assert.equal(calls[0]?.init?.method, 'POST');
     assert.equal(JSON.parse(String(calls[0]?.init?.body)).events[0].id, 'event-1');
     assert.equal(result.acceptedCount, 1);
+  });
+
+  it('loads full lessons from the dedicated offline catalog route', async () => {
+    const calls: string[] = [];
+    globalThis.fetch = async (url) => {
+      calls.push(String(url));
+      return jsonResponse([]);
+    };
+
+    await fetchOfflineLessons('2026-09-01T00:00:00.000Z');
+
+    assert.equal(calls.length, 1);
+    assert.match(calls[0]!, /^http:\/\/localhost:4000\/api\/lessons\/offline\?since=/);
+    assert.equal(calls[0]!.includes('offline=1'), false);
   });
 
   it('synchronizes active-time chunks and receives account totals', async () => {

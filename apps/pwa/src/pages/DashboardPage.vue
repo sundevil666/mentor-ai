@@ -112,6 +112,46 @@
               />
             </div>
           </article>
+
+          <section v-if="newLessonCatalog.length > 0" class="new-lessons" aria-labelledby="new-lessons-title">
+            <div class="new-lessons__heading">
+              <div>
+                <p class="learning-start__eyebrow">Personal practice</p>
+                <h2 id="new-lessons-title">New lessons</h2>
+              </div>
+              <span>{{ newLessonCatalog.length }}</span>
+            </div>
+            <article
+              v-for="lesson in newLessonCatalog"
+              :key="lesson.id"
+              class="new-lesson-link"
+              :class="{ 'new-lesson-link--first': lesson.doFirst }"
+            >
+              <button type="button" class="new-lesson-link__main" @click="startNewLesson(lesson)">
+                <q-icon :name="lesson.doFirst ? 'priority_high' : 'school'" size="24px" />
+                <span>
+                  <small>{{ lesson.doFirst ? 'Do this first' : `Priority ${lesson.priority ?? 0}` }} · {{ lesson.estimatedMinutes }} min</small>
+                  <strong>{{ lesson.title }}</strong>
+                  <span>{{ lesson.purpose }}</span>
+                </span>
+                <q-icon name="arrow_forward" size="22px" />
+              </button>
+              <div class="new-lesson-link__offline">
+                <q-icon :name="newLessonOfflineStatus[lesson.id] === 'ready' ? 'offline_pin' : 'cloud_queue'" />
+                <span>{{ newLessonOfflineLabel(lesson.id) }}</span>
+                <q-btn
+                  color="primary"
+                  dense
+                  flat
+                  no-caps
+                  :loading="newLessonOfflineStatus[lesson.id] === 'working'"
+                  :icon="newLessonOfflineStatus[lesson.id] === 'ready' ? 'delete_outline' : 'download_for_offline'"
+                  :label="newLessonOfflineStatus[lesson.id] === 'ready' ? 'Remove offline' : 'Download offline'"
+                  @click="toggleNewLessonOffline(lesson)"
+                />
+              </div>
+            </article>
+          </section>
           </template>
 
           <section v-else class="training-library">
@@ -671,7 +711,7 @@
 </template>
 
 <script setup lang="ts">
-import type { LearningActivityTotals, LearningContext, PreferredLessonDevice } from '@mentor-ai/shared';
+import type { GeneratedLesson, LearningActivityTotals, LearningContext, PreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { synchronizeDashboardLessonRoute } from 'src/services/navigation-category';
@@ -736,8 +776,13 @@ import {
   readOfflineLessons,
   registerOfflineSpeechLesson,
   replaceOfflineSpeechLesson,
+  removeOfflineLesson,
 } from 'src/services/offline-library';
 import { fetchCurrentLesson } from 'src/services/api-client';
+import {
+  downloadGeneratedLessonOffline,
+  fetchNewLessonCatalog,
+} from 'src/services/offline-lesson-updates';
 import { loadLearningActivityTotals } from 'src/services/learning-activity';
 import { calculateLevelJourney } from 'src/services/level-journey';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
@@ -811,6 +856,8 @@ const currentLessonFeedbackContentId = computed(() => (
 ));
 const lessonEngagementSummaries = ref(new Map<string, ContentEngagementSummary>());
 const libraryDownloadStatus = ref<Record<string, 'idle' | 'checking' | 'downloading' | 'ready' | 'error'>>({});
+const newLessonCatalog = ref<GeneratedLesson[]>([]);
+const newLessonOfflineStatus = ref<Record<string, 'idle' | 'working' | 'ready' | 'error'>>({});
 const showLessonUpdateDialog = ref(false);
 const isLessonUpdateInstalling = ref(false);
 const lessonUpdateError = ref('');
@@ -1388,12 +1435,72 @@ function libraryDownloadIcon(templateKey: string) {
   if (status === 'error') return 'cloud_off';
   return 'cloud_queue';
 }
+
+async function refreshNewLessonCatalog() {
+  try {
+    newLessonCatalog.value = await fetchNewLessonCatalog();
+    const downloadedIds = new Set(readOfflineLessons()
+      .filter((item) => item.category === 'lessons')
+      .map((item) => item.id));
+    for (const lesson of newLessonCatalog.value) {
+      newLessonOfflineStatus.value[lesson.id] = downloadedIds.has(lesson.id) ? 'ready' : 'idle';
+    }
+  } catch {
+    newLessonCatalog.value = [];
+  }
+}
+
+async function toggleNewLessonOffline(lesson: GeneratedLesson) {
+  if (newLessonOfflineStatus.value[lesson.id] === 'working') return;
+  newLessonOfflineStatus.value[lesson.id] = 'working';
+  try {
+    const saved = readOfflineLessons().find((item) => item.id === lesson.id && item.category === 'lessons');
+    if (saved) {
+      await removeOfflineLesson(saved);
+      newLessonOfflineStatus.value[lesson.id] = 'idle';
+      return;
+    }
+    await downloadGeneratedLessonOffline(lesson);
+    newLessonOfflineStatus.value[lesson.id] = 'ready';
+  } catch (error) {
+    console.error('New lesson offline action failed.', error);
+    newLessonOfflineStatus.value[lesson.id] = 'error';
+  }
+}
+
+function newLessonOfflineLabel(lessonId: string) {
+  const status = newLessonOfflineStatus.value[lessonId];
+  if (status === 'ready') return 'Available offline';
+  if (status === 'working') return 'Updating offline copy…';
+  if (status === 'error') return 'Offline action failed — try again';
+  return 'Not downloaded';
+}
+
+function lessonMode(lesson: GeneratedLesson): 'listening' | 'speaking' | 'mixed' {
+  if (lesson.exercises.some((exercise) => exercise.type === 'listening-text')) return 'listening';
+  if (lesson.exercises.some((exercise) => exercise.targetSkill === 'speaking')) return 'speaking';
+  return 'mixed';
+}
+
+async function startNewLesson(lesson: GeneratedLesson) {
+  lessonReturnDestination.value = 'home';
+  activeEngagementContentId.value = lesson.lessonTemplateKey ?? lesson.id;
+  setForwardTransition();
+  await appStore.startLesson(createLearningContext(currentSuggestion.value, {
+    mode: lessonMode(lesson),
+    selectedConcept: lesson.concept,
+    manualConceptChoice: true,
+    lessonTemplateKey: lesson.lessonTemplateKey,
+  }), true);
+  await syncActiveLessonNavigation();
+}
 onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();
   }
   await refreshLessonProgressStates();
   await refreshLevelActivity();
+  await refreshNewLessonCatalog();
   if (!appStore.session && (route.query.training === 'listening' || route.query.training === 'speaking')) {
     await openTrainingLibrary(route.query.training);
   }

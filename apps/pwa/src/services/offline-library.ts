@@ -63,9 +63,10 @@ export function registerOfflineAudio(audio: LibraryAudio) {
   upsert({ id: audio.id, category: 'audio', title: audio.title, contentVersion: getAudioContentVersion(audio), estimatedBytes: audio.sizeBytes, audio });
 }
 export async function registerOfflineGeneratedLesson(lesson: GeneratedLesson, speechTexts: string[]) {
+  const storedLesson = JSON.parse(JSON.stringify(lesson)) as GeneratedLesson;
   const previous = readOfflineLessons().find((item) => item.id === lesson.id && item.category === 'lessons');
   const db = await getMentorDb();
-  await db.put('lessons', lesson);
+  await db.put('lessons', storedLesson);
   upsert({
     id: lesson.id,
     category: 'lessons',

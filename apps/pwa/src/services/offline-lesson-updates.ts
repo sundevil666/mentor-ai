@@ -51,6 +51,27 @@ export function subscribeOfflineLessonUpdates(listener: (state: OfflineLessonUpd
   return () => listeners.delete(listener);
 }
 
+export function prioritizeNewLessons(lessons: GeneratedLesson[]) {
+  return [...lessons].sort((left, right) => {
+    if (Boolean(left.doFirst) !== Boolean(right.doFirst)) return left.doFirst ? -1 : 1;
+    const priorityDifference = (right.priority ?? 0) - (left.priority ?? 0);
+    return priorityDifference || right.createdAt.localeCompare(left.createdAt) || left.id.localeCompare(right.id);
+  });
+}
+
+export async function fetchNewLessonCatalog() {
+  const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  return prioritizeNewLessons(await fetchOfflineLessons(since));
+}
+
+export async function downloadGeneratedLessonOffline(lesson: GeneratedLesson) {
+  const speechTexts = getSpeechTexts(lesson);
+  const result = speechTexts.length ? await preloadSpeechBatch(speechTexts) : { failed: 0 };
+  if (result.failed > 0) throw new Error(`Could not download ${lesson.title}.`);
+  await registerOfflineGeneratedLesson(lesson, speechTexts);
+  await refreshOfflineSizes();
+}
+
 export function updateOfflineLessons(
   loadLesson: (context: LearningContext, createdAt: string, forceRefresh?: boolean) => Promise<GeneratedLesson>,
 ): Promise<OfflineLessonUpdateResult> {

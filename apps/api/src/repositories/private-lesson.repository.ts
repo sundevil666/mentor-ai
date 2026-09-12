@@ -1,5 +1,6 @@
 import { mkdir, readFile, stat } from 'node:fs/promises';
 import type { GeneratedLesson, LearningConcept, LearningMode, LessonSummary, StudentModel } from '@mentor-ai/shared';
+import { config } from '../config/env.js';
 import { resolvePersonalStoragePath } from '../utils/storage-path.js';
 import { getPostgresPool } from './postgres-client.js';
 
@@ -39,7 +40,7 @@ export const privateLessonRepository = {
 
     try {
       const lessons = await this.findAll();
-      const fileMetadata = await stat(resolvePersonalStoragePath('lessons', 'lessons.json'));
+      const fileMetadata = await statExistingLessonLibrary();
       const updatedAt = fileMetadata.mtime.toISOString();
 
       return { version: toDateVersion(updatedAt), updatedAt, lessonCount: lessons.length };
@@ -61,22 +62,27 @@ export const privateLessonRepository = {
 
     await mkdir(lessonDirectory, { recursive: true });
 
-    try {
-      const file = await readFile(resolvePersonalStoragePath('lessons', 'lessons.json'), 'utf8');
-      const parsed = JSON.parse(file) as unknown;
-
-      if (!Array.isArray(parsed)) {
-        return [];
+    const localLessons = new Map<string, GeneratedLesson>();
+    const filenames = config.includeStagedLessons ? ['lessons.json', 'lesson-library.json'] : ['lessons.json'];
+    for (const filename of filenames) {
+      try {
+        const file = await readFile(resolvePersonalStoragePath('lessons', filename), 'utf8');
+        const parsed = JSON.parse(file) as unknown;
+        const lessons = Array.isArray(parsed)
+          ? parsed
+          : parsed && typeof parsed === 'object' && Array.isArray((parsed as { lessons?: unknown }).lessons)
+            ? (parsed as { lessons: unknown[] }).lessons
+            : [];
+        for (const lesson of lessons.filter(isGeneratedLesson)) localLessons.set(lesson.id, lesson);
+      } catch (error) {
+        if (!isMissingFileError(error)) throw error;
       }
-
-      return parsed.filter(isGeneratedLesson).sort((left, right) => left.id.localeCompare(right.id));
-    } catch (error) {
-      if (isMissingFileError(error)) {
-        return [];
-      }
-
-      throw error;
     }
+    return [...localLessons.values()].sort((left, right) => left.id.localeCompare(right.id));
+  },
+
+  async findByTemplateKey(templateKey: string): Promise<GeneratedLesson | null> {
+    return (await this.findAll()).find((lesson) => lesson.lessonTemplateKey === templateKey) ?? null;
   },
 
   async findNextForStudent(model: StudentModel, completedLessonIds: Set<string>): Promise<GeneratedLesson | null> {
@@ -139,6 +145,16 @@ export const privateLessonRepository = {
     return { importedCount: lessons.length };
   },
 };
+
+async function statExistingLessonLibrary() {
+  try {
+    return await stat(resolvePersonalStoragePath('lessons', 'lessons.json'));
+  } catch (error) {
+    if (!isMissingFileError(error)) throw error;
+    if (!config.includeStagedLessons) throw error;
+    return stat(resolvePersonalStoragePath('lessons', 'lesson-library.json'));
+  }
+}
 
 export async function ensurePrivateLessonsTable(): Promise<void> {
   const pool = getPostgresPool();
