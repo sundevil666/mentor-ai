@@ -31,57 +31,21 @@
 
           <template v-if="selectedLessonLibrary === 'home'">
           <section class="home-overview" aria-label="Learning progress">
-            <article class="level-card">
-              <div class="level-card__copy">
-                <span>Your level</span>
-                <strong>{{ levelProgress.currentLevel }} → {{ levelProgress.nextLevel }}</strong>
-                <small>{{ levelProgress.progressPercent }}% · {{ levelProgress.paceLabel }}</small>
-              </div>
-              <q-circular-progress
-                :value="levelProgress.progressPercent"
-                size="82px"
-                :thickness="0.13"
-                color="primary"
-                track-color="grey-3"
-                show-value
-              >{{ levelProgress.progressPercent }}%</q-circular-progress>
-            </article>
-            <div class="home-metrics">
-              <article v-for="metric in homeMetrics" :key="metric.label" class="home-metric">
-                <q-icon :name="metric.icon" size="22px" />
-                <strong>{{ metric.value }}</strong>
-                <span>{{ metric.label }}</span>
+            <div class="home-progress-heading">
+              <p class="learning-start__eyebrow">Your progress</p>
+              <h1>What is left</h1>
+            </div>
+            <div class="home-progress-list">
+              <article v-for="item in homeProgressItems" :key="item.label" class="home-progress-item">
+                <q-icon :name="item.icon" size="25px" />
+                <div class="home-progress-item__copy">
+                  <strong>{{ item.label }}</strong>
+                  <span>{{ item.done }} of {{ item.total }}</span>
+                  <q-linear-progress :value="item.ratio" color="primary" track-color="grey-3" rounded size="7px" />
+                </div>
+                <b>{{ item.remaining }}</b>
               </article>
             </div>
-            <section v-if="lessonCategoryProgress.length" class="category-progress" aria-label="Lesson category progress">
-              <article
-                v-for="category in lessonCategoryProgress"
-                :key="category.key"
-                class="category-progress-card"
-                :class="`category-progress-card--${category.state}`"
-              >
-                <q-icon :name="category.icon" size="25px" />
-                <div class="category-progress-card__copy">
-                  <strong>{{ category.label }}</strong>
-                  <span>{{ category.completed }} of {{ category.total }} completed</span>
-                </div>
-                <b>{{ category.completed }}/{{ category.total }}</b>
-                <div class="category-progress-card__bar" aria-hidden="true">
-                  <i :style="{ width: `${Math.round(category.completed / category.total * 100)}%` }" />
-                </div>
-                <small v-if="category.state === 'complete'">Everything completed</small>
-                <small v-else-if="category.started > 0">{{ category.started }} currently in progress</small>
-                <small v-else-if="category.completed > 0">Keep going</small>
-                <small v-else>Not started yet</small>
-              </article>
-            </section>
-            <article class="focus-card">
-              <q-icon name="track_changes" size="24px" />
-              <div>
-                <strong>Focus next: {{ weakestSkill.label }}</strong>
-                <span>{{ weakestSkill.reason }}</span>
-              </div>
-            </article>
           </section>
 
           <article class="priority-link">
@@ -736,7 +700,7 @@
 </template>
 
 <script setup lang="ts">
-import type { GeneratedLesson, LearningActivityTotals, LearningContext, PreferredLessonDevice } from '@mentor-ai/shared';
+import type { GeneratedLesson, LearningActivityTotals, LearningContext, LearningMode, PreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { synchronizeDashboardLessonRoute } from 'src/services/navigation-category';
@@ -808,9 +772,10 @@ import {
   downloadGeneratedLessonOffline,
   fetchNewLessonCatalog,
 } from 'src/services/offline-lesson-updates';
-import { buildLessonCategoryProgress, type LessonProgressState } from 'src/services/lesson-category-progress';
+import type { LessonProgressState } from 'src/services/lesson-category-progress';
 import { loadLearningActivityTotals } from 'src/services/learning-activity';
-import { calculateLevelJourney } from 'src/services/level-journey';
+import { audioLibrary } from 'src/services/audio-library';
+import { storyLibrary } from 'src/services/story-library';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import {
   loadContentEngagementSummaries,
@@ -1219,10 +1184,6 @@ function lessonProgressState(templateKey: string): LessonProgressState {
   }
   return 'new';
 }
-const lessonCategoryProgress = computed(() => buildLessonCategoryProgress(
-  newLessonCatalog.value,
-  (lesson) => lessonProgressState(lesson.lessonTemplateKey ?? lesson.id),
-));
 function lessonProgressLabel(templateKey: string) {
   const state = lessonProgressState(templateKey);
   if (state === 'completed') return 'Completed';
@@ -1243,19 +1204,6 @@ async function refreshLessonProgressStates() {
 function handleLessonEngagementChange() {
   void refreshLessonProgressStates();
 }
-const weakestSkill = computed(() => {
-  const skills = [
-    { key: 'listening', label: 'listening', value: appStore.studentModel.listening.score.value },
-    { key: 'speaking', label: 'speaking', value: appStore.studentModel.speaking.score.value },
-    { key: 'vocabulary', label: 'vocabulary', value: appStore.studentModel.vocabulary.score.value },
-    { key: 'grammar', label: 'grammar', value: appStore.studentModel.grammar.score.value },
-  ];
-  const weakest = skills.sort((left, right) => left.value - right.value)[0] ?? skills[0]!;
-  return {
-    ...weakest,
-    reason: `This is currently your lowest skill at ${Math.round(weakest.value * 100)}%.`,
-  };
-});
 const homeLessonQueue = computed(() => {
   const priorityMode = chooseRecommendedTraining(currentSuggestion.value, appStore.studentModel) === 'listening'
     ? 'listening'
@@ -1291,20 +1239,42 @@ const isRecommendedLessonPinned = computed(() =>
   pinnedHomeLessonKey.value === recommendedHomeLesson.value.templateKey,
 );
 const levelActivity = ref<LearningActivityTotals>({ listeningSeconds: 0, readingSeconds: 0, speakingSeconds: 0, totalSeconds: 0, updatedAt: null });
-const levelProgress = computed(() => calculateLevelJourney(appStore.studentModel, levelActivity.value, appStore.statisticsSnapshots));
-const homeMetrics = computed(() => {
+const homeProgressItems = computed(() => {
   const totals = appStore.statisticsSnapshots.reduce((summary, snapshot) => ({
     listeningSeconds: summary.listeningSeconds + (snapshot.listeningSeconds ?? 0),
-    activeSeconds: summary.activeSeconds + (snapshot.activeSeconds ?? 0),
-    spokenWords: summary.spokenWords + (snapshot.spokenWords ?? 0),
-  }), { listeningSeconds: 0, activeSeconds: 0, spokenWords: 0 });
-  const synchronizedListeningSeconds = Math.max(totals.listeningSeconds, levelActivity.value.listeningSeconds);
-  const synchronizedActiveSeconds = Math.max(totals.activeSeconds, levelActivity.value.totalSeconds);
+  }), { listeningSeconds: 0 });
+  const listenedSeconds = Math.max(totals.listeningSeconds, levelActivity.value.listeningSeconds);
+  const listeningLessonSeconds = trainingLibraries.listening.lessons.reduce((sum, lesson) => sum + lesson.minutes * 60, 0);
+  const generatedListeningSeconds = newLessonCatalog.value
+    .filter((lesson) => lessonMode(lesson) === 'listening')
+    .reduce((sum, lesson) => sum + lesson.estimatedMinutes * 60, 0);
+  const listeningTotalSeconds = audioLibrary.reduce((sum, item) => sum + item.durationSeconds, 0)
+    + storyLibrary.reduce((sum, item) => sum + item.durationSeconds, 0)
+    + listeningLessonSeconds
+    + generatedListeningSeconds;
+  const lessonKeys = new Set([
+    ...allHomeLessons.value.map((lesson) => lesson.templateKey),
+    ...newLessonCatalog.value.map((lesson) => lesson.lessonTemplateKey ?? lesson.id),
+  ]);
+  const completedLessons = [...lessonKeys].filter((key) => lessonProgressState(key) === 'completed').length;
+  const lessonTotal = lessonKeys.size;
   return [
-    { icon: 'headphones', value: formatHours(synchronizedListeningSeconds), label: 'listened' },
-    { icon: 'record_voice_over', value: totals.spokenWords.toLocaleString(), label: 'words spoken' },
-    { icon: 'timer', value: formatDuration(synchronizedActiveSeconds), label: 'active practice' },
-    { icon: 'task_alt', value: String(appStore.completedLessonsCount), label: 'lessons done' },
+    {
+      icon: 'headphones',
+      label: 'Listening',
+      done: `${formatDuration(listenedSeconds)} listened`,
+      total: formatDuration(listeningTotalSeconds),
+      remaining: `${formatDuration(Math.max(0, listeningTotalSeconds - listenedSeconds))} left`,
+      ratio: listeningTotalSeconds > 0 ? Math.min(1, listenedSeconds / listeningTotalSeconds) : 0,
+    },
+    {
+      icon: 'task_alt',
+      label: 'Lessons',
+      done: `${completedLessons} done`,
+      total: `${lessonTotal} lessons`,
+      remaining: `${Math.max(0, lessonTotal - completedLessons)} left`,
+      ratio: lessonTotal > 0 ? completedLessons / lessonTotal : 0,
+    },
   ];
 });
 const lessonBackLabel = computed(() => {
@@ -1505,10 +1475,10 @@ function newLessonOfflineLabel(lessonId: string) {
   return 'Not downloaded';
 }
 
-function lessonMode(lesson: GeneratedLesson): 'listening' | 'speaking' | 'mixed' {
+function lessonMode(lesson: GeneratedLesson): LearningMode {
   if (lesson.exercises.some((exercise) => exercise.type === 'listening-text')) return 'listening';
   if (lesson.exercises.some((exercise) => exercise.targetSkill === 'speaking')) return 'speaking';
-  return 'mixed';
+  return 'home';
 }
 
 async function startNewLesson(lesson: GeneratedLesson) {
@@ -2515,13 +2485,12 @@ function formatClockTime(totalSeconds: number): string {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
-function formatHours(totalSeconds: number): string {
-  return `${(totalSeconds / 3600).toFixed(1)} h`;
-}
-
 function formatDuration(totalSeconds: number): string {
-  if (totalSeconds < 3600) return `${Math.round(totalSeconds / 60)} min`;
-  return `${(totalSeconds / 3600).toFixed(1)} h`;
+  const minutes = Math.floor(Math.max(0, totalSeconds) / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder ? `${hours} h ${remainder} min` : `${hours} h`;
 }
 
 function readHomePreference(key: string): string | null {
