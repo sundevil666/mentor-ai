@@ -3,8 +3,14 @@ import type { GeneratedLesson } from '@mentor-ai/shared';
 import { config } from '../config/env.js';
 import { lessonService } from '../services/lesson.service.js';
 
-export const listLessons: RequestHandler = async (_req, res, next) => {
+export const listLessons: RequestHandler = async (req, res, next) => {
   try {
+    if (req.query.offline === '1') {
+      const requestedSince = typeof req.query.since === 'string' ? Date.parse(req.query.since) : Number.NaN;
+      const defaultSince = Date.now() - 30 * 86_400_000;
+      res.json({ data: await lessonService.listOfflineLessons(new Date(Number.isFinite(requestedSince) ? requestedSince : defaultSince)) });
+      return;
+    }
     res.json({ data: await lessonService.listLessons() });
   } catch (error) {
     next(error);

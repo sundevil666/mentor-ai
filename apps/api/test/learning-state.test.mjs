@@ -2,8 +2,18 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { learningStateService, selectMasteredLessonIds } from '../dist/services/learning-state.service.js';
+import { parsePrivateLessonFallback } from '../dist/repositories/private-lesson.repository.js';
 
 describe('learning state service', () => {
+  it('reads valid private lessons from the protected environment fallback', () => {
+    const lesson = {
+      id: 'private-fallback-1', title: 'Fallback lesson', concept: 'learning', exercises: [], localEvaluation: [],
+      createdAt: '2026-09-12T12:00:00.000Z',
+    };
+    assert.deepEqual(parsePrivateLessonFallback(JSON.stringify({ lessons: [lesson] })).map(({ id }) => id), [lesson.id]);
+    assert.deepEqual(parsePrivateLessonFallback('not-json'), []);
+  });
+
   it('keeps strict personal lessons active until a complete accurate attempt is recorded', () => {
     const createResult = (exerciseId, correct, lessonId = 'personal-english-01-fixed-patterns') => ({
       id: `result-${exerciseId}`,

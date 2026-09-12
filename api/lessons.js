@@ -1,7 +1,8 @@
-const { handleError, sendJson } = require('./_shared');
+const { handleError, requireLearningIdentity, sendJson } = require('./_shared');
 
 module.exports = async (request, response) => {
   try {
+    if (requireLearningIdentity(request, response) === null) return;
     const { lessonService } = await import('../apps/api/src/services/lesson.service.js');
     if (request.query?.offline === '1') {
       const requestedSince = typeof request.query.since === 'string' ? Date.parse(request.query.since) : Number.NaN;

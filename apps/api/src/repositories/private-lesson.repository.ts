@@ -11,28 +11,32 @@ export const privateLessonRepository = {
     const pool = getPostgresPool();
 
     if (pool) {
-      await ensurePrivateLessonsTable();
-      const result = await pool.query<{ lesson: GeneratedLesson; changed_at: Date | string }>(
-        `
-          SELECT lesson, updated_at AS changed_at
-          FROM private_lessons
-          WHERE is_active = true AND updated_at >= $1
-          ORDER BY updated_at DESC
-        `,
-        [since.toISOString()],
-      );
-
-      return result.rows.map((row) => ({
-        ...row.lesson,
-        createdAt: new Date(row.changed_at).toISOString(),
-      })).filter(isGeneratedLesson);
+      try {
+        await ensurePrivateLessonsTable();
+        const result = await pool.query<{ lesson: GeneratedLesson; changed_at: Date | string }>(
+          `
+            SELECT lesson, updated_at AS changed_at
+            FROM private_lessons
+            WHERE is_active = true AND updated_at >= $1
+            ORDER BY updated_at DESC
+          `,
+          [since.toISOString()],
+        );
+        const databaseLessons = result.rows.map((row) => ({
+          ...row.lesson,
+          createdAt: new Date(row.changed_at).toISOString(),
+        })).filter(isGeneratedLesson);
+        if (databaseLessons.length > 0) return databaseLessons;
+      } catch {
+        // The private environment fallback keeps lessons available while the database quota is blocked.
+      }
     }
 
     return (await this.findAll()).filter((lesson) => Date.parse(lesson.createdAt) >= since.getTime());
   },
 
   async getLibraryMetadata(): Promise<{ version: string; updatedAt: string | null; lessonCount: number }> {
-    const databaseMetadata = await findDatabaseLibraryMetadata();
+    const databaseMetadata = await findDatabaseLibraryMetadata().catch(() => ({ version: 'built-in', updatedAt: null, lessonCount: 0 }));
 
     if (databaseMetadata.lessonCount > 0) {
       return databaseMetadata;
@@ -54,11 +58,14 @@ export const privateLessonRepository = {
   },
 
   async findAll(): Promise<GeneratedLesson[]> {
-    const databaseLessons = await findAllDatabaseLessons();
+    const databaseLessons = await findAllDatabaseLessons().catch(() => []);
 
     if (databaseLessons.length > 0) {
       return databaseLessons;
     }
+
+    const environmentLessons = readEnvironmentFallbackLessons();
+    if (environmentLessons.length > 0) return environmentLessons;
 
     await mkdir(lessonDirectory, { recursive: true });
 
@@ -153,6 +160,25 @@ async function statExistingLessonLibrary() {
     if (!isMissingFileError(error)) throw error;
     if (!config.includeStagedLessons) throw error;
     return stat(resolvePersonalStoragePath('lessons', 'lesson-library.json'));
+  }
+}
+
+function readEnvironmentFallbackLessons(): GeneratedLesson[] {
+  if (!config.privateLessonFallbackJson) return [];
+  return parsePrivateLessonFallback(config.privateLessonFallbackJson);
+}
+
+export function parsePrivateLessonFallback(value: string): GeneratedLesson[] {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    const lessons = Array.isArray(parsed)
+      ? parsed
+      : parsed && typeof parsed === 'object' && Array.isArray((parsed as { lessons?: unknown }).lessons)
+        ? (parsed as { lessons: unknown[] }).lessons
+        : [];
+    return lessons.filter(isGeneratedLesson).sort((left, right) => left.id.localeCompare(right.id));
+  } catch {
+    return [];
   }
 }
 

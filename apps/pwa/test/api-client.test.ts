@@ -75,7 +75,7 @@ describe('PWA API client', () => {
     assert.equal(result.acceptedCount, 1);
   });
 
-  it('loads full lessons from the dedicated offline catalog route', async () => {
+  it('requests the full offline catalog through the Vercel-compatible lessons route', async () => {
     const calls: string[] = [];
     globalThis.fetch = async (url) => {
       calls.push(String(url));
@@ -85,8 +85,7 @@ describe('PWA API client', () => {
     await fetchOfflineLessons('2026-09-01T00:00:00.000Z');
 
     assert.equal(calls.length, 1);
-    assert.match(calls[0]!, /^http:\/\/localhost:4000\/api\/lessons\/offline\?since=/);
-    assert.equal(calls[0]!.includes('offline=1'), false);
+    assert.match(calls[0]!, /^http:\/\/localhost:4000\/api\/lessons\?offline=1&since=/);
   });
 
   it('synchronizes active-time chunks and receives account totals', async () => {

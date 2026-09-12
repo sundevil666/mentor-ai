@@ -135,7 +135,7 @@
             </div>
           </article>
 
-          <section v-if="newLessonCatalog.length > 0" class="new-lessons" aria-labelledby="new-lessons-title">
+          <section class="new-lessons" aria-labelledby="new-lessons-title">
             <div class="new-lessons__heading">
               <div>
                 <p class="learning-start__eyebrow">Personal practice</p>
@@ -143,6 +143,9 @@
               </div>
               <span>{{ newLessonCatalog.length }}</span>
             </div>
+            <p v-if="newLessonCatalog.length === 0" class="new-lessons__empty">
+              New lessons are temporarily unavailable. The app will retry automatically.
+            </p>
             <article
               v-for="lesson in newLessonCatalog"
               :key="lesson.id"

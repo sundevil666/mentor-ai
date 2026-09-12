@@ -42,6 +42,7 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL,
   lessonImportToken: process.env.LESSON_IMPORT_TOKEN,
   includeStagedLessons: process.env.INCLUDE_STAGED_LESSONS === 'true',
+  privateLessonFallbackJson: process.env.PRIVATE_LESSON_FALLBACK_JSON,
   googleClientId: process.env.GOOGLE_CLIENT_ID,
   googleAllowedEmails: (process.env.GOOGLE_ALLOWED_EMAILS ?? '')
     .split(',')
