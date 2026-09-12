@@ -85,6 +85,8 @@ test('marks uploaded lesson versions as synchronized after success', async () =>
   assert.deepEqual(uploaded, { lessons: [lesson] });
   const state = JSON.parse(await readFile(paths.statePath, 'utf8'));
   assert.equal(state.syncedFingerprints[lesson.id], fingerprintLesson(lesson));
+  const clearedLibrary = JSON.parse(await readFile(paths.libraryPath, 'utf8'));
+  assert.deepEqual(clearedLibrary.lessons, []);
 });
 
 async function writeFixture(directory) {

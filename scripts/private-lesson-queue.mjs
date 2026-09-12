@@ -102,7 +102,13 @@ export async function synchronizeLessonQueue(options = {}) {
     state.lastSuccessfulSyncAt = now.toISOString();
     state.lastError = null;
     await writeJsonAtomic(statePath, state);
-    return { attempted: true, reason: 'synchronized', importedCount: pending.length, ...describeQueue(library, state, now) };
+    const clearedLibrary = {
+      version: library.version,
+      updatedAt: now.toISOString(),
+      lessons: [],
+    };
+    await writeJsonAtomic(libraryPath, clearedLibrary);
+    return { attempted: true, reason: 'synchronized', importedCount: pending.length, ...describeQueue(clearedLibrary, state, now) };
   } catch (error) {
     state.lastError = error instanceof Error ? error.message : String(error);
     await writeJsonAtomic(statePath, state);
