@@ -1628,6 +1628,19 @@ body.body--dark .training-library-card--completed .training-library-card__status
 .home-metric { color: var(--app-primary); display: grid; gap: 3px; min-width: 0; padding: 10px 8px; }
 .home-metric strong { color: var(--app-text-strong); font-size: 1.05rem; }
 .home-metric span { color: var(--app-muted-strong); font-size: .68rem; line-height: 1.15; }
+.category-progress { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.category-progress-card { --progress-bright: #7c3aed; --progress-soft: #ede9fe; background: linear-gradient(145deg, color-mix(in srgb, var(--progress-soft) 92%, white), var(--app-surface)); border: 2px solid var(--progress-bright); border-radius: 17px; color: var(--progress-bright); display: grid; gap: 7px; grid-template-columns: 28px 1fr auto; overflow: hidden; padding: 13px; position: relative; }
+.category-progress-card--new { --progress-bright: #64748b; --progress-soft: #f1f5f9; }
+.category-progress-card--started { --progress-bright: #f97316; --progress-soft: #ffedd5; }
+.category-progress-card--progress { --progress-bright: #2563eb; --progress-soft: #dbeafe; }
+.category-progress-card--complete { --progress-bright: #00a65a; --progress-soft: #bbf7d0; box-shadow: 0 9px 24px color-mix(in srgb, #00a65a 24%, transparent); }
+.category-progress-card__copy { display: grid; gap: 1px; min-width: 0; }
+.category-progress-card__copy strong { color: var(--app-text-strong); font-size: .94rem; }
+.category-progress-card__copy span { color: var(--app-muted-strong); font-size: .72rem; }
+.category-progress-card > b { align-self: center; background: var(--progress-bright); border-radius: 999px; color: white; font-size: .76rem; padding: 4px 8px; }
+.category-progress-card__bar { background: color-mix(in srgb, var(--progress-bright) 18%, white); border-radius: 999px; grid-column: 1 / -1; height: 7px; overflow: hidden; }
+.category-progress-card__bar i { background: var(--progress-bright); border-radius: inherit; display: block; height: 100%; min-width: 0; transition: width .3s ease; }
+.category-progress-card > small { color: var(--progress-bright); font-size: .72rem; font-weight: 800; grid-column: 1 / -1; text-transform: uppercase; }
 .focus-card { align-items: center; background: var(--category-soft); border-color: var(--category-border); color: var(--category-accent); display: flex; gap: 12px; padding: 14px 16px; }
 .focus-card div { display: grid; gap: 2px; }
 .focus-card strong { color: var(--app-text-strong); }

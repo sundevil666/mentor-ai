@@ -53,6 +53,28 @@
                 <span>{{ metric.label }}</span>
               </article>
             </div>
+            <section v-if="lessonCategoryProgress.length" class="category-progress" aria-label="Lesson category progress">
+              <article
+                v-for="category in lessonCategoryProgress"
+                :key="category.key"
+                class="category-progress-card"
+                :class="`category-progress-card--${category.state}`"
+              >
+                <q-icon :name="category.icon" size="25px" />
+                <div class="category-progress-card__copy">
+                  <strong>{{ category.label }}</strong>
+                  <span>{{ category.completed }} of {{ category.total }} completed</span>
+                </div>
+                <b>{{ category.completed }}/{{ category.total }}</b>
+                <div class="category-progress-card__bar" aria-hidden="true">
+                  <i :style="{ width: `${Math.round(category.completed / category.total * 100)}%` }" />
+                </div>
+                <small v-if="category.state === 'complete'">Everything completed</small>
+                <small v-else-if="category.started > 0">{{ category.started }} currently in progress</small>
+                <small v-else-if="category.completed > 0">Keep going</small>
+                <small v-else>Not started yet</small>
+              </article>
+            </section>
             <article class="focus-card">
               <q-icon name="track_changes" size="24px" />
               <div>
@@ -783,6 +805,7 @@ import {
   downloadGeneratedLessonOffline,
   fetchNewLessonCatalog,
 } from 'src/services/offline-lesson-updates';
+import { buildLessonCategoryProgress, type LessonProgressState } from 'src/services/lesson-category-progress';
 import { loadLearningActivityTotals } from 'src/services/learning-activity';
 import { calculateLevelJourney } from 'src/services/level-journey';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
@@ -1183,7 +1206,6 @@ const lessonCompletionCounts = computed(() => {
   }
   return counts;
 });
-type LessonProgressState = 'new' | 'started' | 'completed';
 function lessonProgressState(templateKey: string): LessonProgressState {
   const summary = lessonEngagementSummaries.value.get(templateKey);
   if ((lessonCompletionCounts.value.get(templateKey) ?? 0) > 0 || (summary?.fullPlays ?? 0) > 0 || (summary?.finishes ?? 0) > 0) {
@@ -1194,6 +1216,10 @@ function lessonProgressState(templateKey: string): LessonProgressState {
   }
   return 'new';
 }
+const lessonCategoryProgress = computed(() => buildLessonCategoryProgress(
+  newLessonCatalog.value,
+  (lesson) => lessonProgressState(lesson.lessonTemplateKey ?? lesson.id),
+));
 function lessonProgressLabel(templateKey: string) {
   const state = lessonProgressState(templateKey);
   if (state === 'completed') return 'Completed';
@@ -1485,6 +1511,7 @@ function lessonMode(lesson: GeneratedLesson): 'listening' | 'speaking' | 'mixed'
 async function startNewLesson(lesson: GeneratedLesson) {
   lessonReturnDestination.value = 'home';
   activeEngagementContentId.value = lesson.lessonTemplateKey ?? lesson.id;
+  recordLessonStart(activeEngagementContentId.value);
   setForwardTransition();
   await appStore.startLesson(createLearningContext(currentSuggestion.value, {
     mode: lessonMode(lesson),
