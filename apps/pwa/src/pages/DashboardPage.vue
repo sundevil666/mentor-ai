@@ -32,8 +32,12 @@
           <template v-if="selectedLessonLibrary === 'home'">
           <section class="home-overview" aria-label="Learning progress">
             <div class="home-progress-heading">
-              <p class="learning-start__eyebrow">Your progress</p>
-              <h1>What is left</h1>
+              <span class="home-progress-heading__icon"><q-icon name="insights" size="22px" /></span>
+              <div>
+                <p class="learning-start__eyebrow">Statistics · view only</p>
+                <h1>Your progress</h1>
+                <span>See what you have completed and what is still left.</span>
+              </div>
             </div>
             <div class="home-progress-list">
               <article v-for="item in homeProgressItems" :key="item.label" class="home-progress-item">
@@ -47,6 +51,14 @@
               </article>
             </div>
           </section>
+
+          <div class="home-lessons-heading">
+            <div>
+              <p class="learning-start__eyebrow">Lessons</p>
+              <h2>Choose a lesson to start</h2>
+            </div>
+            <q-icon name="touch_app" size="25px" />
+          </div>
 
           <article class="priority-link">
             <button type="button" class="priority-link__main" @click="startRecommendedHomeLesson">

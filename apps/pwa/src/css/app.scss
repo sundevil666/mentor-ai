@@ -1617,16 +1617,22 @@ body.body--dark .training-library-card--completed .training-library-card__status
   width: 100%;
 }
 
-.home-overview { display: grid; gap: 14px; width: 100%; }
-.home-progress-heading { display: grid; gap: 2px; }
+.home-overview { background: color-mix(in srgb, var(--category-soft) 72%, var(--app-surface)); border: 1px solid color-mix(in srgb, var(--category-accent) 34%, var(--app-border)); border-radius: 22px; box-shadow: inset 0 1px 0 color-mix(in srgb, white 70%, transparent); display: grid; gap: 14px; padding: 17px; width: 100%; }
+.home-progress-heading { align-items: center; display: grid; gap: 12px; grid-template-columns: 42px minmax(0, 1fr); }
+.home-progress-heading__icon { align-items: center; background: var(--category-accent); border-radius: 14px; color: white; display: flex; height: 42px; justify-content: center; width: 42px; }
+.home-progress-heading > div { display: grid; gap: 2px; }
 .home-progress-heading p, .home-progress-heading h1 { margin: 0; }
 .home-progress-heading h1 { color: var(--app-text-strong); font-size: clamp(1.55rem, 5vw, 2rem); line-height: 1.1; }
+.home-progress-heading > div > span { color: var(--app-muted-strong); font-size: .8rem; }
 .home-progress-list { display: grid; gap: 8px; }
 .home-progress-item { align-items: center; background: color-mix(in srgb, var(--app-surface) 90%, transparent); border: 1px solid var(--category-border); border-radius: 17px; color: var(--category-accent); display: grid; gap: 12px; grid-template-columns: 30px minmax(0, 1fr) auto; padding: 14px 16px; }
 .home-progress-item__copy { display: grid; gap: 5px; min-width: 0; }
 .home-progress-item__copy strong { color: var(--app-text-strong); font-size: .98rem; }
 .home-progress-item__copy span { color: var(--app-muted-strong); font-size: .78rem; }
 .home-progress-item > b { color: var(--app-text-strong); font-size: .9rem; white-space: nowrap; }
+.home-lessons-heading { align-items: center; border-top: 1px solid var(--app-border-strong); color: var(--category-accent); display: flex; justify-content: space-between; margin-top: 8px; padding: 20px 3px 0; width: 100%; }
+.home-lessons-heading p, .home-lessons-heading h2 { margin: 0; }
+.home-lessons-heading h2 { color: var(--app-text-strong); font-size: 1.2rem; line-height: 1.25; }
 .level-card, .focus-card, .home-metric, .priority-link { backdrop-filter: blur(18px) saturate(1.18); background: color-mix(in srgb, var(--app-surface) 86%, transparent); border: 1px solid color-mix(in srgb, var(--category-border) 70%, transparent); border-radius: 18px; box-shadow: 0 14px 36px color-mix(in srgb, var(--category-accent) 10%, transparent); }
 .level-card { align-items: center; display: flex; justify-content: space-between; padding: 18px 20px; }
 .level-card__copy { display: grid; gap: 2px; }
