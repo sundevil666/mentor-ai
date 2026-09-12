@@ -211,23 +211,37 @@ export const learningStateService = {
       const safe = sanitizeReaderVocabularyItem(candidate, state.student.id);
       if (!safe) continue;
       const current = merged.get(safe.id);
-      if (!current || safe.lookupCount > current.lookupCount || safe.lastLookedUpAt > current.lastLookedUpAt) merged.set(safe.id, safe);
+      if (!current) {
+        merged.set(safe.id, safe);
+        continue;
+      }
+      merged.set(safe.id, {
+        ...current,
+        ...safe,
+        translation: safe.translation || current.translation,
+        phonetic: safe.phonetic || current.phonetic,
+        lookupCount: Math.max(current.lookupCount, safe.lookupCount),
+        pronunciationCount: Math.max(current.pronunciationCount ?? 0, safe.pronunciationCount ?? 0),
+        firstLookedUpAt: current.firstLookedUpAt < safe.firstLookedUpAt ? current.firstLookedUpAt : safe.firstLookedUpAt,
+        lastLookedUpAt: current.lastLookedUpAt > safe.lastLookedUpAt ? current.lastLookedUpAt : safe.lastLookedUpAt,
+      });
     }
     const readerVocabularyItems = [...merged.values()].sort((left, right) => right.lastLookedUpAt.localeCompare(left.lastLookedUpAt));
-    const repeatedItems = readerVocabularyItems.filter((item) => item.lookupCount >= 2).slice(0, 20);
+    const difficultyCount = (item: ReaderVocabularyItem) => item.lookupCount + (item.pronunciationCount ?? 0);
+    const repeatedItems = readerVocabularyItems.filter((item) => difficultyCount(item) >= 2).slice(0, 20);
     const vocabularySignals = repeatedItems.map((item) => ({
       id: `reader-vocabulary-weakness:${item.id}`,
       skill: 'vocabulary' as const,
-      description: `Repeatedly translated while reading: “${item.text}”.`,
+      description: `Repeatedly checked while reading: “${item.text}”.`,
       evidenceIds: [item.id],
-      confidence: Math.min(0.95, 0.55 + item.lookupCount * 0.05),
+      confidence: Math.min(0.95, 0.55 + difficultyCount(item) * 0.05),
       observedAt: item.lastLookedUpAt,
     }));
     const reviewPriorities = repeatedItems.slice(0, 10).map((item) => ({
       id: `reader-vocabulary-review:${item.id}`,
       skill: 'vocabulary' as const,
       target: item.text,
-      reason: `Looked up ${item.lookupCount} times while reading.`,
+      reason: `Translation or pronunciation checked ${difficultyCount(item)} times while reading.`,
       dueAt: item.lastLookedUpAt,
     }));
     const studentModel = repeatedItems.length === 0 ? state.studentModel : {
@@ -925,7 +939,6 @@ function sanitizeReaderVocabularyItem(item: ReaderVocabularyItem, studentId: str
     !item.id ||
     !item.bookId ||
     !text ||
-    !translation ||
     !Number.isFinite(Date.parse(item.firstLookedUpAt)) ||
     !Number.isFinite(Date.parse(item.lastLookedUpAt))
   ) return undefined;
@@ -939,7 +952,8 @@ function sanitizeReaderVocabularyItem(item: ReaderVocabularyItem, studentId: str
     kind: /\s/.test(text) ? 'phrase' : 'word',
     translation,
     phonetic: item.phonetic?.replace(/\s+/g, ' ').trim().slice(0, 160) || undefined,
-    lookupCount: Math.max(1, Math.min(10_000, Math.floor(item.lookupCount || 1))),
+    lookupCount: Math.max(0, Math.min(10_000, Math.floor(item.lookupCount || 0))),
+    pronunciationCount: Math.max(0, Math.min(10_000, Math.floor(item.pronunciationCount || 0))),
     firstLookedUpAt: item.firstLookedUpAt,
     lastLookedUpAt: item.lastLookedUpAt,
   };

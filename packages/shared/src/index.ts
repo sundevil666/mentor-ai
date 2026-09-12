@@ -418,6 +418,7 @@ export interface ReaderVocabularyItem {
   translation: string;
   phonetic?: string;
   lookupCount: number;
+  pronunciationCount?: number;
   firstLookedUpAt: string;
   lastLookedUpAt: string;
 }

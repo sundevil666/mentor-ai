@@ -517,7 +517,7 @@ import { deletePersonalBook, importPersonalBook, listPersonalBookArchives, listP
 import { personalBookSyncControl } from 'src/services/personal-book-sync-control';
 import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot, synchronizePersonalReadingBooks, updateReadingDeviceSession } from 'src/services/api-client';
 import { getAuthToken } from 'src/services/auth';
-import { findReaderVocabularyLookup, recordReaderVocabularyLookup } from 'src/services/reader-vocabulary';
+import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { annualReadingPace, annualReadingPaceMessage as getAnnualReadingPaceMessage, createDailyReadingProgress, dailyReadingGoalWords, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, readingGoalMessage, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { activeReadingHighlightIndexes, alignReadingSpeech, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, previewBrowserReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
@@ -1251,6 +1251,15 @@ function normalizeReaderSelection(value: string) {
 async function selectReaderText(rawText: string, speakImmediately: boolean, wordIndex: number | null) {
   const text = normalizeReaderSelection(rawText);
   if (!text || !selectedBook.value) return;
+  const interactionBook = selectedBook.value;
+  const interactionRecord = recordReaderVocabularyInteraction({
+    studentId: appStore.studentId,
+    bookId: interactionBook.id,
+    chapterId: selectedBookPages.value[currentBookChapterIndex.value]?.chapterId,
+    text,
+    translationRequested: true,
+    pronunciationRequested: speakImmediately,
+  });
   const shouldResumeReadingSpeech = readingSpeechActive.value;
   const requestId = ++readerLookupRequestId;
   const interactionStartedAt = performance.now();
@@ -1273,8 +1282,9 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
         appendReadingSpeechDebug(`Ignoring recognition results while translating "${text}"; capture stays warm.`);
         readingSpeechMessage.value = 'Translation has priority. Listening will continue automatically.';
       } : undefined,
-      pronounce: speakImmediately ? () => { void speakReaderText(text); } : undefined,
+      pronounce: speakImmediately ? () => { void speakReaderText(text, false); } : undefined,
       lookup: async () => {
+        await interactionRecord;
         const cachedLookup = await findReaderVocabularyLookup(appStore.studentId, text).catch(() => null);
         if (requestId !== readerLookupRequestId) return;
         if (cachedLookup) {
@@ -1323,14 +1333,24 @@ async function loadReaderPhonetic(text: string, requestId: number) {
 async function saveReaderLookup(lookup: ReaderTextLookup, requestId: number) {
   const book = selectedBook.value;
   if (!book || requestId !== readerLookupRequestId) return;
-  await recordReaderVocabularyLookup({
+  await enrichReaderVocabularyLookup({
     studentId: appStore.studentId,
     bookId: book.id,
     chapterId: selectedBookPages.value[currentBookChapterIndex.value]?.chapterId,
     lookup: { ...lookup, phonetic: readerPhonetic.value ?? lookup.phonetic },
   });
 }
-async function speakReaderText(text: string) {
+async function speakReaderText(text: string, recordInteraction = true) {
+  const book = selectedBook.value;
+  if (recordInteraction && book) {
+    void recordReaderVocabularyInteraction({
+      studentId: appStore.studentId,
+      bookId: book.id,
+      chapterId: selectedBookPages.value[currentBookChapterIndex.value]?.chapterId,
+      text,
+      pronunciationRequested: true,
+    }).catch(() => undefined);
+  }
   appendReadingSpeechDebug(`Pronunciation requested for "${text}".`);
   const microphoneTracks = readingSpeechStream?.getAudioTracks() ?? [];
   const muteMicrophone = () => {

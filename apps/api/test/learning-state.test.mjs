@@ -489,6 +489,65 @@ describe('learning state service', () => {
     assert.equal(state.studentModel.reviewPriorities.some((priority) => priority.target === 'gripping'), true);
   });
 
+  it('keeps pronunciation difficulty evidence even when translation is unavailable', async () => {
+    const item = {
+      id: `reader-vocabulary:demo-student:thorough-${Date.now()}`,
+      studentId: 'demo-student',
+      bookId: 'book-1',
+      chapterId: 'chapter-1',
+      text: 'thorough',
+      normalizedText: 'thorough',
+      kind: 'word',
+      translation: '',
+      lookupCount: 0,
+      pronunciationCount: 2,
+      firstLookedUpAt: '2026-09-12T10:00:00.000Z',
+      lastLookedUpAt: '2026-09-12T10:05:00.000Z',
+    };
+
+    const merged = await learningStateService.mergeReaderVocabularyItems([item]);
+    const state = await learningStateService.getStudentState();
+
+    assert.equal(merged.find((candidate) => candidate.id === item.id)?.pronunciationCount, 2);
+    assert.equal(merged.find((candidate) => candidate.id === item.id)?.translation, '');
+    assert.equal(state.studentModel.knownWeaknesses.some((signal) => signal.evidenceIds.includes(item.id)), true);
+    assert.equal(state.studentModel.reviewPriorities.some((priority) => priority.target === 'thorough'), true);
+  });
+
+  it('does not erase a synchronized translation when an offline device sends only a difficulty signal', async () => {
+    const id = `reader-vocabulary:demo-student:durable-${Date.now()}`;
+    const translated = {
+      id,
+      studentId: 'demo-student',
+      bookId: 'book-1',
+      text: 'durable',
+      normalizedText: 'durable',
+      kind: 'word',
+      translation: 'прочный',
+      lookupCount: 1,
+      pronunciationCount: 0,
+      firstLookedUpAt: '2026-09-12T09:00:00.000Z',
+      lastLookedUpAt: '2026-09-12T09:00:00.000Z',
+    };
+    await learningStateService.mergeReaderVocabularyItems([translated]);
+
+    const merged = await learningStateService.mergeReaderVocabularyItems([{
+      ...translated,
+      translation: '',
+      lookupCount: 0,
+      pronunciationCount: 2,
+      firstLookedUpAt: '2026-09-12T10:00:00.000Z',
+      lastLookedUpAt: '2026-09-12T10:00:00.000Z',
+    }]);
+    const saved = merged.find((candidate) => candidate.id === id);
+
+    assert.equal(saved?.translation, 'прочный');
+    assert.equal(saved?.lookupCount, 1);
+    assert.equal(saved?.pronunciationCount, 2);
+    assert.equal(saved?.firstLookedUpAt, '2026-09-12T09:00:00.000Z');
+    assert.equal(saved?.lastLookedUpAt, '2026-09-12T10:00:00.000Z');
+  });
+
   it('keeps an imported book available for another device on the same account', async () => {
     const id = `cloud-book-${Date.now()}`;
     const timestamp = '2026-08-29T12:00:00.000Z';
