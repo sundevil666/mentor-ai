@@ -572,7 +572,7 @@ import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { annualReadingPace, annualReadingPaceMessage as getAnnualReadingPaceMessage, createDailyReadingProgress, dailyReadingGoalWords, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, readingGoalMessage, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
-import { activeReadingHighlightIndexes, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
+import { activeReadingHighlightIndexes, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { chooseReadingResumeState, readingDeviceHeartbeatMs, readingDeviceLabel } from 'src/services/reading-device-sync';
 import { queueReadingTranscript, syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
@@ -1840,7 +1840,16 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
   }).catch(() => undefined);
   const spokenCount = rawHeardWords.length;
   readingSpeechLastTranscript.value = transcript;
-  const match = matchSequentialReadingSpeech(readerReferenceWords.value, transcript, readingSpeechAnchor.value);
+  let match = matchSequentialReadingSpeech(readerReferenceWords.value, transcript, readingSpeechAnchor.value);
+  let recoveredPosition = false;
+  if (!match.accepted && whisperRecognition) {
+    const recovered = recoverReadingSpeechPosition(readerReferenceWords.value, transcript, readingSpeechAnchor.value);
+    if (recovered.accepted) {
+      match = recovered;
+      recoveredPosition = true;
+      appendReadingSpeechDebug(`Recovered stale position from exact phrase at indexes=${recovered.matchedWordIndexes[0]}–${recovered.matchedWordIndexes.at(-1)}.`);
+    }
+  }
   if (!match.accepted) {
     readingSpeechLastDecision.value = `Rejected. Still waiting for “${readerReferenceWords.value[readingSpeechAnchor.value] ?? 'end of book'}”.`;
     appendReadingSpeechDebug(`Sequential match rejected at word ${readingSpeechAnchor.value}.`);
@@ -1851,7 +1860,7 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
   const confirmedWordIndexes = match.matchedWordIndexes;
   const confirmedLastWord = confirmedWordIndexes.at(-1)!;
   readingSpeechAnchor.value = match.anchorIndex;
-  readingSpeechLastDecision.value = `Accepted ${confirmedWordIndexes.length} word${confirmedWordIndexes.length === 1 ? '' : 's'}. Next: “${readerReferenceWords.value[readingSpeechAnchor.value] ?? 'end of book'}”.`;
+  readingSpeechLastDecision.value = `${recoveredPosition ? 'Position recovered and accepted' : 'Accepted'} ${confirmedWordIndexes.length} word${confirmedWordIndexes.length === 1 ? '' : 's'}. Next: “${readerReferenceWords.value[readingSpeechAnchor.value] ?? 'end of book'}”.`;
   appendReadingSpeechDebug(`Sequential match accepted: ${confirmedWordIndexes.length}/${rawHeardWords.length} words, indexes=${confirmedWordIndexes[0]}–${confirmedLastWord}, next=${readingSpeechAnchor.value}.`);
   readingSpeechAcceptedWords.value += confirmedWordIndexes.length;
   readingSpeechSpokenWords.value += spokenCount;
@@ -1866,7 +1875,9 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
   spokenReaderWordIndexes.value = nextSpoken;
   recordDailySpokenMatch(confirmedWordIndexes);
   readingSpeechStatus.value = 'listening';
-  readingSpeechMessage.value = match.coverage === 1
+  readingSpeechMessage.value = recoveredPosition
+    ? 'Position recovered — keep reading.'
+    : match.coverage === 1
     ? 'Correct — keep reading.'
     : 'Correct up to the highlighted word. Repeat the next word.';
 }

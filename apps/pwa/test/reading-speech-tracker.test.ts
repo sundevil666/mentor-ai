@@ -137,6 +137,24 @@ describe('reading speech tracking', () => {
     assert.deepEqual(recovered.matchedWordIndexes, [75, 76, 77, 78]);
   });
 
+  it('recovers only a long exact phrase inside a noisy Sherpa transcript', () => {
+    const tabletReference = tokenizeReadingSpeech([
+      'the expected word remains near the old position',
+      ...Array.from({ length: 35 }, (_, index) => `bridge${index}`),
+      'this does not seem like normal behavior at all',
+      'the next sentence must remain untouched',
+    ].join(' '));
+    const transcript = 'unrelated sounds before this does not seem like normal behavior distorted words afterward';
+
+
+    const recovered = recoverReadingSpeechPosition(tabletReference, transcript, 0);
+
+    assert.equal(recovered.accepted, true);
+    assert.deepEqual(recovered.matchedWordIndexes.map((index) => tabletReference[index]), ['this', 'does', 'not', 'seem', 'like', 'normal', 'behavior']);
+    assert.equal(recovered.anchorIndex, recovered.matchedWordIndexes.at(-1)! + 1);
+    assert.ok(recovered.matchedWordIndexes[0]! > 35);
+  });
+
   it('accepts one recognized word only when it is exactly at the locked anchor', () => {
     const lockedReference = tokenizeReadingSpeech('please tell me no are you certain no');
 

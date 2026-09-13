@@ -85,10 +85,43 @@ export function alignReadingSpeech(referenceWords: readonly string[], transcript
 }
 
 export function recoverReadingSpeechPosition(referenceWords: readonly string[], transcript: string, anchorIndex: number, maxRecoveryWords = 600): ReadingSpeechMatch {
+  const spokenWords = tokenizeReadingSpeech(transcript);
+  const safeAnchor = Math.max(0, Math.min(referenceWords.length - 1, anchorIndex));
+  const recoveryEnd = Math.min(referenceWords.length, safeAnchor + maxRecoveryWords + 1);
+  const recoveryWords = referenceWords.slice(safeAnchor, recoveryEnd).map(normalizeReadingWord);
+  let exactRunStart = -1;
+  let exactRunLength = 0;
+  for (let spokenIndex = 0; spokenIndex < spokenWords.length; spokenIndex += 1) {
+    for (let referenceIndex = 0; referenceIndex < recoveryWords.length; referenceIndex += 1) {
+      if (spokenWords[spokenIndex] !== recoveryWords[referenceIndex]) continue;
+      let runLength = 1;
+      while (
+        spokenIndex + runLength < spokenWords.length
+        && referenceIndex + runLength < recoveryWords.length
+        && spokenWords[spokenIndex + runLength] === recoveryWords[referenceIndex + runLength]
+      ) runLength += 1;
+      if (runLength > exactRunLength) {
+        exactRunStart = safeAnchor + referenceIndex;
+        exactRunLength = runLength;
+      }
+    }
+  }
+  // A long exact sequence is reliable even when Sherpa includes noisy words
+  // before and after it. Confirm only that sequence; never paint the gap from
+  // the stale anchor to the recovered phrase.
+  if (exactRunStart >= 0 && exactRunLength >= 4) {
+    const matchedWordIndexes = Array.from({ length: exactRunLength }, (_, index) => exactRunStart + index);
+    return {
+      accepted: true,
+      matchedWordIndexes,
+      coverage: exactRunLength / Math.max(1, spokenWords.length),
+      anchorIndex: exactRunStart + exactRunLength,
+    };
+  }
+
   const probeStep = 16;
   let bestMatch: ReadingSpeechMatch | null = null;
-  const recoveryEnd = Math.min(referenceWords.length - 1, anchorIndex + maxRecoveryWords);
-  for (let probeAnchor = anchorIndex; probeAnchor <= recoveryEnd; probeAnchor += probeStep) {
+  for (let probeAnchor = safeAnchor; probeAnchor < recoveryEnd; probeAnchor += probeStep) {
     const match = alignReadingSpeech(referenceWords, transcript, probeAnchor, {
       maxBackwardWords: 8,
       maxForwardWords: 48,
