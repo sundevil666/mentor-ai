@@ -280,20 +280,22 @@
                       <q-btn aria-label="Increase sidebar size" color="primary" icon="zoom_in" round unelevated :disable="readerSidebarScale >= maxReaderSidebarScale" @click="changeReaderSidebarScale(1)" />
                     </div>
                   </div>
+
+                  <q-separator />
+                  <q-btn
+                    align="left"
+                    class="full-width"
+                    icon="format_clear"
+                    label="Clean book text"
+                    no-caps
+                    outline
+                    :loading="bookCleanupRunning"
+                    @click="cleanCurrentBookText"
+                  />
                 </div>
               </q-menu>
             </q-btn>
           </div>
-
-          <q-btn
-            class="personal-reader__cleanup"
-            icon="format_clear"
-            label="Clean book text"
-            no-caps
-            outline
-            :loading="bookCleanupRunning"
-            @click="cleanCurrentBookText"
-          />
 
           <section class="personal-reader__speech-coach" :class="`personal-reader__speech-coach--${readingSpeechStatus}`" aria-live="polite" aria-label="Reading pronunciation coach">
             <div class="personal-reader__reading-actions">
