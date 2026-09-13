@@ -14,6 +14,7 @@
     "src/services/content-engagement-summary.ts",
     "src/services/content-engagement-retention.ts",
     "src/services/daily-reading-progress.ts",
+    "src/services/book-reading-forecast.ts",
     "src/services/api-client.ts",
     "src/services/auth.ts",
     "src/services/indexed-db.ts",

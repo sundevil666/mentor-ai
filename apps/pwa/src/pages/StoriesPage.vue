@@ -182,6 +182,16 @@
           @touchcancel="resetReaderTouch"
           @wheel="handleReaderWheel"
         >
+          <button
+            v-if="readingMode && selectedBook"
+            class="personal-reader__forecast"
+            type="button"
+            :aria-label="bookReadingForecastAriaLabel"
+          >
+            <span>{{ bookReadingDaysLabel }}</span>
+            <strong>{{ bookReadingFinishDate }}</strong>
+            <small>estimated finish</small>
+          </button>
           <article ref="readerPaper" class="personal-reader__paper" :style="{ fontSize: `${readerFontSize}px` }" @click="handleReaderTextTap">
             <section
               v-for="(page, pageIndex) in renderedBookPages"
@@ -532,6 +542,7 @@ import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, i
 import { beginReaderLookupInteraction, shouldProcessReadingTranscript } from 'src/services/reader-lookup-interaction';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
 import { addReadingStopHistoryEntry, parseReadingStopHistory, type ReadingStopHistoryEntry } from 'src/services/reading-stop-history';
+import { bookReadingForecast } from 'src/services/book-reading-forecast';
 
 const props = withDefaults(defineProps<{
   libraryMode?: 'audio' | 'reading';
@@ -550,6 +561,7 @@ const selectedBook = ref<PersonalBook | null>(null);
 const selectedBookChapters = ref<ReadingChapter[]>([]);
 const selectedBookPages = ref<ReadingPage[]>([]);
 const currentBookPageIndex = ref(0);
+const readerFurthestWordPosition = ref(0);
 const readerContent = ref<HTMLElement | null>(null);
 const readerDragging = ref(false);
 const readerPaper = ref<HTMLElement | null>(null);
@@ -713,6 +725,21 @@ const dailyReadingWordsRemaining = computed(() => Math.max(0, dailyReadingTarget
 const dailyReadingProgressRatio = computed(() => Math.min(1, dailyReadingWords.value / dailyReadingTarget.value));
 const dailyReadingGoalState = computed(() => dailyReadingWords.value >= dailyReadingTarget.value * 1.5 ? 'exceeded' : dailyReadingWords.value >= dailyReadingTarget.value ? 'complete' : 'building');
 const dailyReadingGoalMessage = computed(() => readingGoalMessage(dailyReadingWords.value, dailyReadingTarget.value));
+const currentBookReadingForecast = computed(() => bookReadingForecast(
+  selectedBook.value?.wordCount ?? 0,
+  readerFurthestWordPosition.value,
+  dailyReadingTarget.value,
+));
+const bookReadingDaysLabel = computed(() => {
+  const days = currentBookReadingForecast.value.readingDaysRemaining;
+  return days === 0 ? 'Book complete' : `${days} reading day${days === 1 ? '' : 's'} left`;
+});
+const bookReadingFinishDate = computed(() => currentBookReadingForecast.value.finishDate.toLocaleDateString(undefined, {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+}));
+const bookReadingForecastAriaLabel = computed(() => `${bookReadingDaysLabel.value}. Estimated finish ${bookReadingFinishDate.value}, at ${dailyReadingTarget.value.toLocaleString('en')} words per reading day.`);
 const annualReadingPaceSummary = computed(() => annualReadingPace(dailyReadingProgress.value));
 const annualReadingPaceTotal = computed(() => annualReadingPaceSummary.value.actualWords);
 const annualReadingPaceExpected = computed(() => annualReadingPaceSummary.value.expectedWords);
@@ -976,8 +1003,15 @@ async function openBook(bookId: string) {
   } else if (localBookProgress.wordPosition !== undefined) {
     setResumeHighlight(localBookProgress.wordPosition);
   }
+  readerFurthestWordPosition.value = Math.max(
+    0,
+    localBookProgress.wordPosition ?? 0,
+    Math.round((localBookProgress.furthestProgressRatio ?? 0) * loaded.book.wordCount),
+    checkedPosition?.position ?? 0,
+  );
   readingDeviceProgressUpdatedAt = checkedPosition?.updatedAt ?? localBookProgress.updatedAt ?? new Date().toISOString();
   await restoreSpokenReadingProgress(loaded.book.id);
+  readerFurthestWordPosition.value = Math.max(readerFurthestWordPosition.value, readingSpeechFurthestWordIndex + 1);
   readerMarkerWordIndex.value = readReaderMarker(loaded.book.id);
   readerStopHistory.value = readReaderStopHistory(loaded.book.id);
   await markPersonalBookOpened(loaded.book);
@@ -1004,6 +1038,7 @@ function closeBook() {
   selectedBookChapters.value = [];
   selectedBookPages.value = [];
   currentBookPageIndex.value = 0;
+  readerFurthestWordPosition.value = 0;
   selectedBookChapterIndex.value = 0;
   stableReaderWordPosition = -1;
   resumeWordIndex.value = -1;
@@ -1940,6 +1975,8 @@ function persistBookProgress(updatedAt = new Date().toISOString()) {
   if (!book || typeof localStorage === 'undefined') return;
   const previous = readBookProgress(book.id, selectedBookPages.value.length);
   const progressRatio = getCurrentReaderProgressRatio();
+  const wordPosition = getStableReaderWordPosition();
+  readerFurthestWordPosition.value = Math.max(readerFurthestWordPosition.value, wordPosition);
   localStorage.setItem(bookProgressKey(book.id), JSON.stringify({
     version: 3,
     currentPageIndex: currentBookPageIndex.value,
@@ -1947,7 +1984,7 @@ function persistBookProgress(updatedAt = new Date().toISOString()) {
     progressRatio,
     furthestProgressRatio: Math.max(previous.furthestProgressRatio ?? 0, progressRatio),
     chapterId: selectedBookPages.value[currentBookChapterIndex.value]?.chapterId,
-    wordPosition: getStableReaderWordPosition(),
+    wordPosition,
     updatedAt,
   }));
 }

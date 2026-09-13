@@ -13,8 +13,27 @@ import {
   recordDailySpokenWords,
   spokenWordsForBook,
 } from '../src/services/daily-reading-progress.js';
+import { bookReadingForecast } from '../src/services/book-reading-forecast.js';
 
 describe('daily reading progress', () => {
+  it('moves the finish date forward after an idle day without changing required reading days', () => {
+    const first = bookReadingForecast(30_000, 3_000, 3_000, new Date(2026, 8, 13));
+    const idleNextDay = bookReadingForecast(30_000, 3_000, 3_000, new Date(2026, 8, 14));
+
+    assert.equal(first.readingDaysRemaining, 9);
+    assert.equal(idleNextDay.readingDaysRemaining, 9);
+    assert.equal(first.finishDate.getDate(), 21);
+    assert.equal(idleNextDay.finishDate.getDate(), 22);
+  });
+
+  it('shortens the reading forecast after progress beyond the daily target', () => {
+    const forecast = bookReadingForecast(30_000, 7_000, 3_000, new Date(2026, 8, 13));
+
+    assert.equal(forecast.wordsRemaining, 23_000);
+    assert.equal(forecast.readingDaysRemaining, 8);
+    assert.equal(forecast.finishDate.getDate(), 20);
+  });
+
   it('keeps spoken highlighting separate from independently counted reading', () => {
     let progress = createDailyReadingProgress('2026-08-29');
     progress = recordDailySpokenWords(progress, 'book-a', [10, 11, 12, 13]);

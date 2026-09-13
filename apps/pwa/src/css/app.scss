@@ -210,7 +210,7 @@ body .q-menu {
 }
 
 .app-header__center {
-  left: 50%;
+  left: calc((100vw - min(var(--reader-sidebar-width, 280px), 42vw)) / 2);
   position: absolute;
   top: calc(env(safe-area-inset-top) + 7px);
   transform: translateX(-50%);
@@ -2127,6 +2127,64 @@ html.mentor-theme-dark .personal-reader {
   padding: 15px;
   position: relative;
   touch-action: pan-y;
+}
+
+.personal-reader__forecast {
+  align-content: center;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--reader-paper-muted);
+  cursor: pointer;
+  display: grid;
+  left: 50%;
+  justify-items: center;
+  line-height: 1;
+  opacity: .075;
+  padding: 24px 32px;
+  pointer-events: none;
+  position: fixed;
+  text-align: center;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transition: opacity 180ms ease, background-color 180ms ease, backdrop-filter 180ms ease;
+  width: min(68vw, 720px);
+  z-index: 4;
+}
+
+@media (max-width: 700px) {
+  .personal-reader__forecast {
+    left: calc((100vw - min(var(--reader-sidebar-mobile-width, 208px), 58vw)) / 2);
+    padding-inline: 14px;
+    width: min(38vw, 360px);
+  }
+}
+
+.personal-reader__forecast span,
+.personal-reader__forecast strong,
+.personal-reader__forecast small {
+  pointer-events: auto;
+}
+
+.personal-reader__forecast span,
+.personal-reader__forecast small {
+  font: 800 clamp(.8rem, 1.6vw, 1.05rem)/1.2 system-ui, sans-serif;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.personal-reader__forecast strong {
+  font: 700 clamp(2.1rem, 7vw, 5.8rem)/1.05 'Iowan Old Style', Charter, Georgia, serif;
+  margin: .12em 0;
+}
+
+.personal-reader__forecast:focus,
+.personal-reader__forecast:focus-visible {
+  backdrop-filter: blur(3px);
+  background: color-mix(in srgb, var(--reader-paper-background) 82%, transparent);
+  opacity: .88;
+  outline: 2px solid color-mix(in srgb, var(--category-accent) 58%, transparent);
+  outline-offset: -6px;
 }
 
 .personal-reader__content--dragging {
