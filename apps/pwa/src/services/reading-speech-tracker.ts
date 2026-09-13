@@ -13,6 +13,12 @@ export type ReadingSpeechAlignmentOptions = {
   minSpokenWords?: number;
 };
 
+type ExactReadingRun = {
+  referenceStart: number;
+  spokenStart: number;
+  length: number;
+};
+
 export function normalizeReadingWord(value: string): string {
   return value.toLocaleLowerCase('en').replace(/[’]/g, "'").replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
 }
@@ -89,23 +95,23 @@ export function recoverReadingSpeechPosition(referenceWords: readonly string[], 
   const safeAnchor = Math.max(0, Math.min(referenceWords.length - 1, anchorIndex));
   const recoveryEnd = Math.min(referenceWords.length, safeAnchor + maxRecoveryWords + 1);
   const recoveryWords = referenceWords.slice(safeAnchor, recoveryEnd).map(normalizeReadingWord);
-  let exactRunStart = -1;
-  let exactRunLength = 0;
-  for (let spokenIndex = 0; spokenIndex < spokenWords.length; spokenIndex += 1) {
-    for (let referenceIndex = 0; referenceIndex < recoveryWords.length; referenceIndex += 1) {
-      if (spokenWords[spokenIndex] !== recoveryWords[referenceIndex]) continue;
-      let runLength = 1;
-      while (
-        spokenIndex + runLength < spokenWords.length
-        && referenceIndex + runLength < recoveryWords.length
-        && spokenWords[spokenIndex + runLength] === recoveryWords[referenceIndex + runLength]
-      ) runLength += 1;
-      if (runLength > exactRunLength) {
-        exactRunStart = safeAnchor + referenceIndex;
-        exactRunLength = runLength;
-      }
-    }
+  const exactRun = longestExactReadingRun(recoveryWords, spokenWords);
+  const exactRunStart = exactRun ? safeAnchor + exactRun.referenceStart : -1;
+  const exactRunLength = exactRun?.length ?? 0;
+  if (exactRun && exactRunLength >= 4) {
+    const estimatedTranscriptStart = Math.max(safeAnchor, exactRunStart - exactRun.spokenStart);
+    const aligned = alignReadingSpeech(referenceWords, transcript, estimatedTranscriptStart, {
+      maxBackwardWords: 2,
+      maxForwardWords: Math.max(64, spokenWords.length * 2),
+      minCoverage: 0.42,
+      minMatchedWords: 4,
+    });
+    const alignedIndexes = new Set(aligned.matchedWordIndexes);
+    const containsTrustedRun = Array.from({ length: exactRunLength }, (_, index) => exactRunStart + index)
+      .every((wordIndex) => alignedIndexes.has(wordIndex));
+    if (aligned.accepted && containsTrustedRun) return aligned;
   }
+
   // A long exact sequence is reliable even when Sherpa includes noisy words
   // before and after it. Confirm only that sequence; never paint the gap from
   // the stale anchor to the recovered phrase.
@@ -138,6 +144,34 @@ export function recoverReadingSpeechPosition(referenceWords: readonly string[], 
     }
   }
   return bestMatch ?? rejected(anchorIndex);
+}
+
+function longestExactReadingRun(referenceWords: readonly string[], spokenWords: readonly string[]): ExactReadingRun | null {
+  let best: ExactReadingRun | null = null;
+  for (let spokenIndex = 0; spokenIndex < spokenWords.length; spokenIndex += 1) {
+    for (let referenceIndex = 0; referenceIndex < referenceWords.length; referenceIndex += 1) {
+      if (spokenWords[spokenIndex] !== referenceWords[referenceIndex]) continue;
+      let runLength = 1;
+      while (
+        spokenIndex + runLength < spokenWords.length
+        && referenceIndex + runLength < referenceWords.length
+        && spokenWords[spokenIndex + runLength] === referenceWords[referenceIndex + runLength]
+      ) runLength += 1;
+      if (!best || runLength > best.length) best = { referenceStart: referenceIndex, spokenStart: spokenIndex, length: runLength };
+    }
+  }
+  return best;
+}
+
+export function previewTabletReadingWordIndexes(referenceWords: readonly string[], transcript: string, anchorIndex: number, maxPreviewWords = 120): number[] {
+  const strict = matchSequentialReadingSpeech(referenceWords, transcript, anchorIndex);
+  if (strict.accepted) return strict.matchedWordIndexes;
+  const spokenWords = tokenizeReadingSpeech(transcript);
+  const safeAnchor = Math.max(0, Math.min(referenceWords.length - 1, anchorIndex));
+  const previewWords = referenceWords.slice(safeAnchor, safeAnchor + maxPreviewWords).map(normalizeReadingWord);
+  const exactRun = longestExactReadingRun(previewWords, spokenWords);
+  if (!exactRun || exactRun.length < 4) return [];
+  return Array.from({ length: exactRun.length }, (_, index) => safeAnchor + exactRun.referenceStart + index);
 }
 
 export function matchReadingSpeechAtAnchor(referenceWords: readonly string[], transcript: string, anchorIndex: number): ReadingSpeechMatch {

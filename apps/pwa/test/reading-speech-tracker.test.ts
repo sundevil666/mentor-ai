@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { activeReadingHighlightIndexes, alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
+import { activeReadingHighlightIndexes, alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, previewTabletReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
 import { localReadingChunkDurationMs, normalizeReadingAudio, startLocalReadingTranscriber } from '../src/services/local-reading-transcriber.js';
 
 const reference = tokenizeReadingSpeech('Alice was beginning to get very tired of sitting by her sister on the bank. She read the sentence again because practice matters.');
@@ -153,6 +153,34 @@ describe('reading speech tracking', () => {
     assert.deepEqual(recovered.matchedWordIndexes.map((index) => tabletReference[index]), ['this', 'does', 'not', 'seem', 'like', 'normal', 'behavior']);
     assert.equal(recovered.anchorIndex, recovered.matchedWordIndexes.at(-1)! + 1);
     assert.ok(recovered.matchedWordIndexes[0]! > 35);
+  });
+
+  it('previews a trusted tablet phrase before Sherpa emits its delayed final result', () => {
+    const tabletReference = tokenizeReadingSpeech([
+      'the expected word remains here',
+      ...Array.from({ length: 24 }, (_, index) => `bridge${index}`),
+      'there are other ways to get out of this house',
+    ].join(' '));
+
+    assert.deepEqual(
+      previewTabletReadingWordIndexes(tabletReference, 'distorted sounds there are other ways to get', 0)
+        .map((index) => tabletReference[index]),
+      ['there', 'are', 'other', 'ways', 'to', 'get'],
+    );
+    assert.deepEqual(previewBrowserReadingWordIndexes(tabletReference, 'distorted sounds there are other ways to get', 0), []);
+  });
+
+  it('keeps every exact aligned word after a trusted recovery phrase without filling recognition errors', () => {
+    const tabletReference = tokenizeReadingSpeech('I am an adult I was not going to do anything dangerous I only wanted to take a walk around the block and I still can because there are other ways');
+    const recovered = recoverReadingSpeechPosition(
+      tabletReference,
+      'I am an adult I was not going to do anything dangerous I wrongly wanted to take a walk around the block and I still can noise there are other ways',
+      0,
+    );
+
+    assert.equal(recovered.accepted, true);
+    assert.ok(recovered.matchedWordIndexes.length > 16);
+    assert.equal(recovered.matchedWordIndexes.includes(tabletReference.indexOf('only')), false);
   });
 
   it('accepts one recognized word only when it is exactly at the locked anchor', () => {

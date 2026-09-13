@@ -572,7 +572,7 @@ import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { annualReadingPace, annualReadingPaceMessage as getAnnualReadingPaceMessage, createDailyReadingProgress, dailyReadingGoalWords, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, readingGoalMessage, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
-import { activeReadingHighlightIndexes, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
+import { activeReadingHighlightIndexes, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, previewTabletReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { chooseReadingResumeState, readingDeviceHeartbeatMs, readingDeviceLabel } from 'src/services/reading-device-sync';
 import { queueReadingTranscript, syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
@@ -1694,7 +1694,7 @@ async function startReadingSpeech() {
           if (sessionId !== readingSpeechSessionId || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
           updateReadingSpeechPace(transcript);
           appendReadingSpeechDebug(`Sherpa interim: "${transcript}"`);
-          const previewWordIndexes = previewBrowserReadingWordIndexes(readerReferenceWords.value, transcript, readingSpeechAnchor.value);
+          const previewWordIndexes = previewTabletReadingWordIndexes(readerReferenceWords.value, transcript, readingSpeechAnchor.value);
           updateReadingSpeechDiagnosticDecision(transcript, previewWordIndexes, true);
           provisionalReaderWordIndexes.value = new Set(previewWordIndexes);
         },
