@@ -1174,12 +1174,31 @@ const trainingLibraries: Record<'listening' | 'speaking', {
     ],
   },
 };
-const activeTrainingLibrary = computed(() =>
-  selectedLessonLibrary.value === 'speaking' ? trainingLibraries.speaking : trainingLibraries.listening,
-);
+const generatedHomeLessons = computed<HomeLesson[]>(() => newLessonCatalog.value
+  .map((lesson) => {
+    const mode = lessonMode(lesson);
+    if (mode !== 'listening' && mode !== 'speaking') return null;
+    return {
+      templateKey: lesson.lessonTemplateKey ?? lesson.id,
+      title: lesson.title,
+      focus: lesson.purpose,
+      mode,
+      minutes: lesson.estimatedMinutes,
+      skillLabel: mode === 'listening' ? 'Listening' : 'Speaking',
+    };
+  })
+  .filter((lesson): lesson is HomeLesson => lesson !== null));
+const lessonsByTrainingCategory = computed(() => ({
+  listening: [...trainingLibraries.listening.lessons, ...generatedHomeLessons.value.filter((lesson) => lesson.mode === 'listening')],
+  speaking: [...trainingLibraries.speaking.lessons, ...generatedHomeLessons.value.filter((lesson) => lesson.mode === 'speaking')],
+}));
+const activeTrainingLibrary = computed(() => selectedLessonLibrary.value === 'speaking'
+  ? { ...trainingLibraries.speaking, lessons: lessonsByTrainingCategory.value.speaking }
+  : { ...trainingLibraries.listening, lessons: lessonsByTrainingCategory.value.listening });
 const allHomeLessons = computed<HomeLesson[]>(() => [
   ...trainingLibraries.listening.lessons.map((lesson) => ({ ...lesson, skillLabel: 'Listening' })),
   ...trainingLibraries.speaking.lessons.map((lesson) => ({ ...lesson, skillLabel: 'Speaking' })),
+  ...generatedHomeLessons.value,
 ]);
 const lessonCompletionCounts = computed(() => {
   const counts = new Map<string, number>();
