@@ -367,13 +367,29 @@
                 @click="showMicrophoneAccessHelp"
               />
             </div>
+            <div
+              v-if="readingSpeechActive || readingSpeechDebugEntries.length > 1"
+              class="personal-reader__log-status"
+              :class="{ 'personal-reader__log-status--recording': readingSpeechActive }"
+              aria-live="polite"
+            >
+              <span class="personal-reader__log-status-copy">
+                <q-icon :name="readingSpeechActive ? 'fiber_manual_record' : 'pause_circle'" />
+                <span>
+                  <strong>{{ readingSpeechActive ? 'Recognition log is recording' : 'Recognition log is paused' }}</strong>
+                  <small>{{ readingSpeechDebugEntries.length }} log entries</small>
+                </span>
+              </span>
+              <q-btn dense flat icon="content_copy" label="Copy log" no-caps @click="copyReadingSpeechDebugLog" />
+            </div>
             <q-btn
+              v-if="readingSpeechActive || readingSpeechDebugEntries.length > 1"
               class="personal-reader__diagnostics-toggle"
               :color="readingSpeechDiagnosticsOpen ? 'primary' : 'grey-7'"
               dense
               flat
               icon="bug_report"
-              label="Test recognition"
+              :label="readingSpeechDiagnosticsOpen ? 'Hide log details' : 'View log details'"
               no-caps
               @click="readingSpeechDiagnosticsOpen = !readingSpeechDiagnosticsOpen"
             />
@@ -386,7 +402,6 @@
               <p><b>Decision:</b> {{ readingSpeechLastDecision }}</p>
               <div class="personal-reader__diagnostics-actions">
                 <q-btn dense flat icon="my_location" label="Start from selected word" no-caps @click="useSelectedWordAsSpeechAnchor" />
-                <q-btn dense flat icon="content_copy" label="Copy log" no-caps @click="copyReadingSpeechDebugLog" />
               </div>
               <pre>{{ readingSpeechDebugEntries.join('\n') }}</pre>
               <small>No microphone audio is stored. The log contains only recognition text and local word indexes.</small>

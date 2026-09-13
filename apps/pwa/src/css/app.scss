@@ -3029,6 +3029,71 @@ body.body--dark .personal-reader__sidebar {
   min-height: 30px;
 }
 
+.personal-reader__log-status {
+  align-items: center;
+  background: color-mix(in srgb, var(--app-muted-strong) 7%, var(--app-surface));
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  display: grid;
+  gap: 5px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 7px 7px 7px 9px;
+  text-align: left;
+  width: 100%;
+}
+
+.personal-reader__log-status--recording {
+  background: color-mix(in srgb, var(--q-positive) 10%, var(--app-surface));
+  border-color: color-mix(in srgb, var(--q-positive) 48%, var(--app-border));
+}
+
+.personal-reader__log-status-copy {
+  align-items: center;
+  display: grid;
+  gap: 7px;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+}
+
+.personal-reader__log-status-copy > .q-icon {
+  color: var(--app-muted-strong);
+  font-size: .9em;
+}
+
+.personal-reader__log-status--recording .personal-reader__log-status-copy > .q-icon {
+  animation: reader-log-recording 1.5s ease-in-out infinite;
+  color: var(--q-negative);
+}
+
+.personal-reader__log-status-copy > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.personal-reader__log-status-copy strong {
+  color: var(--app-text-strong);
+  font-size: .68em;
+  line-height: 1.15;
+}
+
+.personal-reader__log-status-copy small {
+  color: var(--app-muted-strong);
+  font-size: .58em;
+}
+
+.personal-reader__log-status .q-btn {
+  font-size: .68em;
+  min-height: 34px;
+  padding-inline: 6px;
+  white-space: nowrap;
+}
+
+@keyframes reader-log-recording {
+  0%, 100% { opacity: .5; }
+  50% { opacity: 1; }
+}
+
 .personal-reader__diagnostics {
   background: color-mix(in srgb, var(--app-surface) 94%, var(--category-accent));
   border: 1px solid var(--app-border);
