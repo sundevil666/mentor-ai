@@ -2130,74 +2130,150 @@ html.mentor-theme-dark .personal-reader {
 }
 
 .personal-reader__forecast {
-  align-items: center;
-  appearance: none;
   backdrop-filter: blur(10px);
-  background: color-mix(in srgb, var(--reader-paper-background) 94%, var(--category-soft));
+  background: color-mix(in srgb, var(--reader-paper-background) 92%, var(--category-soft));
   border: 1px solid color-mix(in srgb, var(--category-accent) 38%, var(--app-border-strong));
-  border-radius: 999px;
+  border-radius: 18px;
   bottom: 12px;
   box-shadow: 0 8px 24px rgba(17, 24, 39, .16);
   color: var(--reader-paper-text);
-  cursor: pointer;
   display: grid;
-  gap: 12px;
-  grid-template-columns: auto auto;
+  gap: 8px 14px;
+  grid-template-columns: minmax(74px, 1fr) minmax(140px, 1.6fr) minmax(74px, 1fr);
   left: calc((100vw - min(var(--reader-sidebar-width, 280px), 42vw)) / 2);
-  justify-items: center;
   line-height: 1.15;
-  opacity: .92;
-  padding: 8px 14px 8px 9px;
-  pointer-events: auto;
+  overflow: hidden;
+  padding: 10px 12px 9px;
   position: fixed;
   text-align: center;
   transform: translateX(-50%);
-  transition: opacity 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
-  width: max-content;
+  transition: border-color 220ms ease, box-shadow 220ms ease;
+  width: min(620px, calc(100vw - min(var(--reader-sidebar-width, 280px), 42vw) - 30px));
   z-index: 4;
 }
 
 @media (max-width: 700px) {
   .personal-reader__forecast {
+    border-radius: 14px;
+    gap: 6px;
+    grid-template-columns: minmax(54px, 1fr) minmax(96px, 1.5fr) minmax(54px, 1fr);
     left: calc((100vw - min(var(--reader-sidebar-mobile-width, 208px), 58vw)) / 2);
-    max-width: calc(42vw - 12px);
+    padding: 8px 7px 7px;
+    width: calc(100vw - min(var(--reader-sidebar-mobile-width, 208px), 58vw) - 16px);
+  }
+
+  .personal-reader__forecast-stat--remaining strong {
+    font-size: .72rem;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .personal-reader__forecast-stat--remaining span {
+    display: none;
   }
 }
 
-.personal-reader__forecast-days {
-  background: color-mix(in srgb, var(--category-accent) 18%, transparent);
-  border-radius: 999px;
-  color: var(--category-accent);
-  font: 900 clamp(.78rem, 1.3vw, .98rem)/1.1 system-ui, sans-serif;
-  padding: 9px 12px;
-  white-space: nowrap;
-}
-
-.personal-reader__forecast-date {
+.personal-reader__forecast-stat {
   display: grid;
   gap: 2px;
-  justify-items: start;
-  text-align: left;
+  min-width: 0;
+  place-content: center;
 }
 
-.personal-reader__forecast-date small {
+.personal-reader__forecast-stat--remaining {
+  border-inline: 1px solid color-mix(in srgb, var(--category-accent) 22%, transparent);
+  padding-inline: 10px;
+}
+
+.personal-reader__forecast-stat small {
   color: var(--reader-paper-muted);
-  font: 800 .62rem/1 system-ui, sans-serif;
+  font: 800 clamp(.5rem, 1vw, .64rem)/1 system-ui, sans-serif;
   letter-spacing: .06em;
   text-transform: uppercase;
 }
 
-.personal-reader__forecast-date strong {
-  font: 800 clamp(.8rem, 1.4vw, 1rem)/1.15 system-ui, sans-serif;
+.personal-reader__forecast-stat strong {
+  color: var(--reader-paper-text);
+  font: 900 clamp(.75rem, 1.5vw, 1.08rem)/1.15 system-ui, sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.personal-reader__forecast:hover,
-.personal-reader__forecast:focus-visible {
-  border-color: var(--category-accent);
-  box-shadow: 0 10px 28px rgba(17, 24, 39, .22), 0 0 0 3px color-mix(in srgb, var(--category-accent) 16%, transparent);
-  opacity: 1;
-  outline: none;
+.personal-reader__forecast-stat--remaining strong {
+  font-size: clamp(.7rem, 1.3vw, .98rem);
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.personal-reader__forecast-stat--read strong {
+  color: #31c6d4;
+}
+
+.personal-reader__forecast-stat--goal strong {
+  color: #9d6cff;
+}
+
+.personal-reader__forecast-stat span {
+  color: var(--reader-paper-muted);
+  font: 700 clamp(.5rem, 1vw, .64rem)/1.1 system-ui, sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.personal-reader__goal-progress {
+  background: color-mix(in srgb, var(--reader-paper-muted) 18%, transparent);
+  border-radius: 999px;
+  box-shadow: inset 0 1px 2px rgba(17, 24, 39, .16);
+  grid-column: 1 / -1;
+  height: 8px;
+  overflow: hidden;
+}
+
+.personal-reader__goal-progress > span {
+  animation: reader-goal-glow 2.4s ease-in-out infinite;
+  background: linear-gradient(90deg, #18c7d8 0%, #4c8dff 38%, #9d5cff 72%, #ff5ca8 100%);
+  border-radius: inherit;
+  box-shadow: 0 0 14px color-mix(in srgb, #7d6cff 65%, transparent);
+  display: block;
+  height: 100%;
+  min-width: 5px;
+  position: relative;
+  transition: width 700ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.personal-reader__goal-progress > span::after {
+  animation: reader-goal-shimmer 1.8s linear infinite;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .72), transparent);
+  content: '';
+  inset: 0;
+  position: absolute;
+  transform: translateX(-100%);
+}
+
+.personal-reader__forecast--complete,
+.personal-reader__forecast--exceeded {
+  border-color: color-mix(in srgb, #44d7a8 55%, var(--app-border-strong));
+  box-shadow: 0 8px 28px rgba(17, 24, 39, .18), 0 0 18px rgba(68, 215, 168, .16);
+}
+
+@keyframes reader-goal-shimmer {
+  to { transform: translateX(100%); }
+}
+
+@keyframes reader-goal-glow {
+  0%, 100% { filter: saturate(1); }
+  50% { filter: saturate(1.35) brightness(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .personal-reader__goal-progress > span,
+  .personal-reader__goal-progress > span::after {
+    animation: none;
+  }
 }
 
 .personal-reader__content--dragging {
@@ -2676,69 +2752,11 @@ body.body--dark .personal-reader__sidebar {
   font-size: 0.8em;
 }
 
-.personal-reader__sidebar .personal-reader__daily-goal-heading span { font-size: 0.72em; }
-.personal-reader__sidebar .personal-reader__daily-goal-heading strong { font-size: 1em; }
-.personal-reader__sidebar .personal-reader__daily-goal p { font-size: 0.8em; }
-.personal-reader__sidebar .personal-reader__daily-goal small { font-size: 0.68em; }
 .personal-reader__sidebar .personal-reader__speech-copy strong { font-size: 1em; }
 .personal-reader__sidebar .personal-reader__speech-copy span,
 .personal-reader__sidebar .personal-reader__speech-stats span,
 .personal-reader__sidebar .personal-reader__speech-coach small { font-size: 0.7em; }
 .personal-reader__sidebar .personal-reader__speech-stats strong { font-size: 1.25em; }
-
-.personal-reader__daily-goal {
-  background: color-mix(in srgb, var(--category-accent) 8%, var(--app-surface));
-  border: 1px solid var(--category-border);
-  border-radius: var(--app-radius-md);
-  display: grid;
-  gap: 5px;
-  padding: 9px;
-}
-
-.personal-reader__daily-goal--complete,
-.personal-reader__daily-goal--exceeded {
-  background: color-mix(in srgb, var(--q-positive) 10%, var(--app-surface));
-  border-color: color-mix(in srgb, var(--q-positive) 45%, var(--app-border));
-}
-
-.personal-reader__daily-goal-heading {
-  align-items: baseline;
-  display: flex;
-  gap: 6px;
-  justify-content: space-between;
-}
-
-.personal-reader__daily-goal-heading span {
-  color: var(--app-muted-strong);
-  font-size: 0.72rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.personal-reader__daily-goal-heading strong {
-  color: var(--app-text-strong);
-  font-size: 1rem;
-  white-space: nowrap;
-}
-
-.personal-reader__daily-goal p,
-.personal-reader__daily-goal small {
-  margin: 0;
-}
-
-.personal-reader__annual-pace {
-  border-top: 1px solid var(--category-border);
-  display: grid;
-  gap: 4px;
-  margin-top: 2px;
-  padding-top: 6px;
-}
-
-.personal-reader__annual-pace--ahead small {
-  color: var(--q-positive);
-  font-weight: 700;
-}
 
 .personal-reader__speech-coach {
   align-items: center;
@@ -3165,19 +3183,6 @@ body.body--dark .personal-reader__sidebar {
 @keyframes reader-speech-pulse {
   0%, 100% { opacity: .2; transform: scale(.9); }
   50% { opacity: .48; transform: scale(1); }
-}
-
-.personal-reader__daily-goal p {
-  color: var(--app-text-strong);
-  font-size: 0.8rem;
-  font-weight: 800;
-  line-height: 1.25;
-}
-
-.personal-reader__daily-goal small {
-  color: var(--app-muted-strong);
-  font-size: 0.68rem;
-  line-height: 1.25;
 }
 
 .personal-reader__lookup {
@@ -4190,20 +4195,6 @@ body.body--dark .personal-reader__lookup-error {
   .personal-reader__sidebar {
     gap: 12px;
     padding: max(10px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) 8px;
-  }
-
-  .personal-reader__daily-goal {
-    gap: 6px;
-    padding: 8px;
-  }
-
-  .personal-reader__daily-goal-heading strong {
-    font-size: 0.82rem;
-  }
-
-  .personal-reader__daily-goal small {
-    display: block;
-    font-size: .62rem;
   }
 
   .personal-reader__speech-coach {

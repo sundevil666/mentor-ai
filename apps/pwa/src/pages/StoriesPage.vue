@@ -182,18 +182,38 @@
           @touchcancel="resetReaderTouch"
           @wheel="handleReaderWheel"
         >
-          <button
+          <section
             v-if="readingMode && selectedBook"
             class="personal-reader__forecast"
-            type="button"
+            :class="`personal-reader__forecast--${dailyReadingGoalState}`"
             :aria-label="bookReadingForecastAriaLabel"
           >
-            <span class="personal-reader__forecast-days">{{ bookReadingDaysLabel }}</span>
-            <span class="personal-reader__forecast-date">
-              <small>Estimated finish</small>
-              <strong>{{ bookReadingFinishDate }}</strong>
-            </span>
-          </button>
+            <div class="personal-reader__forecast-stat personal-reader__forecast-stat--read">
+              <small>Read today</small>
+              <strong>{{ dailyReadingWords.toLocaleString('en') }}</strong>
+              <span>words</span>
+            </div>
+            <div class="personal-reader__forecast-stat personal-reader__forecast-stat--remaining">
+              <small>Book remaining</small>
+              <strong>{{ bookReadingDaysLabel }}</strong>
+              <span>Finish {{ bookReadingFinishDate }}</span>
+            </div>
+            <div class="personal-reader__forecast-stat personal-reader__forecast-stat--goal">
+              <small>Today's goal</small>
+              <strong>{{ dailyReadingTarget.toLocaleString('en') }}</strong>
+              <span>words</span>
+            </div>
+            <div
+              class="personal-reader__goal-progress"
+              role="progressbar"
+              aria-label="Today's reading goal progress"
+              aria-valuemin="0"
+              :aria-valuemax="dailyReadingTarget"
+              :aria-valuenow="dailyReadingWords"
+            >
+              <span :style="{ width: `${dailyReadingProgressRatio * 100}%` }" />
+            </div>
+          </section>
           <article ref="readerPaper" class="personal-reader__paper" :style="{ fontSize: `${readerFontSize}px` }" @click="handleReaderTextTap">
             <section
               v-for="(page, pageIndex) in renderedBookPages"
@@ -274,31 +294,6 @@
             :loading="bookCleanupRunning"
             @click="cleanCurrentBookText"
           />
-
-          <section class="personal-reader__daily-goal" :class="`personal-reader__daily-goal--${dailyReadingGoalState}`" aria-label="Today's reading goal">
-            <div class="personal-reader__daily-goal-heading">
-              <span>Today</span>
-              <strong>{{ dailyReadingWords.toLocaleString('en') }} / {{ dailyReadingTarget.toLocaleString('en') }}</strong>
-            </div>
-            <q-linear-progress
-              rounded
-              size="12px"
-              :value="dailyReadingProgressRatio"
-              :color="dailyReadingGoalState === 'exceeded' ? 'positive' : 'primary'"
-              track-color="grey-3"
-            />
-            <p>{{ dailyReadingGoalMessage }}</p>
-            <small>{{ dailyReadingWordsRemaining.toLocaleString('en') }} words left today · counted from completed pages</small>
-            <small v-if="dailyReadingTarget > dailyReadingGoalWords">Your recent average is raising the level above the 3,000-word base.</small>
-            <div class="personal-reader__annual-pace" :class="{ 'personal-reader__annual-pace--ahead': annualReadingPaceBalance >= 0 }">
-              <div class="personal-reader__daily-goal-heading">
-                <span>Year pace</span>
-                <strong>{{ annualReadingPaceTotal.toLocaleString('en') }} / {{ annualReadingPaceExpected.toLocaleString('en') }}</strong>
-              </div>
-              <small>{{ annualReadingPaceMessage }}</small>
-              <small>Calendar year · days before tracking use the 3,000-word base.</small>
-            </div>
-          </section>
 
           <section class="personal-reader__speech-coach" :class="`personal-reader__speech-coach--${readingSpeechStatus}`" aria-live="polite" aria-label="Reading pronunciation coach">
             <div class="personal-reader__reading-actions">
@@ -571,7 +566,7 @@ import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot,
 import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
-import { annualReadingPace, annualReadingPaceMessage as getAnnualReadingPaceMessage, createDailyReadingProgress, dailyReadingGoalWords, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, readingGoalMessage, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
+import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { activeReadingHighlightIndexes, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, previewTabletReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { chooseReadingResumeState, readingDeviceHeartbeatMs, readingDeviceLabel } from 'src/services/reading-device-sync';
 import { queueReadingTranscript, syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
@@ -769,10 +764,8 @@ const bookPageOptions = computed(() => selectedBookPages.value.map((page, index)
 })));
 const dailyReadingWords = computed(() => dailyWordsRead(dailyReadingProgress.value));
 const dailyReadingTarget = computed(() => dailyReadingTargetWords(dailyReadingProgress.value));
-const dailyReadingWordsRemaining = computed(() => Math.max(0, dailyReadingTarget.value - dailyReadingWords.value));
 const dailyReadingProgressRatio = computed(() => Math.min(1, dailyReadingWords.value / dailyReadingTarget.value));
 const dailyReadingGoalState = computed(() => dailyReadingWords.value >= dailyReadingTarget.value * 1.5 ? 'exceeded' : dailyReadingWords.value >= dailyReadingTarget.value ? 'complete' : 'building');
-const dailyReadingGoalMessage = computed(() => readingGoalMessage(dailyReadingWords.value, dailyReadingTarget.value));
 const currentBookReadingForecast = computed(() => bookReadingForecast(
   selectedBook.value?.wordCount ?? 0,
   readerFurthestWordPosition.value,
@@ -788,11 +781,6 @@ const bookReadingFinishDate = computed(() => currentBookReadingForecast.value.fi
   year: 'numeric',
 }));
 const bookReadingForecastAriaLabel = computed(() => `${bookReadingDaysLabel.value}. Estimated finish ${bookReadingFinishDate.value}, at ${dailyReadingTarget.value.toLocaleString('en')} words per reading day.`);
-const annualReadingPaceSummary = computed(() => annualReadingPace(dailyReadingProgress.value));
-const annualReadingPaceTotal = computed(() => annualReadingPaceSummary.value.actualWords);
-const annualReadingPaceExpected = computed(() => annualReadingPaceSummary.value.expectedWords);
-const annualReadingPaceBalance = computed(() => annualReadingPaceSummary.value.balanceWords);
-const annualReadingPaceMessage = computed(() => getAnnualReadingPaceMessage(annualReadingPaceBalance.value, dailyReadingTarget.value));
 const readerSidebarScalePercent = computed(() => 100 + readerSidebarScale.value * 10);
 const readerSidebarStyle = computed(() => ({
   '--reader-sidebar-width': `${280 + readerSidebarScale.value * 30}px`,
