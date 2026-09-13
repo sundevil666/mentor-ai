@@ -24,13 +24,13 @@
           </div>
           <div class="storage-category-summary">
             <span>{{ categoryLessons(category.id).length }} lessons · {{ formatBytes(categoryBytes(category.id)) }}</span>
-            <q-btn flat no-caps color="negative" icon="delete_sweep" label="Clear category" :disable="categoryLessons(category.id).length === 0" @click="clearCategory(category.id)" />
+            <q-btn round flat color="negative" icon="delete_sweep" :aria-label="`Remove all ${category.label} from offline storage`" :disable="categoryLessons(category.id).length === 0" @click="clearCategory(category.id)"><q-tooltip>Remove all from offline storage</q-tooltip></q-btn>
           </div>
           <q-list v-if="categoryLessons(category.id).length" separator class="offline-lesson-list">
             <q-item v-for="lesson in categoryLessons(category.id)" :key="lesson.id">
               <q-item-section avatar><q-avatar color="primary" text-color="white" :icon="category.icon" /></q-item-section>
               <q-item-section><q-item-label>{{ lesson.title }}</q-item-label><q-item-label caption>{{ formatBytes(lesson.estimatedBytes) }} · Last opened {{ formatDate(lesson.lastOpenedAt) }}</q-item-label></q-item-section>
-              <q-item-section side><q-btn round flat color="negative" icon="delete_outline" :aria-label="`Delete ${lesson.title}`" @click="removeLesson(lesson)" /></q-item-section>
+              <q-item-section side><q-btn round flat color="negative" icon="delete_outline" :aria-label="`Remove ${lesson.title} from offline storage`" @click="removeLesson(lesson)" /></q-item-section>
             </q-item>
           </q-list>
           <div v-else class="storage-empty"><q-icon name="cloud_off" size="42px" /><strong>No saved lessons</strong><span>Downloaded {{ category.label.toLowerCase() }} lessons will appear here.</span></div>
@@ -55,6 +55,7 @@ import { Notify } from 'quasar';
 import { computed, onMounted, ref } from 'vue';
 import { formatDisplayDate } from 'src/services/date-format';
 import { cleanupExpiredOfflineLessons, clearOfflineCategory, migrateLegacySpeechDownloads, offlineCategories, readOfflineLessons, readOfflineMaxBytes, readOfflineRetention, refreshOfflineSizes, removeOfflineLesson, saveOfflineMaxBytes, saveOfflineRetention, type OfflineCategory, type OfflineLesson, type RetentionDays } from 'src/services/offline-library';
+import { confirmOfflineRemoval } from 'src/services/offline-removal-confirmation';
 import { useAppStore } from 'src/stores/app-store';
 
 const activeTab = ref<OfflineCategory | 'statistics'>('listening');
@@ -78,8 +79,8 @@ function categoryBytes(category: OfflineCategory) { return categoryLessons(categ
 function categoryPercent(category: OfflineCategory) { return totalBytes.value ? Math.round(categoryBytes(category) / totalBytes.value * 100) : 0; }
 function savePeriod(category: OfflineCategory) { saveOfflineRetention(category, retention.value[category] as RetentionDays); }
 async function saveLimit() { saveOfflineMaxBytes(maxBytes.value); await cleanupExpiredOfflineLessons(); lessons.value = readOfflineLessons(); }
-async function removeLesson(lesson: OfflineLesson) { await removeOfflineLesson(lesson); lessons.value = readOfflineLessons(); Notify.create({ type: 'positive', message: `${lesson.title} removed from this device.` }); }
-async function clearCategory(category: OfflineCategory) { await clearOfflineCategory(category); lessons.value = readOfflineLessons(); Notify.create({ type: 'positive', message: 'Category storage cleared.' }); }
+async function removeLesson(lesson: OfflineLesson) { if (!(await confirmOfflineRemoval(lesson.title))) return; await removeOfflineLesson(lesson); lessons.value = readOfflineLessons(); Notify.create({ type: 'positive', message: `${lesson.title} removed from this device.` }); }
+async function clearCategory(category: OfflineCategory) { const details = offlineCategories.find((item) => item.id === category); if (!(await confirmOfflineRemoval(details?.label ?? 'This category', `All saved ${details?.label.toLowerCase() ?? 'category'} content will be removed from offline storage on this device.`))) return; await clearOfflineCategory(category); lessons.value = readOfflineLessons(); Notify.create({ type: 'positive', message: 'Category storage cleared.' }); }
 function formatBytes(bytes: number) { if (!bytes) return '0 MB'; return bytes >= 1_000_000 ? `${(bytes / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1_000))} KB`; }
 function formatDate(value: string) { return formatDisplayDate(value); }
 </script>

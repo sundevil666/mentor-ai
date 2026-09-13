@@ -47,7 +47,7 @@
           </div>
           <ContentMentorFeedback category="audio" :content-id="item.id" hide-select-after-feedback>
             <template v-if="cachedUrls.has(item.sourceUrl)" #action>
-              <q-btn :aria-label="`Delete ${item.title} from offline storage`" color="primary" flat icon="delete_outline" round :loading="busyId === item.id" @click="removeAudio(item)" />
+              <q-btn :aria-label="`Remove ${item.title} from offline storage`" color="negative" flat icon="delete_outline" round :loading="busyId === item.id" @click="removeAudio(item)" />
             </template>
           </ContentMentorFeedback>
         </article>
@@ -67,7 +67,7 @@
           </div>
           <ContentMentorFeedback category="audio" :content-id="selectedAudio.id">
             <template v-if="cachedUrls.has(selectedAudio.sourceUrl)" #action>
-              <q-btn aria-label="Remove offline copy" color="primary" flat icon="delete_outline" round :loading="busyId === selectedAudio.id" @click="removeAudio(selectedAudio)" />
+              <q-btn :aria-label="`Remove ${selectedAudio.title} from offline storage`" color="negative" flat icon="delete_outline" round :loading="busyId === selectedAudio.id" @click="removeAudio(selectedAudio)" />
             </template>
           </ContentMentorFeedback>
         </div>
@@ -119,6 +119,7 @@ import { Notify } from 'quasar';
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { audioLibrary, deleteOfflineAudio, formatAudioDuration, formatAudioSize, getCachedAudioUrls, resolveAudioPlaybackUrl, saveAudioOffline, type LibraryAudio } from 'src/services/audio-library';
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineAudio } from 'src/services/offline-library';
+import { confirmOfflineRemoval } from 'src/services/offline-removal-confirmation';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import AppDetailLayout from 'src/components/AppDetailLayout.vue';
 import { loadContentEngagementSummaries, recordContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
@@ -221,6 +222,7 @@ async function downloadAudio(item: LibraryAudio) {
 }
 
 async function removeAudio(item: LibraryAudio) {
+  if (!(await confirmOfflineRemoval(item.title))) return;
   busyId.value = item.id;
   await deleteOfflineAudio(item);
   forgetOfflineLesson(item.id, 'audio');

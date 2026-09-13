@@ -12,7 +12,7 @@ export default configure(() => ({
         position: 'top-right',
       },
     },
-    plugins: ['Notify'],
+    plugins: ['Dialog', 'Notify'],
   },
   build: {
     env: {

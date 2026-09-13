@@ -123,7 +123,7 @@
             </div>
             <q-btn
               :aria-label="patternOffline ? 'Remove offline phrase audio' : 'Download phrase audio for offline use'"
-              color="primary"
+              :color="patternOffline ? 'negative' : 'primary'"
               flat
               :icon="patternOffline ? 'delete_outline' : 'download_for_offline'"
               :loading="playlistPreparing"
@@ -307,6 +307,7 @@ import { patternLibrary, type PhrasePatternExample } from 'src/services/pattern-
 import { expressionLibrary, expressionPractice, type EnglishExpression } from 'src/services/expression-library';
 import { deleteSpeechBatch, isSpeechBatchCached, preloadSpeechBatch, speakWithPreferredVoice, stopSpeech } from 'src/services/speech-synthesis';
 import { deleteOutdatedPatternPlaylists, deletePatternPlaylist, getCachedPatternPlaylist, hasOutdatedPatternPlaylist, preparePatternPlaylist } from 'src/services/pattern-playlist';
+import { confirmOfflineRemoval } from 'src/services/offline-removal-confirmation';
 import { configurePlaybackAudioSession } from 'src/services/audio-session';
 import AppAudioDock from 'src/components/AppAudioDock.vue';
 import AppDetailLayout from 'src/components/AppDetailLayout.vue';
@@ -498,8 +499,12 @@ async function downloadPlaylist() {
   if (practice && await ensurePatternOffline()) Notify.create({ type: 'positive', icon: 'offline_pin', message: `${practice.title} playlist and all phrases downloaded for offline practice.` });
 }
 
-function togglePatternOffline() {
-  if (patternOffline.value) void removePlaylist();
+async function togglePatternOffline() {
+  if (patternOffline.value) {
+    const practice = selectedPractice.value;
+    if (!practice || !(await confirmOfflineRemoval(practice.title, `${practice.title} playlist and phrase audio will be removed from offline storage on this device.`))) return;
+    await removePlaylist();
+  }
   else void downloadPlaylist();
 }
 

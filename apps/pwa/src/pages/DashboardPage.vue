@@ -141,13 +141,15 @@
                 <q-icon :name="newLessonOfflineStatus[lesson.id] === 'ready' ? 'offline_pin' : 'cloud_queue'" />
                 <span>{{ newLessonOfflineLabel(lesson.id) }}</span>
                 <q-btn
-                  color="primary"
+                  :aria-label="newLessonOfflineStatus[lesson.id] === 'ready' ? `Remove ${lesson.title} from offline storage` : `Download ${lesson.title} offline`"
+                  :color="newLessonOfflineStatus[lesson.id] === 'ready' ? 'negative' : 'primary'"
                   dense
                   flat
                   no-caps
                   :loading="newLessonOfflineStatus[lesson.id] === 'working'"
                   :icon="newLessonOfflineStatus[lesson.id] === 'ready' ? 'delete_outline' : 'download_for_offline'"
-                  :label="newLessonOfflineStatus[lesson.id] === 'ready' ? 'Remove offline' : 'Download offline'"
+                  :label="newLessonOfflineStatus[lesson.id] === 'ready' ? undefined : 'Download offline'"
+                  :round="newLessonOfflineStatus[lesson.id] === 'ready'"
                   @click="toggleNewLessonOffline(lesson)"
                 />
               </div>
@@ -779,6 +781,7 @@ import {
   replaceOfflineSpeechLesson,
   removeOfflineLesson,
 } from 'src/services/offline-library';
+import { confirmOfflineRemoval } from 'src/services/offline-removal-confirmation';
 import { fetchCurrentLesson } from 'src/services/api-client';
 import {
   downloadGeneratedLessonOffline,
@@ -1463,9 +1466,10 @@ async function refreshNewLessonCatalog() {
 
 async function toggleNewLessonOffline(lesson: GeneratedLesson) {
   if (newLessonOfflineStatus.value[lesson.id] === 'working') return;
+  const saved = readOfflineLessons().find((item) => item.id === lesson.id && item.category === 'lessons');
+  if (saved && !(await confirmOfflineRemoval(lesson.title))) return;
   newLessonOfflineStatus.value[lesson.id] = 'working';
   try {
-    const saved = readOfflineLessons().find((item) => item.id === lesson.id && item.category === 'lessons');
     if (saved) {
       await removeOfflineLesson(saved);
       newLessonOfflineStatus.value[lesson.id] = 'idle';

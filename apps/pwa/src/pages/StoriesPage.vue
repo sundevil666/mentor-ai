@@ -126,9 +126,9 @@
             >
               <template #action>
                 <q-btn
-                  :aria-label="isSaved(selectedStory) ? 'Delete offline story' : 'Save story offline'"
+                  :aria-label="isSaved(selectedStory) ? `Remove ${selectedStory.title} from offline storage` : `Save ${selectedStory.title} offline`"
                   class="video-detail__offline-action"
-                  color="primary"
+                  :color="isSaved(selectedStory) ? 'negative' : 'primary'"
                   flat
                   :icon="isSaved(selectedStory) ? 'delete_outline' : 'download_for_offline'"
                   round
@@ -510,6 +510,7 @@ import { loadContentEngagementSummaries, recordContentEngagement, type ContentEn
 import { getContentProgressDeviceId, loadContentProgress, saveContentProgress, syncAllContentProgress } from 'src/services/content-progress';
 import { shouldUseSyncedReaderPosition } from 'src/services/content-progress-merge';
 import { forgetOfflineLesson, markOfflineLessonOpened, registerOfflineStory } from 'src/services/offline-library';
+import { confirmOfflineRemoval } from 'src/services/offline-removal-confirmation';
 import { deleteOfflineStory, formatStoryDuration, formatStorySize, getCachedStoryUrls, saveStoryOffline, storyLibrary, type LibraryStory } from 'src/services/story-library';
 import { useAppStore } from 'src/stores/app-store';
 import { configureCaptureAudioSession, configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
@@ -2483,9 +2484,11 @@ function persistProgress(completed = false) {
   void saveContentProgress({ studentId: appStore.studentId, category: 'audio', contentId: story.id, position: audio.currentTime, furthestPosition: audio.currentTime, duration: duration.value || story.durationSeconds, completed, updatedAt: new Date().toISOString() });
 }
 async function toggleOffline(story: LibraryStory) {
+  const saved = isSaved(story);
+  if (saved && !(await confirmOfflineRemoval(story.title))) return;
   busy.value = true;
   try {
-    if (isSaved(story)) { await deleteOfflineStory(story); forgetOfflineLesson(story.id, 'stories'); }
+    if (saved) { await deleteOfflineStory(story); forgetOfflineLesson(story.id, 'stories'); }
     else { await saveStoryOffline(story); registerOfflineStory(story); }
     cachedUrls.value = await getCachedStoryUrls();
   } catch { Notify.create({ type: 'negative', message: 'Could not update offline storage.' }); }
