@@ -368,7 +368,7 @@
               />
             </div>
             <div
-              v-if="readingSpeechActive || readingSpeechDebugEntries.length > 1"
+              v-if="readingSpeechActive || readingSpeechDebugEntryCount > 1"
               class="personal-reader__log-status"
               :class="{ 'personal-reader__log-status--recording': readingSpeechActive }"
               aria-live="polite"
@@ -377,13 +377,13 @@
                 <q-icon :name="readingSpeechActive ? 'fiber_manual_record' : 'pause_circle'" />
                 <span>
                   <strong>{{ readingSpeechActive ? 'Recognition log is recording' : 'Recognition log is paused' }}</strong>
-                  <small>{{ readingSpeechDebugEntries.length }} log entries</small>
+                  <small>{{ readingSpeechDebugEntryCount }} log entries</small>
                 </span>
               </span>
               <q-btn dense flat icon="content_copy" label="Copy log" no-caps @click="copyReadingSpeechDebugLog" />
             </div>
             <q-btn
-              v-if="readingSpeechActive || readingSpeechDebugEntries.length > 1"
+              v-if="readingSpeechActive || readingSpeechDebugEntryCount > 1"
               class="personal-reader__diagnostics-toggle"
               :color="readingSpeechDiagnosticsOpen ? 'primary' : 'grey-7'"
               dense
@@ -656,6 +656,7 @@ const activeReaderWordIndexes = ref(new Set<number>());
 const readingSpeechAcceptedWords = ref(0);
 const readingSpeechSpokenWords = ref(0);
 const readingSpeechDebugEntries = ref<string[]>(['Waiting for microphone start.']);
+const readingSpeechDebugEntryCount = ref(1);
 const readingSpeechDiagnosticsOpen = ref(false);
 const readingSpeechLastTranscript = ref('');
 const readingSpeechLastDecision = ref('Waiting for recognition.');
@@ -671,6 +672,8 @@ let readingSpeechAudioContext: AudioContext | null = null;
 let readingSpeechAnimationFrame = 0;
 let readingSpeechSessionId = 0;
 let readingSpeechDebugStartedAt = 0;
+let readingSpeechDebugBuffer = ['Waiting for microphone start.'];
+let readingSpeechDebugUiTimer = 0;
 let readingSpeechLastSignalState = false;
 let readingSpeechPaceWordCount = 0;
 let readingSpeechPaceSampleAt = 0;
@@ -870,6 +873,8 @@ onUnmounted(() => {
   window.clearTimeout(readerWheelSettleTimer);
   cancelAnimationFrame(readerScrollAnimationFrame);
   stopReadingSpeech('idle');
+  window.clearTimeout(readingSpeechDebugUiTimer);
+  readingSpeechDebugUiTimer = 0;
 });
 
 async function openStory(id: string) {
@@ -1967,14 +1972,25 @@ function updateReadingSpeechChunkPace(wordCount: number) {
 
 function startReadingSpeechDebug(engine: string) {
   readingSpeechDebugStartedAt = performance.now();
+  readingSpeechDebugBuffer = [];
   readingSpeechDebugEntries.value = [];
+  readingSpeechDebugEntryCount.value = 0;
+  window.clearTimeout(readingSpeechDebugUiTimer);
+  readingSpeechDebugUiTimer = 0;
   appendReadingSpeechDebug(`Start. Engine=${engine}; platform=${navigator.platform || 'unknown'}; standalone=${window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone)}; AudioWorklet=${typeof window.AudioContext !== 'undefined' && 'audioWorklet' in window.AudioContext.prototype}; AudioContext=${typeof window.AudioContext !== 'undefined'}.`);
   appendReadingSpeechDebug(`Voice frame: viewport=${window.innerWidth}x${window.innerHeight}; fullscreen=${readingMode.value}; reducedMotion=${window.matchMedia('(prefers-reduced-motion: reduce)').matches}; animation=recording-pulse+voice-wave.`);
 }
 
 function appendReadingSpeechDebug(message: string) {
   const elapsed = readingSpeechDebugStartedAt ? ((performance.now() - readingSpeechDebugStartedAt) / 1_000).toFixed(1) : '0.0';
-  readingSpeechDebugEntries.value = [...readingSpeechDebugEntries.value.slice(-119), `[+${elapsed}s] ${message}`];
+  readingSpeechDebugBuffer.push(`[+${elapsed}s] ${message}`);
+  if (readingSpeechDebugBuffer.length > 120) readingSpeechDebugBuffer.splice(0, readingSpeechDebugBuffer.length - 120);
+  if (readingSpeechDebugUiTimer) return;
+  readingSpeechDebugUiTimer = window.setTimeout(() => {
+    readingSpeechDebugUiTimer = 0;
+    readingSpeechDebugEntryCount.value = readingSpeechDebugBuffer.length;
+    readingSpeechDebugEntries.value = [...readingSpeechDebugBuffer];
+  }, 1_000);
 }
 
 function updateReadingSpeechDiagnosticDecision(transcript: string, matchedWordIndexes: readonly number[], interim: boolean) {
@@ -2004,12 +2020,32 @@ async function copyReadingSpeechDebugLog() {
     `Last heard: ${readingSpeechLastTranscript.value || 'nothing'}`,
     `Last decision: ${readingSpeechLastDecision.value}`,
   ];
-  try {
-    await navigator.clipboard.writeText([...header, '', ...readingSpeechDebugEntries.value].join('\n'));
-    Notify.create({ type: 'positive', message: 'Recognition test log copied.' });
-  } catch {
-    Notify.create({ type: 'negative', message: 'Could not copy the recognition test log.' });
+  const logText = [...header, '', ...readingSpeechDebugBuffer].join('\n');
+  const textarea = document.createElement('textarea');
+  textarea.value = logText;
+  textarea.style.position = 'fixed';
+  textarea.style.left = '0';
+  textarea.style.top = '0';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+  let copied = document.execCommand('copy');
+  textarea.remove();
+  if (!copied) {
+    try {
+      await navigator.clipboard.writeText(logText);
+      copied = true;
+    } catch {
+      copied = false;
+    }
   }
+  Notify.create({
+    type: copied ? 'positive' : 'negative',
+    icon: copied ? 'content_copy' : 'error_outline',
+    message: copied ? 'Recognition log copied.' : 'Could not copy the recognition log.',
+  });
 }
 
 function applyReadingMode(value: boolean) {
