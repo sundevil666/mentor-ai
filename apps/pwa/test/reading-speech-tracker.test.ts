@@ -183,6 +183,21 @@ describe('reading speech tracking', () => {
     assert.equal(recovered.matchedWordIndexes.includes(tabletReference.indexOf('only')), false);
   });
 
+  it('does not jump across a long unread range while recovering a stale tablet position', () => {
+    const tabletReference = tokenizeReadingSpeech([
+      'trusted exact phrase starts here and stays local',
+      ...Array.from({ length: 70 }, (_, index) => index % 3 === 0 ? 'the' : `gap${index}`),
+      'the reader has not reached this ending yet',
+    ].join(' '));
+    const transcript = 'trusted exact phrase starts here and stays local the the the the the the the the';
+
+    const recovered = recoverReadingSpeechPosition(tabletReference, transcript, 0);
+
+    assert.equal(recovered.accepted, true);
+    assert.ok(recovered.anchorIndex < 20);
+    assert.ok(recovered.matchedWordIndexes.at(-1)! - recovered.matchedWordIndexes[0]! < 20);
+  });
+
   it('accepts one recognized word only when it is exactly at the locked anchor', () => {
     const lockedReference = tokenizeReadingSpeech('please tell me no are you certain no');
 

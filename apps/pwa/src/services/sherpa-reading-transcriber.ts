@@ -9,7 +9,7 @@ type SherpaReadingTranscriberOptions = {
   onDebug?: (message: string) => void;
 };
 
-export type SherpaReadingTranscriber = { stop: () => void };
+export type SherpaReadingTranscriber = { stop: (flushFinal?: boolean) => void };
 
 let sharedWorker: Worker | null = null;
 let sharedWorkerReady = false;
@@ -68,6 +68,7 @@ export function startSherpaReadingTranscriber(stream: MediaStream, options: Sher
     if (event.data.sessionId !== sessionId) return;
     if (event.data.type === 'interim' && event.data.text) options.onInterim(event.data.text);
     if (event.data.type === 'final' && event.data.text) options.onFinal(event.data.text);
+    if (event.data.type === 'stopped') detach();
   };
   worker.onmessage = handleMessage;
   worker.onerror = (event) => {
@@ -85,26 +86,31 @@ export function startSherpaReadingTranscriber(stream: MediaStream, options: Sher
   }
 
   return {
-    stop() {
-      stopped = true;
+    stop(flushFinal = false) {
       worker.postMessage({ type: 'stop', sessionId });
-      if (worker.onmessage === handleMessage) worker.onmessage = null;
-      worker.onerror = null;
-      processor && (processor.port.onmessage = null);
-      processor?.disconnect();
-      source?.disconnect();
-      silentOutput?.disconnect();
-      void context?.close();
-      context = null;
-      sharedWorkerIdleTimer = setTimeout(() => {
-        if (sharedWorker !== worker) return;
-        worker.terminate();
-        sharedWorker = null;
-        sharedWorkerReady = false;
-        sharedWorkerIdleTimer = null;
-      }, 60_000);
+      if (flushFinal) return;
+      detach();
     },
   };
+
+  function detach() {
+    stopped = true;
+    if (worker.onmessage === handleMessage) worker.onmessage = null;
+    worker.onerror = null;
+    processor && (processor.port.onmessage = null);
+    processor?.disconnect();
+    source?.disconnect();
+    silentOutput?.disconnect();
+    void context?.close();
+    context = null;
+    sharedWorkerIdleTimer = setTimeout(() => {
+      if (sharedWorker !== worker) return;
+      worker.terminate();
+      sharedWorker = null;
+      sharedWorkerReady = false;
+      sharedWorkerIdleTimer = null;
+    }, 60_000);
+  }
 }
 
 export function isSherpaReaderExperiment(): boolean {

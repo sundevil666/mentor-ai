@@ -109,7 +109,20 @@ export function recoverReadingSpeechPosition(referenceWords: readonly string[], 
     const alignedIndexes = new Set(aligned.matchedWordIndexes);
     const containsTrustedRun = Array.from({ length: exactRunLength }, (_, index) => exactRunStart + index)
       .every((wordIndex) => alignedIndexes.has(wordIndex));
-    if (aligned.accepted && containsTrustedRun) return aligned;
+    if (aligned.accepted && containsTrustedRun) {
+      const coherentIndexes = coherentRecoveredIndexes(
+        aligned.matchedWordIndexes,
+        exactRunStart,
+        exactRunLength,
+        spokenWords.length,
+      );
+      return {
+        accepted: true,
+        matchedWordIndexes: coherentIndexes,
+        coverage: coherentIndexes.length / Math.max(1, spokenWords.length),
+        anchorIndex: coherentIndexes.at(-1)! + 1,
+      };
+    }
   }
 
   // A long exact sequence is reliable even when Sherpa includes noisy words
@@ -144,6 +157,27 @@ export function recoverReadingSpeechPosition(referenceWords: readonly string[], 
     }
   }
   return bestMatch ?? rejected(anchorIndex);
+}
+
+function coherentRecoveredIndexes(indexes: readonly number[], trustedStart: number, trustedLength: number, spokenWordCount: number): number[] {
+  const trustedEnd = trustedStart + trustedLength - 1;
+  const maximumSpan = spokenWordCount + Math.max(8, Math.ceil(spokenWordCount * 0.25));
+  const ordered = [...new Set(indexes)].sort((left, right) => left - right);
+  let first = ordered.findIndex((wordIndex) => wordIndex === trustedStart);
+  let last = ordered.findIndex((wordIndex) => wordIndex === trustedEnd);
+  if (first < 0 || last < first) return Array.from({ length: trustedLength }, (_, index) => trustedStart + index);
+
+  while (first > 0) {
+    const candidate = ordered[first - 1]!;
+    if (ordered[first]! - candidate > 3 || ordered[last]! - candidate + 1 > maximumSpan) break;
+    first -= 1;
+  }
+  while (last + 1 < ordered.length) {
+    const candidate = ordered[last + 1]!;
+    if (candidate - ordered[last]! > 3 || candidate - ordered[first]! + 1 > maximumSpan) break;
+    last += 1;
+  }
+  return ordered.slice(first, last + 1);
 }
 
 function longestExactReadingRun(referenceWords: readonly string[], spokenWords: readonly string[]): ExactReadingRun | null {

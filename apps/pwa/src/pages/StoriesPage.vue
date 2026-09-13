@@ -667,6 +667,7 @@ let syncedReaderPositionUpdatedAt: string | undefined;
 let readingSpeechRecognition: ContinuousSpeechRecognition | null = null;
 let localReadingTranscriber: LocalReadingTranscriber | null = null;
 let sherpaReadingTranscriber: SherpaReadingTranscriber | null = null;
+let readingSpeechSherpaStopping = false;
 let readingSpeechStream: MediaStream | null = null;
 let readingSpeechAudioContext: AudioContext | null = null;
 let readingSpeechAnimationFrame = 0;
@@ -1590,6 +1591,7 @@ async function toggleReadingSpeech() {
 async function startReadingSpeech() {
   if (readingSpeechRecognition || readingSpeechStream || !readingMode.value) return;
   const sessionId = ++readingSpeechSessionId;
+  readingSpeechSherpaStopping = false;
   const useSherpaRecognition = isSherpaReaderExperiment();
   const useBrowserRecognition = !useSherpaRecognition && isSpeechRecognitionAvailable();
   const useLocalRecognition = !useSherpaRecognition && !useBrowserRecognition;
@@ -1702,6 +1704,11 @@ async function startReadingSpeech() {
           if (sessionId !== readingSpeechSessionId || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
           provisionalReaderWordIndexes.value = new Set();
           handleReadingSpeechTranscript(transcript, 'sherpa-onnx');
+          if (readingSpeechSherpaStopping) {
+            readingSpeechSherpaStopping = false;
+            readingSpeechStatus.value = 'paused';
+            readingSpeechMessage.value = 'Your highlighted words are kept. Tap Start listening when you are ready.';
+          }
         },
         onDebug: (message) => appendReadingSpeechDebug(message),
         onReady: () => {
@@ -1925,13 +1932,15 @@ async function startReadingSpeechMeter(stream: MediaStream, sessionId: number) {
   update();
 }
 function stopReadingSpeech(status: ReadingSpeechStatus) {
-  readingSpeechSessionId += 1;
+  const flushSherpaFinal = status === 'paused' && Boolean(sherpaReadingTranscriber);
+  readingSpeechSherpaStopping = flushSherpaFinal;
+  if (!flushSherpaFinal) readingSpeechSessionId += 1;
   appendReadingSpeechDebug(`Stopping microphone: status=${status}.`);
   readingSpeechRecognition?.stop();
   readingSpeechRecognition = null;
   localReadingTranscriber?.stop();
   localReadingTranscriber = null;
-  sherpaReadingTranscriber?.stop();
+  sherpaReadingTranscriber?.stop(flushSherpaFinal);
   sherpaReadingTranscriber = null;
   readingSpeechSuppressedForLookup = false;
   provisionalReaderWordIndexes.value = new Set();

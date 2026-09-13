@@ -38,9 +38,11 @@ self.onmessage = (event) => {
   }
   if (message.type === 'stop') {
     if (message.sessionId !== activeSession) return;
+    if (lastPartial) self.postMessage({ type: 'final', sessionId: activeSession, text: lastPartial });
     recognitionStream?.free();
     recognitionStream = null;
     lastPartial = '';
+    self.postMessage({ type: 'stopped', sessionId: activeSession });
     return;
   }
   if (message.type !== 'audio' || message.sessionId !== activeSession || !recognizer || !recognitionStream) return;
