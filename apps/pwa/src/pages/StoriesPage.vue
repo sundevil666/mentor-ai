@@ -365,6 +365,30 @@
                 @click="showMicrophoneAccessHelp"
               />
             </div>
+            <q-btn
+              class="personal-reader__diagnostics-toggle"
+              :color="readingSpeechDiagnosticsOpen ? 'primary' : 'grey-7'"
+              dense
+              flat
+              icon="bug_report"
+              label="Test recognition"
+              no-caps
+              @click="readingSpeechDiagnosticsOpen = !readingSpeechDiagnosticsOpen"
+            />
+            <div v-if="readingSpeechDiagnosticsOpen" class="personal-reader__diagnostics" aria-live="off">
+              <div class="personal-reader__diagnostics-current">
+                <span>Expected next</span>
+                <strong>#{{ readingSpeechAnchor + 1 }} · {{ readerReferenceWords[readingSpeechAnchor] || 'end of book' }}</strong>
+              </div>
+              <p><b>Heard:</b> {{ readingSpeechLastTranscript || 'nothing yet' }}</p>
+              <p><b>Decision:</b> {{ readingSpeechLastDecision }}</p>
+              <div class="personal-reader__diagnostics-actions">
+                <q-btn dense flat icon="my_location" label="Start from selected word" no-caps @click="useSelectedWordAsSpeechAnchor" />
+                <q-btn dense flat icon="content_copy" label="Copy log" no-caps @click="copyReadingSpeechDebugLog" />
+              </div>
+              <pre>{{ readingSpeechDebugEntries.join('\n') }}</pre>
+              <small>No microphone audio is stored. The log contains only recognition text and local word indexes.</small>
+            </div>
           </section>
 
           <section
@@ -615,7 +639,10 @@ const activeReaderWordIndexes = ref(new Set<number>());
 const readingSpeechAcceptedWords = ref(0);
 const readingSpeechSpokenWords = ref(0);
 const readingSpeechDebugEntries = ref<string[]>(['Waiting for microphone start.']);
-let readingSpeechAnchor = 0;
+const readingSpeechDiagnosticsOpen = ref(false);
+const readingSpeechLastTranscript = ref('');
+const readingSpeechLastDecision = ref('Waiting for recognition.');
+const readingSpeechAnchor = ref(0);
 let readingSpeechFurthestWordIndex = -1;
 let syncedReaderPositionWordIndex = -1;
 let syncedReaderPositionUpdatedAt: string | undefined;
@@ -1092,7 +1119,7 @@ function goToBookPage(pageIndex: number | null) {
   selectedBookChapterIndex.value = resolveBookChapterIndex(destinationPageIndex);
   scrollToReaderPage();
   persistBookProgress();
-  readingSpeechAnchor = getVisibleReaderWordAnchor();
+  readingSpeechAnchor.value = getVisibleReaderWordAnchor();
   provisionalReaderWordIndexes.value = new Set();
   activeReaderWordIndexes.value = new Set();
   void persistReaderNavigationProgress();
@@ -1548,9 +1575,11 @@ async function startReadingSpeech() {
   provisionalReaderWordIndexes.value = new Set();
   activeReaderWordIndexes.value = new Set();
   resetReadingSpeechPace();
-  readingSpeechAnchor = getVisibleReaderWordAnchor();
-  appendReadingSpeechDebug(`Reading anchor: word ${readingSpeechAnchor}.`);
-  appendReadingSpeechDebug(`Expected nearby text: "${readerReferenceWords.value.slice(readingSpeechAnchor, readingSpeechAnchor + 18).join(' ')}"`);
+  readingSpeechAnchor.value = getVisibleReaderWordAnchor();
+  readingSpeechLastTranscript.value = '';
+  readingSpeechLastDecision.value = 'Listening for the expected word.';
+  appendReadingSpeechDebug(`Reading anchor: word ${readingSpeechAnchor.value}.`);
+  appendReadingSpeechDebug(`Expected nearby text: "${readerReferenceWords.value.slice(readingSpeechAnchor.value, readingSpeechAnchor.value + 18).join(' ')}"`);
   if (useBrowserRecognition) {
     readingSpeechStatus.value = 'requesting';
     readingSpeechPermissionBlocked.value = false;
@@ -1566,7 +1595,8 @@ async function startReadingSpeech() {
           updateReadingSpeechPace(transcript);
           appendReadingSpeechDebug(`Interim text: "${transcript}"`);
           if (!readingSpeechRecognition || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
-          const previewWordIndexes = previewBrowserReadingWordIndexes(readerReferenceWords.value, transcript, readingSpeechAnchor);
+          const previewWordIndexes = previewBrowserReadingWordIndexes(readerReferenceWords.value, transcript, readingSpeechAnchor.value);
+          updateReadingSpeechDiagnosticDecision(transcript, previewWordIndexes, true);
           provisionalReaderWordIndexes.value = new Set(previewWordIndexes);
         },
         onFinal: (transcript) => {
@@ -1642,7 +1672,9 @@ async function startReadingSpeech() {
           if (sessionId !== readingSpeechSessionId || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
           updateReadingSpeechPace(transcript);
           appendReadingSpeechDebug(`Sherpa interim: "${transcript}"`);
-          provisionalReaderWordIndexes.value = new Set(previewBrowserReadingWordIndexes(readerReferenceWords.value, transcript, readingSpeechAnchor));
+          const previewWordIndexes = previewBrowserReadingWordIndexes(readerReferenceWords.value, transcript, readingSpeechAnchor.value);
+          updateReadingSpeechDiagnosticDecision(transcript, previewWordIndexes, true);
+          provisionalReaderWordIndexes.value = new Set(previewWordIndexes);
         },
         onFinal: (transcript) => {
           if (sessionId !== readingSpeechSessionId || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
@@ -1785,17 +1817,20 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     recognitionEngine,
   }).catch(() => undefined);
   const spokenCount = rawHeardWords.length;
-  const match = matchSequentialReadingSpeech(readerReferenceWords.value, transcript, readingSpeechAnchor);
+  readingSpeechLastTranscript.value = transcript;
+  const match = matchSequentialReadingSpeech(readerReferenceWords.value, transcript, readingSpeechAnchor.value);
   if (!match.accepted) {
-    appendReadingSpeechDebug(`Sequential match rejected at word ${readingSpeechAnchor}.`);
+    readingSpeechLastDecision.value = `Rejected. Still waiting for “${readerReferenceWords.value[readingSpeechAnchor.value] ?? 'end of book'}”.`;
+    appendReadingSpeechDebug(`Sequential match rejected at word ${readingSpeechAnchor.value}.`);
     readingSpeechStatus.value = 'noise';
     readingSpeechMessage.value = 'That did not match the next word. Try it again.';
     return;
   }
   const confirmedWordIndexes = match.matchedWordIndexes;
   const confirmedLastWord = confirmedWordIndexes.at(-1)!;
-  readingSpeechAnchor = match.anchorIndex;
-  appendReadingSpeechDebug(`Sequential match accepted: ${confirmedWordIndexes.length}/${rawHeardWords.length} words, indexes=${confirmedWordIndexes[0]}–${confirmedLastWord}, next=${readingSpeechAnchor}.`);
+  readingSpeechAnchor.value = match.anchorIndex;
+  readingSpeechLastDecision.value = `Accepted ${confirmedWordIndexes.length} word${confirmedWordIndexes.length === 1 ? '' : 's'}. Next: “${readerReferenceWords.value[readingSpeechAnchor.value] ?? 'end of book'}”.`;
+  appendReadingSpeechDebug(`Sequential match accepted: ${confirmedWordIndexes.length}/${rawHeardWords.length} words, indexes=${confirmedWordIndexes[0]}–${confirmedLastWord}, next=${readingSpeechAnchor.value}.`);
   readingSpeechAcceptedWords.value += confirmedWordIndexes.length;
   readingSpeechSpokenWords.value += spokenCount;
   const nextSpoken = new Set(spokenReaderWordIndexes.value);
@@ -1815,14 +1850,14 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
 }
 function getVisibleReaderWordAnchor() {
   const viewport = readerContent.value;
-  if (!viewport) return readingSpeechAnchor;
+  if (!viewport) return readingSpeechAnchor.value;
   const viewportBounds = viewport.getBoundingClientRect();
   const visibleWord = Array.from(viewport.querySelectorAll<HTMLElement>('[data-reader-word-index]')).find((word) => {
     const bounds = word.getBoundingClientRect();
     return bounds.right > viewportBounds.left && bounds.left < viewportBounds.right && bounds.bottom > viewportBounds.top && bounds.top < viewportBounds.bottom;
   });
   const wordIndex = Number(visibleWord?.dataset.readerWordIndex);
-  return Number.isInteger(wordIndex) ? wordIndex : readingSpeechAnchor;
+  return Number.isInteger(wordIndex) ? wordIndex : readingSpeechAnchor.value;
 }
 async function startReadingSpeechMeter(stream: MediaStream, sessionId: number) {
   const AudioContextConstructor = window.AudioContext;
@@ -1925,6 +1960,41 @@ function appendReadingSpeechDebug(message: string) {
   readingSpeechDebugEntries.value = [...readingSpeechDebugEntries.value.slice(-119), `[+${elapsed}s] ${message}`];
 }
 
+function updateReadingSpeechDiagnosticDecision(transcript: string, matchedWordIndexes: readonly number[], interim: boolean) {
+  readingSpeechLastTranscript.value = transcript;
+  readingSpeechLastDecision.value = matchedWordIndexes.length
+    ? `${interim ? 'Interim' : 'Final'} exact prefix: ${matchedWordIndexes.length} word${matchedWordIndexes.length === 1 ? '' : 's'}.`
+    : `No exact prefix. Waiting for “${readerReferenceWords.value[readingSpeechAnchor.value] ?? 'end of book'}”.`;
+}
+
+function useSelectedWordAsSpeechAnchor() {
+  const wordIndex = selectedReaderWordIndex.value;
+  if (wordIndex === null || !Number.isInteger(wordIndex)) {
+    Notify.create({ type: 'warning', message: 'Tap the word you want to read first, then try again.' });
+    return;
+  }
+  readingSpeechAnchor.value = wordIndex;
+  provisionalReaderWordIndexes.value = new Set();
+  activeReaderWordIndexes.value = new Set();
+  readingSpeechLastDecision.value = `Anchor moved manually. Waiting for “${readerReferenceWords.value[wordIndex] ?? 'end of book'}”.`;
+  appendReadingSpeechDebug(`Anchor manually moved to word ${wordIndex}: "${readerReferenceWords.value[wordIndex] ?? ''}".`);
+}
+
+async function copyReadingSpeechDebugLog() {
+  const header = [
+    `Expected index: ${readingSpeechAnchor.value}`,
+    `Expected word: ${readerReferenceWords.value[readingSpeechAnchor.value] ?? 'end of book'}`,
+    `Last heard: ${readingSpeechLastTranscript.value || 'nothing'}`,
+    `Last decision: ${readingSpeechLastDecision.value}`,
+  ];
+  try {
+    await navigator.clipboard.writeText([...header, '', ...readingSpeechDebugEntries.value].join('\n'));
+    Notify.create({ type: 'positive', message: 'Recognition test log copied.' });
+  } catch {
+    Notify.create({ type: 'negative', message: 'Could not copy the recognition test log.' });
+  }
+}
+
 function applyReadingMode(value: boolean) {
   readingMode.value = value;
   if (typeof document === 'undefined') return;
@@ -2022,7 +2092,7 @@ async function restoreSpokenReadingProgress(bookId: string) {
   // The furthest position is useful for resuming, but it cannot prove that
   // every preceding word was spoken. Exact voice-confirmed indexes are restored
   // separately by restoreDailySpokenWords and are the only highlighted words.
-  readingSpeechAnchor = furthestWordIndex + 1;
+  readingSpeechAnchor.value = furthestWordIndex + 1;
 }
 async function persistSpokenReadingProgress(furthestWordIndex: number) {
   const book = selectedBook.value;
