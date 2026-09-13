@@ -2130,61 +2130,74 @@ html.mentor-theme-dark .personal-reader {
 }
 
 .personal-reader__forecast {
-  align-content: center;
+  align-items: center;
   appearance: none;
-  background: transparent;
-  border: 0;
-  color: var(--reader-paper-muted);
+  backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--reader-paper-background) 94%, var(--category-soft));
+  border: 1px solid color-mix(in srgb, var(--category-accent) 38%, var(--app-border-strong));
+  border-radius: 999px;
+  bottom: 12px;
+  box-shadow: 0 8px 24px rgba(17, 24, 39, .16);
+  color: var(--reader-paper-text);
   cursor: pointer;
   display: grid;
-  left: 50%;
+  gap: 12px;
+  grid-template-columns: auto auto;
+  left: calc((100vw - min(var(--reader-sidebar-width, 280px), 42vw)) / 2);
   justify-items: center;
-  line-height: 1;
-  opacity: .075;
-  padding: 24px 32px;
-  pointer-events: none;
+  line-height: 1.15;
+  opacity: .92;
+  padding: 8px 14px 8px 9px;
+  pointer-events: auto;
   position: fixed;
   text-align: center;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  transition: opacity 180ms ease, background-color 180ms ease, backdrop-filter 180ms ease;
-  width: min(68vw, 720px);
+  transform: translateX(-50%);
+  transition: opacity 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  width: max-content;
   z-index: 4;
 }
 
 @media (max-width: 700px) {
   .personal-reader__forecast {
     left: calc((100vw - min(var(--reader-sidebar-mobile-width, 208px), 58vw)) / 2);
-    padding-inline: 14px;
-    width: min(38vw, 360px);
+    max-width: calc(42vw - 12px);
   }
 }
 
-.personal-reader__forecast span,
-.personal-reader__forecast strong,
-.personal-reader__forecast small {
-  pointer-events: auto;
+.personal-reader__forecast-days {
+  background: color-mix(in srgb, var(--category-accent) 18%, transparent);
+  border-radius: 999px;
+  color: var(--category-accent);
+  font: 900 clamp(.78rem, 1.3vw, .98rem)/1.1 system-ui, sans-serif;
+  padding: 9px 12px;
+  white-space: nowrap;
 }
 
-.personal-reader__forecast span,
-.personal-reader__forecast small {
-  font: 800 clamp(.8rem, 1.6vw, 1.05rem)/1.2 system-ui, sans-serif;
-  letter-spacing: .08em;
+.personal-reader__forecast-date {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  text-align: left;
+}
+
+.personal-reader__forecast-date small {
+  color: var(--reader-paper-muted);
+  font: 800 .62rem/1 system-ui, sans-serif;
+  letter-spacing: .06em;
   text-transform: uppercase;
 }
 
-.personal-reader__forecast strong {
-  font: 700 clamp(2.1rem, 7vw, 5.8rem)/1.05 'Iowan Old Style', Charter, Georgia, serif;
-  margin: .12em 0;
+.personal-reader__forecast-date strong {
+  font: 800 clamp(.8rem, 1.4vw, 1rem)/1.15 system-ui, sans-serif;
+  white-space: nowrap;
 }
 
-.personal-reader__forecast:focus,
+.personal-reader__forecast:hover,
 .personal-reader__forecast:focus-visible {
-  backdrop-filter: blur(3px);
-  background: color-mix(in srgb, var(--reader-paper-background) 82%, transparent);
-  opacity: .88;
-  outline: 2px solid color-mix(in srgb, var(--category-accent) 58%, transparent);
-  outline-offset: -6px;
+  border-color: var(--category-accent);
+  box-shadow: 0 10px 28px rgba(17, 24, 39, .22), 0 0 0 3px color-mix(in srgb, var(--category-accent) 16%, transparent);
+  opacity: 1;
+  outline: none;
 }
 
 .personal-reader__content--dragging {
@@ -2536,7 +2549,7 @@ body.body--book-reading-mode .mobile-start-dock {
   height: 100%;
   letter-spacing: 0.006em;
   line-height: 1.78;
-  padding: 15px;
+  padding: 15px 15px 76px;
   text-rendering: optimizeLegibility;
   width: 100%;
 }
@@ -4106,7 +4119,7 @@ body.body--dark .personal-reader__lookup-error {
     border-radius: 2px;
     letter-spacing: 0;
     line-height: 1.72;
-    padding: 15px;
+    padding: 15px 15px 76px;
   }
 
   .personal-reader__sidebar {

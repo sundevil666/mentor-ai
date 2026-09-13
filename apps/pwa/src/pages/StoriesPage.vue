@@ -188,9 +188,11 @@
             type="button"
             :aria-label="bookReadingForecastAriaLabel"
           >
-            <span>{{ bookReadingDaysLabel }}</span>
-            <strong>{{ bookReadingFinishDate }}</strong>
-            <small>estimated finish</small>
+            <span class="personal-reader__forecast-days">{{ bookReadingDaysLabel }}</span>
+            <span class="personal-reader__forecast-date">
+              <small>Estimated finish</small>
+              <strong>{{ bookReadingFinishDate }}</strong>
+            </span>
           </button>
           <article ref="readerPaper" class="personal-reader__paper" :style="{ fontSize: `${readerFontSize}px` }" @click="handleReaderTextTap">
             <section
