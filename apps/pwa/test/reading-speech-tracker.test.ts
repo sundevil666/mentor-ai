@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { activeReadingHighlightIndexes, alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, previewBrowserReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
+import { activeReadingHighlightIndexes, alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
 import { localReadingChunkDurationMs, normalizeReadingAudio, startLocalReadingTranscriber } from '../src/services/local-reading-transcriber.js';
 
 const reference = tokenizeReadingSpeech('Alice was beginning to get very tired of sitting by her sister on the bank. She read the sentence again because practice matters.');
@@ -49,14 +49,14 @@ describe('reading speech tracking', () => {
     assert.equal(alignReadingSpeech(browserReference, 'the browser finds this exact spoken sentence', 0, { maxForwardWords: 360 }).accepted, true);
   });
 
-  it('turns an interim browser transcript into a continuous live highlight', () => {
+  it('highlights only a transcript that starts at the exact next word', () => {
     const browserReference = tokenizeReadingSpeech('Camila walks to the front door and slowly puts on her jacket');
-    const preview = previewBrowserReadingWordIndexes(browserReference, 'front door slowly puts on her jacket', 0);
+    const preview = previewBrowserReadingWordIndexes(browserReference, 'Camila walks to the front door', 0);
 
-    assert.deepEqual(preview, [4, 5, 6, 7, 8, 9, 10, 11]);
+    assert.deepEqual(preview, [0, 1, 2, 3, 4, 5]);
   });
 
-  it('does not fill unread text between distant interim matches', () => {
+  it('keeps only the exact prefix before distant interim words', () => {
     const paragraph = tokenizeReadingSpeech([
       'Camila exits through the front door',
       ...Array.from({ length: 90 }, (_, index) => `unread${index}`),
@@ -65,14 +65,14 @@ describe('reading speech tracking', () => {
 
     assert.deepEqual(
       previewBrowserReadingWordIndexes(paragraph, 'Camila exits through the front door the key is hidden by the desk', 0),
-      [],
+      [0, 1, 2, 3, 4, 5],
     );
   });
 
-  it('bridges only one small word omitted by an interim transcript', () => {
+  it('stops before a word omitted by an interim transcript', () => {
     const phrase = tokenizeReadingSpeech('Graham disappears back into the quiet kitchen');
 
-    assert.deepEqual(previewBrowserReadingWordIndexes(phrase, 'Graham disappears back into quiet kitchen', 0), [0, 1, 2, 3, 4, 5, 6]);
+    assert.deepEqual(previewBrowserReadingWordIndexes(phrase, 'Graham disappears back into quiet kitchen', 0), [0, 1, 2, 3]);
   });
 
   it('does not preview unrelated or one-word interim browser noise', () => {
@@ -83,6 +83,22 @@ describe('reading speech tracking', () => {
   it('starts live highlighting from the first exact word at the reading anchor', () => {
     assert.deepEqual(previewBrowserReadingWordIndexes(reference, 'Alice', 0), [0]);
     assert.deepEqual(previewBrowserReadingWordIndexes(reference, 'was', 0), []);
+  });
+
+  it('confirms words one by one and never searches ahead', () => {
+    const strictReference = tokenizeReadingSpeech('Alice was beginning to read aloud');
+
+    assert.deepEqual(matchSequentialReadingSpeech(strictReference, 'Alice', 0).matchedWordIndexes, [0]);
+    assert.deepEqual(matchSequentialReadingSpeech(strictReference, 'was beginning', 1).matchedWordIndexes, [1, 2]);
+    assert.equal(matchSequentialReadingSpeech(strictReference, 'beginning to read', 0).accepted, false);
+  });
+
+  it('stops permanently at the first mismatch without filling or skipping it', () => {
+    const strictReference = tokenizeReadingSpeech('Alice was beginning to read aloud');
+    const result = matchSequentialReadingSpeech(strictReference, 'Alice wrong beginning to read aloud', 0);
+
+    assert.deepEqual(result.matchedWordIndexes, [0]);
+    assert.equal(result.anchorIndex, 1);
   });
 
   it('lets tablet speech recover a dense phrase farther ahead of a stale visible anchor', () => {

@@ -521,7 +521,7 @@ import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { annualReadingPace, annualReadingPaceMessage as getAnnualReadingPaceMessage, createDailyReadingProgress, dailyReadingGoalWords, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, readingGoalMessage, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
-import { activeReadingHighlightIndexes, alignReadingSpeech, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, previewBrowserReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
+import { activeReadingHighlightIndexes, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { chooseReadingResumeState, readingDeviceHeartbeatMs, readingDeviceLabel } from 'src/services/reading-device-sync';
 import { queueReadingTranscript, syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
@@ -607,8 +607,6 @@ let readingSpeechAnchor = 0;
 let readingSpeechFurthestWordIndex = -1;
 let syncedReaderPositionWordIndex = -1;
 let syncedReaderPositionUpdatedAt: string | undefined;
-let readingSpeechLocalTranscriptWindow: string[] = [];
-let readingSpeechPositionLocked = false;
 let readingSpeechRecognition: ContinuousSpeechRecognition | null = null;
 let localReadingTranscriber: LocalReadingTranscriber | null = null;
 let sherpaReadingTranscriber: SherpaReadingTranscriber | null = null;
@@ -1512,8 +1510,6 @@ async function startReadingSpeech() {
   const useBrowserRecognition = !useSherpaRecognition && isSpeechRecognitionAvailable();
   const useLocalRecognition = !useSherpaRecognition && !useBrowserRecognition;
   startReadingSpeechDebug(useSherpaRecognition ? 'sherpa-onnx' : useBrowserRecognition ? 'browser-speech' : 'device-whisper');
-  readingSpeechLocalTranscriptWindow = [];
-  readingSpeechPositionLocked = false;
   provisionalReaderWordIndexes.value = new Set();
   activeReaderWordIndexes.value = new Set();
   resetReadingSpeechPace();
@@ -1743,9 +1739,6 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
   if (whisperRecognition) updateReadingSpeechChunkPace(rawHeardWords.length);
   appendReadingSpeechDebug(`Final text (${recognitionEngine}, ${rawHeardWords.length} words): "${transcript}"`);
   if (!rawHeardWords.length) return;
-  if (whisperRecognition) {
-    readingSpeechLocalTranscriptWindow = [...readingSpeechLocalTranscriptWindow, transcript].slice(-3);
-  }
   const book = selectedBook.value;
   if (book) void queueReadingTranscript({
     id: `reading-transcript-${crypto.randomUUID()}`,
@@ -1757,75 +1750,17 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
     recognitionEngine,
   }).catch(() => undefined);
   const spokenCount = rawHeardWords.length;
-  const lockedSingleWordMatch = whisperRecognition && readingSpeechPositionLocked
-    ? matchReadingSpeechAtAnchor(readerReferenceWords.value, transcript, readingSpeechAnchor)
-    : null;
-  // A one-word Whisper chunk is safe only after the position is locked and it
-  // is exactly the next book word. This preserves short dialogue such as “No.”
-  // without letting common isolated words jump the reader position.
-  const minimumRecognizedWords = lockedSingleWordMatch?.accepted
-    ? 1
-    : whisperRecognition && readingSpeechPositionLocked ? 2 : 3;
-  if (rawHeardWords.length < minimumRecognizedWords) {
-    appendReadingSpeechDebug(`Match skipped: fewer than ${minimumRecognizedWords} recognized words.`);
-    return;
-  }
-  const alignmentCandidates = [{ text: transcript, words: rawHeardWords, source: 'current chunk' }];
-  if (whisperRecognition && readingSpeechLocalTranscriptWindow.length > 1) {
-    const combinedText = readingSpeechLocalTranscriptWindow.join(' ');
-    alignmentCandidates.push({ text: combinedText, words: tokenizeReadingSpeech(combinedText), source: `${readingSpeechLocalTranscriptWindow.length} combined chunks` });
-  }
-  const alignmentOptions = recognitionEngine === 'browser'
-    ? { maxForwardWords: 360 }
-    : readingSpeechPositionLocked
-      ? { maxBackwardWords: 6, maxForwardWords: 16, minCoverage: 0.6, minMatchedWords: 2, minSpokenWords: 2 }
-      : { minCoverage: 0.4 };
-  const evaluatedCandidates = alignmentCandidates.map((candidate, candidateIndex) => ({
-    ...candidate,
-    match: candidateIndex === 0 && lockedSingleWordMatch?.accepted
-      ? lockedSingleWordMatch
-      : alignReadingSpeech(readerReferenceWords.value, candidate.text, readingSpeechAnchor, alignmentOptions),
-  }));
-  const nearbyCandidate = evaluatedCandidates.find((candidate) => candidate.match.accepted);
-  const tabletRecoveryCandidate = whisperRecognition && !nearbyCandidate
-    ? {
-        text: transcript,
-        words: rawHeardWords,
-        source: 'wide position recovery',
-        match: recoverReadingSpeechPosition(readerReferenceWords.value, transcript, readingSpeechAnchor),
-      }
-    : null;
-  const selectedCandidate = nearbyCandidate
-    ?? (tabletRecoveryCandidate?.match.accepted ? tabletRecoveryCandidate : null)
-    ?? evaluatedCandidates.reduce((best, candidate) => candidate.match.coverage > best.match.coverage ? candidate : best);
-  const { match, words: heardWords } = selectedCandidate;
-  if (whisperRecognition) {
-    appendReadingSpeechDebug(`Tablet ${selectedCandidate.source}: coverage=${Math.round(match.coverage * 100)}%, accepted=${match.accepted}.`);
-  }
+  const match = matchSequentialReadingSpeech(readerReferenceWords.value, transcript, readingSpeechAnchor);
   if (!match.accepted) {
-    appendReadingSpeechDebug(`Match rejected near word ${readingSpeechAnchor}; coverage=${Math.round(match.coverage * 100)}%.`);
+    appendReadingSpeechDebug(`Sequential match rejected at word ${readingSpeechAnchor}.`);
     readingSpeechStatus.value = 'noise';
-    readingSpeechMessage.value = 'I heard sound, but it did not match the nearby book text. Keep reading.';
+    readingSpeechMessage.value = 'That did not match the next word. Try it again.';
     return;
   }
-  const confirmedWordIndexes = whisperRecognition
-    ? confirmTabletReadingWordIndexes(match.matchedWordIndexes, readingSpeechAnchor, heardWords.length, readingSpeechPositionLocked ? 2 : 3)
-    : match.matchedWordIndexes;
-  if (confirmedWordIndexes.length < minimumRecognizedWords) {
-    appendReadingSpeechDebug(`Match rejected after removing forward outliers: fewer than ${minimumRecognizedWords} nearby words remain.`);
-    readingSpeechStatus.value = 'noise';
-    readingSpeechMessage.value = 'I heard sound, but it did not match the nearby book text. Keep reading.';
-    return;
-  }
+  const confirmedWordIndexes = match.matchedWordIndexes;
   const confirmedLastWord = confirmedWordIndexes.at(-1)!;
-  const trimmedMatches = match.matchedWordIndexes.length - confirmedWordIndexes.length;
-  const recoveredWords = confirmedWordIndexes.filter((wordIndex) => !match.matchedWordIndexes.includes(wordIndex)).length;
-  readingSpeechAnchor = whisperRecognition
-    ? Math.max(readingSpeechAnchor, confirmedLastWord + 1)
-    : match.anchorIndex;
-  if (whisperRecognition) readingSpeechPositionLocked = true;
-  appendReadingSpeechDebug(`Match accepted: ${confirmedWordIndexes.length}/${heardWords.length} words, coverage=${Math.round(match.coverage * 100)}%, indexes=${confirmedWordIndexes[0]}–${confirmedLastWord}, next=${readingSpeechAnchor}${recoveredWords ? `, recovered=${recoveredWords}` : ''}${trimmedMatches > 0 ? `, trimmed=${trimmedMatches}` : ''}.`);
-  if (whisperRecognition) readingSpeechLocalTranscriptWindow = [];
+  readingSpeechAnchor = match.anchorIndex;
+  appendReadingSpeechDebug(`Sequential match accepted: ${confirmedWordIndexes.length}/${rawHeardWords.length} words, indexes=${confirmedWordIndexes[0]}–${confirmedLastWord}, next=${readingSpeechAnchor}.`);
   readingSpeechAcceptedWords.value += confirmedWordIndexes.length;
   readingSpeechSpokenWords.value += spokenCount;
   const nextSpoken = new Set(spokenReaderWordIndexes.value);
@@ -1839,9 +1774,9 @@ function handleReadingSpeechTranscript(transcript: string, recognitionEngine: 'd
   spokenReaderWordIndexes.value = nextSpoken;
   recordDailySpokenMatch(confirmedWordIndexes);
   readingSpeechStatus.value = 'listening';
-  readingSpeechMessage.value = match.coverage >= 0.8
-    ? 'Great match — keep reading.'
-    : 'Following you. A few words were unclear or skipped.';
+  readingSpeechMessage.value = match.coverage === 1
+    ? 'Correct — keep reading.'
+    : 'Correct up to the highlighted word. Repeat the next word.';
 }
 function getVisibleReaderWordAnchor() {
   const viewport = readerContent.value;

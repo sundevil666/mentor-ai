@@ -119,32 +119,29 @@ export function matchReadingSpeechAtAnchor(referenceWords: readonly string[], tr
   };
 }
 
-export function previewBrowserReadingWordIndexes(referenceWords: readonly string[], transcript: string, anchorIndex: number): number[] {
+export function matchSequentialReadingSpeech(referenceWords: readonly string[], transcript: string, anchorIndex: number): ReadingSpeechMatch {
   const spokenWords = tokenizeReadingSpeech(transcript);
-  if (spokenWords.length === 1) {
-    const exactAnchorMatch = matchReadingSpeechAtAnchor(referenceWords, transcript, anchorIndex);
-    return exactAnchorMatch.accepted ? exactAnchorMatch.matchedWordIndexes : [];
+  if (!spokenWords.length || anchorIndex < 0 || anchorIndex >= referenceWords.length) return rejected(anchorIndex);
+
+  const matchedWordIndexes: number[] = [];
+  for (let spokenIndex = 0; spokenIndex < spokenWords.length; spokenIndex += 1) {
+    const wordIndex = anchorIndex + spokenIndex;
+    if (wordIndex >= referenceWords.length) break;
+    if (normalizeReadingWord(referenceWords[wordIndex] ?? '') !== spokenWords[spokenIndex]) break;
+    matchedWordIndexes.push(wordIndex);
   }
-  const match = alignReadingSpeech(referenceWords, transcript, anchorIndex, {
-    maxForwardWords: 360,
-    minMatchedWords: 2,
-    minSpokenWords: 2,
-  });
-  if (!match.accepted) return [];
-  const firstIndex = match.matchedWordIndexes[0]!;
-  const lastIndex = match.matchedWordIndexes.at(-1)!;
-  if (lastIndex - firstIndex + 1 > spokenWords.length * 2 + 8) return [];
-  // Interim browser transcripts are rewritten continuously and commonly omit
-  // an article or preposition. Bridge only one missing book word; filling the
-  // complete first-to-last span can paint unread sentences when common words
-  // happen to match across a paragraph.
-  const preview = new Set(match.matchedWordIndexes);
-  for (let index = 1; index < match.matchedWordIndexes.length; index += 1) {
-    const previous = match.matchedWordIndexes[index - 1]!;
-    const current = match.matchedWordIndexes[index]!;
-    if (current - previous === 2) preview.add(previous + 1);
-  }
-  return [...preview].sort((left, right) => left - right);
+
+  if (!matchedWordIndexes.length) return rejected(anchorIndex);
+  return {
+    accepted: true,
+    matchedWordIndexes,
+    coverage: matchedWordIndexes.length / spokenWords.length,
+    anchorIndex: matchedWordIndexes.at(-1)! + 1,
+  };
+}
+
+export function previewBrowserReadingWordIndexes(referenceWords: readonly string[], transcript: string, anchorIndex: number): number[] {
+  return matchSequentialReadingSpeech(referenceWords, transcript, anchorIndex).matchedWordIndexes;
 }
 
 export function boundTabletReadingProgress(matchedWordIndexes: readonly number[], anchorIndex: number, spokenWordCount: number): number[] {
