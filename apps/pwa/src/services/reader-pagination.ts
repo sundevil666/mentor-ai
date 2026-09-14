@@ -53,3 +53,13 @@ export function chooseReaderStopWordIndex(input: {
   }
   return input.pageWordIndex;
 }
+
+export function chooseReaderSpeechAnchor(input: {
+  destinationPageWordIndex: number;
+  visibleWordIndex: number;
+  currentAnchor: number;
+}) {
+  if (input.destinationPageWordIndex >= 0) return input.destinationPageWordIndex;
+  if (input.visibleWordIndex >= 0) return input.visibleWordIndex;
+  return input.currentAnchor;
+}

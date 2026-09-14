@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop, chooseReaderStopWordIndex } from '../src/services/reader-pagination.js';
+import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop, chooseReaderSpeechAnchor, chooseReaderStopWordIndex } from '../src/services/reader-pagination.js';
 
 test('reader columns advance by exactly one viewport after accounting for nested padding', () => {
   const geometry = calculateReaderPaginationGeometry({
@@ -68,4 +68,25 @@ test('saving keeps the active highlight when it belongs to the current page', ()
     highlightedWordPageIndex: 4,
     pageWordIndex: 88,
   }), 93);
+});
+
+test('speech follows the destination page before a smooth scroll finishes', () => {
+  assert.equal(chooseReaderSpeechAnchor({
+    destinationPageWordIndex: 120,
+    visibleWordIndex: 96,
+    currentAnchor: 101,
+  }), 120);
+});
+
+test('speech anchor falls back safely when page geometry is unavailable', () => {
+  assert.equal(chooseReaderSpeechAnchor({
+    destinationPageWordIndex: -1,
+    visibleWordIndex: 96,
+    currentAnchor: 101,
+  }), 96);
+  assert.equal(chooseReaderSpeechAnchor({
+    destinationPageWordIndex: -1,
+    visibleWordIndex: -1,
+    currentAnchor: 101,
+  }), 101);
 });

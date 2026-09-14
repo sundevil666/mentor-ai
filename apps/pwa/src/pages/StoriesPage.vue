@@ -581,7 +581,7 @@ import { queueReadingTranscript, syncReadingTranscripts } from 'src/services/rea
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { isSherpaReaderExperiment, startSherpaReadingTranscriber, type SherpaReadingTranscriber } from 'src/services/sherpa-reading-transcriber';
-import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop, chooseReaderStopWordIndex } from 'src/services/reader-pagination';
+import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop, chooseReaderSpeechAnchor, chooseReaderStopWordIndex } from 'src/services/reader-pagination';
 import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerTouchDestination, readerWheelDestination, shouldCommitReaderWheel, type ReaderSwipePoint } from 'src/services/reader-swipe';
 import { beginReaderLookupInteraction, shouldProcessReadingTranscript } from 'src/services/reader-lookup-interaction';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
@@ -1139,7 +1139,14 @@ function goToBookPage(pageIndex: number | null, smooth = true) {
   selectedBookChapterIndex.value = resolveBookChapterIndex(destinationPageIndex);
   scrollToReaderPage(smooth);
   persistBookProgress();
-  readingSpeechAnchor.value = getVisibleReaderWordAnchor();
+  const destinationWordIndex = getReaderPageWordAnchor(destinationPageIndex);
+  readingSpeechAnchor.value = chooseReaderSpeechAnchor({
+    destinationPageWordIndex: destinationWordIndex,
+    visibleWordIndex: getVisibleReaderWordAnchor(),
+    currentAnchor: readingSpeechAnchor.value,
+  });
+  resetSherpaReadingFragment();
+  appendReadingSpeechDebug(`Reading anchor moved with page ${destinationPageIndex + 1}: word ${readingSpeechAnchor.value} "${readerReferenceWords.value[readingSpeechAnchor.value] ?? ''}".`);
   provisionalReaderWordIndexes.value = new Set();
   activeReaderWordIndexes.value = new Set();
   void persistReaderNavigationProgress();
@@ -1716,8 +1723,13 @@ async function startReadingSpeech() {
           confirmStableSherpaInterim(transcript);
         },
         onFinal: (transcript) => {
-          if (sessionId !== readingSpeechSessionId || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
+          if (sessionId !== readingSpeechSessionId) return;
           provisionalReaderWordIndexes.value = new Set();
+          if (!shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) {
+            resetSherpaReadingFragment();
+            appendReadingSpeechDebug('Sherpa final ignored during lookup; fragment state reset at the endpoint.');
+            return;
+          }
           handleSherpaFinalTranscript(transcript);
           if (readingSpeechSherpaStopping) {
             readingSpeechSherpaStopping = false;
