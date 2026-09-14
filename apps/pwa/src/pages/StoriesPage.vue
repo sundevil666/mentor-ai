@@ -194,7 +194,6 @@
               <span>words</span>
             </div>
             <div class="personal-reader__forecast-stat personal-reader__forecast-stat--remaining">
-              <small>Book remaining</small>
               <strong>{{ bookReadingDaysLabel }}</strong>
               <span>Finish {{ bookReadingFinishDate }}</span>
             </div>
@@ -584,6 +583,7 @@ import { beginReaderLookupInteraction, shouldProcessReadingTranscript } from 'sr
 import { ActiveLearningTimer } from 'src/services/learning-activity';
 import { addReadingStopHistoryEntry, parseReadingStopHistory, type ReadingStopHistoryEntry } from 'src/services/reading-stop-history';
 import { bookReadingForecast } from 'src/services/book-reading-forecast';
+import { formatDisplayDate } from 'src/services/date-format';
 
 const props = withDefaults(defineProps<{
   libraryMode?: 'audio' | 'reading';
@@ -780,11 +780,7 @@ const bookReadingDaysLabel = computed(() => {
   const days = currentBookReadingForecast.value.readingDaysRemaining;
   return days === 0 ? 'Book complete' : `${days} reading day${days === 1 ? '' : 's'} left`;
 });
-const bookReadingFinishDate = computed(() => currentBookReadingForecast.value.finishDate.toLocaleDateString(undefined, {
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-}));
+const bookReadingFinishDate = computed(() => formatDisplayDate(currentBookReadingForecast.value.finishDate));
 const bookReadingForecastAriaLabel = computed(() => `${bookReadingDaysLabel.value}. Estimated finish ${bookReadingFinishDate.value}, at ${dailyReadingTarget.value.toLocaleString('en')} words per reading day.`);
 const readerSidebarScalePercent = computed(() => 100 + readerSidebarScale.value * 10);
 const readerSidebarStyle = computed(() => ({
