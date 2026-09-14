@@ -575,7 +575,7 @@ import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
-import { activeReadingHighlightIndexes, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, stableReadingInterimPrefix, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
+import { activeReadingHighlightIndexes, matchExpectedReadingWordStream, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, stableReadingInterimPrefix, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { chooseReadingResumeState, readingDeviceHeartbeatMs, readingDeviceLabel } from 'src/services/reading-device-sync';
 import { queueReadingTranscript, syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
@@ -678,7 +678,6 @@ let readingSpeechAnimationFrame = 0;
 let readingSpeechSessionId = 0;
 let readingSpeechSherpaInterimTranscript = '';
 let readingSpeechSherpaCommittedWordCount = 0;
-let readingSpeechSherpaFragmentBlocked = false;
 let readingSpeechDebugStartedAt = 0;
 let readingSpeechDebugBuffer = ['Waiting for microphone start.'];
 let readingSpeechDebugUiTimer = 0;
@@ -1721,9 +1720,11 @@ async function startReadingSpeech() {
           const unconfirmedTranscript = tokenizeReadingSpeech(transcript)
             .slice(readingSpeechSherpaCommittedWordCount)
             .join(' ');
-          const previewWordIndexes = readingSpeechSherpaFragmentBlocked
-            ? []
-            : previewBrowserReadingWordIndexes(readerReferenceWords.value, unconfirmedTranscript, readingSpeechAnchor.value);
+          const previewWordIndexes = matchExpectedReadingWordStream(
+            readerReferenceWords.value,
+            unconfirmedTranscript,
+            readingSpeechAnchor.value,
+          ).matchedWordIndexes;
           updateReadingSpeechDiagnosticDecision(unconfirmedTranscript, previewWordIndexes, true);
           provisionalReaderWordIndexes.value = new Set(previewWordIndexes);
           confirmStableSherpaInterim(transcript);
@@ -1867,6 +1868,7 @@ function handleReadingSpeechTranscript(
   recognitionEngine: 'device-whisper' | 'browser' | 'sherpa-onnx' = 'browser',
   recordTranscript = true,
   debugLabel = 'Final text',
+  consumeAsWordStream = false,
 ) {
   const whisperRecognition = recognitionEngine !== 'browser';
   const rawHeardWords = tokenizeReadingSpeech(transcript);
@@ -1876,7 +1878,9 @@ function handleReadingSpeechTranscript(
   if (recordTranscript) recordReadingTranscript(transcript, recognitionEngine);
   const spokenCount = rawHeardWords.length;
   readingSpeechLastTranscript.value = transcript;
-  const match = matchSequentialReadingSpeech(readerReferenceWords.value, transcript, readingSpeechAnchor.value);
+  const match = consumeAsWordStream
+    ? matchExpectedReadingWordStream(readerReferenceWords.value, transcript, readingSpeechAnchor.value)
+    : matchSequentialReadingSpeech(readerReferenceWords.value, transcript, readingSpeechAnchor.value);
   if (!match.accepted) {
     readingSpeechLastDecision.value = `Rejected. Still waiting for “${readerReferenceWords.value[readingSpeechAnchor.value] ?? 'end of book'}”.`;
     appendReadingSpeechDebug(`Sequential match rejected at word ${readingSpeechAnchor.value}.`);
@@ -1925,14 +1929,10 @@ function recordReadingTranscript(transcript: string, recognitionEngine: 'device-
 function confirmStableSherpaInterim(transcript: string) {
   const stableWords = stableReadingInterimPrefix(readingSpeechSherpaInterimTranscript, transcript);
   readingSpeechSherpaInterimTranscript = transcript;
-  if (readingSpeechSherpaFragmentBlocked || stableWords.length <= readingSpeechSherpaCommittedWordCount) return;
+  if (stableWords.length <= readingSpeechSherpaCommittedWordCount) return;
   const newStableWords = stableWords.slice(readingSpeechSherpaCommittedWordCount);
-  const match = handleReadingSpeechTranscript(newStableWords.join(' '), 'sherpa-onnx', false, 'Stable interim text');
+  handleReadingSpeechTranscript(newStableWords.join(' '), 'sherpa-onnx', false, 'Stable interim text', true);
   readingSpeechSherpaCommittedWordCount = stableWords.length;
-  if (!match || match.matchedWordIndexes.length !== newStableWords.length) {
-    readingSpeechSherpaFragmentBlocked = true;
-    appendReadingSpeechDebug('Sherpa fragment blocked after its first unmatched stable word; waiting for an endpoint.');
-  }
 }
 
 function handleSherpaFinalTranscript(transcript: string) {
@@ -1940,18 +1940,13 @@ function handleSherpaFinalTranscript(transcript: string) {
   const remainingWords = finalWords.slice(readingSpeechSherpaCommittedWordCount);
   appendReadingSpeechDebug(`Sherpa final text (${finalWords.length} words, ${readingSpeechSherpaCommittedWordCount} already confirmed): "${transcript}"`);
   recordReadingTranscript(transcript, 'sherpa-onnx');
-  if (!readingSpeechSherpaFragmentBlocked && remainingWords.length) {
-    handleReadingSpeechTranscript(remainingWords.join(' '), 'sherpa-onnx', false, 'Unconfirmed final remainder');
-  } else if (readingSpeechSherpaFragmentBlocked) {
-    appendReadingSpeechDebug('Final remainder ignored because this fragment already contained an unmatched stable word.');
-  }
+  if (remainingWords.length) handleReadingSpeechTranscript(remainingWords.join(' '), 'sherpa-onnx', false, 'Unconfirmed final remainder', true);
   resetSherpaReadingFragment();
 }
 
 function resetSherpaReadingFragment() {
   readingSpeechSherpaInterimTranscript = '';
   readingSpeechSherpaCommittedWordCount = 0;
-  readingSpeechSherpaFragmentBlocked = false;
 }
 function getVisibleReaderWordAnchor() {
   const viewport = readerContent.value;

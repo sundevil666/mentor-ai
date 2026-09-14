@@ -241,6 +241,28 @@ export function matchSequentialReadingSpeech(referenceWords: readonly string[], 
   };
 }
 
+export function matchExpectedReadingWordStream(referenceWords: readonly string[], transcript: string, anchorIndex: number): ReadingSpeechMatch {
+  const spokenWords = tokenizeReadingSpeech(transcript);
+  if (!spokenWords.length || anchorIndex < 0 || anchorIndex >= referenceWords.length) return rejected(anchorIndex);
+
+  const matchedWordIndexes: number[] = [];
+  let nextExpectedIndex = anchorIndex;
+  spokenWords.forEach((spokenWord) => {
+    if (nextExpectedIndex >= referenceWords.length) return;
+    if (normalizeReadingWord(referenceWords[nextExpectedIndex] ?? '') !== spokenWord) return;
+    matchedWordIndexes.push(nextExpectedIndex);
+    nextExpectedIndex += 1;
+  });
+
+  if (!matchedWordIndexes.length) return rejected(anchorIndex);
+  return {
+    accepted: true,
+    matchedWordIndexes,
+    coverage: matchedWordIndexes.length / spokenWords.length,
+    anchorIndex: nextExpectedIndex,
+  };
+}
+
 export function previewBrowserReadingWordIndexes(referenceWords: readonly string[], transcript: string, anchorIndex: number): number[] {
   return matchSequentialReadingSpeech(referenceWords, transcript, anchorIndex).matchedWordIndexes;
 }

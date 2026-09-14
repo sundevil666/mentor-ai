@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { activeReadingHighlightIndexes, alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, previewTabletReadingWordIndexes, recoverReadingSpeechPosition, stableReadingInterimPrefix, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
+import { activeReadingHighlightIndexes, alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, matchExpectedReadingWordStream, matchReadingSpeechAtAnchor, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, previewTabletReadingWordIndexes, recoverReadingSpeechPosition, stableReadingInterimPrefix, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
 import { localReadingChunkDurationMs, normalizeReadingAudio, startLocalReadingTranscriber } from '../src/services/local-reading-transcriber.js';
 
 const reference = tokenizeReadingSpeech('Alice was beginning to get very tired of sitting by her sister on the bank. She read the sentence again because practice matters.');
@@ -105,6 +105,18 @@ describe('reading speech tracking', () => {
     assert.deepEqual(stableReadingInterimPrefix('SHE CROSSE', 'SHE CROSSES THE'), ['she']);
     assert.deepEqual(stableReadingInterimPrefix('SHE CROSSES THE', 'SHE CROSSES THE ROOM'), ['she', 'crosses', 'the']);
     assert.deepEqual(stableReadingInterimPrefix('I FELL', 'I FEEL MYSELF'), ['i']);
+  });
+
+  it('keeps waiting for the expected word after recognition noise', () => {
+    const result = matchExpectedReadingWordStream(['She', 'sounds', 'almost', 'exasperated'], 'IT WAS SHE SOUNDS', 0);
+    assert.deepEqual(result.matchedWordIndexes, [0, 1]);
+    assert.equal(result.anchorIndex, 2);
+  });
+
+  it('does not skip an expected word when recognition substitutes it', () => {
+    const result = matchExpectedReadingWordStream(['I', 'feel', 'myself', 'melt'], 'I FELL MYSELF MELT', 0);
+    assert.deepEqual(result.matchedWordIndexes, [0]);
+    assert.equal(result.anchorIndex, 1);
   });
 
   it('lets tablet speech recover a dense phrase farther ahead of a stale visible anchor', () => {
