@@ -2139,7 +2139,7 @@ html.mentor-theme-dark .personal-reader {
   color: var(--reader-paper-text);
   display: grid;
   gap: 8px 14px;
-  grid-template-columns: minmax(74px, 1fr) minmax(140px, 1.6fr) minmax(74px, 1fr);
+  grid-template-columns: minmax(120px, 1fr) minmax(180px, 1.35fr) minmax(120px, 1fr);
   left: calc((100vw - min(var(--reader-sidebar-width, 280px), 42vw)) / 2);
   line-height: 1.15;
   overflow: hidden;
@@ -2148,7 +2148,7 @@ html.mentor-theme-dark .personal-reader {
   text-align: center;
   transform: translateX(-50%);
   transition: border-color 220ms ease, box-shadow 220ms ease;
-  width: min(620px, calc(100vw - min(var(--reader-sidebar-width, 280px), 42vw) - 30px));
+  width: min(760px, calc(100vw - min(var(--reader-sidebar-width, 280px), 42vw) - 30px));
   z-index: 4;
 }
 
@@ -2156,14 +2156,14 @@ html.mentor-theme-dark .personal-reader {
   .personal-reader__forecast {
     border-radius: 14px;
     gap: 6px;
-    grid-template-columns: minmax(54px, 1fr) minmax(96px, 1.5fr) minmax(54px, 1fr);
+    grid-template-columns: minmax(58px, 1fr) minmax(96px, 1.35fr) minmax(58px, 1fr);
     left: calc((100vw - min(var(--reader-sidebar-mobile-width, 208px), 58vw)) / 2);
     padding: 8px 7px 7px;
     width: calc(100vw - min(var(--reader-sidebar-mobile-width, 208px), 58vw) - 16px);
   }
 
   .personal-reader__forecast-stat--remaining strong {
-    font-size: .72rem;
+    font-size: .78rem;
     overflow: visible;
     text-overflow: clip;
     white-space: normal;
@@ -2188,21 +2188,21 @@ html.mentor-theme-dark .personal-reader {
 
 .personal-reader__forecast-stat small {
   color: var(--reader-paper-muted);
-  font: 800 clamp(.5rem, 1vw, .64rem)/1 system-ui, sans-serif;
+  font: 800 clamp(.56rem, 1vw, .72rem)/1 system-ui, sans-serif;
   letter-spacing: .06em;
   text-transform: uppercase;
 }
 
 .personal-reader__forecast-stat strong {
   color: var(--reader-paper-text);
-  font: 900 clamp(.75rem, 1.5vw, 1.08rem)/1.15 system-ui, sans-serif;
+  font: 900 clamp(.82rem, 1.5vw, 1.18rem)/1.15 system-ui, sans-serif;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .personal-reader__forecast-stat--remaining strong {
-  font-size: clamp(.7rem, 1.3vw, .98rem);
+  font-size: clamp(.78rem, 1.3vw, 1.08rem);
   overflow: visible;
   text-overflow: clip;
   white-space: normal;
@@ -2218,10 +2218,18 @@ html.mentor-theme-dark .personal-reader {
 
 .personal-reader__forecast-stat span {
   color: var(--reader-paper-muted);
-  font: 700 clamp(.5rem, 1vw, .64rem)/1.1 system-ui, sans-serif;
+  font: 700 clamp(.56rem, 1vw, .72rem)/1.1 system-ui, sans-serif;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.personal-reader__forecast-value {
+  align-items: baseline;
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  min-width: 0;
 }
 
 .personal-reader__goal-progress {

@@ -190,8 +190,10 @@
           >
             <div class="personal-reader__forecast-stat personal-reader__forecast-stat--read">
               <small>Read today</small>
-              <strong>{{ dailyReadingWords.toLocaleString('en') }}</strong>
-              <span>words</span>
+              <div class="personal-reader__forecast-value">
+                <strong>{{ dailyReadingWords.toLocaleString('en') }}</strong>
+                <span>words</span>
+              </div>
             </div>
             <div class="personal-reader__forecast-stat personal-reader__forecast-stat--remaining">
               <strong>{{ bookReadingDaysLabel }}</strong>
@@ -199,8 +201,10 @@
             </div>
             <div class="personal-reader__forecast-stat personal-reader__forecast-stat--goal">
               <small>Today's goal</small>
-              <strong>{{ dailyReadingTarget.toLocaleString('en') }}</strong>
-              <span>words</span>
+              <div class="personal-reader__forecast-value">
+                <strong>{{ dailyReadingTarget.toLocaleString('en') }}</strong>
+                <span>words</span>
+              </div>
             </div>
             <div
               class="personal-reader__goal-progress"
