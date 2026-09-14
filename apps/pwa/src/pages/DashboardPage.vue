@@ -929,11 +929,16 @@ const lessonProgressRatio = computed(() => {
   );
 });
 const displayedLessonProgress = computed(() => Math.round(lessonProgressRatio.value * 100));
-const hasCurrentExerciseAudio = computed(() => Boolean(currentExercise.value?.audioText?.trim()));
+const currentExercisePlaybackText = computed(() => (
+  currentExercise.value?.type === 'dialogue-translation'
+    ? resolveDialogueExpectedText(currentExercise.value)
+    : currentExercise.value?.audioText?.trim() ?? ''
+));
+const hasCurrentExerciseAudio = computed(() => Boolean(currentExercisePlaybackText.value));
 const estimatedCurrentAudioSeconds = computed(() => {
   const wordCount = isListeningPlayer.value
     ? listeningTokens.value.length
-    : currentExercise.value?.audioText?.trim().split(/\s+/).filter(Boolean).length ?? 0;
+    : currentExercisePlaybackText.value.split(/\s+/).filter(Boolean).length;
 
   return estimateAudioTotalSeconds(wordCount);
 });
@@ -961,7 +966,7 @@ const isListeningPlayer = computed(() => {
 const isDialogueTranslationExercise = computed(
   () => currentExercise.value?.type === 'dialogue-translation',
 );
-const dialogueExpectedText = computed(() => resolveDialogueExpectedText(currentExercise.value));
+const dialogueExpectedText = computed(() => currentExercisePlaybackText.value);
 const dialogueExpectedSegments = computed(() => getDialogueExpectedSegments(
   speechRecognitionCaptured.value ? answer.value : '',
   dialogueExpectedText.value,
@@ -1903,9 +1908,7 @@ function monitorDialogueSpeech(stream: MediaStream) {
 }
 
 async function playAudio() {
-  const text = isDialogueTranslationExercise.value
-    ? dialogueExpectedText.value
-    : currentExercise.value?.audioText;
+  const text = currentExercisePlaybackText.value;
   const exerciseId = currentExercise.value?.id;
 
   if (text && isSpeechSynthesisAvailable()) {
