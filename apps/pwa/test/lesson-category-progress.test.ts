@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { GeneratedLesson } from '@mentor-ai/shared';
-import { buildLessonCategoryProgress, type LessonProgressState } from '../src/services/lesson-category-progress.js';
+import {
+  buildLessonCategoryProgress,
+  generatedLessonMode,
+  type LessonProgressState,
+} from '../src/services/lesson-category-progress.js';
 
 const lessons = [
   { id: 'grammar-1', targetSkills: ['grammar', 'review'] },
@@ -10,6 +14,23 @@ const lessons = [
 ] as GeneratedLesson[];
 
 describe('lesson category progress', () => {
+  it('puts generated lessons into the category represented by their exercises', () => {
+    const speakingLesson = {
+      targetSkills: ['grammar', 'review'],
+      exercises: [{ type: 'dialogue-translation', targetSkill: 'grammar' }],
+    } as GeneratedLesson;
+    const listeningLesson = {
+      targetSkills: ['grammar', 'listening'],
+      exercises: [
+        { type: 'dialogue-translation', targetSkill: 'grammar' },
+        { type: 'listening-comprehension', targetSkill: 'listening' },
+      ],
+    } as GeneratedLesson;
+
+    assert.equal(generatedLessonMode(speakingLesson), 'speaking');
+    assert.equal(generatedLessonMode(listeningLesson), 'listening');
+  });
+
   it('distinguishes started, partially completed, and fully completed categories', () => {
     const progress = new Map<string, LessonProgressState>([
       ['grammar-1', 'completed'],

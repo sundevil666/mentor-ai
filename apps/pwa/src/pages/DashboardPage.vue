@@ -714,7 +714,7 @@
 </template>
 
 <script setup lang="ts">
-import type { GeneratedLesson, LearningActivityTotals, LearningContext, LearningMode, PreferredLessonDevice } from '@mentor-ai/shared';
+import type { GeneratedLesson, LearningActivityTotals, LearningContext, PreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { synchronizeDashboardLessonRoute } from 'src/services/navigation-category';
@@ -789,7 +789,10 @@ import {
   downloadGeneratedLessonOffline,
   fetchNewLessonCatalog,
 } from 'src/services/offline-lesson-updates';
-import type { LessonProgressState } from 'src/services/lesson-category-progress';
+import {
+  generatedLessonMode,
+  type LessonProgressState,
+} from 'src/services/lesson-category-progress';
 import { loadLearningActivityTotals } from 'src/services/learning-activity';
 import { audioLibrary } from 'src/services/audio-library';
 import { storyLibrary } from 'src/services/story-library';
@@ -1193,7 +1196,7 @@ const trainingLibraries: Record<'listening' | 'speaking', {
 };
 const generatedHomeLessons = computed<HomeLesson[]>(() => newLessonCatalog.value
   .map((lesson) => {
-    const mode = lessonMode(lesson);
+    const mode = generatedLessonMode(lesson);
     if (mode !== 'listening' && mode !== 'speaking') return null;
     return {
       templateKey: lesson.lessonTemplateKey ?? lesson.id,
@@ -1297,7 +1300,7 @@ const homeProgressItems = computed(() => {
   const listenedSeconds = Math.max(totals.listeningSeconds, levelActivity.value.listeningSeconds);
   const listeningLessonSeconds = trainingLibraries.listening.lessons.reduce((sum, lesson) => sum + lesson.minutes * 60, 0);
   const generatedListeningSeconds = newLessonCatalog.value
-    .filter((lesson) => lessonMode(lesson) === 'listening')
+    .filter((lesson) => generatedLessonMode(lesson) === 'listening')
     .reduce((sum, lesson) => sum + lesson.estimatedMinutes * 60, 0);
   const listeningTotalSeconds = audioLibrary.reduce((sum, item) => sum + item.durationSeconds, 0)
     + storyLibrary.reduce((sum, item) => sum + item.durationSeconds, 0)
@@ -1527,19 +1530,13 @@ function newLessonOfflineLabel(lessonId: string) {
   return 'Not downloaded';
 }
 
-function lessonMode(lesson: GeneratedLesson): LearningMode {
-  if (lesson.exercises.some((exercise) => exercise.type === 'listening-text')) return 'listening';
-  if (lesson.exercises.some((exercise) => exercise.targetSkill === 'speaking')) return 'speaking';
-  return 'home';
-}
-
 async function startNewLesson(lesson: GeneratedLesson) {
   lessonReturnDestination.value = 'home';
   activeEngagementContentId.value = lesson.lessonTemplateKey ?? lesson.id;
   recordLessonStart(activeEngagementContentId.value);
   setForwardTransition();
   await appStore.startLesson(createLearningContext(currentSuggestion.value, {
-    mode: lessonMode(lesson),
+    mode: generatedLessonMode(lesson),
     selectedConcept: lesson.concept,
     manualConceptChoice: true,
     lessonTemplateKey: lesson.lessonTemplateKey,

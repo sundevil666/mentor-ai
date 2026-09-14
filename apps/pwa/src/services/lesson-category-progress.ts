@@ -1,4 +1,4 @@
-import type { GeneratedLesson, SkillArea } from '@mentor-ai/shared';
+import type { GeneratedLesson, LearningMode, SkillArea } from '@mentor-ai/shared';
 
 export type LessonProgressState = 'new' | 'started' | 'completed';
 export type LessonCategoryState = 'new' | 'started' | 'progress' | 'complete';
@@ -10,6 +10,27 @@ const categories: Array<{ key: SkillArea; label: string; icon: string }> = [
   { key: 'vocabulary', label: 'Vocabulary', icon: 'translate' },
   { key: 'review', label: 'Review', icon: 'replay' },
 ];
+
+export function generatedLessonMode(lesson: GeneratedLesson): LearningMode {
+  if (lesson.exercises.some((exercise) => (
+    exercise.type === 'listening-text'
+    || exercise.type === 'listening-comprehension'
+  ))) {
+    return 'listening';
+  }
+
+  if (lesson.exercises.some((exercise) => (
+    exercise.type === 'dialogue-translation'
+    || exercise.type === 'repeat-speaking'
+    || exercise.targetSkill === 'speaking'
+  ))) {
+    return 'speaking';
+  }
+
+  if (lesson.targetSkills.includes('listening')) return 'listening';
+  if (lesson.targetSkills.includes('speaking')) return 'speaking';
+  return 'home';
+}
 
 export function buildLessonCategoryProgress(
   lessons: GeneratedLesson[],
