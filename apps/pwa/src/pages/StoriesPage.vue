@@ -1226,8 +1226,8 @@ function handleReaderWheel(event: WheelEvent) {
     readerDragging.value = false;
     const destination = readerWheelDestination(readerWheelStartPageIndex, readerPageCount.value, readerWheelDeltaX);
     readerWheelDeltaX = 0;
-    if (destination === currentBookPageIndex.value) scrollToReaderPage();
-    else goToBookPage(destination);
+    if (destination === currentBookPageIndex.value) scrollToReaderPage(false);
+    else goToBookPage(destination, false);
     readerWheelSettleTimer = window.setTimeout(resetReaderWheel, 140);
     return;
   }
@@ -1238,7 +1238,7 @@ function settleReaderWheel() {
   readerWheelSettleTimer = 0;
   readerDragging.value = false;
   readerWheelDeltaX = 0;
-  scrollToReaderPage();
+  scrollToReaderPage(false);
 }
 
 function resetReaderWheel() {
