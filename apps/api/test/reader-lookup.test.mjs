@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
-import { lookupReaderPhonetic, lookupReaderText, normalizeLookupText } from '../dist/services/reader-lookup.service.js';
+import { convertArpabetToIpa, lookupReaderPhonetic, lookupReaderText, normalizeLookupText } from '../dist/services/reader-lookup.service.js';
 import {
   countTranslationCharacters,
   createTranslationUsage,
@@ -23,10 +23,14 @@ describe('reader text lookup', () => {
     await assert.rejects(() => lookupReaderText('a'.repeat(501)), /no more than 500 characters/);
   });
 
-  it('falls back to Datamuse IPA when the primary dictionary is unavailable', async () => {
+  it('uses the fast Datamuse IPA without waiting for the slower dictionary', async () => {
     const originalFetch = globalThis.fetch;
+    let dictionaryRequested = false;
     globalThis.fetch = async (url) => {
-      if (String(url).includes('dictionaryapi.dev')) return new Response(null, { status: 503 });
+      if (String(url).includes('dictionaryapi.dev')) {
+        dictionaryRequested = true;
+        return new Response(null, { status: 503 });
+      }
       return new Response(JSON.stringify([{ word: 'this', tags: ['pron', 'ipa_pron:ðˈɪs'] }]), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -34,9 +38,15 @@ describe('reader text lookup', () => {
     };
     try {
       assert.deepEqual(await lookupReaderPhonetic('This'), { text: 'This', phonetic: '/ðˈɪs/' });
+      assert.equal(dictionaryRequested, false);
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  it('converts the pronunciation fallback to IPA when Datamuse omits its IPA tag', () => {
+    assert.equal(convertArpabetToIpa('DH IH1 S'), '/ðˈɪs/');
+    assert.equal(convertArpabetToIpa('N OW1 T B UH2 K'), '/nˈoʊtbˌʊk/');
   });
 
   it('publishes the phonetic lookup through the Vercel reader endpoint', () => {
