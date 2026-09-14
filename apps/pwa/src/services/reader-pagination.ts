@@ -63,3 +63,15 @@ export function chooseReaderSpeechAnchor(input: {
   if (input.visibleWordIndex >= 0) return input.visibleWordIndex;
   return input.currentAnchor;
 }
+
+export function chooseReaderSpeechStartAnchor(input: {
+  currentPageIndex: number;
+  currentAnchor: number;
+  currentAnchorPageIndex: number;
+  visibleWordIndex: number;
+}) {
+  if (input.currentAnchor >= 0 && input.currentAnchorPageIndex === input.currentPageIndex) {
+    return input.currentAnchor;
+  }
+  return input.visibleWordIndex >= 0 ? input.visibleWordIndex : Math.max(0, input.currentAnchor);
+}

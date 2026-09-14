@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop, chooseReaderSpeechAnchor, chooseReaderStopWordIndex } from '../src/services/reader-pagination.js';
+import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop, chooseReaderSpeechAnchor, chooseReaderSpeechStartAnchor, chooseReaderStopWordIndex } from '../src/services/reader-pagination.js';
 
 test('reader columns advance by exactly one viewport after accounting for nested padding', () => {
   const geometry = calculateReaderPaginationGeometry({
@@ -89,4 +89,22 @@ test('speech anchor falls back safely when page geometry is unavailable', () => 
     visibleWordIndex: -1,
     currentAnchor: 101,
   }), 101);
+});
+
+test('restarting speech keeps confirmed progress within the current page', () => {
+  assert.equal(chooseReaderSpeechStartAnchor({
+    currentPageIndex: 4,
+    currentAnchor: 119,
+    currentAnchorPageIndex: 4,
+    visibleWordIndex: 96,
+  }), 119);
+});
+
+test('starting speech uses the visible page when saved speech progress belongs elsewhere', () => {
+  assert.equal(chooseReaderSpeechStartAnchor({
+    currentPageIndex: 4,
+    currentAnchor: 87,
+    currentAnchorPageIndex: 3,
+    visibleWordIndex: 96,
+  }), 96);
 });

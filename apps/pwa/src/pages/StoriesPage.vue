@@ -581,7 +581,7 @@ import { queueReadingTranscript, syncReadingTranscripts } from 'src/services/rea
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { isSherpaReaderExperiment, startSherpaReadingTranscriber, type SherpaReadingTranscriber } from 'src/services/sherpa-reading-transcriber';
-import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop, chooseReaderSpeechAnchor, chooseReaderStopWordIndex } from 'src/services/reader-pagination';
+import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop, chooseReaderSpeechAnchor, chooseReaderSpeechStartAnchor, chooseReaderStopWordIndex } from 'src/services/reader-pagination';
 import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerTouchDestination, readerWheelDestination, shouldCommitReaderWheel, type ReaderSwipePoint } from 'src/services/reader-swipe';
 import { beginReaderLookupInteraction, shouldProcessReadingTranscript } from 'src/services/reader-lookup-interaction';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
@@ -1614,7 +1614,13 @@ async function startReadingSpeech() {
   provisionalReaderWordIndexes.value = new Set();
   activeReaderWordIndexes.value = new Set();
   resetReadingSpeechPace();
-  readingSpeechAnchor.value = getVisibleReaderWordAnchor();
+  const visibleWordIndex = getVisibleReaderWordAnchor();
+  readingSpeechAnchor.value = chooseReaderSpeechStartAnchor({
+    currentPageIndex: currentBookPageIndex.value,
+    currentAnchor: readingSpeechAnchor.value,
+    currentAnchorPageIndex: getReaderWordPageIndex(readingSpeechAnchor.value),
+    visibleWordIndex,
+  });
   readingSpeechLastTranscript.value = '';
   readingSpeechLastDecision.value = 'Listening for the expected word.';
   resetSherpaReadingFragment();
