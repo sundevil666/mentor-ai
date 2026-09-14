@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { activeReadingHighlightIndexes, alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, previewTabletReadingWordIndexes, recoverReadingSpeechPosition, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
+import { activeReadingHighlightIndexes, alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, matchReadingSpeechAtAnchor, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, previewTabletReadingWordIndexes, recoverReadingSpeechPosition, stableReadingInterimPrefix, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
 import { localReadingChunkDurationMs, normalizeReadingAudio, startLocalReadingTranscriber } from '../src/services/local-reading-transcriber.js';
 
 const reference = tokenizeReadingSpeech('Alice was beginning to get very tired of sitting by her sister on the bank. She read the sentence again because practice matters.');
@@ -99,6 +99,12 @@ describe('reading speech tracking', () => {
 
     assert.deepEqual(result.matchedWordIndexes, [0]);
     assert.equal(result.anchorIndex, 1);
+  });
+
+  it('treats only unchanged interim words as stable', () => {
+    assert.deepEqual(stableReadingInterimPrefix('SHE CROSSE', 'SHE CROSSES THE'), ['she']);
+    assert.deepEqual(stableReadingInterimPrefix('SHE CROSSES THE', 'SHE CROSSES THE ROOM'), ['she', 'crosses', 'the']);
+    assert.deepEqual(stableReadingInterimPrefix('I FELL', 'I FEEL MYSELF'), ['i']);
   });
 
   it('lets tablet speech recover a dense phrase farther ahead of a stale visible anchor', () => {

@@ -245,6 +245,18 @@ export function previewBrowserReadingWordIndexes(referenceWords: readonly string
   return matchSequentialReadingSpeech(referenceWords, transcript, anchorIndex).matchedWordIndexes;
 }
 
+export function stableReadingInterimPrefix(previousTranscript: string, currentTranscript: string): string[] {
+  const previousWords = tokenizeReadingSpeech(previousTranscript);
+  const currentWords = tokenizeReadingSpeech(currentTranscript);
+  const stableWords: string[] = [];
+  const maximumLength = Math.min(previousWords.length, currentWords.length);
+  for (let index = 0; index < maximumLength; index += 1) {
+    if (previousWords[index] !== currentWords[index]) break;
+    stableWords.push(currentWords[index]!);
+  }
+  return stableWords;
+}
+
 export function boundTabletReadingProgress(matchedWordIndexes: readonly number[], anchorIndex: number, spokenWordCount: number): number[] {
   if (!matchedWordIndexes.length || spokenWordCount <= 0) return [];
   const nearby = matchedWordIndexes.filter((wordIndex) => wordIndex >= Math.max(0, anchorIndex - 8));
