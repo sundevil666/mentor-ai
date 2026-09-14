@@ -761,6 +761,7 @@ import {
   chooseBestDialogueTranscript,
   getDialogueExpectedSegments,
   isConfidentDialogueAnswer,
+  resolveDialogueExpectedText,
 } from 'src/services/dialogue-speech';
 import {
   readListeningProgressPreference,
@@ -960,9 +961,10 @@ const isListeningPlayer = computed(() => {
 const isDialogueTranslationExercise = computed(
   () => currentExercise.value?.type === 'dialogue-translation',
 );
+const dialogueExpectedText = computed(() => resolveDialogueExpectedText(currentExercise.value));
 const dialogueExpectedSegments = computed(() => getDialogueExpectedSegments(
   speechRecognitionCaptured.value ? answer.value : '',
-  currentExercise.value?.audioText ?? '',
+  dialogueExpectedText.value,
 ));
 const isRepeatedLesson = computed(() => canFinishRepeatedLesson(
   appStore.session?.lesson.lessonTemplateKey,
@@ -1843,7 +1845,7 @@ function startDialogueLiveTranscript(recognitionRunId: number) {
 
 function applyDialogueTranscript(transcript: string, recognitionRunId: number) {
   if (recognitionRunId !== dialogueRecognitionRunId || !transcript.trim()) return;
-  const expected = currentExercise.value?.audioText ?? '';
+  const expected = dialogueExpectedText.value;
   const bestTranscript = chooseBestDialogueTranscript(answer.value, transcript, expected);
   const matchesExpected = isConfidentDialogueAnswer(bestTranscript, expected);
   answer.value = bestTranscript;
@@ -1901,7 +1903,9 @@ function monitorDialogueSpeech(stream: MediaStream) {
 }
 
 async function playAudio() {
-  const text = currentExercise.value?.audioText;
+  const text = isDialogueTranslationExercise.value
+    ? dialogueExpectedText.value
+    : currentExercise.value?.audioText;
   const exerciseId = currentExercise.value?.id;
 
   if (text && isSpeechSynthesisAvailable()) {

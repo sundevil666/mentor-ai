@@ -5,9 +5,21 @@ import {
   dialogueAnswerCoverage,
   getDialogueExpectedSegments,
   isConfidentDialogueAnswer,
+  resolveDialogueExpectedText,
 } from '../src/services/dialogue-speech.js';
 
 describe('dialogue speech recognition', () => {
+  it('uses the expected response when a generated dialogue exercise omits audio text', () => {
+    assert.equal(
+      resolveDialogueExpectedText({ expectedResponse: 'The majority voted for the new schedule.' }),
+      'The majority voted for the new schedule.',
+    );
+    assert.equal(
+      resolveDialogueExpectedText({ audioText: 'Preferred audio text.', expectedResponse: 'Fallback answer.' }),
+      'Preferred audio text.',
+    );
+  });
+
   it('stops for a phrase that confidently matches the native answer', () => {
     assert.equal(isConfidentDialogueAnswer('What time do you start work today?', 'What time do you start work today?'), true);
     assert.equal(isConfidentDialogueAnswer('What time start today?', 'What time do you start work today?'), false);

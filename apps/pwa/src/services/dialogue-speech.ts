@@ -37,6 +37,13 @@ export interface DialogueExpectedSegment {
   matched: boolean | null;
 }
 
+export function resolveDialogueExpectedText(exercise: {
+  audioText?: string;
+  expectedResponse?: string;
+} | null | undefined): string {
+  return exercise?.audioText?.trim() || exercise?.expectedResponse?.trim() || '';
+}
+
 export function getDialogueExpectedSegments(transcript: string, expected: string): DialogueExpectedSegment[] {
   const expectedMatches = [...expected.matchAll(/[a-z]+(?:'[a-z]+)?|\d+/gi)];
   if (!expectedMatches.length) return expected ? [{ text: expected, matched: null }] : [];
