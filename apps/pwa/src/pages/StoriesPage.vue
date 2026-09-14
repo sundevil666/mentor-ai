@@ -429,7 +429,10 @@
               </div>
             </div>
             <p v-if="selectedReaderText" class="personal-reader__lookup-text">{{ selectedReaderText }}</p>
-            <p v-if="readerPhonetic" class="personal-reader__lookup-phonetic">{{ readerPhonetic }}</p>
+            <div v-if="readerPhonetic" class="personal-reader__lookup-phonetic">
+              <span>Transcription</span>
+              <strong>{{ readerPhonetic }}</strong>
+            </div>
             <div v-else-if="readerPhoneticLoading && readerLookupKind === 'word'" class="personal-reader__lookup-loading personal-reader__lookup-loading--phonetic">
               <q-spinner color="primary" size="16px" />
               <span>Loading transcription…</span>
@@ -1397,7 +1400,12 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
 async function loadReaderPhonetic(text: string, requestId: number) {
   try {
     const phonetic = await fetchReaderPhonetic(text);
-    if (requestId === readerLookupRequestId) readerPhonetic.value = phonetic;
+    if (requestId === readerLookupRequestId) {
+      readerPhonetic.value = phonetic;
+      if (phonetic && readerLookup.value?.translation) {
+        await saveReaderLookup({ ...readerLookup.value, phonetic }, requestId);
+      }
+    }
   } catch (error) {
     appendReadingSpeechDebug(`Optional phonetic lookup unavailable: ${error instanceof Error ? error.message : String(error)}.`);
   } finally {

@@ -3227,11 +3227,29 @@ body.body--dark .personal-reader__lookup-text {
   justify-content: flex-start;
 }
 
-.personal-reader__lookup-heading strong,
-.personal-reader__lookup-phonetic {
+.personal-reader__lookup-heading strong {
   color: var(--app-muted-strong);
   font-size: 0.78em;
   font-weight: 800;
+}
+
+.personal-reader__lookup-phonetic {
+  align-items: baseline;
+  color: var(--app-muted-strong);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.78em;
+  gap: 4px 8px;
+}
+
+.personal-reader__lookup-phonetic span {
+  font-weight: 700;
+}
+
+.personal-reader__lookup-phonetic strong {
+  color: var(--app-text-strong);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.08em;
 }
 
 .personal-reader__lookup-text {
