@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import { lookupReaderPhonetic, lookupReaderText, normalizeLookupText } from '../dist/services/reader-lookup.service.js';
@@ -26,16 +27,26 @@ describe('reader text lookup', () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async (url) => {
       if (String(url).includes('dictionaryapi.dev')) return new Response(null, { status: 503 });
-      return new Response(JSON.stringify([{ word: 'gripping', tags: ['adj', 'ipa_pron:grˈɪpɪŋ'] }]), {
+      return new Response(JSON.stringify([{ word: 'this', tags: ['pron', 'ipa_pron:ðˈɪs'] }]), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
     };
     try {
-      assert.deepEqual(await lookupReaderPhonetic('gripping'), { text: 'gripping', phonetic: '/grˈɪpɪŋ/' });
+      assert.deepEqual(await lookupReaderPhonetic('This'), { text: 'This', phonetic: '/ðˈɪs/' });
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  it('publishes the phonetic lookup through the Vercel reader endpoint', () => {
+    const vercelConfig = JSON.parse(readFileSync(new URL('../../../vercel.json', import.meta.url), 'utf8'));
+    const readerRoute = vercelConfig.routes.find((route) => route.dest === '/api/reader?action=$1');
+    const serverlessReader = readFileSync(new URL('../../../api/reader.js', import.meta.url), 'utf8');
+
+    assert.match('/api/reader/phonetic', new RegExp(readerRoute.src));
+    assert.match(serverlessReader, /action === 'phonetic'/);
+    assert.match(serverlessReader, /lookupReaderPhonetic\(body\?\.text\)/);
   });
 });
 

@@ -9,7 +9,7 @@
       "dest": "/api/configuration?health=1"
     },
     {
-      "src": "^/api/reader/(lookup|usage)$",
+      "src": "^/api/reader/(lookup|usage|phonetic)$",
       "dest": "/api/reader?action=$1"
     },
     {
