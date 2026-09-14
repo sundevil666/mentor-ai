@@ -2456,8 +2456,12 @@ html.mentor-theme-dark .personal-reader {
 }
 
 .personal-reader__word--expected {
-  background: color-mix(in srgb, var(--category-accent) 13%, transparent);
-  box-shadow: inset 0 -3px color-mix(in srgb, var(--category-accent) 82%, #24594a);
+  background: color-mix(in srgb, #55d6aa 58%, #eafff7);
+  box-shadow:
+    inset 0 -3px #197654,
+    0 0 0 2px color-mix(in srgb, #197654 45%, transparent);
+  color: #102d23;
+  font-weight: 750;
 }
 
 .personal-reader__word--active {
@@ -2673,8 +2677,11 @@ body.body--dark .personal-reader__word--provisional {
 }
 
 body.body--dark .personal-reader__word--expected {
-  background: color-mix(in srgb, #74c9a4 16%, transparent);
-  box-shadow: inset 0 -3px color-mix(in srgb, #74c9a4 78%, #d9fff0);
+  background: color-mix(in srgb, #55d6aa 48%, #163d30);
+  box-shadow:
+    inset 0 -3px #a8f5d9,
+    0 0 0 2px color-mix(in srgb, #a8f5d9 42%, transparent);
+  color: #f2fff9;
 }
 
 body.body--dark .personal-reader__word--active {

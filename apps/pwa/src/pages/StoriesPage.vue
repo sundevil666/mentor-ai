@@ -236,7 +236,7 @@
                       'personal-reader__word--marker': token.wordIndex === readerMarkerWordIndex,
                       'personal-reader__word--resume': token.wordIndex === resumeWordIndex,
                       'personal-reader__word--resume-sentence': token.wordIndex !== undefined && token.wordIndex >= resumeSentenceStartIndex && token.wordIndex <= resumeSentenceEndIndex,
-                      'personal-reader__word--expected': readingSpeechActive && token.wordIndex === readingSpeechAnchor,
+                      'personal-reader__word--expected': (readingSpeechActive || readingSpeechTransitioning) && token.wordIndex === readingSpeechAnchor,
                       'personal-reader__word--spoken': token.wordIndex !== undefined && spokenReaderWordIndexes.has(token.wordIndex),
                       'personal-reader__word--provisional': token.wordIndex !== undefined && provisionalReaderWordIndexes.has(token.wordIndex) && !spokenReaderWordIndexes.has(token.wordIndex),
                       'personal-reader__word--active': token.wordIndex !== undefined && activeReaderWordIndexes.has(token.wordIndex),
@@ -1625,7 +1625,7 @@ async function startReadingSpeech() {
     visibleWordIndex,
   });
   readingSpeechLastTranscript.value = '';
-  readingSpeechLastDecision.value = 'Listening for the expected word.';
+  readingSpeechLastDecision.value = `Start with “${readerReferenceWords.value[readingSpeechAnchor.value] ?? 'end of book'}”.`;
   resetSherpaReadingFragment();
   appendReadingSpeechDebug(`Reading anchor: word ${readingSpeechAnchor.value}.`);
   appendReadingSpeechDebug(`Expected nearby text: "${readerReferenceWords.value.slice(readingSpeechAnchor.value, readingSpeechAnchor.value + 18).join(' ')}"`);
@@ -1910,9 +1910,10 @@ function handleReadingSpeechTranscript(
   spokenReaderWordIndexes.value = nextSpoken;
   recordDailySpokenMatch(confirmedWordIndexes);
   readingSpeechStatus.value = 'listening';
-  readingSpeechMessage.value = match.coverage === 1
-    ? 'Correct — keep reading.'
-    : 'Correct up to the highlighted word. Repeat the next word.';
+  const nextExpectedWord = readerReferenceWords.value[readingSpeechAnchor.value];
+  readingSpeechMessage.value = nextExpectedWord
+    ? `Correct. Next: “${nextExpectedWord}”.`
+    : 'Correct. You reached the end of the book.';
   return match;
 }
 
