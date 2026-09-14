@@ -236,6 +236,7 @@
                       'personal-reader__word--marker': token.wordIndex === readerMarkerWordIndex,
                       'personal-reader__word--resume': token.wordIndex === resumeWordIndex,
                       'personal-reader__word--resume-sentence': token.wordIndex !== undefined && token.wordIndex >= resumeSentenceStartIndex && token.wordIndex <= resumeSentenceEndIndex,
+                      'personal-reader__word--expected': readingSpeechActive && token.wordIndex === readingSpeechAnchor,
                       'personal-reader__word--spoken': token.wordIndex !== undefined && spokenReaderWordIndexes.has(token.wordIndex),
                       'personal-reader__word--provisional': token.wordIndex !== undefined && provisionalReaderWordIndexes.has(token.wordIndex) && !spokenReaderWordIndexes.has(token.wordIndex),
                       'personal-reader__word--active': token.wordIndex !== undefined && activeReaderWordIndexes.has(token.wordIndex),
@@ -1357,6 +1358,7 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
       revealSelection: () => {
         selectedReaderText.value = text;
         selectedReaderWordIndex.value = wordIndex;
+        if (shouldResumeReadingSpeech && wordIndex !== null) setReadingSpeechAnchor(wordIndex, 'Selected word');
         readerLookup.value = null;
         readerPhonetic.value = undefined;
         readerLookupError.value = '';
@@ -1618,6 +1620,8 @@ async function startReadingSpeech() {
     currentPageIndex: currentBookPageIndex.value,
     currentAnchor: readingSpeechAnchor.value,
     currentAnchorPageIndex: getReaderWordPageIndex(readingSpeechAnchor.value),
+    selectedWordIndex: selectedReaderWordIndex.value ?? -1,
+    selectedWordPageIndex: getReaderWordPageIndex(selectedReaderWordIndex.value ?? -1),
     visibleWordIndex,
   });
   readingSpeechLastTranscript.value = '';
@@ -2087,11 +2091,16 @@ function useSelectedWordAsSpeechAnchor() {
     Notify.create({ type: 'warning', message: 'Tap the word you want to read first, then try again.' });
     return;
   }
+  setReadingSpeechAnchor(wordIndex, 'Anchor manually moved');
+}
+
+function setReadingSpeechAnchor(wordIndex: number, reason: string) {
   readingSpeechAnchor.value = wordIndex;
+  resetSherpaReadingFragment();
   provisionalReaderWordIndexes.value = new Set();
   activeReaderWordIndexes.value = new Set();
-  readingSpeechLastDecision.value = `Anchor moved manually. Waiting for “${readerReferenceWords.value[wordIndex] ?? 'end of book'}”.`;
-  appendReadingSpeechDebug(`Anchor manually moved to word ${wordIndex}: "${readerReferenceWords.value[wordIndex] ?? ''}".`);
+  readingSpeechLastDecision.value = `${reason}. Waiting for “${readerReferenceWords.value[wordIndex] ?? 'end of book'}”.`;
+  appendReadingSpeechDebug(`${reason} set reading anchor to word ${wordIndex}: "${readerReferenceWords.value[wordIndex] ?? ''}".`);
 }
 
 async function copyReadingSpeechDebugLog() {

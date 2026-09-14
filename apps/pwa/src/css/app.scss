@@ -2455,6 +2455,11 @@ html.mentor-theme-dark .personal-reader {
   color: var(--reader-paper-text);
 }
 
+.personal-reader__word--expected {
+  background: color-mix(in srgb, var(--category-accent) 13%, transparent);
+  box-shadow: inset 0 -3px color-mix(in srgb, var(--category-accent) 82%, #24594a);
+}
+
 .personal-reader__word--active {
   background: color-mix(in srgb, #f6d982 72%, transparent);
   box-shadow: 0 0 0 2px color-mix(in srgb, #d49f1f 15%, transparent);
@@ -2665,6 +2670,11 @@ body.body--dark .personal-reader__word--spoken {
 body.body--dark .personal-reader__word--provisional {
   background: color-mix(in srgb, #74c9a4 18%, transparent);
   color: #f2eee2;
+}
+
+body.body--dark .personal-reader__word--expected {
+  background: color-mix(in srgb, #74c9a4 16%, transparent);
+  box-shadow: inset 0 -3px color-mix(in srgb, #74c9a4 78%, #d9fff0);
 }
 
 body.body--dark .personal-reader__word--active {

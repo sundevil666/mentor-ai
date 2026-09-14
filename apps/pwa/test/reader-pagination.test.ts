@@ -96,8 +96,21 @@ test('restarting speech keeps confirmed progress within the current page', () =>
     currentPageIndex: 4,
     currentAnchor: 119,
     currentAnchorPageIndex: 4,
+    selectedWordIndex: -1,
+    selectedWordPageIndex: -1,
     visibleWordIndex: 96,
   }), 119);
+});
+
+test('speech starts from an explicitly selected word on the current page', () => {
+  assert.equal(chooseReaderSpeechStartAnchor({
+    currentPageIndex: 4,
+    currentAnchor: 119,
+    currentAnchorPageIndex: 4,
+    selectedWordIndex: 127,
+    selectedWordPageIndex: 4,
+    visibleWordIndex: 96,
+  }), 127);
 });
 
 test('starting speech uses the visible page when saved speech progress belongs elsewhere', () => {
@@ -105,6 +118,8 @@ test('starting speech uses the visible page when saved speech progress belongs e
     currentPageIndex: 4,
     currentAnchor: 87,
     currentAnchorPageIndex: 3,
+    selectedWordIndex: -1,
+    selectedWordPageIndex: -1,
     visibleWordIndex: 96,
   }), 96);
 });

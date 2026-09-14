@@ -68,8 +68,13 @@ export function chooseReaderSpeechStartAnchor(input: {
   currentPageIndex: number;
   currentAnchor: number;
   currentAnchorPageIndex: number;
+  selectedWordIndex: number;
+  selectedWordPageIndex: number;
   visibleWordIndex: number;
 }) {
+  if (input.selectedWordIndex >= 0 && input.selectedWordPageIndex === input.currentPageIndex) {
+    return input.selectedWordIndex;
+  }
   if (input.currentAnchor >= 0 && input.currentAnchorPageIndex === input.currentPageIndex) {
     return input.currentAnchor;
   }
