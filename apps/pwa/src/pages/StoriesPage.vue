@@ -581,7 +581,7 @@ import { queueReadingTranscript, syncReadingTranscripts } from 'src/services/rea
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { isSherpaReaderExperiment, startSherpaReadingTranscriber, type SherpaReadingTranscriber } from 'src/services/sherpa-reading-transcriber';
-import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop } from 'src/services/reader-pagination';
+import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop, chooseReaderStopWordIndex } from 'src/services/reader-pagination';
 import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerWheelDestination, shouldCommitReaderWheel, type ReaderSwipePoint } from 'src/services/reader-swipe';
 import { beginReaderLookupInteraction, shouldProcessReadingTranscript } from 'src/services/reader-lookup-interaction';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
@@ -1525,9 +1525,13 @@ function toggleReaderMarker() {
 async function saveReaderStopHere() {
   const book = selectedBook.value;
   if (!book || readerStopSaving.value) return;
-  const wordIndex = currentReaderHighlightWordIndex.value >= 0
-    ? currentReaderHighlightWordIndex.value
-    : getStableReaderWordPosition();
+  const highlightedWordIndex = currentReaderHighlightWordIndex.value;
+  const wordIndex = chooseReaderStopWordIndex({
+    currentPageIndex: currentBookPageIndex.value,
+    highlightedWordIndex,
+    highlightedWordPageIndex: getReaderWordPageIndex(highlightedWordIndex),
+    pageWordIndex: getStableReaderWordPosition(),
+  });
   const updatedAt = new Date().toISOString();
 
   readerStopSaving.value = true;
@@ -2487,6 +2491,11 @@ function getReaderPageWordAnchor(pageIndex: number) {
   ));
   const wordIndex = Number(word?.dataset.readerWordIndex);
   return Number.isInteger(wordIndex) ? wordIndex : -1;
+}
+function getReaderWordPageIndex(wordIndex: number) {
+  if (wordIndex < 0 || !readerPaper.value || readerPageStride.value <= 0) return -1;
+  const word = readerPaper.value.querySelector<HTMLElement>(`[data-reader-word-index="${wordIndex}"]`);
+  return word ? Math.floor((word.offsetLeft + 1) / readerPageStride.value) : -1;
 }
 function getReaderChapterWordAnchor(chapterIndex: number) {
   const word = readerPaper.value

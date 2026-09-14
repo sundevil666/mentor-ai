@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop } from '../src/services/reader-pagination.js';
+import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop, chooseReaderStopWordIndex } from '../src/services/reader-pagination.js';
 
 test('reader columns advance by exactly one viewport after accounting for nested padding', () => {
   const geometry = calculateReaderPaginationGeometry({
@@ -50,4 +50,22 @@ test('normal reader places the exact resume word near the upper reading line', (
 test('normal reader resume scrolling stays inside the document bounds', () => {
   assert.equal(calculateReaderResumeScrollTop({ viewportHeight: 600, wordOffsetTop: 80, scrollHeight: 3_000 }), 0);
   assert.equal(calculateReaderResumeScrollTop({ viewportHeight: 600, wordOffsetTop: 2_950, scrollHeight: 3_000 }), 2_400);
+});
+
+test('saving after a swipe uses the first word on the newly opened page', () => {
+  assert.equal(chooseReaderStopWordIndex({
+    currentPageIndex: 4,
+    highlightedWordIndex: 87,
+    highlightedWordPageIndex: 3,
+    pageWordIndex: 88,
+  }), 88);
+});
+
+test('saving keeps the active highlight when it belongs to the current page', () => {
+  assert.equal(chooseReaderStopWordIndex({
+    currentPageIndex: 4,
+    highlightedWordIndex: 93,
+    highlightedWordPageIndex: 4,
+    pageWordIndex: 88,
+  }), 93);
 });

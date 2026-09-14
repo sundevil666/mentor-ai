@@ -41,3 +41,15 @@ export function calculateReaderResumeScrollTop(input: {
   const comfortableReadingOffset = viewportHeight * 0.28;
   return Math.max(0, Math.min(maximumScrollTop, input.wordOffsetTop - comfortableReadingOffset));
 }
+
+export function chooseReaderStopWordIndex(input: {
+  currentPageIndex: number;
+  highlightedWordIndex: number;
+  highlightedWordPageIndex: number;
+  pageWordIndex: number;
+}) {
+  if (input.highlightedWordIndex >= 0 && input.highlightedWordPageIndex === input.currentPageIndex) {
+    return input.highlightedWordIndex;
+  }
+  return input.pageWordIndex;
+}
