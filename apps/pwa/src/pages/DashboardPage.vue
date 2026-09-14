@@ -331,8 +331,8 @@
                 <strong>{{ currentExercise.nativePrompt }}</strong>
               </div>
 
-              <div v-if="currentExercise.audioText" class="dialogue-drill__native">
-                <span>Native answer</span>
+              <div v-if="dialogueExpectedText" class="dialogue-drill__native">
+                <span>Say in English</span>
                 <strong>
                   <template v-for="(segment, index) in dialogueExpectedSegments" :key="`${index}:${segment.text}`">
                     <mark v-if="segment.matched" class="dialogue-drill__matched-word">{{ segment.text }}</mark>
