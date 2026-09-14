@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { activeReadingHighlightIndexes, alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, matchExpectedReadingWordStream, matchReadingSpeechAtAnchor, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, previewTabletReadingWordIndexes, recoverReadingSpeechPosition, stableReadingInterimPrefix, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
+import { activeReadingHighlightIndexes, alignReadingSpeech, boundTabletReadingProgress, confirmTabletReadingWordIndexes, immediateReadingInterimWords, matchExpectedReadingWordStream, matchReadingSpeechAtAnchor, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, previewTabletReadingWordIndexes, recoverReadingSpeechPosition, stableReadingInterimPrefix, tokenizeReadingSpeech } from '../src/services/reading-speech-tracker.js';
 import { localReadingChunkDurationMs, normalizeReadingAudio, startLocalReadingTranscriber } from '../src/services/local-reading-transcriber.js';
 
 const reference = tokenizeReadingSpeech('Alice was beginning to get very tired of sitting by her sister on the bank. She read the sentence again because practice matters.');
@@ -117,6 +117,24 @@ describe('reading speech tracking', () => {
     const result = matchExpectedReadingWordStream(['I', 'feel', 'myself', 'melt'], 'I FELL MYSELF MELT', 0);
     assert.deepEqual(result.matchedWordIndexes, [0]);
     assert.equal(result.anchorIndex, 1);
+  });
+
+  it('processes the exact expected last interim word without waiting for silence', () => {
+    assert.deepEqual(immediateReadingInterimWords('FIX BETRAYED AFTER THEIR WAY SHE BETRAYED YOU', 7, 'you'), {
+      words: ['you'],
+      processedWordCount: 8,
+    });
+  });
+
+  it('holds an unmatched last interim word for revision or final', () => {
+    assert.deepEqual(immediateReadingInterimWords('LAST NIGHT LACY ADDR', 3, 'dress'), {
+      words: [],
+      processedWordCount: 3,
+    });
+    assert.deepEqual(immediateReadingInterimWords('LAST NIGHT LACY ADDRESS', 3, 'dress'), {
+      words: [],
+      processedWordCount: 3,
+    });
   });
 
   it('lets tablet speech recover a dense phrase farther ahead of a stale visible anchor', () => {

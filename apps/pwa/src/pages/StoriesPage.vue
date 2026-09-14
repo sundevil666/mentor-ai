@@ -575,7 +575,7 @@ import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
-import { activeReadingHighlightIndexes, matchExpectedReadingWordStream, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, stableReadingInterimPrefix, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
+import { activeReadingHighlightIndexes, immediateReadingInterimWords, matchExpectedReadingWordStream, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { chooseReadingResumeState, readingDeviceHeartbeatMs, readingDeviceLabel } from 'src/services/reading-device-sync';
 import { queueReadingTranscript, syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
@@ -676,8 +676,7 @@ let readingSpeechStream: MediaStream | null = null;
 let readingSpeechAudioContext: AudioContext | null = null;
 let readingSpeechAnimationFrame = 0;
 let readingSpeechSessionId = 0;
-let readingSpeechSherpaInterimTranscript = '';
-let readingSpeechSherpaCommittedWordCount = 0;
+let readingSpeechSherpaProcessedWordCount = 0;
 let readingSpeechDebugStartedAt = 0;
 let readingSpeechDebugBuffer = ['Waiting for microphone start.'];
 let readingSpeechDebugUiTimer = 0;
@@ -1719,17 +1718,15 @@ async function startReadingSpeech() {
           if (sessionId !== readingSpeechSessionId || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
           updateReadingSpeechPace(transcript);
           appendReadingSpeechDebug(`Sherpa interim: "${transcript}"`);
-          const unconfirmedTranscript = tokenizeReadingSpeech(transcript)
-            .slice(readingSpeechSherpaCommittedWordCount)
-            .join(' ');
-          const previewWordIndexes = matchExpectedReadingWordStream(
-            readerReferenceWords.value,
-            unconfirmedTranscript,
-            readingSpeechAnchor.value,
-          ).matchedWordIndexes;
-          updateReadingSpeechDiagnosticDecision(unconfirmedTranscript, previewWordIndexes, true);
-          provisionalReaderWordIndexes.value = new Set(previewWordIndexes);
-          confirmStableSherpaInterim(transcript);
+          const interim = immediateReadingInterimWords(
+            transcript,
+            readingSpeechSherpaProcessedWordCount,
+            readerReferenceWords.value[readingSpeechAnchor.value] ?? '',
+          );
+          readingSpeechSherpaProcessedWordCount = interim.processedWordCount;
+          if (interim.words.length) {
+            handleReadingSpeechTranscript(interim.words.join(' '), 'sherpa-onnx', false, 'Immediate interim text', true);
+          }
         },
         onFinal: (transcript) => {
           if (sessionId !== readingSpeechSessionId) return;
@@ -1929,27 +1926,17 @@ function recordReadingTranscript(transcript: string, recognitionEngine: 'device-
   }).catch(() => undefined);
 }
 
-function confirmStableSherpaInterim(transcript: string) {
-  const stableWords = stableReadingInterimPrefix(readingSpeechSherpaInterimTranscript, transcript);
-  readingSpeechSherpaInterimTranscript = transcript;
-  if (stableWords.length <= readingSpeechSherpaCommittedWordCount) return;
-  const newStableWords = stableWords.slice(readingSpeechSherpaCommittedWordCount);
-  handleReadingSpeechTranscript(newStableWords.join(' '), 'sherpa-onnx', false, 'Stable interim text', true);
-  readingSpeechSherpaCommittedWordCount = stableWords.length;
-}
-
 function handleSherpaFinalTranscript(transcript: string) {
   const finalWords = tokenizeReadingSpeech(transcript);
-  const remainingWords = finalWords.slice(readingSpeechSherpaCommittedWordCount);
-  appendReadingSpeechDebug(`Sherpa final text (${finalWords.length} words, ${readingSpeechSherpaCommittedWordCount} already confirmed): "${transcript}"`);
+  const remainingWords = finalWords.slice(readingSpeechSherpaProcessedWordCount);
+  appendReadingSpeechDebug(`Sherpa final text (${finalWords.length} words, ${readingSpeechSherpaProcessedWordCount} already processed): "${transcript}"`);
   recordReadingTranscript(transcript, 'sherpa-onnx');
   if (remainingWords.length) handleReadingSpeechTranscript(remainingWords.join(' '), 'sherpa-onnx', false, 'Unconfirmed final remainder', true);
   resetSherpaReadingFragment();
 }
 
 function resetSherpaReadingFragment() {
-  readingSpeechSherpaInterimTranscript = '';
-  readingSpeechSherpaCommittedWordCount = 0;
+  readingSpeechSherpaProcessedWordCount = 0;
 }
 function getVisibleReaderWordAnchor() {
   const viewport = readerContent.value;

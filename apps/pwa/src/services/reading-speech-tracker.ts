@@ -279,6 +279,18 @@ export function stableReadingInterimPrefix(previousTranscript: string, currentTr
   return stableWords;
 }
 
+export function immediateReadingInterimWords(transcript: string, processedWordCount: number, expectedWord: string) {
+  const currentWords = tokenizeReadingSpeech(transcript);
+  const safeProcessedCount = Math.max(0, Math.min(processedWordCount, currentWords.length));
+  const settledWordCount = Math.max(0, currentWords.length - 1);
+  const lastWordMatchesExpected = currentWords.at(-1) === normalizeReadingWord(expectedWord);
+  const nextProcessedWordCount = lastWordMatchesExpected ? currentWords.length : Math.max(safeProcessedCount, settledWordCount);
+  return {
+    words: currentWords.slice(safeProcessedCount, nextProcessedWordCount),
+    processedWordCount: nextProcessedWordCount,
+  };
+}
+
 export function boundTabletReadingProgress(matchedWordIndexes: readonly number[], anchorIndex: number, spokenWordCount: number): number[] {
   if (!matchedWordIndexes.length || spokenWordCount <= 0) return [];
   const nearby = matchedWordIndexes.filter((wordIndex) => wordIndex >= Math.max(0, anchorIndex - 8));
