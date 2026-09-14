@@ -724,6 +724,7 @@ import {
   createLearningContext,
 } from 'src/services/learning-context';
 import {
+  calculateCompletedExerciseRatio,
   calculateLessonProgressRatio,
   calculatePlaybackProgress,
   calculateRemainingSeconds,
@@ -928,7 +929,16 @@ const lessonProgressRatio = computed(() => {
     Boolean(session.completedAt),
   );
 });
-const displayedLessonProgress = computed(() => Math.round(lessonProgressRatio.value * 100));
+const displayedLessonProgress = computed(() => {
+  const session = appStore.session;
+  if (!session) return 0;
+
+  return Math.round(calculateCompletedExerciseRatio(
+    session.currentExerciseIndex,
+    session.lesson.exercises.length,
+    Boolean(session.completedAt),
+  ) * 100);
+});
 const currentExercisePlaybackText = computed(() => (
   currentExercise.value?.type === 'dialogue-translation'
     ? resolveDialogueExpectedText(currentExercise.value)

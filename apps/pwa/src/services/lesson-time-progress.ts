@@ -10,6 +10,17 @@ export function calculateLessonProgressRatio(
   return clampRatio((currentExerciseIndex + clampRatio(exerciseProgress)) / exerciseCount);
 }
 
+export function calculateCompletedExerciseRatio(
+  currentExerciseIndex: number,
+  exerciseCount: number,
+  completed: boolean,
+): number {
+  if (exerciseCount <= 0) return 0;
+  if (completed) return 1;
+
+  return clampRatio(currentExerciseIndex / exerciseCount);
+}
+
 export function calculatePlaybackProgress(currentTime: number, duration: number): number {
   if (!Number.isFinite(currentTime) || !Number.isFinite(duration) || duration <= 0) return 0;
   return clampRatio(currentTime / duration);

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  calculateCompletedExerciseRatio,
   calculateLessonProgressRatio,
   calculatePlaybackProgress,
   calculateRemainingSeconds,
@@ -9,6 +10,15 @@ import {
 } from '../src/services/lesson-time-progress.js';
 
 describe('lesson time progress', () => {
+  it('does not count listening to an answer as completing the current exercise', () => {
+    const playbackProgress = calculateLessonProgressRatio(0, 1, 5, false);
+    const completedProgress = calculateCompletedExerciseRatio(0, 5, false);
+
+    assert.equal(playbackProgress, 0.2);
+    assert.equal(completedProgress, 0);
+    assert.equal(calculateCompletedExerciseRatio(1, 5, false), 0.2);
+  });
+
   it('fills the progress bar from left to right while a speaking example plays', () => {
     const beforePlayback = calculateLessonProgressRatio(1, 0, 6, false);
     const duringPlayback = calculateLessonProgressRatio(
