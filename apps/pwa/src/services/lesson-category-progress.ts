@@ -32,6 +32,12 @@ export function generatedLessonMode(lesson: GeneratedLesson): LearningMode {
   return 'home';
 }
 
+export function sortGeneratedLessonsNewestFirst(lessons: GeneratedLesson[]): GeneratedLesson[] {
+  return [...lessons].sort((left, right) => (
+    right.createdAt.localeCompare(left.createdAt) || left.id.localeCompare(right.id)
+  ));
+}
+
 export function buildLessonCategoryProgress(
   lessons: GeneratedLesson[],
   getProgress: (lesson: GeneratedLesson) => LessonProgressState,

@@ -791,6 +791,7 @@ import {
 } from 'src/services/offline-lesson-updates';
 import {
   generatedLessonMode,
+  sortGeneratedLessonsNewestFirst,
   type LessonProgressState,
 } from 'src/services/lesson-category-progress';
 import { loadLearningActivityTotals } from 'src/services/learning-activity';
@@ -1194,7 +1195,7 @@ const trainingLibraries: Record<'listening' | 'speaking', {
     ],
   },
 };
-const generatedHomeLessons = computed<HomeLesson[]>(() => newLessonCatalog.value
+const generatedHomeLessons = computed<HomeLesson[]>(() => sortGeneratedLessonsNewestFirst(newLessonCatalog.value)
   .map((lesson) => {
     const mode = generatedLessonMode(lesson);
     if (mode !== 'listening' && mode !== 'speaking') return null;
@@ -1209,8 +1210,8 @@ const generatedHomeLessons = computed<HomeLesson[]>(() => newLessonCatalog.value
   })
   .filter((lesson): lesson is HomeLesson => lesson !== null));
 const lessonsByTrainingCategory = computed(() => ({
-  listening: [...trainingLibraries.listening.lessons, ...generatedHomeLessons.value.filter((lesson) => lesson.mode === 'listening')],
-  speaking: [...trainingLibraries.speaking.lessons, ...generatedHomeLessons.value.filter((lesson) => lesson.mode === 'speaking')],
+  listening: [...generatedHomeLessons.value.filter((lesson) => lesson.mode === 'listening'), ...trainingLibraries.listening.lessons],
+  speaking: [...generatedHomeLessons.value.filter((lesson) => lesson.mode === 'speaking'), ...trainingLibraries.speaking.lessons],
 }));
 const activeTrainingLibrary = computed(() => selectedLessonLibrary.value === 'speaking'
   ? { ...trainingLibraries.speaking, lessons: lessonsByTrainingCategory.value.speaking }

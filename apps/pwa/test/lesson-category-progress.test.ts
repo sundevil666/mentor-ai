@@ -4,6 +4,7 @@ import type { GeneratedLesson } from '@mentor-ai/shared';
 import {
   buildLessonCategoryProgress,
   generatedLessonMode,
+  sortGeneratedLessonsNewestFirst,
   type LessonProgressState,
 } from '../src/services/lesson-category-progress.js';
 
@@ -14,6 +15,19 @@ const lessons = [
 ] as GeneratedLesson[];
 
 describe('lesson category progress', () => {
+  it('shows the freshest generated lessons first in category lists', () => {
+    const catalog = [
+      { id: 'older', createdAt: '2026-09-10T08:00:00.000Z' },
+      { id: 'newest', createdAt: '2026-09-14T08:00:00.000Z' },
+      { id: 'middle', createdAt: '2026-09-12T08:00:00.000Z' },
+    ] as GeneratedLesson[];
+
+    assert.deepEqual(
+      sortGeneratedLessonsNewestFirst(catalog).map((lesson) => lesson.id),
+      ['newest', 'middle', 'older'],
+    );
+  });
+
   it('puts generated lessons into the category represented by their exercises', () => {
     const speakingLesson = {
       targetSkills: ['grammar', 'review'],
