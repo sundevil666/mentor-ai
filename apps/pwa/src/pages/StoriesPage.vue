@@ -238,7 +238,6 @@
                       'personal-reader__word--resume-sentence': token.wordIndex !== undefined && token.wordIndex >= resumeSentenceStartIndex && token.wordIndex <= resumeSentenceEndIndex,
                       'personal-reader__word--expected': (readingSpeechActive || readingSpeechTransitioning) && token.wordIndex === readingSpeechAnchor,
                       'personal-reader__word--spoken': token.wordIndex !== undefined && spokenReaderWordIndexes.has(token.wordIndex),
-                      'personal-reader__word--provisional': token.wordIndex !== undefined && provisionalReaderWordIndexes.has(token.wordIndex) && !spokenReaderWordIndexes.has(token.wordIndex),
                       'personal-reader__word--active': token.wordIndex !== undefined && activeReaderWordIndexes.has(token.wordIndex),
                       'personal-reader__word--current': token.wordIndex === currentReaderHighlightWordIndex,
                     }"
@@ -807,8 +806,7 @@ const renderedBookPages = computed(() => {
 });
 const readerReferenceWords = computed(() => renderedBookPages.value.flatMap((page) => page.paragraphs.flatMap((paragraph) => paragraph.filter((token) => token.isWord).map((token) => token.text))));
 const currentReaderHighlightWordIndex = computed(() => {
-  const provisional = [...provisionalReaderWordIndexes.value].at(-1);
-  return provisional ?? [...activeReaderWordIndexes.value].at(-1) ?? -1;
+  return [...activeReaderWordIndexes.value].at(-1) ?? -1;
 });
 const readingSpeechActive = computed(() => readingSpeechStatus.value === 'listening' || readingSpeechStatus.value === 'noise' || readingSpeechStatus.value === 'requesting');
 const readingSpeechHasSignal = computed(() => readingSpeechLevel.value >= 0.035);
