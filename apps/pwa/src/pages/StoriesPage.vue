@@ -582,7 +582,7 @@ import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type Co
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { isSherpaReaderExperiment, startSherpaReadingTranscriber, type SherpaReadingTranscriber } from 'src/services/sherpa-reading-transcriber';
 import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop, chooseReaderStopWordIndex } from 'src/services/reader-pagination';
-import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerWheelDestination, shouldCommitReaderWheel, type ReaderSwipePoint } from 'src/services/reader-swipe';
+import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerTouchDestination, readerWheelDestination, shouldCommitReaderWheel, type ReaderSwipePoint } from 'src/services/reader-swipe';
 import { beginReaderLookupInteraction, shouldProcessReadingTranscript } from 'src/services/reader-lookup-interaction';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
 import { addReadingStopHistoryEntry, parseReadingStopHistory, type ReadingStopHistoryEntry } from 'src/services/reading-stop-history';
@@ -716,6 +716,7 @@ let readerSelectionTimer = 0;
 let readerLookupRequestId = 0;
 let readerTouchStart: ReaderSwipePoint | null = null;
 let readerTouchStartScrollLeft = 0;
+let readerTouchStartPageIndex = 0;
 let readerWheelStartPageIndex = 0;
 let readerWheelStartScrollLeft = 0;
 let readerWheelDeltaX = 0;
@@ -1129,14 +1130,14 @@ async function cleanCurrentBookText() {
     bookCleanupRunning.value = false;
   }
 }
-function goToBookPage(pageIndex: number | null) {
+function goToBookPage(pageIndex: number | null, smooth = true) {
   if (pageIndex === null || !Number.isInteger(pageIndex)) return;
   const destinationPageIndex = Math.max(0, Math.min(readerPageCount.value - 1, pageIndex));
   if (destinationPageIndex > currentBookPageIndex.value) recordCompletedReaderPage(currentBookPageIndex.value);
   persistBookProgress();
   currentBookPageIndex.value = destinationPageIndex;
   selectedBookChapterIndex.value = resolveBookChapterIndex(destinationPageIndex);
-  scrollToReaderPage();
+  scrollToReaderPage(smooth);
   persistBookProgress();
   readingSpeechAnchor.value = getVisibleReaderWordAnchor();
   provisionalReaderWordIndexes.value = new Set();
@@ -1188,8 +1189,10 @@ function handleReaderTouchStart(event: TouchEvent) {
   cancelReaderScrollAnimation();
   resetReaderWheel();
   const touch = event.touches.length === 1 ? event.touches[0] : undefined;
+  readerTouchStartPageIndex = currentBookPageIndex.value;
+  readerTouchStartScrollLeft = readerTouchStartPageIndex * readerPageStride.value;
+  if (readerContent.value) readerContent.value.scrollLeft = readerTouchStartScrollLeft;
   readerTouchStart = touch ? { clientX: touch.clientX, clientY: touch.clientY } : null;
-  readerTouchStartScrollLeft = readerContent.value?.scrollLeft ?? 0;
   readerDragging.value = false;
 }
 
@@ -1268,20 +1271,20 @@ function handleReaderTouchEnd(event: TouchEvent) {
   readerDragging.value = false;
   const touch = event.changedTouches.length === 1 ? event.changedTouches[0] : undefined;
   if (!start || !touch) {
-    if (wasDragging) scrollToReaderPage();
+    if (wasDragging) scrollToReaderPage(false);
     return;
   }
   const direction = detectReaderSwipe(start, { clientX: touch.clientX, clientY: touch.clientY });
   if (wasDragging) suppressReaderTapUntil = Date.now() + 400;
   if (!direction) {
-    if (wasDragging) scrollToReaderPage();
+    if (wasDragging) scrollToReaderPage(false);
     return;
   }
-  goToBookPage(currentBookPageIndex.value + (direction === 'next' ? 1 : -1));
+  goToBookPage(readerTouchDestination(readerTouchStartPageIndex, readerPageCount.value, direction), false);
 }
 function resetReaderTouch() {
   readerTouchStart = null;
-  if (readerDragging.value) scrollToReaderPage();
+  if (readerDragging.value) scrollToReaderPage(false);
   readerDragging.value = false;
 }
 function handleReaderSelectionChange() {
@@ -1965,11 +1968,12 @@ async function startReadingSpeechMeter(stream: MediaStream, sessionId: number) {
     if (sessionId !== readingSpeechSessionId || readingSpeechAudioContext !== context) return;
     analyser.getByteFrequencyData(samples);
     const average = samples.reduce((sum, value) => sum + value, 0) / Math.max(1, samples.length);
-    readingSpeechLevel.value = Math.min(1, average / 72);
-    const hasSignal = readingSpeechLevel.value >= 0.035;
+    const sampledLevel = Math.min(1, average / 72);
+    if (!readerDragging.value) readingSpeechLevel.value = sampledLevel;
+    const hasSignal = sampledLevel >= 0.035;
     if (hasSignal !== readingSpeechLastSignalState) {
       readingSpeechLastSignalState = hasSignal;
-      appendReadingSpeechDebug(hasSignal ? `Sound detected: level=${readingSpeechLevel.value.toFixed(2)}.` : 'Sound stopped.');
+      appendReadingSpeechDebug(hasSignal ? `Sound detected: level=${sampledLevel.toFixed(2)}.` : 'Sound stopped.');
     }
     readingSpeechAnimationFrame = requestAnimationFrame(update);
   };

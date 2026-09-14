@@ -44,6 +44,16 @@ export function detectReaderSwipe(
   return deltaX < 0 ? 'next' : 'previous';
 }
 
+export function readerTouchDestination(
+  startPageIndex: number,
+  pageCount: number,
+  direction: ReaderSwipeDirection,
+) {
+  if (!direction) return startPageIndex;
+  const step = direction === 'next' ? 1 : -1;
+  return Math.max(0, Math.min(pageCount - 1, startPageIndex + step));
+}
+
 export function normalizeReaderWheelDelta(event: ReaderWheelDelta, pageHeight: number) {
   const multiplier = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? pageHeight : 1;
   return {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerWheelDestination, shouldCommitReaderWheel } from '../src/services/reader-swipe.js';
+import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerTouchDestination, readerWheelDestination, shouldCommitReaderWheel } from '../src/services/reader-swipe.js';
 
 test('a horizontal swipe left advances exactly one reader page', () => {
   assert.equal(detectReaderSwipe({ clientX: 300, clientY: 200 }, { clientX: 190, clientY: 205 }), 'next');
@@ -8,6 +8,13 @@ test('a horizontal swipe left advances exactly one reader page', () => {
 
 test('a horizontal swipe right returns exactly one reader page', () => {
   assert.equal(detectReaderSwipe({ clientX: 120, clientY: 200 }, { clientX: 230, clientY: 195 }), 'previous');
+});
+
+test('a touch gesture always settles one page from where that gesture started', () => {
+  assert.equal(readerTouchDestination(4, 10, 'next'), 5);
+  assert.equal(readerTouchDestination(4, 10, 'previous'), 3);
+  assert.equal(readerTouchDestination(4, 10, null), 4);
+  assert.equal(readerTouchDestination(9, 10, 'next'), 9);
 });
 
 test('short taps and primarily vertical gestures do not turn a page', () => {
