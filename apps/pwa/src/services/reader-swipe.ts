@@ -80,3 +80,9 @@ export function readerWheelDestination(
 export function shouldCommitReaderWheel(accumulatedDeltaX: number, minimumDistance = 42) {
   return Math.abs(accumulatedDeltaX) >= minimumDistance;
 }
+
+export const readerWheelTurnQuietMs = 650;
+
+export function isReaderWheelTurnContinuation(committedAt: number, eventAt: number): boolean {
+  return committedAt >= 0 && eventAt >= committedAt && eventAt - committedAt < readerWheelTurnQuietMs;
+}

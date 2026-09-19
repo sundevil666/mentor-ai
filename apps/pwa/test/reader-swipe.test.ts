@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerTouchDestination, readerWheelDestination, shouldCommitReaderWheel } from '../src/services/reader-swipe.js';
+import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerTouchDestination, readerWheelDestination, isReaderWheelTurnContinuation, readerWheelTurnQuietMs, shouldCommitReaderWheel } from '../src/services/reader-swipe.js';
 
 test('a horizontal swipe left advances exactly one reader page', () => {
   assert.equal(detectReaderSwipe({ clientX: 300, clientY: 200 }, { clientX: 190, clientY: 205 }), 'next');
@@ -58,4 +58,11 @@ test('a trackpad gesture commits as soon as it crosses the paging threshold', ()
   assert.equal(shouldCommitReaderWheel(41.9), false);
   assert.equal(shouldCommitReaderWheel(42), true);
   assert.equal(shouldCommitReaderWheel(-90), true);
+});
+
+test('keeps momentum from one page turn from opening a second page', () => {
+  const committedAt = 1_000;
+  assert.equal(isReaderWheelTurnContinuation(committedAt, committedAt + 120), true);
+  assert.equal(isReaderWheelTurnContinuation(committedAt, committedAt + readerWheelTurnQuietMs - 1), true);
+  assert.equal(isReaderWheelTurnContinuation(committedAt, committedAt + readerWheelTurnQuietMs), false);
 });

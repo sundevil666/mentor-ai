@@ -9,7 +9,7 @@ type SherpaReadingTranscriberOptions = {
   onDebug?: (message: string) => void;
 };
 
-export type SherpaReadingTranscriber = { stop: (flushFinal?: boolean) => void };
+export type SherpaReadingTranscriber = { stop: (flushFinal?: boolean) => void; suspend: () => void; resume: () => void; reset: () => void };
 
 let sharedWorker: Worker | null = null;
 let sharedWorkerReady = false;
@@ -26,6 +26,7 @@ export function startSherpaReadingTranscriber(stream: MediaStream, options: Sher
   let processor: AudioWorkletNode | null = null;
   let silentOutput: GainNode | null = null;
   let stopped = false;
+  let suspended = false;
 
   const startCapture = async () => {
     if (stopped || context || !stream.active) return;
@@ -37,7 +38,7 @@ export function startSherpaReadingTranscriber(stream: MediaStream, options: Sher
     silentOutput = context.createGain();
     silentOutput.gain.value = 0;
     processor.port.onmessage = (event: MessageEvent<Float32Array>) => {
-      if (stopped || !(event.data instanceof Float32Array) || !context) return;
+      if (stopped || suspended || !(event.data instanceof Float32Array) || !context) return;
       const audio = resampleReadingAudio(event.data, context.sampleRate, 16_000);
       worker.postMessage({ type: 'audio', sessionId, audio }, [audio.buffer]);
     };
@@ -86,6 +87,19 @@ export function startSherpaReadingTranscriber(stream: MediaStream, options: Sher
   }
 
   return {
+    suspend() {
+      if (stopped || suspended) return;
+      suspended = true;
+      worker.postMessage({ type: 'pause', sessionId });
+    },
+    resume() {
+      if (stopped || !suspended) return;
+      worker.postMessage({ type: 'resume', sessionId });
+      suspended = false;
+    },
+    reset() {
+      if (!stopped) worker.postMessage({ type: 'reset', sessionId });
+    },
     stop(flushFinal = false) {
       worker.postMessage({ type: 'stop', sessionId });
       if (flushFinal) return;

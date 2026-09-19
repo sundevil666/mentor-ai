@@ -4,6 +4,7 @@ let recognizer = null;
 let recognitionStream = null;
 let lastPartial = '';
 let activeSession = 0;
+let suspended = false;
 
 self.Module = {
   locateFile(path) {
@@ -31,8 +32,23 @@ self.onmessage = (event) => {
   const message = event.data;
   if (message.type === 'start') {
     activeSession = message.sessionId;
+    suspended = false;
     recognitionStream?.free();
     recognitionStream = recognizer?.createStream() ?? null;
+    lastPartial = '';
+    return;
+  }
+  if (message.type === 'pause' && message.sessionId === activeSession) {
+    suspended = true;
+    recognitionStream?.free();
+    recognitionStream = null;
+    lastPartial = '';
+    return;
+  }
+  if ((message.type === 'resume' || message.type === 'reset') && message.sessionId === activeSession) {
+    recognitionStream?.free();
+    recognitionStream = suspended && message.type === 'reset' ? null : recognizer?.createStream() ?? null;
+    if (message.type === 'resume') suspended = false;
     lastPartial = '';
     return;
   }
@@ -45,7 +61,7 @@ self.onmessage = (event) => {
     self.postMessage({ type: 'stopped', sessionId: activeSession });
     return;
   }
-  if (message.type !== 'audio' || message.sessionId !== activeSession || !recognizer || !recognitionStream) return;
+  if (message.type !== 'audio' || message.sessionId !== activeSession || suspended || !recognizer || !recognitionStream) return;
 
   recognitionStream.acceptWaveform(16_000, message.audio);
   while (recognizer.isReady(recognitionStream)) recognizer.decode(recognitionStream);

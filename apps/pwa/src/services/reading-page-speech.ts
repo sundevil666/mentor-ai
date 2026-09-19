@@ -8,11 +8,13 @@ export interface ReadingPageSpeechSummary {
   missedWords: { index: number; word: string }[];
 }
 
-/** The index is built once on a page turn, never for each microphone update. */
+/** Match a short spoken stream against the current page only. */
 export class ReadingPageSpeech {
-  private readonly positions = new Map<string, number[]>();
+  private readonly normalized = new Map<number, string>();
   private readonly matched = new Set<number>();
   private wasAttempted = false;
+  private cursorIndex: number;
+  private pendingWord: string | null = null;
   readonly words: readonly ReadingPageWord[];
   readonly pageIndex: number;
 
@@ -21,41 +23,68 @@ export class ReadingPageSpeech {
     this.words = words;
     const allowed = new Set(words.map((word) => word.index));
     previouslyMatched.forEach((index) => { if (allowed.has(index)) this.matched.add(index); });
-    for (const word of words) {
-      const key = normalizeReadingWord(word.text);
-      if (!key) continue;
-      const occurrences = this.positions.get(key) ?? [];
-      occurrences.push(word.index);
-      this.positions.set(key, occurrences);
-    }
+    this.cursorIndex = words.find((word) => !this.matched.has(word.index))?.index ?? (words.at(-1)?.index ?? -1) + 1;
+    for (const word of words) this.normalized.set(word.index, normalizeReadingWord(word.text));
   }
 
   match(transcript: string): number[] {
     const heard = tokenizeReadingSpeech(transcript);
     if (heard.length) this.wasAttempted = true;
-    const matches: number[] = [];
-    for (const word of heard) {
-      const firstUnused = this.positions.get(word)?.find((index) => !this.matched.has(index));
-      if (firstUnused === undefined) continue;
-      this.matched.add(firstUnused);
-      matches.push(firstUnused);
-    }
-    return matches;
+    const result = this.consume(heard, this.cursorIndex, this.pendingWord, this.matched);
+    this.cursorIndex = result.cursor;
+    this.pendingWord = result.pending;
+    return result.indexes;
   }
 
   preview(transcript: string): number[] {
-    const used = new Set(this.matched);
-    return tokenizeReadingSpeech(transcript).flatMap((word) => {
-      const firstUnused = this.positions.get(word)?.find((index) => !used.has(index));
-      if (firstUnused === undefined) return [];
-      used.add(firstUnused);
-      return [firstUnused];
-    });
+    return this.consume(tokenizeReadingSpeech(transcript), this.cursorIndex, this.pendingWord, new Set(this.matched)).indexes;
+  }
+
+  private consume(heard: readonly string[], start: number, previousPending: string | null, matched: Set<number>) {
+    const indexes: number[] = [];
+    let cursor = start;
+    let pending = previousPending;
+    const confirm = (index: number) => {
+      if (!matched.has(index)) {
+        matched.add(index);
+        indexes.push(index);
+      }
+      cursor = index + 1;
+    };
+    for (const word of heard) {
+      if (this.normalized.get(cursor) === word) {
+        confirm(cursor);
+        pending = null;
+        continue;
+      }
+      let recovered = false;
+      if (pending) {
+        // A single familiar word ahead is weak evidence. Two consecutive words
+        // may confirm a tiny skipped gap, leaving that gap uncredited.
+        for (let gap = 1; gap <= 2; gap += 1) {
+          const first = cursor + gap;
+          if (this.normalized.get(first) !== pending || this.normalized.get(first + 1) !== word) continue;
+          confirm(first);
+          confirm(first + 1);
+          pending = null;
+          recovered = true;
+          break;
+        }
+      }
+      if (!recovered) pending = word;
+    }
+    return { indexes, cursor, pending };
   }
 
   get attempted(): boolean { return this.wasAttempted; }
   get matchedIndexes(): number[] { return [...this.matched]; }
-  get nextIndex(): number { return this.words.find((word) => !this.matched.has(word.index))?.index ?? (this.words.at(-1)?.index ?? -1) + 1; }
+  get nextIndex(): number { return this.cursorIndex; }
+  moveTo(index: number): void {
+    if (this.normalized.has(index)) {
+      this.cursorIndex = index;
+      this.pendingWord = null;
+    }
+  }
   summary(): ReadingPageSpeechSummary {
     return {
       pageIndex: this.pageIndex,

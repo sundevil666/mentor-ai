@@ -583,8 +583,8 @@ import { syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { isSherpaReaderExperiment, startSherpaReadingTranscriber, type SherpaReadingTranscriber } from 'src/services/sherpa-reading-transcriber';
-import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop, chooseReaderSpeechAnchor, chooseReaderSpeechStartAnchor, chooseReaderStopWordIndex } from 'src/services/reader-pagination';
-import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerTouchDestination, readerWheelDestination, shouldCommitReaderWheel, type ReaderSwipePoint } from 'src/services/reader-swipe';
+import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop, chooseReaderSpeechStartAnchor, chooseReaderStopWordIndex } from 'src/services/reader-pagination';
+import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerTouchDestination, readerWheelDestination, readerWheelTurnQuietMs, isReaderWheelTurnContinuation, shouldCommitReaderWheel, type ReaderSwipePoint } from 'src/services/reader-swipe';
 import { beginReaderLookupInteraction, shouldProcessReadingTranscript } from 'src/services/reader-lookup-interaction';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
 import { addReadingStopHistoryEntry, parseReadingStopHistory, type ReadingStopHistoryEntry } from 'src/services/reading-stop-history';
@@ -670,6 +670,7 @@ const readingSpeechLastDecision = ref('Waiting for recognition.');
 const readingSpeechAnchor = ref(0);
 let readingSpeechFurthestWordIndex = -1;
 let readingPageSpeech: ReadingPageSpeech | null = null;
+let readerPageWordCache = new Map<number, ReadingPageWord[]>();
 let syncedReaderPositionWordIndex = -1;
 let syncedReaderPositionUpdatedAt: string | undefined;
 let readingSpeechRecognition: ContinuousSpeechRecognition | null = null;
@@ -678,7 +679,7 @@ let sherpaReadingTranscriber: SherpaReadingTranscriber | null = null;
 let readingSpeechSherpaStopping = false;
 let readingSpeechStream: MediaStream | null = null;
 let readingSpeechAudioContext: AudioContext | null = null;
-let readingSpeechAnimationFrame = 0;
+let readingSpeechMeterTimer: ReturnType<typeof setInterval> | null = null;
 let readingSpeechSessionId = 0;
 let readingSpeechSherpaProcessedWordCount = 0;
 let readingSpeechDebugStartedAt = 0;
@@ -724,6 +725,7 @@ let readerWheelStartScrollLeft = 0;
 let readerWheelDeltaX = 0;
 let readerWheelSettleTimer = 0;
 let readerWheelGestureLocked = false;
+let readerWheelCommittedAt = -1;
 let readerScrollAnimationFrame = 0;
 let suppressReaderTapUntil = 0;
 let personalBookSyncPromise: Promise<void> | null = null;
@@ -1083,6 +1085,7 @@ function closeBook() {
   stopReadingDeviceHeartbeat();
   void readingActivityTimer.stop();
   persistBookProgress();
+  saveReadingPageSpeech();
   stopReaderPagination();
   applyReadingMode(false);
   selectedBook.value = null;
@@ -1099,8 +1102,8 @@ function closeBook() {
   readerPageCount.value = 1;
   readerPageStride.value = 1;
   chapterPageIndexes.value = [];
-  saveReadingPageSpeech();
   readingPageSpeech = null;
+  readerPageWordCache = new Map();
   spokenReaderWordIndexes.value = new Set();
   provisionalReaderWordIndexes.value = new Set();
   activeReaderWordIndexes.value = new Set();
@@ -1150,12 +1153,9 @@ function goToBookPage(pageIndex: number | null, smooth = true) {
   scrollToReaderPage(smooth);
   persistBookProgress();
   const destinationWordIndex = getReaderPageWordAnchor(destinationPageIndex);
-  readingSpeechAnchor.value = chooseReaderSpeechAnchor({
-    destinationPageWordIndex: destinationWordIndex,
-    visibleWordIndex: getVisibleReaderWordAnchor(),
-    currentAnchor: readingSpeechAnchor.value,
-  });
+  readingSpeechAnchor.value = destinationWordIndex >= 0 ? destinationWordIndex : readingSpeechAnchor.value;
   loadReadingPageSpeech(destinationPageIndex);
+  sherpaReadingTranscriber?.reset();
   resetSherpaReadingFragment();
   appendReadingSpeechDebug(`Reading anchor moved with page ${destinationPageIndex + 1}: word ${readingSpeechAnchor.value} "${readerReferenceWords.value[readingSpeechAnchor.value] ?? ''}".`);
   provisionalReaderWordIndexes.value = new Set();
@@ -1218,9 +1218,9 @@ function handleReaderWheel(event: WheelEvent) {
   const viewport = readerContent.value;
   if (!readingMode.value || !viewport || !isReaderHorizontalWheel(event, viewport.clientHeight)) return;
   event.preventDefault();
-  if (readerWheelGestureLocked) {
+  if (readerWheelGestureLocked || isReaderWheelTurnContinuation(readerWheelCommittedAt, event.timeStamp)) {
     window.clearTimeout(readerWheelSettleTimer);
-    readerWheelSettleTimer = window.setTimeout(resetReaderWheel, 140);
+    readerWheelSettleTimer = window.setTimeout(resetReaderWheel, readerWheelTurnQuietMs);
     return;
   }
   cancelReaderScrollAnimation();
@@ -1241,12 +1241,13 @@ function handleReaderWheel(event: WheelEvent) {
   window.clearTimeout(readerWheelSettleTimer);
   if (shouldCommitReaderWheel(readerWheelDeltaX)) {
     readerWheelGestureLocked = true;
+    readerWheelCommittedAt = event.timeStamp;
     readerDragging.value = false;
     const destination = readerWheelDestination(readerWheelStartPageIndex, readerPageCount.value, readerWheelDeltaX);
     readerWheelDeltaX = 0;
     if (destination === currentBookPageIndex.value) scrollToReaderPage(false);
     else goToBookPage(destination, false);
-    readerWheelSettleTimer = window.setTimeout(resetReaderWheel, 140);
+    readerWheelSettleTimer = window.setTimeout(resetReaderWheel, readerWheelTurnQuietMs);
     return;
   }
   readerWheelSettleTimer = window.setTimeout(settleReaderWheel, 110);
@@ -1360,7 +1361,7 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
     text,
     translationRequested: true,
     pronunciationRequested: speakImmediately,
-  });
+  }).catch(() => undefined);
   const shouldResumeReadingSpeech = readingSpeechActive.value;
   const requestId = ++readerLookupRequestId;
   const interactionStartedAt = performance.now();
@@ -1369,7 +1370,6 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
       revealSelection: () => {
         selectedReaderText.value = text;
         selectedReaderWordIndex.value = wordIndex;
-        if (shouldResumeReadingSpeech && wordIndex !== null) setReadingSpeechAnchor(wordIndex, 'Selected word');
         readerLookup.value = null;
         readerPhonetic.value = undefined;
         readerLookupError.value = '';
@@ -1381,12 +1381,14 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
       },
       suppressListening: shouldResumeReadingSpeech ? () => {
         readingSpeechSuppressedForLookup = true;
+        sherpaReadingTranscriber?.suspend();
+        readingSpeechLevel.value = 0;
+        resetSherpaReadingFragment();
         appendReadingSpeechDebug(`Ignoring recognition results while translating "${text}"; capture stays warm.`);
         readingSpeechMessage.value = 'Translation has priority. Listening will continue automatically.';
       } : undefined,
       pronounce: speakImmediately ? () => { void speakReaderText(text, false); } : undefined,
       lookup: async () => {
-        await interactionRecord;
         const cachedLookup = await findReaderVocabularyLookup(appStore.studentId, text).catch(() => null);
         if (requestId !== readerLookupRequestId) return;
         if (cachedLookup) {
@@ -1395,6 +1397,7 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
           readerLookupLoading.value = false;
           appendReadingSpeechDebug(`Cached translation ready after ${Math.round(performance.now() - interactionStartedAt)}ms.`);
           if (!cachedLookup.phonetic && !/\s/.test(text)) void loadReaderPhonetic(text, requestId);
+          await interactionRecord;
           await saveReaderLookup(cachedLookup, requestId);
           return;
         }
@@ -1403,8 +1406,12 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
           const lookup = await fetchReaderTextLookup(text);
           if (requestId !== readerLookupRequestId) return;
           readerLookup.value = lookup;
+          readerLookupLoading.value = false;
           appendReadingSpeechDebug(`Online translation ready after ${Math.round(performance.now() - interactionStartedAt)}ms.`);
-          if (lookup.translation) await saveReaderLookup(lookup, requestId);
+          if (lookup.translation) {
+            await interactionRecord;
+            await saveReaderLookup(lookup, requestId);
+          }
         } catch (error) {
           if (requestId === readerLookupRequestId) readerLookupError.value = error instanceof Error ? error.message : 'Translation is unavailable right now.';
         } finally {
@@ -1417,6 +1424,7 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
   } finally {
     if (requestId === readerLookupRequestId && readingSpeechSuppressedForLookup) {
       readingSpeechSuppressedForLookup = false;
+      sherpaReadingTranscriber?.resume();
       appendReadingSpeechDebug(`Translation interaction finished after ${Math.round(performance.now() - interactionStartedAt)}ms; recognition results enabled.`);
       if (readingSpeechActive.value) readingSpeechMessage.value = 'Read aloud. Recognition is ready.';
     }
@@ -1957,26 +1965,21 @@ async function startReadingSpeechMeter(stream: MediaStream, sessionId: number) {
   analyser.smoothingTimeConstant = 0.76;
   context.createMediaStreamSource(stream).connect(analyser);
   const samples = new Uint8Array(analyser.frequencyBinCount);
-  let lastMeterSampleAt = 0;
-  const update = (now: number) => {
-    if (sessionId !== readingSpeechSessionId || readingSpeechAudioContext !== context) return;
-    if (now - lastMeterSampleAt < 100) {
-      readingSpeechAnimationFrame = requestAnimationFrame(update);
-      return;
-    }
-    lastMeterSampleAt = now;
+  const update = () => {
+    if (sessionId !== readingSpeechSessionId || readingSpeechAudioContext !== context || readingSpeechSuppressedForLookup) return;
     analyser.getByteFrequencyData(samples);
     const average = samples.reduce((sum, value) => sum + value, 0) / Math.max(1, samples.length);
     const sampledLevel = Math.min(1, average / 72);
-    if (!readerDragging.value) readingSpeechLevel.value = sampledLevel;
     const hasSignal = sampledLevel >= 0.035;
+    if (!readerDragging.value && (hasSignal !== readingSpeechLastSignalState || Math.abs(sampledLevel - readingSpeechLevel.value) >= 0.15)) {
+      readingSpeechLevel.value = sampledLevel;
+    }
     if (hasSignal !== readingSpeechLastSignalState) {
       readingSpeechLastSignalState = hasSignal;
       appendReadingSpeechDebug(hasSignal ? `Sound detected: level=${sampledLevel.toFixed(2)}.` : 'Sound stopped.');
     }
-    readingSpeechAnimationFrame = requestAnimationFrame(update);
   };
-  readingSpeechAnimationFrame = requestAnimationFrame(update);
+  readingSpeechMeterTimer = setInterval(update, 250);
 }
 function stopReadingSpeech(status: ReadingSpeechStatus) {
   const flushSherpaFinal = status === 'paused' && Boolean(sherpaReadingTranscriber);
@@ -1993,8 +1996,8 @@ function stopReadingSpeech(status: ReadingSpeechStatus) {
   provisionalReaderWordIndexes.value = new Set();
   readingSpeechStream?.getTracks().forEach((track) => track.stop());
   readingSpeechStream = null;
-  cancelAnimationFrame(readingSpeechAnimationFrame);
-  readingSpeechAnimationFrame = 0;
+  if (readingSpeechMeterTimer) clearInterval(readingSpeechMeterTimer);
+  readingSpeechMeterTimer = null;
   void readingSpeechAudioContext?.close();
   readingSpeechAudioContext = null;
   readingSpeechLevel.value = 0;
@@ -2077,7 +2080,9 @@ function useSelectedWordAsSpeechAnchor() {
 }
 
 function setReadingSpeechAnchor(wordIndex: number, reason: string) {
+  readingPageSpeech?.moveTo(wordIndex);
   readingSpeechAnchor.value = wordIndex;
+  sherpaReadingTranscriber?.reset();
   resetSherpaReadingFragment();
   provisionalReaderWordIndexes.value = new Set();
   activeReaderWordIndexes.value = new Set();
@@ -2269,12 +2274,7 @@ async function persistReaderNavigationProgress(preferredWordIndex?: number, upda
   });
 }
 function getReadingPageWords(pageIndex: number): ReadingPageWord[] {
-  const paper = readerPaper.value;
-  if (!paper || readerPageStride.value <= 0) return [];
-  return Array.from(paper.querySelectorAll<HTMLElement>('[data-reader-word-index]'))
-    .filter((word) => Math.floor((word.offsetLeft + 1) / readerPageStride.value) === pageIndex)
-    .map((word) => ({ index: Number(word.dataset.readerWordIndex), text: word.dataset.readerWord ?? '' }))
-    .filter((word) => Number.isInteger(word.index) && word.index >= 0);
+  return readerPageWordCache.get(pageIndex) ?? [];
 }
 function loadReadingPageSpeech(pageIndex: number) {
   const book = selectedBook.value;
@@ -2297,12 +2297,8 @@ function saveReadingPageSpeech() {
 }
 function recordCompletedReaderPage(pageIndex: number) {
   const book = selectedBook.value;
-  const paper = readerPaper.value;
-  if (!book || !paper || readerPageStride.value <= 0 || typeof localStorage === 'undefined') return;
-  const wordIndexes = Array.from(paper.querySelectorAll<HTMLElement>('[data-reader-word-index]'))
-    .filter((word) => Math.floor((word.offsetLeft + 1) / readerPageStride.value) === pageIndex)
-    .map((word) => Number(word.dataset.readerWordIndex))
-    .filter((wordIndex) => Number.isInteger(wordIndex) && wordIndex >= 0);
+  if (!book || typeof localStorage === 'undefined') return;
+  const wordIndexes = getReadingPageWords(pageIndex).map((word) => word.index);
   if (!wordIndexes.length) return;
   readerFurthestWordPosition.value = Math.max(readerFurthestWordPosition.value, Math.max(...wordIndexes) + 1);
   dailyReadingProgress.value = prepareDailyReadingProgress(dailyReadingProgress.value);
@@ -2493,6 +2489,17 @@ async function repaginateReader(position: BookReaderProgress = { wordPosition: g
     paperScrollWidth: paper.scrollWidth,
   });
   readerPageStride.value = pageWidth;
+  saveReadingPageSpeech();
+  readingPageSpeech = null;
+  readerPageWordCache = new Map();
+  for (const element of paper.querySelectorAll<HTMLElement>('[data-reader-word-index]')) {
+    const pageIndex = Math.floor((element.offsetLeft + 1) / pageWidth);
+    const index = Number(element.dataset.readerWordIndex);
+    if (!Number.isInteger(index) || index < 0) continue;
+    const pageWords = readerPageWordCache.get(pageIndex) ?? [];
+    pageWords.push({ index, text: element.dataset.readerWord ?? '' });
+    readerPageWordCache.set(pageIndex, pageWords);
+  }
   viewport.style.setProperty('--reader-paper-scroll-width', `${paper.scrollWidth}px`);
   viewport.style.setProperty('--reader-end-gutter', `${columnGap}px`);
   chapterPageIndexes.value = selectedBookPages.value.map((_, chapterIndex) => {
@@ -2516,6 +2523,8 @@ async function repaginateReader(position: BookReaderProgress = { wordPosition: g
     stableReaderWordPosition = getReaderPageWordAnchor(currentBookPageIndex.value);
   }
   scrollToReaderPage(false);
+  loadReadingPageSpeech(currentBookPageIndex.value);
+  sherpaReadingTranscriber?.reset();
 }
 function goToSyncedReaderPosition() {
   if (syncedReaderPositionWordIndex < 0 || readerPageStride.value <= 0) return;
@@ -2527,16 +2536,11 @@ function goToSyncedReaderPosition() {
   const chapterIndex = Number(word.closest<HTMLElement>('[data-book-chapter-index]')?.dataset.bookChapterIndex);
   selectedBookChapterIndex.value = Number.isInteger(chapterIndex) ? chapterIndex : resolveBookChapterIndex(currentBookPageIndex.value);
   scrollToReaderPage(false);
+  loadReadingPageSpeech(currentBookPageIndex.value);
   persistBookProgress(syncedReaderPositionUpdatedAt);
 }
 function getReaderPageWordAnchor(pageIndex: number) {
-  const paper = readerPaper.value;
-  if (!paper || readerPageStride.value <= 0) return -1;
-  const word = Array.from(paper.querySelectorAll<HTMLElement>('[data-reader-word-index]')).find((candidate) => (
-    Math.floor((candidate.offsetLeft + 1) / readerPageStride.value) === pageIndex
-  ));
-  const wordIndex = Number(word?.dataset.readerWordIndex);
-  return Number.isInteger(wordIndex) ? wordIndex : -1;
+  return readerPageWordCache.get(pageIndex)?.[0]?.index ?? -1;
 }
 function getReaderWordPageIndex(wordIndex: number) {
   if (wordIndex < 0 || !readerPaper.value || readerPageStride.value <= 0) return -1;
