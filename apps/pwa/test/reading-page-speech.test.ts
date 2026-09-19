@@ -43,6 +43,27 @@ describe('page speech matching', () => {
     assert.equal(next.nextIndex, 14);
   });
 
+  it('recovers from a stale expected word using a unique phrase on this page', () => {
+    const words = ['rise', 'over', 'the', 'hill', 'then', 'quietly', 'close', 'the', 'wooden', 'door', 'behind', 'you']
+      .map((text, offset) => ({ index: 61683 + offset, text }));
+    const page = new ReadingPageSpeech(0, words);
+    for (const word of ['noise', 'quietly', 'close', 'the']) assert.deepEqual(page.match(word), []);
+    assert.deepEqual(page.match('wooden'), [61688, 61689, 61690, 61691]);
+    assert.equal(page.nextIndex, 61692);
+    assert.deepEqual(page.match('door behind you'), [61692, 61693, 61694]);
+    assert.deepEqual(page.summary().missedWords.map(({ index }) => index), [61683, 61684, 61685, 61686, 61687]);
+  });
+
+  it('does not relocate to an ambiguous or off-page phrase', () => {
+    const words = ['start', 'one', 'two', 'three', 'blue', 'birds', 'fly', 'away', 'blue', 'birds', 'fly', 'away']
+      .map((text, index) => ({ index, text }));
+    const page = new ReadingPageSpeech(0, words);
+    assert.deepEqual(page.match('blue birds fly away'), []);
+    assert.deepEqual(page.match('a different phrase entirely'), []);
+    assert.equal(page.nextIndex, 0);
+    assert.equal(page.summary().correctWords, 0);
+  });
+
   it('previews without consuming and resumes from a compact summary', () => {
     const words = [{ index: 0, text: 'I' }, { index: 1, text: 'see' }, { index: 2, text: 'I' }];
     const page = new ReadingPageSpeech(0, words);

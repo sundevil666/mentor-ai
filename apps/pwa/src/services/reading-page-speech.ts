@@ -14,7 +14,7 @@ export class ReadingPageSpeech {
   private readonly matched = new Set<number>();
   private wasAttempted = false;
   private cursorIndex: number;
-  private pendingWord: string | null = null;
+  private pendingWords: string[] = [];
   readonly words: readonly ReadingPageWord[];
   readonly pageIndex: number;
 
@@ -30,20 +30,20 @@ export class ReadingPageSpeech {
   match(transcript: string): number[] {
     const heard = tokenizeReadingSpeech(transcript);
     if (heard.length) this.wasAttempted = true;
-    const result = this.consume(heard, this.cursorIndex, this.pendingWord, this.matched);
+    const result = this.consume(heard, this.cursorIndex, this.pendingWords, this.matched);
     this.cursorIndex = result.cursor;
-    this.pendingWord = result.pending;
+    this.pendingWords = result.pending;
     return result.indexes;
   }
 
   preview(transcript: string): number[] {
-    return this.consume(tokenizeReadingSpeech(transcript), this.cursorIndex, this.pendingWord, new Set(this.matched)).indexes;
+    return this.consume(tokenizeReadingSpeech(transcript), this.cursorIndex, this.pendingWords, new Set(this.matched)).indexes;
   }
 
-  private consume(heard: readonly string[], start: number, previousPending: string | null, matched: Set<number>) {
+  private consume(heard: readonly string[], start: number, previousPending: readonly string[], matched: Set<number>) {
     const indexes: number[] = [];
     let cursor = start;
-    let pending = previousPending;
+    let pending = [...previousPending];
     const confirm = (index: number) => {
       if (!matched.has(index)) {
         matched.add(index);
@@ -54,24 +54,35 @@ export class ReadingPageSpeech {
     for (const word of heard) {
       if (this.normalized.get(cursor) === word) {
         confirm(cursor);
-        pending = null;
+        pending = [];
         continue;
       }
       let recovered = false;
-      if (pending) {
+      const precedingWord = pending.at(-1);
+      if (precedingWord) {
         // A single familiar word ahead is weak evidence. Two consecutive words
         // may confirm a tiny skipped gap, leaving that gap uncredited.
         for (let gap = 1; gap <= 2; gap += 1) {
           const first = cursor + gap;
-          if (this.normalized.get(first) !== pending || this.normalized.get(first + 1) !== word) continue;
+          if (this.normalized.get(first) !== precedingWord || this.normalized.get(first + 1) !== word) continue;
           confirm(first);
           confirm(first + 1);
-          pending = null;
+          pending = [];
           recovered = true;
           break;
         }
       }
-      if (!recovered) pending = word;
+      if (recovered) continue;
+      pending.push(word);
+      if (pending.length > 4) pending.shift();
+      if (pending.length < 4) continue;
+      // Relocate only on an unambiguous phrase from the current page. Do not
+      // credit any words between the old cursor and the confirmed phrase.
+      const candidates = this.words.filter(({ index }) => index >= cursor &&
+        pending.every((part, offset) => this.normalized.get(index + offset) === part));
+      if (candidates.length !== 1) continue;
+      for (let offset = 0; offset < 4; offset += 1) confirm(candidates[0]!.index + offset);
+      pending = [];
     }
     return { indexes, cursor, pending };
   }
@@ -82,7 +93,7 @@ export class ReadingPageSpeech {
   moveTo(index: number): void {
     if (this.normalized.has(index)) {
       this.cursorIndex = index;
-      this.pendingWord = null;
+      this.pendingWords = [];
     }
   }
   summary(): ReadingPageSpeechSummary {
