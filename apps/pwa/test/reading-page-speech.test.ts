@@ -64,6 +64,14 @@ describe('page speech matching', () => {
     assert.equal(page.summary().correctWords, 0);
   });
 
+  it('uses a repeated phrase when only its later occurrence remains unread', () => {
+    const words = ['blue', 'birds', 'fly', 'away', 'pause', 'again', 'blue', 'birds', 'fly', 'away']
+      .map((text, index) => ({ index, text }));
+    const page = new ReadingPageSpeech(0, words);
+    assert.deepEqual(page.match('blue birds fly away pause again'), [0, 1, 2, 3, 4, 5]);
+    assert.deepEqual(page.match('noise blue birds fly away'), [6, 7, 8, 9]);
+  });
+
   it('previews without consuming and resumes from a compact summary', () => {
     const words = [{ index: 0, text: 'I' }, { index: 1, text: 'see' }, { index: 2, text: 'I' }];
     const page = new ReadingPageSpeech(0, words);

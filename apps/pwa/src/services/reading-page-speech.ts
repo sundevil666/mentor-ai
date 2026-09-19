@@ -11,6 +11,7 @@ export interface ReadingPageSpeechSummary {
 /** Match a short spoken stream against the current page only. */
 export class ReadingPageSpeech {
   private readonly normalized = new Map<number, string>();
+  private readonly phraseStarts = new Map<string, number[]>();
   private readonly matched = new Set<number>();
   private wasAttempted = false;
   private cursorIndex: number;
@@ -25,6 +26,14 @@ export class ReadingPageSpeech {
     previouslyMatched.forEach((index) => { if (allowed.has(index)) this.matched.add(index); });
     this.cursorIndex = words.find((word) => !this.matched.has(word.index))?.index ?? (words.at(-1)?.index ?? -1) + 1;
     for (const word of words) this.normalized.set(word.index, normalizeReadingWord(word.text));
+    for (const word of words) {
+      const phrase = Array.from({ length: 4 }, (_, offset) => this.normalized.get(word.index + offset));
+      if (phrase.some((part) => part === undefined)) continue;
+      const key = phrase.join('\u0000');
+      const starts = this.phraseStarts.get(key) ?? [];
+      starts.push(word.index);
+      this.phraseStarts.set(key, starts);
+    }
   }
 
   match(transcript: string): number[] {
@@ -78,10 +87,10 @@ export class ReadingPageSpeech {
       if (pending.length < 4) continue;
       // Relocate only on an unambiguous phrase from the current page. Do not
       // credit any words between the old cursor and the confirmed phrase.
-      const candidates = this.words.filter(({ index }) => index >= cursor &&
-        pending.every((part, offset) => this.normalized.get(index + offset) === part));
-      if (candidates.length !== 1) continue;
-      for (let offset = 0; offset < 4; offset += 1) confirm(candidates[0]!.index + offset);
+      const candidates = this.phraseStarts.get(pending.join('\u0000')) ?? [];
+      const candidate = candidates.findIndex((index) => index >= cursor);
+      if (candidate < 0 || candidate + 1 < candidates.length) continue;
+      for (let offset = 0; offset < 4; offset += 1) confirm(candidates[candidate]! + offset);
       pending = [];
     }
     return { indexes, cursor, pending };
