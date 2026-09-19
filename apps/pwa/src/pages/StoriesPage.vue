@@ -574,8 +574,9 @@ import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot,
 import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
-import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, recordDailyReadWords, recordDailySpokenWords, spokenWordsForBook, type DailyReadingProgress } from 'src/services/daily-reading-progress';
-import { activeReadingHighlightIndexes, immediateReadingInterimWords, matchExpectedReadingWordStream, matchSequentialReadingSpeech, previewBrowserReadingWordIndexes, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
+import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, recordDailyReadWords, type DailyReadingProgress } from 'src/services/daily-reading-progress';
+import { ReadingPageSpeech, type ReadingPageSpeechSummary, type ReadingPageWord } from 'src/services/reading-page-speech';
+import { activeReadingHighlightIndexes, immediateReadingInterimWords, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { chooseReadingResumeState, readingDeviceHeartbeatMs, readingDeviceLabel } from 'src/services/reading-device-sync';
 import { queueReadingTranscript, syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
@@ -666,6 +667,7 @@ const readingSpeechLastTranscript = ref('');
 const readingSpeechLastDecision = ref('Waiting for recognition.');
 const readingSpeechAnchor = ref(0);
 let readingSpeechFurthestWordIndex = -1;
+let readingPageSpeech: ReadingPageSpeech | null = null;
 let syncedReaderPositionWordIndex = -1;
 let syncedReaderPositionUpdatedAt: string | undefined;
 let readingSpeechRecognition: ContinuousSpeechRecognition | null = null;
@@ -1091,6 +1093,8 @@ function closeBook() {
   readerPageCount.value = 1;
   readerPageStride.value = 1;
   chapterPageIndexes.value = [];
+  saveReadingPageSpeech();
+  readingPageSpeech = null;
   spokenReaderWordIndexes.value = new Set();
   provisionalReaderWordIndexes.value = new Set();
   activeReaderWordIndexes.value = new Set();
@@ -1129,7 +1133,10 @@ async function cleanCurrentBookText() {
 function goToBookPage(pageIndex: number | null, smooth = true) {
   if (pageIndex === null || !Number.isInteger(pageIndex)) return;
   const destinationPageIndex = Math.max(0, Math.min(readerPageCount.value - 1, pageIndex));
-  if (destinationPageIndex > currentBookPageIndex.value) recordCompletedReaderPage(currentBookPageIndex.value);
+  if (destinationPageIndex !== currentBookPageIndex.value) {
+    saveReadingPageSpeech();
+    if (destinationPageIndex > currentBookPageIndex.value) recordCompletedReaderPage(currentBookPageIndex.value);
+  }
   persistBookProgress();
   currentBookPageIndex.value = destinationPageIndex;
   selectedBookChapterIndex.value = resolveBookChapterIndex(destinationPageIndex);
@@ -1141,6 +1148,7 @@ function goToBookPage(pageIndex: number | null, smooth = true) {
     visibleWordIndex: getVisibleReaderWordAnchor(),
     currentAnchor: readingSpeechAnchor.value,
   });
+  loadReadingPageSpeech(destinationPageIndex);
   resetSherpaReadingFragment();
   appendReadingSpeechDebug(`Reading anchor moved with page ${destinationPageIndex + 1}: word ${readingSpeechAnchor.value} "${readerReferenceWords.value[readingSpeechAnchor.value] ?? ''}".`);
   provisionalReaderWordIndexes.value = new Set();
@@ -1611,6 +1619,7 @@ async function startReadingSpeech() {
   provisionalReaderWordIndexes.value = new Set();
   activeReaderWordIndexes.value = new Set();
   resetReadingSpeechPace();
+  loadReadingPageSpeech(currentBookPageIndex.value);
   const visibleWordIndex = getVisibleReaderWordAnchor();
   readingSpeechAnchor.value = chooseReaderSpeechStartAnchor({
     currentPageIndex: currentBookPageIndex.value,
@@ -1620,6 +1629,7 @@ async function startReadingSpeech() {
     selectedWordPageIndex: getReaderWordPageIndex(selectedReaderWordIndex.value ?? -1),
     visibleWordIndex,
   });
+  readingSpeechAnchor.value = readingPageSpeech?.nextIndex ?? readingSpeechAnchor.value;
   readingSpeechLastTranscript.value = '';
   readingSpeechLastDecision.value = `Start with “${readerReferenceWords.value[readingSpeechAnchor.value] ?? 'end of book'}”.`;
   resetSherpaReadingFragment();
@@ -1640,7 +1650,7 @@ async function startReadingSpeech() {
           updateReadingSpeechPace(transcript);
           appendReadingSpeechDebug(`Interim text: "${transcript}"`);
           if (!readingSpeechRecognition || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
-          const previewWordIndexes = previewBrowserReadingWordIndexes(readerReferenceWords.value, transcript, readingSpeechAnchor.value);
+          const previewWordIndexes = readingPageSpeech?.preview(transcript) ?? [];
           updateReadingSpeechDiagnosticDecision(transcript, previewWordIndexes, true);
           provisionalReaderWordIndexes.value = new Set(previewWordIndexes);
         },
@@ -1866,7 +1876,7 @@ function handleReadingSpeechTranscript(
   recognitionEngine: 'device-whisper' | 'browser' | 'sherpa-onnx' = 'browser',
   recordTranscript = true,
   debugLabel = 'Final text',
-  consumeAsWordStream = false,
+  _consumeAsWordStream = false,
 ) {
   const whisperRecognition = recognitionEngine !== 'browser';
   const rawHeardWords = tokenizeReadingSpeech(transcript);
@@ -1876,39 +1886,31 @@ function handleReadingSpeechTranscript(
   if (recordTranscript) recordReadingTranscript(transcript, recognitionEngine);
   const spokenCount = rawHeardWords.length;
   readingSpeechLastTranscript.value = transcript;
-  const match = consumeAsWordStream
-    ? matchExpectedReadingWordStream(readerReferenceWords.value, transcript, readingSpeechAnchor.value)
-    : matchSequentialReadingSpeech(readerReferenceWords.value, transcript, readingSpeechAnchor.value);
-  if (!match.accepted) {
-    readingSpeechLastDecision.value = `Rejected. Still waiting for “${readerReferenceWords.value[readingSpeechAnchor.value] ?? 'end of book'}”.`;
-    appendReadingSpeechDebug(`Sequential match rejected at word ${readingSpeechAnchor.value}.`);
-    readingSpeechStatus.value = 'noise';
-    readingSpeechMessage.value = 'That did not match the next word. Try it again.';
-    return match;
-  }
-  const confirmedWordIndexes = match.matchedWordIndexes;
-  const confirmedLastWord = confirmedWordIndexes.at(-1)!;
-  readingSpeechAnchor.value = match.anchorIndex;
-  readingSpeechLastDecision.value = `Accepted ${confirmedWordIndexes.length} word${confirmedWordIndexes.length === 1 ? '' : 's'}. Next: “${readerReferenceWords.value[readingSpeechAnchor.value] ?? 'end of book'}”.`;
-  appendReadingSpeechDebug(`Sequential match accepted: ${confirmedWordIndexes.length}/${rawHeardWords.length} words, indexes=${confirmedWordIndexes[0]}–${confirmedLastWord}, next=${readingSpeechAnchor.value}.`);
-  readingSpeechAcceptedWords.value += confirmedWordIndexes.length;
+  const confirmedWordIndexes = readingPageSpeech?.match(transcript) ?? [];
   readingSpeechSpokenWords.value += spokenCount;
+  if (!confirmedWordIndexes.length) {
+    readingSpeechLastDecision.value = 'No unmarked word on this page matched.';
+    readingSpeechStatus.value = 'noise';
+    readingSpeechMessage.value = 'No matching unread word on this page. Try again.';
+    return null;
+  }
+  readingSpeechAnchor.value = readingPageSpeech!.nextIndex;
+  readingSpeechLastDecision.value = `Accepted ${confirmedWordIndexes.length} word${confirmedWordIndexes.length === 1 ? '' : 's'} on this page.`;
+  readingSpeechAcceptedWords.value += confirmedWordIndexes.length;
   const nextSpoken = new Set(spokenReaderWordIndexes.value);
   confirmedWordIndexes.forEach((wordIndex) => nextSpoken.add(wordIndex));
+  spokenReaderWordIndexes.value = nextSpoken;
   activeReaderWordIndexes.value = new Set(activeReadingHighlightIndexes(confirmedWordIndexes));
-  const furthestMatchedWord = confirmedLastWord;
+  const furthestMatchedWord = Math.max(...confirmedWordIndexes);
   if (furthestMatchedWord > readingSpeechFurthestWordIndex) {
     readingSpeechFurthestWordIndex = furthestMatchedWord;
-    void persistSpokenReadingProgress(furthestMatchedWord);
   }
-  spokenReaderWordIndexes.value = nextSpoken;
-  recordDailySpokenMatch(confirmedWordIndexes);
   readingSpeechStatus.value = 'listening';
   const nextExpectedWord = readerReferenceWords.value[readingSpeechAnchor.value];
   readingSpeechMessage.value = nextExpectedWord
     ? `Correct. Next: “${nextExpectedWord}”.`
     : 'Correct. You reached the end of the book.';
-  return match;
+  return confirmedWordIndexes;
 }
 
 function recordReadingTranscript(transcript: string, recognitionEngine: 'device-whisper' | 'browser' | 'sherpa-onnx') {
@@ -1966,8 +1968,14 @@ async function startReadingSpeechMeter(stream: MediaStream, sessionId: number) {
   analyser.smoothingTimeConstant = 0.76;
   context.createMediaStreamSource(stream).connect(analyser);
   const samples = new Uint8Array(analyser.frequencyBinCount);
-  const update = () => {
+  let lastMeterSampleAt = 0;
+  const update = (now: number) => {
     if (sessionId !== readingSpeechSessionId || readingSpeechAudioContext !== context) return;
+    if (now - lastMeterSampleAt < 100) {
+      readingSpeechAnimationFrame = requestAnimationFrame(update);
+      return;
+    }
+    lastMeterSampleAt = now;
     analyser.getByteFrequencyData(samples);
     const average = samples.reduce((sum, value) => sum + value, 0) / Math.max(1, samples.length);
     const sampledLevel = Math.min(1, average / 72);
@@ -1979,7 +1987,7 @@ async function startReadingSpeechMeter(stream: MediaStream, sessionId: number) {
     }
     readingSpeechAnimationFrame = requestAnimationFrame(update);
   };
-  update();
+  readingSpeechAnimationFrame = requestAnimationFrame(update);
 }
 function stopReadingSpeech(status: ReadingSpeechStatus) {
   const flushSherpaFinal = status === 'paused' && Boolean(sherpaReadingTranscriber);
@@ -2203,9 +2211,9 @@ function readDailyReadingProgress(): DailyReadingProgress {
   }
   return createDailyReadingProgress(today);
 }
-function restoreDailySpokenWords(bookId: string) {
+function restoreDailySpokenWords(_bookId: string) {
   dailyReadingProgress.value = prepareDailyReadingProgress(dailyReadingProgress.value);
-  spokenReaderWordIndexes.value = new Set(spokenWordsForBook(dailyReadingProgress.value, bookId));
+  spokenReaderWordIndexes.value = new Set();
   readingSpeechAcceptedWords.value = 0;
   readingSpeechSpokenWords.value = 0;
 }
@@ -2254,12 +2262,42 @@ async function persistReaderNavigationProgress(preferredWordIndex?: number, upda
     updatedAt,
   });
 }
-function recordDailySpokenMatch(wordIndexes: readonly number[]) {
+function readingPageSpeechKey(bookId: string) { return `mentor-ai:reading-page-speech:${bookId}`; }
+function readReadingPageSummaries(bookId: string): Record<string, ReadingPageSpeechSummary> {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(readingPageSpeechKey(bookId)) ?? '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, ReadingPageSpeechSummary> : {};
+  } catch { return {}; }
+}
+function getReadingPageWords(pageIndex: number): ReadingPageWord[] {
+  const paper = readerPaper.value;
+  if (!paper || readerPageStride.value <= 0) return [];
+  return Array.from(paper.querySelectorAll<HTMLElement>('[data-reader-word-index]'))
+    .filter((word) => Math.floor((word.offsetLeft + 1) / readerPageStride.value) === pageIndex)
+    .map((word) => ({ index: Number(word.dataset.readerWordIndex), text: word.dataset.readerWord ?? '' }))
+    .filter((word) => Number.isInteger(word.index) && word.index >= 0);
+}
+function loadReadingPageSpeech(pageIndex: number) {
   const book = selectedBook.value;
-  if (!book || typeof localStorage === 'undefined') return;
-  dailyReadingProgress.value = prepareDailyReadingProgress(dailyReadingProgress.value);
-  dailyReadingProgress.value = recordDailySpokenWords(dailyReadingProgress.value, book.id, wordIndexes);
-  localStorage.setItem(dailyReadingProgressKey, JSON.stringify(dailyReadingProgress.value));
+  if (!book) return;
+  if (readingPageSpeech?.pageIndex === pageIndex) return;
+  const words = getReadingPageWords(pageIndex);
+  const previous = readReadingPageSummaries(book.id)[String(pageIndex)];
+  const missed = new Set(Array.isArray(previous?.missedWords) ? previous.missedWords.map((word) => word.index) : []);
+  const previouslyMatched = previous && previous.totalWords === words.length
+    ? words.filter((word) => !missed.has(word.index)).map((word) => word.index) : [];
+  readingPageSpeech = new ReadingPageSpeech(pageIndex, words, previouslyMatched);
+  spokenReaderWordIndexes.value = new Set(previouslyMatched);
+  readingSpeechAnchor.value = readingPageSpeech.nextIndex;
+}
+function saveReadingPageSpeech() {
+  const book = selectedBook.value;
+  if (!book || !readingPageSpeech || typeof localStorage === 'undefined') return;
+  const summaries = readReadingPageSummaries(book.id);
+  summaries[String(readingPageSpeech.pageIndex)] = readingPageSpeech.summary();
+  localStorage.setItem(readingPageSpeechKey(book.id), JSON.stringify(summaries));
+  if (readingSpeechFurthestWordIndex >= 0) void persistSpokenReadingProgress(readingSpeechFurthestWordIndex);
 }
 function recordCompletedReaderPage(pageIndex: number) {
   const book = selectedBook.value;
@@ -2678,6 +2716,8 @@ function engagementLabel(id: string) { const summary = engagementSummaries.value
 function handleVisibilityChange() {
   persistProgress();
   if (document.visibilityState === 'visible') {
+    refreshReadingDay();
+    scheduleReadingDayRefresh();
     handleBookSyncWakeup();
     if (selectedBook.value) readingActivityTimer.start();
   } else {
