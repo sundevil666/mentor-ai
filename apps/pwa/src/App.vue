@@ -75,6 +75,7 @@ import { syncLearningActivity } from 'src/services/learning-activity';
 import { syncContentEngagement } from 'src/services/content-engagement';
 import { syncApplicationTelemetry } from 'src/services/application-telemetry';
 import { syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
+import { syncReadingPageSpeech, readingPageSpeechSyncIntervalMs } from 'src/services/reading-page-speech-outbox';
 import { runServerMaintenance } from 'src/services/server-maintenance';
 import { syncReaderVocabulary } from 'src/services/reader-vocabulary';
 import { updateOfflineLessons } from 'src/services/offline-lesson-updates';
@@ -84,6 +85,7 @@ const appStore = useAppStore();
 const router = useRouter();
 const route = useRoute();
 let stopUpdatePolling: (() => void) | undefined;
+let readingPageSpeechTimer: ReturnType<typeof setInterval> | null = null;
 let removeRouteGuard: (() => void) | undefined;
 let isReloadingForUpdate = false;
 let pendingManifest: AppUpdateCheckResult['manifest'] | null = null;
@@ -104,6 +106,7 @@ onMounted(async () => {
   navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
   stopUpdatePolling = startAppUpdatePolling(handleServerUpdateAvailable);
   void runDailyServerMaintenance();
+  readingPageSpeechTimer = setInterval(() => { if (navigator.onLine) void syncReadingPageSpeech(appStore.studentId).catch(() => undefined); }, readingPageSpeechSyncIntervalMs);
   await showCompletedUpdateNotification();
 });
 
@@ -115,6 +118,7 @@ onUnmounted(() => {
   removeRouteGuard?.();
   navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
   stopUpdatePolling?.();
+  if (readingPageSpeechTimer) clearInterval(readingPageSpeechTimer);
   window.removeEventListener('online', handleServerMaintenanceWakeup);
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
@@ -402,6 +406,7 @@ async function runDailyServerMaintenance() {
       syncLearningActivity(),
       syncApplicationTelemetry(),
       syncReadingTranscripts(),
+      syncReadingPageSpeech(appStore.studentId),
       syncReaderVocabulary(appStore.studentId),
       updateOfflineLessons(appStore.loadLesson.bind(appStore)).then(async (offlineUpdate) => {
         if (offlineUpdate.downloaded > 0) {

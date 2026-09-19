@@ -8,7 +8,9 @@ describe('page speech matching', () => {
       { index: 20, text: 'The' }, { index: 21, text: 'cat' },
       { index: 22, text: 'the' }, { index: 23, text: 'cat' },
     ]);
+    assert.equal(page.attempted, false);
     assert.deepEqual(page.match('cat'), [21]);
+    assert.equal(page.attempted, true);
     assert.deepEqual(page.match('cat'), [23]);
     assert.deepEqual(page.match('cat'), []);
     assert.deepEqual(page.match('the the'), [20, 22]);

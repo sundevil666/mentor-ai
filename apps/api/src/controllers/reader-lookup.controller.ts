@@ -4,6 +4,7 @@ import type { PersonalReadingBookArchive, ReaderVocabularyItem, ReadingTranscrip
 import { learningStateService } from '../services/learning-state.service.js';
 import { getTranslationUsage, synchronizeTranslationUsageDevice, TranslationLimitError } from '../services/translation-usage.service.js';
 import { storeReadingTranscripts } from '../services/reading-transcripts.service.js';
+import { storeReadingPageSpeech } from '../services/reading-page-speech.service.js';
 
 export const translateReaderText: RequestHandler = async (req, res, _next) => {
   try {
@@ -69,4 +70,11 @@ export const saveReadingTranscript: RequestHandler = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+export const saveReadingPageSpeech: RequestHandler = async (req, res, next) => {
+  try {
+    if (!req.authUser) { res.status(401).json({ error: { message: 'Sign in to save reading progress.' } }); return; }
+    res.json({ data: await storeReadingPageSpeech(req.body?.pages, req.authUser) });
+  } catch (error) { next(error); }
 };

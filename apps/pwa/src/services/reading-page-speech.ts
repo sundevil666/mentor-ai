@@ -12,6 +12,7 @@ export interface ReadingPageSpeechSummary {
 export class ReadingPageSpeech {
   private readonly positions = new Map<string, number[]>();
   private readonly matched = new Set<number>();
+  private wasAttempted = false;
   readonly words: readonly ReadingPageWord[];
   readonly pageIndex: number;
 
@@ -30,8 +31,10 @@ export class ReadingPageSpeech {
   }
 
   match(transcript: string): number[] {
+    const heard = tokenizeReadingSpeech(transcript);
+    if (heard.length) this.wasAttempted = true;
     const matches: number[] = [];
-    for (const word of tokenizeReadingSpeech(transcript)) {
+    for (const word of heard) {
       const firstUnused = this.positions.get(word)?.find((index) => !this.matched.has(index));
       if (firstUnused === undefined) continue;
       this.matched.add(firstUnused);
@@ -50,6 +53,7 @@ export class ReadingPageSpeech {
     });
   }
 
+  get attempted(): boolean { return this.wasAttempted; }
   get matchedIndexes(): number[] { return [...this.matched]; }
   get nextIndex(): number { return this.words.find((word) => !this.matched.has(word.index))?.index ?? (this.words.at(-1)?.index ?? -1) + 1; }
   summary(): ReadingPageSpeechSummary {

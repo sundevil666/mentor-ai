@@ -575,7 +575,8 @@ import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, millisecondsUntilNextReadingDay, prepareDailyReadingProgress, recordDailyReadWords, type DailyReadingProgress } from 'src/services/daily-reading-progress';
-import { ReadingPageSpeech, type ReadingPageSpeechSummary, type ReadingPageWord } from 'src/services/reading-page-speech';
+import { ReadingPageSpeech, type ReadingPageWord } from 'src/services/reading-page-speech';
+import { readReadingPageSummaries, saveReadingPageSummary } from 'src/services/reading-page-speech-outbox';
 import { activeReadingHighlightIndexes, immediateReadingInterimWords, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { chooseReadingResumeState, readingDeviceHeartbeatMs, readingDeviceLabel } from 'src/services/reading-device-sync';
 import { syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
@@ -2267,14 +2268,6 @@ async function persistReaderNavigationProgress(preferredWordIndex?: number, upda
     updatedAt,
   });
 }
-function readingPageSpeechKey(bookId: string) { return `mentor-ai:reading-page-speech:${bookId}`; }
-function readReadingPageSummaries(bookId: string): Record<string, ReadingPageSpeechSummary> {
-  if (typeof localStorage === 'undefined') return {};
-  try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(readingPageSpeechKey(bookId)) ?? '{}');
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, ReadingPageSpeechSummary> : {};
-  } catch { return {}; }
-}
 function getReadingPageWords(pageIndex: number): ReadingPageWord[] {
   const paper = readerPaper.value;
   if (!paper || readerPageStride.value <= 0) return [];
@@ -2288,7 +2281,7 @@ function loadReadingPageSpeech(pageIndex: number) {
   if (!book) return;
   if (readingPageSpeech?.pageIndex === pageIndex) return;
   const words = getReadingPageWords(pageIndex);
-  const previous = readReadingPageSummaries(book.id)[String(pageIndex)];
+  const previous = readReadingPageSummaries(appStore.studentId, book.id)[String(pageIndex)];
   const missed = new Set(Array.isArray(previous?.missedWords) ? previous.missedWords.map((word) => word.index) : []);
   const previouslyMatched = previous && previous.totalWords === words.length
     ? words.filter((word) => !missed.has(word.index)).map((word) => word.index) : [];
@@ -2298,10 +2291,8 @@ function loadReadingPageSpeech(pageIndex: number) {
 }
 function saveReadingPageSpeech() {
   const book = selectedBook.value;
-  if (!book || !readingPageSpeech || typeof localStorage === 'undefined') return;
-  const summaries = readReadingPageSummaries(book.id);
-  summaries[String(readingPageSpeech.pageIndex)] = readingPageSpeech.summary();
-  localStorage.setItem(readingPageSpeechKey(book.id), JSON.stringify(summaries));
+  if (!book || !readingPageSpeech?.attempted || typeof localStorage === 'undefined') return;
+  saveReadingPageSummary(appStore.studentId, book.id, readingPageSpeech.summary());
   if (readingSpeechFurthestWordIndex >= 0) void persistSpokenReadingProgress(readingSpeechFurthestWordIndex);
 }
 function recordCompletedReaderPage(pageIndex: number) {

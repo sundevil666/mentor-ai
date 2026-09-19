@@ -26,6 +26,7 @@ import type {
   TranslationUsage,
 } from '@mentor-ai/shared';
 import { getAuthToken } from './auth.js';
+import type { ReadingPageSpeechUpload } from './reading-page-speech-outbox.js';
 
 interface StudentStateResponse {
   student: Student;
@@ -215,6 +216,16 @@ export async function fetchReaderPhonetic(text: string): Promise<string | undefi
   if (!response.ok) return undefined;
   const body = (await response.json()) as ApiResponse<{ text: string; phonetic?: string }>;
   return body.data.phonetic;
+}
+
+export async function synchronizeReadingPageSpeech(pages: ReadingPageSpeechUpload[]): Promise<ReadingPageSpeechUpload[]> {
+  const response = await fetch(`${apiBaseUrl}/api/reader/page-speech`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ pages }),
+  });
+  if (!response.ok) throw new Error('Reading page synchronization failed.');
+  return ((await response.json()) as ApiResponse<ReadingPageSpeechUpload[]>).data;
 }
 
 export async function synchronizeReaderVocabulary(items: ReaderVocabularyItem[]): Promise<ReaderVocabularyItem[]> {
