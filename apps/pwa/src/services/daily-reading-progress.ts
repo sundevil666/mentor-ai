@@ -27,6 +27,11 @@ export function localReadingDate(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+export function millisecondsUntilNextReadingDay(now = new Date()): number {
+  const nextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  return Math.max(1, nextDay.getTime() - now.getTime());
+}
+
 export function createDailyReadingProgress(date = localReadingDate()): DailyReadingProgress {
   return { date, books: {}, history: [], trackingStartDate: date };
 }

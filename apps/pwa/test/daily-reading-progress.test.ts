@@ -7,6 +7,7 @@ import {
   dailyReadingGoalWords,
   dailyReadingTargetWords,
   dailyWordsRead,
+  millisecondsUntilNextReadingDay,
   prepareDailyReadingProgress,
   readingGoalMessage,
   recordDailyReadWords,
@@ -121,6 +122,23 @@ describe('daily reading progress', () => {
     assert.equal(nextDay.date, '2026-08-30');
     assert.equal(dailyWordsRead(nextDay), 0);
     assert.deepEqual(nextDay.history, [{ date: '2026-08-29', wordsRead: 3, targetWords: 3_000 }]);
+  });
+
+  it('updates the daily target at the next local day while the reader stays open', () => {
+    let progress = createDailyReadingProgress('2026-09-19');
+    progress = recordDailyReadWords(progress, 'book-a', Array.from({ length: 3_600 }, (_, index) => index));
+    assert.equal(dailyReadingTargetWords(progress), 3_000);
+
+    progress = prepareDailyReadingProgress(progress, '2026-09-20');
+    assert.equal(progress.date, '2026-09-20');
+    assert.equal(dailyWordsRead(progress), 0);
+    assert.equal(dailyReadingTargetWords(progress), 3_600);
+    assert.equal(bookReadingForecast(16_000, 3_600, dailyReadingTargetWords(progress), new Date(2026, 8, 20)).readingDaysRemaining, 12_400 / 3_600);
+  });
+
+  it('schedules the next refresh at local midnight', () => {
+    assert.equal(millisecondsUntilNextReadingDay(new Date(2026, 8, 19, 23, 59, 30)), 30_000);
+    assert.equal(millisecondsUntilNextReadingDay(new Date(2026, 8, 19, 0, 0, 0)), 86_400_000);
   });
 
   it('keeps an absolute yearly pace while the daily counter resets', () => {

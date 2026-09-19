@@ -574,11 +574,11 @@ import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot,
 import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
-import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, recordDailyReadWords, type DailyReadingProgress } from 'src/services/daily-reading-progress';
+import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, millisecondsUntilNextReadingDay, prepareDailyReadingProgress, recordDailyReadWords, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { ReadingPageSpeech, type ReadingPageSpeechSummary, type ReadingPageWord } from 'src/services/reading-page-speech';
 import { activeReadingHighlightIndexes, immediateReadingInterimWords, tokenizeReadingSpeech } from 'src/services/reading-speech-tracker';
 import { chooseReadingResumeState, readingDeviceHeartbeatMs, readingDeviceLabel } from 'src/services/reading-device-sync';
-import { queueReadingTranscript, syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
+import { syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { isSherpaReaderExperiment, startSherpaReadingTranscriber, type SherpaReadingTranscriber } from 'src/services/sherpa-reading-transcriber';
@@ -628,6 +628,7 @@ const bookResumeWaitingDevices = ref<ReadingDeviceSession[]>([]);
 const bookResumeError = ref('');
 let pendingBookOpenId: string | null = null;
 let readingDeviceHeartbeat: ReturnType<typeof setInterval> | null = null;
+let readingDayTimer: ReturnType<typeof setTimeout> | null = null;
 let allowUnconfirmedBookOpen = false;
 let readingDeviceProgressUpdatedAt = '';
 let readingDeviceSyncAvailable = true;
@@ -776,6 +777,7 @@ const bookPageOptions = computed(() => selectedBookPages.value.map((page, index)
   value: index,
 })));
 const dailyReadingWords = computed(() => dailyWordsRead(dailyReadingProgress.value));
+const readingForecastToday = ref(new Date());
 const dailyReadingTarget = computed(() => dailyReadingTargetWords(dailyReadingProgress.value));
 const dailyReadingProgressRatio = computed(() => Math.min(1, dailyReadingWords.value / dailyReadingTarget.value));
 const dailyReadingGoalState = computed(() => dailyReadingWords.value >= dailyReadingTarget.value * 1.5 ? 'exceeded' : dailyReadingWords.value >= dailyReadingTarget.value ? 'complete' : 'building');
@@ -783,6 +785,7 @@ const currentBookReadingForecast = computed(() => bookReadingForecast(
   selectedBook.value?.wordCount ?? 0,
   readerFurthestWordPosition.value,
   dailyReadingTarget.value,
+  readingForecastToday.value,
 ));
 const bookReadingDaysLabel = computed(() => {
   return formatReadingDaysRemaining(currentBookReadingForecast.value.readingDaysRemaining);
@@ -831,6 +834,7 @@ const readingSpeechActionLabel = computed(() => {
 
 onMounted(async () => {
   configurePlaybackAudioSession();
+  scheduleReadingDayRefresh();
   if (isAudioLibrary.value) {
     cachedUrls.value = await getCachedStoryUrls();
     engagementSummaries.value = await loadContentEngagementSummaries('audio');
@@ -850,6 +854,7 @@ onMounted(async () => {
   }
 });
 onUnmounted(() => {
+  if (readingDayTimer) clearTimeout(readingDayTimer);
   void listeningActivityTimer.stop();
   void readingActivityTimer.stop();
   personalBookSyncControl.visible = false;
@@ -1132,6 +1137,7 @@ async function cleanCurrentBookText() {
 }
 function goToBookPage(pageIndex: number | null, smooth = true) {
   if (pageIndex === null || !Number.isInteger(pageIndex)) return;
+  refreshReadingDay();
   const destinationPageIndex = Math.max(0, Math.min(readerPageCount.value - 1, pageIndex));
   if (destinationPageIndex !== currentBookPageIndex.value) {
     saveReadingPageSpeech();
@@ -1734,7 +1740,7 @@ async function startReadingSpeech() {
           );
           readingSpeechSherpaProcessedWordCount = interim.processedWordCount;
           if (interim.words.length) {
-            handleReadingSpeechTranscript(interim.words.join(' '), 'sherpa-onnx', false, 'Immediate interim text', true);
+            handleReadingSpeechTranscript(interim.words.join(' '), 'sherpa-onnx', 'Immediate interim text');
           }
         },
         onFinal: (transcript) => {
@@ -1874,16 +1880,13 @@ function isMicrophonePermissionError(error: unknown) {
 function handleReadingSpeechTranscript(
   transcript: string,
   recognitionEngine: 'device-whisper' | 'browser' | 'sherpa-onnx' = 'browser',
-  recordTranscript = true,
   debugLabel = 'Final text',
-  _consumeAsWordStream = false,
 ) {
   const whisperRecognition = recognitionEngine !== 'browser';
   const rawHeardWords = tokenizeReadingSpeech(transcript);
   if (whisperRecognition) updateReadingSpeechChunkPace(rawHeardWords.length);
   appendReadingSpeechDebug(`${debugLabel} (${recognitionEngine}, ${rawHeardWords.length} words): "${transcript}"`);
   if (!rawHeardWords.length) return null;
-  if (recordTranscript) recordReadingTranscript(transcript, recognitionEngine);
   const spokenCount = rawHeardWords.length;
   readingSpeechLastTranscript.value = transcript;
   const confirmedWordIndexes = readingPageSpeech?.match(transcript) ?? [];
@@ -1913,26 +1916,11 @@ function handleReadingSpeechTranscript(
   return confirmedWordIndexes;
 }
 
-function recordReadingTranscript(transcript: string, recognitionEngine: 'device-whisper' | 'browser' | 'sherpa-onnx') {
-  const book = selectedBook.value;
-  if (!book) return;
-  void queueReadingTranscript({
-    id: `reading-transcript-${crypto.randomUUID()}`,
-    studentId: appStore.studentId,
-    bookId: book.id,
-    pageIndex: currentBookPageIndex.value,
-    text: transcript,
-    capturedAt: new Date().toISOString(),
-    recognitionEngine,
-  }).catch(() => undefined);
-}
-
 function handleSherpaFinalTranscript(transcript: string) {
   const finalWords = tokenizeReadingSpeech(transcript);
   const remainingWords = finalWords.slice(readingSpeechSherpaProcessedWordCount);
   appendReadingSpeechDebug(`Sherpa final text (${finalWords.length} words, ${readingSpeechSherpaProcessedWordCount} already processed): "${transcript}"`);
-  recordReadingTranscript(transcript, 'sherpa-onnx');
-  if (remainingWords.length) handleReadingSpeechTranscript(remainingWords.join(' '), 'sherpa-onnx', false, 'Unconfirmed final remainder', true);
+  if (remainingWords.length) handleReadingSpeechTranscript(remainingWords.join(' '), 'sherpa-onnx', 'Unconfirmed final remainder');
   resetSherpaReadingFragment();
 }
 
@@ -2211,6 +2199,23 @@ function readDailyReadingProgress(): DailyReadingProgress {
   }
   return createDailyReadingProgress(today);
 }
+function refreshReadingDay() {
+  const now = new Date();
+  const today = localReadingDate(now);
+  if (dailyReadingProgress.value.date === today) return;
+  dailyReadingProgress.value = prepareDailyReadingProgress(dailyReadingProgress.value, today);
+  readingForecastToday.value = now;
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(dailyReadingProgressKey, JSON.stringify(dailyReadingProgress.value));
+  }
+}
+function scheduleReadingDayRefresh() {
+  if (readingDayTimer) clearTimeout(readingDayTimer);
+  readingDayTimer = setTimeout(() => {
+    refreshReadingDay();
+    scheduleReadingDayRefresh();
+  }, millisecondsUntilNextReadingDay() + 50);
+}
 function restoreDailySpokenWords(_bookId: string) {
   dailyReadingProgress.value = prepareDailyReadingProgress(dailyReadingProgress.value);
   spokenReaderWordIndexes.value = new Set();
@@ -2308,6 +2313,7 @@ function recordCompletedReaderPage(pageIndex: number) {
     .map((word) => Number(word.dataset.readerWordIndex))
     .filter((wordIndex) => Number.isInteger(wordIndex) && wordIndex >= 0);
   if (!wordIndexes.length) return;
+  readerFurthestWordPosition.value = Math.max(readerFurthestWordPosition.value, Math.max(...wordIndexes) + 1);
   dailyReadingProgress.value = prepareDailyReadingProgress(dailyReadingProgress.value);
   dailyReadingProgress.value = recordDailyReadWords(dailyReadingProgress.value, book.id, wordIndexes);
   localStorage.setItem(dailyReadingProgressKey, JSON.stringify(dailyReadingProgress.value));
