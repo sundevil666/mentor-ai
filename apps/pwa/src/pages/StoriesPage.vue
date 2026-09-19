@@ -586,7 +586,7 @@ import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, i
 import { beginReaderLookupInteraction, shouldProcessReadingTranscript } from 'src/services/reader-lookup-interaction';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
 import { addReadingStopHistoryEntry, parseReadingStopHistory, type ReadingStopHistoryEntry } from 'src/services/reading-stop-history';
-import { bookReadingForecast } from 'src/services/book-reading-forecast';
+import { bookReadingForecast, formatReadingDaysRemaining } from 'src/services/book-reading-forecast';
 import { formatDisplayDate } from 'src/services/date-format';
 
 const props = withDefaults(defineProps<{
@@ -783,8 +783,7 @@ const currentBookReadingForecast = computed(() => bookReadingForecast(
   dailyReadingTarget.value,
 ));
 const bookReadingDaysLabel = computed(() => {
-  const days = currentBookReadingForecast.value.readingDaysRemaining;
-  return days === 0 ? 'Book complete' : `${days} reading day${days === 1 ? '' : 's'} left`;
+  return formatReadingDaysRemaining(currentBookReadingForecast.value.readingDaysRemaining);
 });
 const bookReadingFinishDate = computed(() => formatDisplayDate(currentBookReadingForecast.value.finishDate));
 const bookReadingForecastAriaLabel = computed(() => `${bookReadingDaysLabel.value}. Estimated finish ${bookReadingFinishDate.value}, at ${dailyReadingTarget.value.toLocaleString('en')} words per reading day.`);

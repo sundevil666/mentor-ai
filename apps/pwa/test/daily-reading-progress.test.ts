@@ -13,7 +13,7 @@ import {
   recordDailySpokenWords,
   spokenWordsForBook,
 } from '../src/services/daily-reading-progress.js';
-import { bookReadingForecast } from '../src/services/book-reading-forecast.js';
+import { bookReadingForecast, formatReadingDaysRemaining } from '../src/services/book-reading-forecast.js';
 
 describe('daily reading progress', () => {
   it('moves the finish date forward after an idle day without changing required reading days', () => {
@@ -30,8 +30,35 @@ describe('daily reading progress', () => {
     const forecast = bookReadingForecast(30_000, 7_000, 3_000, new Date(2026, 8, 13));
 
     assert.equal(forecast.wordsRemaining, 23_000);
-    assert.equal(forecast.readingDaysRemaining, 8);
+    assert.equal(forecast.readingDaysRemaining, 23 / 3);
     assert.equal(forecast.finishDate.getDate(), 20);
+  });
+
+  it('reduces fractional reading days with each page while keeping one finish date', () => {
+    const today = new Date(2026, 8, 19);
+    const before = bookReadingForecast(16_000, 0, 3_200, today);
+    const afterOnePage = bookReadingForecast(16_000, 160, 3_200, today);
+    const afterTwoPages = bookReadingForecast(16_000, 320, 3_200, today);
+    const afterTwoDays = bookReadingForecast(16_000, 6_320, 3_200, new Date(2026, 8, 21));
+
+    assert.equal(before.readingDaysRemaining, 5);
+    assert.equal(afterOnePage.readingDaysRemaining, 4.95);
+    assert.equal(afterTwoPages.readingDaysRemaining, 4.9);
+    assert.equal(afterTwoDays.readingDaysRemaining, 3.025);
+    assert.equal(formatReadingDaysRemaining(before.readingDaysRemaining), '5,00 reading days left');
+    assert.equal(formatReadingDaysRemaining(afterOnePage.readingDaysRemaining), '4,95 reading days left');
+    assert.equal(formatReadingDaysRemaining(afterTwoDays.readingDaysRemaining), '3,02 reading days left');
+    assert.deepEqual(
+      [before, afterOnePage, afterTwoPages, afterTwoDays].map(({ finishDate }) => finishDate.toDateString()),
+      [23, 23, 23, 24].map((day) => new Date(2026, 8, day).toDateString()),
+    );
+  });
+
+  it('shows no remaining days when the book is complete', () => {
+    const forecast = bookReadingForecast(16_000, 16_000, 3_200, new Date(2026, 8, 19));
+    assert.equal(forecast.readingDaysRemaining, 0);
+    assert.equal(formatReadingDaysRemaining(forecast.readingDaysRemaining), 'Book complete');
+    assert.equal(forecast.finishDate.getDate(), 19);
   });
 
   it('keeps spoken highlighting separate from independently counted reading', () => {
