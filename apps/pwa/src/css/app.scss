@@ -3173,6 +3173,26 @@ body.body--dark .personal-reader__lookup-text {
   padding: 8px 10px;
 }
 
+.personal-reader__lookup-register {
+  background: color-mix(in srgb, #d66b39 15%, var(--app-surface));
+  border-left: 4px solid #d66b39;
+  border-radius: 8px;
+  display: grid;
+  font-size: 0.8em;
+  gap: 3px;
+  line-height: 1.4;
+  padding: 8px 10px;
+}
+
+.personal-reader__lookup-context-link {
+  color: var(--category-accent);
+  font-size: 0.78em;
+  font-weight: 700;
+  line-height: 1.4;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .personal-reader__lookup-hint,
 .personal-reader__lookup-loading,
 .personal-reader__lookup-error {

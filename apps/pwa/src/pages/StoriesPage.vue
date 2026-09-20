@@ -414,6 +414,17 @@
               </div>
               <p v-else class="personal-reader__lookup-hint">Tap a word, or press and hold to select a phrase.</p>
             </div>
+            <div v-if="selectedReaderText && readerWordContext(selectedReaderText).warning" class="personal-reader__lookup-register">
+              <strong>{{ readerWordContext(selectedReaderText).warning?.label }}</strong>
+              <span>{{ readerWordContext(selectedReaderText).warning?.closerTranslation }}</span>
+            </div>
+            <a
+              v-if="selectedReaderText"
+              class="personal-reader__lookup-context-link"
+              :href="readerWordContext(selectedReaderText).reversoUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            >Другие значения и примеры в Reverso Context ↗</a>
           </section>
 
           <div class="personal-reader__sidebar-navigation">
@@ -537,6 +548,7 @@ import { personalBookSyncControl } from 'src/services/personal-book-sync-control
 import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot, ReaderTranslationSignInRequiredError, synchronizePersonalReadingBooks, updateReadingDeviceSession } from 'src/services/api-client';
 import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
+import { readerWordContext } from 'src/services/reader-word-context';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, millisecondsUntilNextReadingDay, prepareDailyReadingProgress, recordDailyReadWords, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { ReadingPageSpeech, type ReadingPageWord } from 'src/services/reading-page-speech';
