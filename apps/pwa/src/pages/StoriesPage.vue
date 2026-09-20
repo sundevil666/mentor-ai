@@ -408,7 +408,10 @@
               </div>
               <p v-else-if="readerLookup?.translation" class="personal-reader__lookup-translation">{{ readerLookup.translation }}</p>
               <p v-else-if="readerLookup?.translationError" class="personal-reader__lookup-error">{{ readerLookup.translationError }}</p>
-              <p v-else-if="readerLookupError" class="personal-reader__lookup-error">{{ readerLookupError }}</p>
+              <div v-else-if="readerLookupError" class="personal-reader__lookup-error">
+                <p>{{ readerLookupError }}</p>
+                <q-btn v-if="readerLookupSignInRequired" color="primary" icon="login" label="Sign in with Google" no-caps @click="requestReaderGoogleSignIn" />
+              </div>
               <p v-else class="personal-reader__lookup-hint">Tap a word, or press and hold to select a phrase.</p>
             </div>
           </section>
@@ -531,7 +534,7 @@ import { useAppStore } from 'src/stores/app-store';
 import { configureCaptureAudioSession, configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 import { deletePersonalBook, importPersonalBook, listPersonalBookArchives, listPersonalBooks, loadPersonalBook, markPersonalBookOpened, mergePersonalBookArchives, type PersonalBook } from 'src/services/personal-book-library';
 import { personalBookSyncControl } from 'src/services/personal-book-sync-control';
-import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot, synchronizePersonalReadingBooks, updateReadingDeviceSession } from 'src/services/api-client';
+import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot, ReaderTranslationSignInRequiredError, synchronizePersonalReadingBooks, updateReadingDeviceSession } from 'src/services/api-client';
 import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
@@ -602,6 +605,7 @@ const readerLookupLoading = ref(false);
 const readerPhonetic = ref<string | undefined>();
 const readerPhoneticLoading = ref(false);
 const readerLookupError = ref('');
+const readerLookupSignInRequired = ref(false);
 const minReaderFontSize = 14;
 const maxReaderFontSize = 32;
 const readerFontSize = ref(20);
@@ -797,6 +801,7 @@ onMounted(async () => {
   }
   document.addEventListener('visibilitychange', handleVisibilityChange);
   window.addEventListener('online', handleBookSyncWakeup);
+  window.addEventListener('mentor-ai:google-sign-in-complete', retryReaderTranslationAfterSignIn);
   document.addEventListener('keydown', handleReaderKeydown);
   document.addEventListener('selectionchange', handleReaderSelectionChange);
   const requestedStoryId = isAudioLibrary.value
@@ -821,6 +826,7 @@ onUnmounted(() => {
   clearMediaSession();
   document.removeEventListener('visibilitychange', handleVisibilityChange);
   window.removeEventListener('online', handleBookSyncWakeup);
+  window.removeEventListener('mentor-ai:google-sign-in-complete', retryReaderTranslationAfterSignIn);
   document.removeEventListener('keydown', handleReaderKeydown);
   document.removeEventListener('selectionchange', handleReaderSelectionChange);
   window.clearTimeout(readerSelectionTimer);
@@ -1293,18 +1299,18 @@ function getWordAtPoint(x: number, y: number) {
 function normalizeReaderSelection(value: string) {
   return value.replace(/\s+/g, ' ').trim().slice(0, 500);
 }
-async function selectReaderText(rawText: string, speakImmediately: boolean, wordIndex: number | null) {
+async function selectReaderText(rawText: string, speakImmediately: boolean, wordIndex: number | null, recordInteraction = true) {
   const text = normalizeReaderSelection(rawText);
   if (!text || !selectedBook.value) return;
   const interactionBook = selectedBook.value;
-  const interactionRecord = recordReaderVocabularyInteraction({
+  const interactionRecord = recordInteraction ? recordReaderVocabularyInteraction({
     studentId: appStore.studentId,
     bookId: interactionBook.id,
     chapterId: selectedBookPages.value[currentBookChapterIndex.value]?.chapterId,
     text,
     translationRequested: true,
     pronunciationRequested: speakImmediately,
-  }).catch(() => undefined);
+  }).catch(() => undefined) : Promise.resolve();
   const shouldResumeReadingSpeech = readingSpeechActive.value;
   const requestId = ++readerLookupRequestId;
   try {
@@ -1315,6 +1321,7 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
         readerLookup.value = null;
         readerPhonetic.value = undefined;
         readerLookupError.value = '';
+        readerLookupSignInRequired.value = false;
         readerLookupLoading.value = true;
         readerPhoneticLoading.value = !/\s/.test(text);
       },
@@ -1349,14 +1356,14 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
             await saveReaderLookup(lookup, requestId);
           }
         } catch (error) {
-          if (requestId === readerLookupRequestId) readerLookupError.value = error instanceof Error ? error.message : 'Translation is unavailable right now.';
+          if (requestId === readerLookupRequestId) showReaderLookupError(error);
         } finally {
           if (requestId === readerLookupRequestId) readerLookupLoading.value = false;
         }
       },
     });
   } catch (error) {
-    if (requestId === readerLookupRequestId) readerLookupError.value = error instanceof Error ? error.message : 'Translation is unavailable right now.';
+    if (requestId === readerLookupRequestId) showReaderLookupError(error);
   } finally {
     if (requestId === readerLookupRequestId && readingSpeechSuppressedForLookup) {
       readingSpeechSuppressedForLookup = false;
@@ -1364,6 +1371,17 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
       if (readingSpeechActive.value) readingSpeechMessage.value = 'Read aloud. Recognition is ready.';
     }
   }
+}
+function showReaderLookupError(error: unknown) {
+  readerLookupSignInRequired.value = error instanceof ReaderTranslationSignInRequiredError;
+  readerLookupError.value = error instanceof Error ? error.message : 'Translation is unavailable right now.';
+}
+function requestReaderGoogleSignIn() {
+  window.dispatchEvent(new Event('mentor-ai:request-google-sign-in'));
+}
+function retryReaderTranslationAfterSignIn() {
+  if (!readerLookupSignInRequired.value || !selectedReaderText.value) return;
+  void selectReaderText(selectedReaderText.value, false, selectedReaderWordIndex.value, false);
 }
 async function loadReaderPhonetic(text: string, requestId: number) {
   try {
@@ -1439,6 +1457,7 @@ function clearReaderLookup() {
   readerPhonetic.value = undefined;
   readerPhoneticLoading.value = false;
   readerLookupError.value = '';
+  readerLookupSignInRequired.value = false;
 }
 function readerMarkerKey(bookId: string) { return `mentor-ai:personal-book-marker:${bookId}`; }
 function readerStopHistoryKey(bookId: string) { return `mentor-ai:personal-book-stop-history:${bookId}`; }

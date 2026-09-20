@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-import { fetchLearningActivityTotals, fetchOfflineLessons, fetchReaderTextLookup, fetchReadingResumeSnapshot, fetchTranslationUsage, saveReadingTranscripts, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, synchronizeStatisticsSnapshots, upsertSessionHandoff } from '../src/services/api-client.js';
+import { fetchLearningActivityTotals, fetchOfflineLessons, fetchReaderTextLookup, fetchReadingResumeSnapshot, fetchTranslationUsage, ReaderTranslationSignInRequiredError, saveReadingTranscripts, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, synchronizeStatisticsSnapshots, upsertSessionHandoff } from '../src/services/api-client.js';
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
@@ -44,6 +44,15 @@ describe('PWA API client', () => {
     const snapshot = calls.find((call) => call.url.endsWith('/api/reader/usage'))!;
     assert.equal(snapshot.init?.method, 'POST');
     assert.equal(JSON.parse(String(snapshot.init?.body)).usedCharacters, 5);
+  });
+
+  it('explains an expired Google session without counting a failed translation', async () => {
+    globalThis.fetch = async () => new Response(JSON.stringify({ data: { message: 'Google sign-in is required for cloud learning synchronization.' } }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+    await assert.rejects(fetchReaderTextLookup('hello'), ReaderTranslationSignInRequiredError);
+    assert.equal(localStorage.getItem('mentor-ai:translation-usage:v1'), null);
   });
 
   it('sends learning evidence envelopes to synchronization', async () => {

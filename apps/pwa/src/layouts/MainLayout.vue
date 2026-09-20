@@ -302,7 +302,7 @@
         <q-card-section>
           <div class="text-h6">Sign in to Mentor AI</div>
           <div class="text-body2 text-grey-7 q-mt-sm">
-            Continue with your Google account to synchronize your learning progress.
+            Continue with your Google account to translate words and synchronize your learning progress.
           </div>
         </q-card-section>
         <q-card-section class="google-sign-in-dialog__button">
@@ -573,6 +573,7 @@ onMounted(async () => {
   window.addEventListener('online', handleApplicationOnline);
   window.addEventListener('offline', handleApplicationOffline);
   window.addEventListener('translation-usage-updated', loadTranslationUsage);
+  window.addEventListener('mentor-ai:request-google-sign-in', signInWithGoogle);
   window.addEventListener('mentor-learning-activity-updated', refreshLevelActivity);
   window.addEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyServerMaintenanceFinished);
   window.addEventListener('error', handleRuntimeError);
@@ -595,6 +596,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('online', handleApplicationOnline);
   window.removeEventListener('offline', handleApplicationOffline);
   window.removeEventListener('translation-usage-updated', loadTranslationUsage);
+  window.removeEventListener('mentor-ai:request-google-sign-in', signInWithGoogle);
   window.removeEventListener('mentor-learning-activity-updated', refreshLevelActivity);
   window.removeEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyServerMaintenanceFinished);
   window.removeEventListener('error', handleRuntimeError);
@@ -800,6 +802,7 @@ async function completeGoogleSignIn(credential: string) {
     const session = await signInWithGoogleCredential(credential);
     await appStore.signIn(session);
     showGoogleSignIn.value = false;
+    window.dispatchEvent(new Event('mentor-ai:google-sign-in-complete'));
   } catch {
     Notify.create({
       type: 'negative',

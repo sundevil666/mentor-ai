@@ -110,6 +110,9 @@ export async function fetchReaderTextLookup(text: string): Promise<ReaderTextLoo
     body: JSON.stringify({ text }),
   });
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new ReaderTranslationSignInRequiredError();
+    }
     if (response.status === 429 && typeof window !== 'undefined') {
       window.dispatchEvent(new Event('translation-usage-updated'));
     }
@@ -120,6 +123,13 @@ export async function fetchReaderTextLookup(text: string): Promise<ReaderTextLoo
   writeLocalTranslationUsage({ ...usage, usedCharacters: usage.usedCharacters + characterCount });
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('translation-usage-updated'));
   return result;
+}
+
+export class ReaderTranslationSignInRequiredError extends Error {
+  constructor() {
+    super('Google sign-in is needed for translation. Sign in, then tap the word again.');
+    this.name = 'ReaderTranslationSignInRequiredError';
+  }
 }
 
 export async function fetchTranslationUsage(): Promise<TranslationUsage> {
