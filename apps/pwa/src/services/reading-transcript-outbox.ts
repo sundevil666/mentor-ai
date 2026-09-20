@@ -9,6 +9,7 @@ let activeSync: Promise<number> | null = null;
 export async function queueReadingTranscript(chunk: ReadingTranscriptChunk) {
   const db = await mentorDb;
   await db.put('reading-transcript-outbox', chunk);
+  window.dispatchEvent(new Event('mentor-learning-upload-queue-updated'));
   const pending = await db.getAll('reading-transcript-outbox') as ReadingTranscriptChunk[];
   for (const stale of pending
     .sort((left, right) => left.capturedAt.localeCompare(right.capturedAt))
@@ -36,6 +37,7 @@ async function flushAllReadingTranscripts() {
       if (savedIds.has(chunk.id)) await db.delete('reading-transcript-outbox', chunk.id);
     }
     savedCount += savedIds.size;
+    if (savedIds.size > 0) window.dispatchEvent(new Event('mentor-learning-upload-queue-updated'));
     if (savedIds.size < pending.length) return savedCount;
     pending = (await db.getAll('reading-transcript-outbox') as ReadingTranscriptChunk[])
       .sort((left, right) => left.capturedAt.localeCompare(right.capturedAt))

@@ -71,10 +71,11 @@ import {
 } from 'src/services/app-update';
 import { useAppStore } from 'src/stores/app-store';
 import { syncAllContentProgress } from 'src/services/content-progress';
-import { syncLearningActivity } from 'src/services/learning-activity';
+import { pendingLearningActivityCount, syncLearningActivity } from 'src/services/learning-activity';
 import { syncContentEngagement } from 'src/services/content-engagement';
 import { syncApplicationTelemetry } from 'src/services/application-telemetry';
 import { syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
+import { mentorDb } from 'src/services/indexed-db';
 import { syncReadingPageSpeech, readingPageSpeechSyncIntervalMs } from 'src/services/reading-page-speech-outbox';
 import { runServerMaintenance } from 'src/services/server-maintenance';
 import { syncReaderVocabulary } from 'src/services/reader-vocabulary';
@@ -86,6 +87,7 @@ const router = useRouter();
 const route = useRoute();
 let stopUpdatePolling: (() => void) | undefined;
 let readingPageSpeechTimer: ReturnType<typeof setInterval> | null = null;
+let dailySyncTimer: ReturnType<typeof setInterval> | null = null;
 let removeRouteGuard: (() => void) | undefined;
 let isReloadingForUpdate = false;
 let pendingManifest: AppUpdateCheckResult['manifest'] | null = null;
@@ -106,6 +108,7 @@ onMounted(async () => {
   navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
   stopUpdatePolling = startAppUpdatePolling(handleServerUpdateAvailable);
   void runDailyServerMaintenance();
+  dailySyncTimer = setInterval(() => { void runDailyServerMaintenance(); }, 60 * 60 * 1_000);
   readingPageSpeechTimer = setInterval(() => { if (navigator.onLine) void syncReadingPageSpeech(appStore.studentId).catch(() => undefined); }, readingPageSpeechSyncIntervalMs);
   await showCompletedUpdateNotification();
 });
@@ -119,6 +122,7 @@ onUnmounted(() => {
   navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
   stopUpdatePolling?.();
   if (readingPageSpeechTimer) clearInterval(readingPageSpeechTimer);
+  if (dailySyncTimer) clearInterval(dailySyncTimer);
   window.removeEventListener('online', handleServerMaintenanceWakeup);
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
@@ -392,13 +396,17 @@ function handleServiceWorkerMessage(event: MessageEvent) {
   }
 }
 
-function handleServerMaintenanceWakeup() { void runDailyServerMaintenance(); }
+async function handleServerMaintenanceWakeup() {
+  const hasPendingActivity = (await pendingLearningActivityCount().catch(() => 0)) > 0;
+  const hasPendingTranscripts = (await mentorDb.then((db) => db.count('reading-transcript-outbox')).catch(() => 0)) > 0;
+  void runDailyServerMaintenance(hasPendingActivity || hasPendingTranscripts || appStore.pendingSyncCount > 0);
+}
 
-async function runDailyServerMaintenance() {
+async function runDailyServerMaintenance(force = false) {
   if (!navigator.onLine) return;
   await runServerMaintenance(async () => {
     if (!appStore.isHydrated) await appStore.hydrate();
-    await Promise.allSettled([
+    const syncResults = await Promise.allSettled([
       appStore.refreshMyShiftActivity(false),
       appStore.refreshRemoteLearningState(),
       syncAllContentProgress(),
@@ -421,7 +429,12 @@ async function runDailyServerMaintenance() {
       fetchTranslationUsage(),
     ]);
     window.dispatchEvent(new Event('mentor-ai:daily-server-maintenance-finished'));
-  }).catch(() => undefined);
+    if ([2, 3, 4, 6].some((index) => syncResults[index]?.status === 'rejected')
+      || (await pendingLearningActivityCount()) > 0
+      || (await (await mentorDb).count('reading-transcript-outbox')) > 0) {
+      throw new Error('Learning data remains queued for synchronization');
+    }
+  }, { force }).catch(() => undefined);
 }
 
 </script>

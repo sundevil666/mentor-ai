@@ -43,9 +43,10 @@ export function syncReadingPageSpeech(
   studentId: string,
   now = Date.now(),
   send: (pages: ReadingPageSpeechUpload[]) => Promise<ReadingPageSpeechUpload[]> = synchronizeReadingPageSpeech,
+  force = false,
 ): Promise<number> {
   if (activeSync) return activeSync;
-  activeSync = flushReadingPageSpeech(studentId, now, send).finally(() => { activeSync = null; });
+  activeSync = flushReadingPageSpeech(studentId, now, send, force).finally(() => { activeSync = null; });
   return activeSync;
 }
 
@@ -53,11 +54,12 @@ async function flushReadingPageSpeech(
   studentId: string,
   now: number,
   send: (pages: ReadingPageSpeechUpload[]) => Promise<ReadingPageSpeechUpload[]>,
+  force: boolean,
 ): Promise<number> {
   if (typeof localStorage === 'undefined' || (typeof navigator !== 'undefined' && !navigator.onLine)) return 0;
   const attemptKey = `${attemptPrefix}${studentId}`;
   const lastAttempt = Number(localStorage.getItem(attemptKey));
-  if (lastAttempt > 0 && now >= lastAttempt && now - lastAttempt < readingPageSpeechSyncIntervalMs) return 0;
+  if (!force && lastAttempt > 0 && now >= lastAttempt && now - lastAttempt < readingPageSpeechSyncIntervalMs) return 0;
   const entries: { key: string; pageKey: string; value: ReadingPageSpeechSummary; bookId: string }[] = [];
   const scope = `${prefix}${studentId}:`;
   let batchBytes = 0;

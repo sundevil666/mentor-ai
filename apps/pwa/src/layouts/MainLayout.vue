@@ -57,12 +57,18 @@
         <q-btn
           class="sync-status-button"
           :aria-label="syncStatusTooltip"
-          flat
+          :color="pendingUploadCount > 0 ? 'deep-orange-7' : 'primary'"
+          :flat="pendingUploadCount === 0"
           :icon="syncStatusIcon"
-          round
+          :label="pendingUploadCount > 0 ? 'Send' : undefined"
+          :loading="isManualSyncRunning"
+          :round="pendingUploadCount === 0"
+          :rounded="pendingUploadCount > 0"
+          :unelevated="pendingUploadCount > 0"
+          @click="syncLearningDataNow"
         >
-          <q-badge v-if="appStore.pendingSyncCount > 0" color="deep-orange-7" floating>
-            {{ appStore.pendingSyncCount }}
+          <q-badge v-if="pendingUploadCount > 0" color="red-7" floating>
+            {{ pendingUploadCount > 99 ? '99+' : pendingUploadCount }}
           </q-badge>
           <q-tooltip>{{ syncStatusTooltip }}</q-tooltip>
         </q-btn>
@@ -336,7 +342,14 @@ import { recordApplicationTelemetry } from 'src/services/application-telemetry';
 import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
 import { formatDisplayDateTime } from 'src/services/date-format';
 import { cleanupExpiredOfflineLessons } from 'src/services/offline-library';
-import { loadLearningActivityTotals } from 'src/services/learning-activity';
+import { loadLearningActivityTotals, pendingLearningActivityCount, syncLearningActivity } from 'src/services/learning-activity';
+import { syncAllContentProgress } from 'src/services/content-progress';
+import { syncContentEngagement } from 'src/services/content-engagement';
+import { syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
+import { syncReadingPageSpeech } from 'src/services/reading-page-speech-outbox';
+import { syncReaderVocabulary } from 'src/services/reader-vocabulary';
+import { syncApplicationTelemetry } from 'src/services/application-telemetry';
+import { mentorDb } from 'src/services/indexed-db';
 import { calculateLevelJourney } from 'src/services/level-journey';
 import {
   getOfflineLessonUpdateState,
@@ -408,6 +421,10 @@ const googleSignInButton = ref<HTMLElement | null>(null);
 const showGoogleSignIn = ref(false);
 const routeTransitionName = ref('route-slide-forward');
 const levelActivity = ref<LearningActivityTotals>({ listeningSeconds: 0, readingSeconds: 0, speakingSeconds: 0, totalSeconds: 0, updatedAt: null });
+const pendingActivityCount = ref(0);
+const pendingReadingTranscriptCount = ref(0);
+const isManualSyncRunning = ref(false);
+const pendingUploadCount = computed(() => appStore.pendingSyncCount + pendingActivityCount.value + pendingReadingTranscriptCount.value);
 const levelTrend = computed(() => calculateLevelJourney(appStore.studentModel, levelActivity.value, appStore.statisticsSnapshots));
 const deferredInstallPrompt = ref<BeforeInstallPromptEvent | null>(null);
 const isPwaInstalled = ref(false);
@@ -479,26 +496,26 @@ const lessonUpdateTooltip = computed(() => {
   return 'Current lessons are available offline. Tap to check the server now.';
 });
 const syncStatusIcon = computed(() => {
-  if (appStore.pendingSyncCount > 0) {
+  if (pendingUploadCount.value > 0) {
     return appStore.isOnline ? 'cloud_upload' : 'cloud_off';
   }
 
   return appStore.isSyncRefreshing ? 'sync' : 'cloud_done';
 });
 const syncStatusTooltip = computed(() => {
-  if (appStore.pendingSyncCount > 0 && !appStore.isOnline) {
-    return `${appStore.pendingSyncCount} learning updates are saved on this device and need internet.`;
+  if (pendingUploadCount.value > 0 && !appStore.isOnline) {
+    return `${pendingUploadCount.value} learning updates are saved on this device. They will upload when internet returns.`;
   }
 
-  if (appStore.pendingSyncCount > 0) {
-    return `${appStore.pendingSyncCount} learning updates are waiting to upload.`;
+  if (pendingUploadCount.value > 0) {
+    return `${pendingUploadCount.value} learning updates are waiting to upload. Tap to sync now.`;
   }
 
   if (appStore.isSyncRefreshing) {
     return 'Checking progress from your other devices.';
   }
 
-  return 'Learning progress is synchronized.';
+  return 'Tap to upload local progress and refresh from the server.';
 });
 const activeDashboardTraining = computed(() => {
   return resolveDashboardTrainingCategory(route.query.training, appStore.session?.context.mode);
@@ -575,6 +592,8 @@ onMounted(async () => {
   window.addEventListener('translation-usage-updated', loadTranslationUsage);
   window.addEventListener('mentor-ai:request-google-sign-in', signInWithGoogle);
   window.addEventListener('mentor-learning-activity-updated', refreshLevelActivity);
+  window.addEventListener('mentor-learning-activity-updated', refreshPendingActivityCount);
+  window.addEventListener('mentor-learning-upload-queue-updated', refreshPendingReadingTranscriptCount);
   window.addEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyServerMaintenanceFinished);
   window.addEventListener('error', handleRuntimeError);
   window.addEventListener('unhandledrejection', handleUnhandledRejection);
@@ -586,6 +605,8 @@ onMounted(async () => {
     await appStore.hydrate();
   }
   await refreshLevelActivity();
+  await refreshPendingActivityCount();
+  await refreshPendingReadingTranscriptCount();
   await recordApplicationTelemetry({ studentId: appStore.studentId, type: 'app-opened', route: String(route.name ?? 'unknown') });
   await loadTranslationUsage();
 });
@@ -598,6 +619,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('translation-usage-updated', loadTranslationUsage);
   window.removeEventListener('mentor-ai:request-google-sign-in', signInWithGoogle);
   window.removeEventListener('mentor-learning-activity-updated', refreshLevelActivity);
+  window.removeEventListener('mentor-learning-activity-updated', refreshPendingActivityCount);
+  window.removeEventListener('mentor-learning-upload-queue-updated', refreshPendingReadingTranscriptCount);
   window.removeEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyServerMaintenanceFinished);
   window.removeEventListener('error', handleRuntimeError);
   window.removeEventListener('unhandledrejection', handleUnhandledRejection);
@@ -664,6 +687,40 @@ function handleApplicationOffline() {
   void recordApplicationTelemetry({ studentId: appStore.studentId, type: 'offline', severity: 'warning' });
 }
 async function refreshLevelActivity() { levelActivity.value = await loadLearningActivityTotals(); }
+async function refreshPendingActivityCount() { pendingActivityCount.value = await pendingLearningActivityCount(); }
+async function refreshPendingReadingTranscriptCount() {
+  pendingReadingTranscriptCount.value = await (await mentorDb).count('reading-transcript-outbox');
+}
+async function syncLearningDataNow() {
+  if (isManualSyncRunning.value) return;
+  if (!navigator.onLine) {
+    Notify.create({ type: 'warning', icon: 'cloud_off', message: 'Saved on this device. Upload will resume when internet returns.' });
+    return;
+  }
+  isManualSyncRunning.value = true;
+  try {
+    const results = await Promise.allSettled([
+      appStore.refreshRemoteLearningState(),
+      syncAllContentProgress(),
+      syncContentEngagement(),
+      syncLearningActivity(),
+      syncReadingTranscripts(),
+      syncReadingPageSpeech(appStore.studentId, Date.now(), undefined, true),
+      syncReaderVocabulary(appStore.studentId),
+      syncApplicationTelemetry(),
+    ]);
+    await Promise.all([refreshLevelActivity(), refreshPendingActivityCount(), refreshPendingReadingTranscriptCount()]);
+    if (results.some((result) => result.status === 'rejected') || pendingUploadCount.value > 0) {
+      Notify.create({ type: 'warning', icon: 'cloud_off', message: 'Some updates are still saved on this device. Try again later.' });
+    } else {
+      Notify.create({ type: 'positive', icon: 'cloud_done', message: 'Learning data uploaded and refreshed.' });
+    }
+  } catch {
+    Notify.create({ type: 'negative', icon: 'cloud_off', message: 'Sync failed. Your local data is still saved.' });
+  } finally {
+    isManualSyncRunning.value = false;
+  }
+}
 function handleRuntimeError(event: ErrorEvent) {
   void recordApplicationTelemetry({
     studentId: appStore.studentId,
