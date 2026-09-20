@@ -367,45 +367,6 @@
                 @click="showMicrophoneAccessHelp"
               />
             </div>
-            <div
-              v-if="readingSpeechActive || readingSpeechDebugEntryCount > 1"
-              class="personal-reader__log-status"
-              :class="{ 'personal-reader__log-status--recording': readingSpeechActive }"
-              aria-live="polite"
-            >
-              <span class="personal-reader__log-status-copy">
-                <q-icon :name="readingSpeechActive ? 'fiber_manual_record' : 'pause_circle'" />
-                <span>
-                  <strong>{{ readingSpeechActive ? 'Recognition log is recording' : 'Recognition log is paused' }}</strong>
-                  <small>{{ readingSpeechDebugEntryCount }} log entries</small>
-                </span>
-              </span>
-              <q-btn dense flat icon="content_copy" label="Copy log" no-caps @click="copyReadingSpeechDebugLog" />
-            </div>
-            <q-btn
-              v-if="readingSpeechActive || readingSpeechDebugEntryCount > 1"
-              class="personal-reader__diagnostics-toggle"
-              :color="readingSpeechDiagnosticsOpen ? 'primary' : 'grey-7'"
-              dense
-              flat
-              icon="bug_report"
-              :label="readingSpeechDiagnosticsOpen ? 'Hide log details' : 'View log details'"
-              no-caps
-              @click="readingSpeechDiagnosticsOpen = !readingSpeechDiagnosticsOpen"
-            />
-            <div v-if="readingSpeechDiagnosticsOpen" class="personal-reader__diagnostics" aria-live="off">
-              <div class="personal-reader__diagnostics-current">
-                <span>Expected next</span>
-                <strong>#{{ readingSpeechAnchor + 1 }} · {{ readerReferenceWords[readingSpeechAnchor] || 'end of book' }}</strong>
-              </div>
-              <p><b>Heard:</b> {{ readingSpeechLastTranscript || 'nothing yet' }}</p>
-              <p><b>Decision:</b> {{ readingSpeechLastDecision }}</p>
-              <div class="personal-reader__diagnostics-actions">
-                <q-btn dense flat icon="my_location" label="Start from selected word" no-caps @click="useSelectedWordAsSpeechAnchor" />
-              </div>
-              <pre>{{ readingSpeechDebugEntries.join('\n') }}</pre>
-              <small>No microphone audio is stored. The log contains only recognition text and local word indexes.</small>
-            </div>
           </section>
 
           <section
@@ -658,15 +619,7 @@ const readingSpeechMessage = ref('Tap the microphone to request access and start
 const readingSpeechPermissionBlocked = ref(false);
 const readingSpeechCaptureUnavailable = ref(false);
 const spokenReaderWordIndexes = ref(new Set<number>());
-const provisionalReaderWordIndexes = ref(new Set<number>());
 const activeReaderWordIndexes = ref(new Set<number>());
-const readingSpeechAcceptedWords = ref(0);
-const readingSpeechSpokenWords = ref(0);
-const readingSpeechDebugEntries = ref<string[]>(['Waiting for microphone start.']);
-const readingSpeechDebugEntryCount = ref(1);
-const readingSpeechDiagnosticsOpen = ref(false);
-const readingSpeechLastTranscript = ref('');
-const readingSpeechLastDecision = ref('Waiting for recognition.');
 const readingSpeechAnchor = ref(0);
 let readingSpeechFurthestWordIndex = -1;
 let readingPageSpeech: ReadingPageSpeech | null = null;
@@ -682,9 +635,6 @@ let readingSpeechAudioContext: AudioContext | null = null;
 let readingSpeechMeterTimer: ReturnType<typeof setInterval> | null = null;
 let readingSpeechSessionId = 0;
 let readingSpeechSherpaProcessedWordCount = 0;
-let readingSpeechDebugStartedAt = 0;
-let readingSpeechDebugBuffer = ['Waiting for microphone start.'];
-let readingSpeechDebugUiTimer = 0;
 let readingSpeechLastSignalState = false;
 let readingSpeechPaceWordCount = 0;
 let readingSpeechPaceSampleAt = 0;
@@ -877,8 +827,6 @@ onUnmounted(() => {
   window.clearTimeout(readerWheelSettleTimer);
   cancelAnimationFrame(readerScrollAnimationFrame);
   stopReadingSpeech('idle');
-  window.clearTimeout(readingSpeechDebugUiTimer);
-  readingSpeechDebugUiTimer = 0;
 });
 
 async function openStory(id: string) {
@@ -1105,7 +1053,6 @@ function closeBook() {
   readingPageSpeech = null;
   readerPageWordCache = new Map();
   spokenReaderWordIndexes.value = new Set();
-  provisionalReaderWordIndexes.value = new Set();
   activeReaderWordIndexes.value = new Set();
   readingSpeechFurthestWordIndex = -1;
   syncedReaderPositionWordIndex = -1;
@@ -1113,8 +1060,6 @@ function closeBook() {
   selectedReaderWordIndex.value = null;
   readerMarkerWordIndex.value = null;
   readerStopHistory.value = [];
-  readingSpeechAcceptedWords.value = 0;
-  readingSpeechSpokenWords.value = 0;
   clearReaderLookup();
   stopReadingSpeech('idle');
 }
@@ -1157,8 +1102,6 @@ function goToBookPage(pageIndex: number | null, smooth = true) {
   loadReadingPageSpeech(destinationPageIndex);
   sherpaReadingTranscriber?.reset();
   resetSherpaReadingFragment();
-  appendReadingSpeechDebug(`Reading anchor moved with page ${destinationPageIndex + 1}: word ${readingSpeechAnchor.value} "${readerReferenceWords.value[readingSpeechAnchor.value] ?? ''}".`);
-  provisionalReaderWordIndexes.value = new Set();
   activeReaderWordIndexes.value = new Set();
   void persistReaderNavigationProgress();
   markReadingDevicePositionChanged();
@@ -1364,7 +1307,6 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
   }).catch(() => undefined);
   const shouldResumeReadingSpeech = readingSpeechActive.value;
   const requestId = ++readerLookupRequestId;
-  const interactionStartedAt = performance.now();
   try {
     await beginReaderLookupInteraction({
       revealSelection: () => {
@@ -1375,16 +1317,12 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
         readerLookupError.value = '';
         readerLookupLoading.value = true;
         readerPhoneticLoading.value = !/\s/.test(text);
-        appendReadingSpeechDebug(`Lookup word visible after ${Math.round(performance.now() - interactionStartedAt)}ms: "${text}".`);
-        void nextTick().then(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
-          .then(() => appendReadingSpeechDebug(`Lookup UI painted after ${Math.round(performance.now() - interactionStartedAt)}ms.`));
       },
       suppressListening: shouldResumeReadingSpeech ? () => {
         readingSpeechSuppressedForLookup = true;
         sherpaReadingTranscriber?.suspend();
         readingSpeechLevel.value = 0;
         resetSherpaReadingFragment();
-        appendReadingSpeechDebug(`Ignoring recognition results while translating "${text}"; capture stays warm.`);
         readingSpeechMessage.value = 'Translation has priority. Listening will continue automatically.';
       } : undefined,
       pronounce: speakImmediately ? () => { void speakReaderText(text, false); } : undefined,
@@ -1395,7 +1333,6 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
           readerLookup.value = cachedLookup;
           readerPhonetic.value = cachedLookup.phonetic;
           readerLookupLoading.value = false;
-          appendReadingSpeechDebug(`Cached translation ready after ${Math.round(performance.now() - interactionStartedAt)}ms.`);
           if (!cachedLookup.phonetic && !/\s/.test(text)) void loadReaderPhonetic(text, requestId);
           await interactionRecord;
           await saveReaderLookup(cachedLookup, requestId);
@@ -1407,7 +1344,6 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
           if (requestId !== readerLookupRequestId) return;
           readerLookup.value = lookup;
           readerLookupLoading.value = false;
-          appendReadingSpeechDebug(`Online translation ready after ${Math.round(performance.now() - interactionStartedAt)}ms.`);
           if (lookup.translation) {
             await interactionRecord;
             await saveReaderLookup(lookup, requestId);
@@ -1425,7 +1361,6 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
     if (requestId === readerLookupRequestId && readingSpeechSuppressedForLookup) {
       readingSpeechSuppressedForLookup = false;
       sherpaReadingTranscriber?.resume();
-      appendReadingSpeechDebug(`Translation interaction finished after ${Math.round(performance.now() - interactionStartedAt)}ms; recognition results enabled.`);
       if (readingSpeechActive.value) readingSpeechMessage.value = 'Read aloud. Recognition is ready.';
     }
   }
@@ -1439,8 +1374,8 @@ async function loadReaderPhonetic(text: string, requestId: number) {
         await saveReaderLookup({ ...readerLookup.value, phonetic }, requestId);
       }
     }
-  } catch (error) {
-    appendReadingSpeechDebug(`Optional phonetic lookup unavailable: ${error instanceof Error ? error.message : String(error)}.`);
+  } catch {
+    // Phonetic lookup is optional.
   } finally {
     if (requestId === readerLookupRequestId) readerPhoneticLoading.value = false;
   }
@@ -1466,32 +1401,26 @@ async function speakReaderText(text: string, recordInteraction = true) {
       pronunciationRequested: true,
     }).catch(() => undefined);
   }
-  appendReadingSpeechDebug(`Pronunciation requested for "${text}".`);
   const microphoneTracks = readingSpeechStream?.getAudioTracks() ?? [];
   const muteMicrophone = () => {
     microphoneTracks.forEach((track) => { track.enabled = false; });
-    if (microphoneTracks.length) appendReadingSpeechDebug(`Microphone muted while pronouncing "${text}".`);
   };
   const restoreMicrophone = () => {
     microphoneTracks.forEach((track) => { if (track.readyState === 'live') track.enabled = true; });
-    if (microphoneTracks.length) appendReadingSpeechDebug('Microphone resumed after word pronunciation.');
   };
   let fallbackStarted = false;
   const playFallback = async () => {
     if (fallbackStarted) return;
     fallbackStarted = true;
     restoreMicrophone();
-    appendReadingSpeechDebug(`System pronunciation failed; starting fallback voice for "${text}".`);
     const played = await speakWithPreferredVoice(text, {
       mediaTitle: `Book: ${selectedBook.value?.title ?? 'selected text'}`,
       temporary: true,
     });
-    appendReadingSpeechDebug(played ? 'Fallback pronunciation started.' : 'Fallback pronunciation failed.');
     if (!played) Notify.create({ type: 'warning', message: 'Pronunciation is unavailable right now.' });
   };
   const systemVoiceStarted = speakWithSystemVoice(text, {
     onStart: () => {
-      appendReadingSpeechDebug(`System pronunciation started for "${text}".`);
       muteMicrophone();
     },
     onEnd: restoreMicrophone,
@@ -1610,7 +1539,6 @@ async function toggleReadingSpeech() {
   if (readingSpeechTransitioning.value) return;
   readingSpeechTransitioning.value = true;
   if (readingSpeechActive.value) {
-    appendReadingSpeechDebug('Stop requested by user.');
     stopReadingSpeech('paused');
     readingSpeechMessage.value = 'Your highlighted words are kept. Tap Start listening when you are ready.';
     await nextTick();
@@ -1630,8 +1558,6 @@ async function startReadingSpeech() {
   const useSherpaRecognition = isSherpaReaderExperiment();
   const useBrowserRecognition = !useSherpaRecognition && isSpeechRecognitionAvailable();
   const useLocalRecognition = !useSherpaRecognition && !useBrowserRecognition;
-  startReadingSpeechDebug(useSherpaRecognition ? 'sherpa-onnx' : useBrowserRecognition ? 'browser-speech' : 'device-whisper');
-  provisionalReaderWordIndexes.value = new Set();
   activeReaderWordIndexes.value = new Set();
   resetReadingSpeechPace();
   loadReadingPageSpeech(currentBookPageIndex.value);
@@ -1645,17 +1571,12 @@ async function startReadingSpeech() {
     visibleWordIndex,
   });
   readingSpeechAnchor.value = readingPageSpeech?.nextIndex ?? readingSpeechAnchor.value;
-  readingSpeechLastTranscript.value = '';
-  readingSpeechLastDecision.value = `Start with “${readerReferenceWords.value[readingSpeechAnchor.value] ?? 'end of book'}”.`;
   resetSherpaReadingFragment();
-  appendReadingSpeechDebug(`Reading anchor: word ${readingSpeechAnchor.value}.`);
-  appendReadingSpeechDebug(`Expected nearby text: "${readerReferenceWords.value.slice(readingSpeechAnchor.value, readingSpeechAnchor.value + 18).join(' ')}"`);
   if (useBrowserRecognition) {
     readingSpeechStatus.value = 'requesting';
     readingSpeechPermissionBlocked.value = false;
     readingSpeechCaptureUnavailable.value = false;
     readingSpeechMessage.value = 'Starting browser voice recognition…';
-    appendReadingSpeechDebug('Starting browser-managed microphone capture.');
     try {
       configureCaptureAudioSession();
       readingSpeechRecognition = startContinuousSpeechRecognition({
@@ -1663,21 +1584,14 @@ async function startReadingSpeech() {
         onInterim: (transcript) => {
           if (sessionId !== readingSpeechSessionId) return;
           updateReadingSpeechPace(transcript);
-          appendReadingSpeechDebug(`Interim text: "${transcript}"`);
-          if (!readingSpeechRecognition || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
-          const previewWordIndexes = readingPageSpeech?.preview(transcript) ?? [];
-          updateReadingSpeechDiagnosticDecision(transcript, previewWordIndexes, true);
-          provisionalReaderWordIndexes.value = new Set(previewWordIndexes);
         },
         onFinal: (transcript) => {
           if (sessionId !== readingSpeechSessionId) return;
-          provisionalReaderWordIndexes.value = new Set();
           if (!readingSpeechRecognition || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
           handleReadingSpeechTranscript(transcript, 'browser');
         },
         onListeningChange: (listening) => {
           if (sessionId !== readingSpeechSessionId) return;
-          appendReadingSpeechDebug(listening ? 'Browser recognition listening.' : 'Browser recognition reconnecting.');
           if (!readingSpeechRecognition && !listening) return;
           readingSpeechStatus.value = listening ? 'listening' : 'requesting';
           readingSpeechMessage.value = listening ? 'Read naturally. Matching words are highlighted as you speak.' : 'Reconnecting voice recognition…';
@@ -1685,7 +1599,6 @@ async function startReadingSpeech() {
         },
         onError: (message) => {
           if (sessionId !== readingSpeechSessionId) return;
-          appendReadingSpeechDebug(`ERROR: browser recognition: ${message}`);
           stopReadingSpeech('error');
           readingSpeechCaptureUnavailable.value = isMicrophoneCaptureUnavailable(message);
           readingSpeechPermissionBlocked.value = !readingSpeechCaptureUnavailable.value && /not-allowed|permission|denied/i.test(message);
@@ -1702,7 +1615,6 @@ async function startReadingSpeech() {
       if (sessionId !== readingSpeechSessionId) return;
       stopReadingSpeech('error');
       const technicalMessage = microphoneErrorDetails(error);
-      appendReadingSpeechDebug(`ERROR: browser recognition start failed: ${technicalMessage}`);
       readingSpeechMessage.value = `Speech recognition could not be started: ${technicalMessage}`;
       readingSpeechTransitioning.value = false;
       Notify.create({ type: 'negative', icon: 'mic', message: readingSpeechMessage.value, timeout: 8_000 });
@@ -1710,7 +1622,6 @@ async function startReadingSpeech() {
     return;
   }
   if (!navigator.mediaDevices?.getUserMedia) {
-    appendReadingSpeechDebug('ERROR: getUserMedia is unavailable.');
     readingSpeechStatus.value = 'error';
     readingSpeechMessage.value = 'Safari does not expose microphone capture on this page.';
     readingSpeechTransitioning.value = false;
@@ -1721,27 +1632,20 @@ async function startReadingSpeech() {
   readingSpeechPermissionBlocked.value = false;
   readingSpeechCaptureUnavailable.value = false;
   readingSpeechMessage.value = 'Use the device prompt to allow microphone access.';
-  appendReadingSpeechDebug('Requesting microphone permission…');
   try {
     configureCaptureAudioSession();
-    appendReadingSpeechDebug('Audio session configured for capture.');
     const acquiredStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     if (sessionId !== readingSpeechSessionId || !readingMode.value) {
       acquiredStream.getTracks().forEach((track) => track.stop());
-      appendReadingSpeechDebug('Discarded microphone stream from an obsolete start request.');
       return;
     }
     readingSpeechStream = acquiredStream;
-    const audioTrack = readingSpeechStream.getAudioTracks()[0];
-    const settings = audioTrack?.getSettings();
-    appendReadingSpeechDebug(`Microphone granted: track=${audioTrack?.readyState ?? 'missing'}, enabled=${audioTrack?.enabled ?? false}, muted=${audioTrack?.muted ?? false}, sampleRate=${settings?.sampleRate ?? 'unknown'}, channels=${settings?.channelCount ?? 'unknown'}.`);
     void startReadingSpeechMeter(readingSpeechStream, sessionId);
     if (useSherpaRecognition) {
       sherpaReadingTranscriber = startSherpaReadingTranscriber(readingSpeechStream, {
         onInterim: (transcript) => {
           if (sessionId !== readingSpeechSessionId || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) return;
           updateReadingSpeechPace(transcript);
-          appendReadingSpeechDebug(`Sherpa interim: "${transcript}"`);
           const interim = immediateReadingInterimWords(
             transcript,
             readingSpeechSherpaProcessedWordCount,
@@ -1749,15 +1653,13 @@ async function startReadingSpeech() {
           );
           readingSpeechSherpaProcessedWordCount = interim.processedWordCount;
           if (interim.words.length) {
-            handleReadingSpeechTranscript(interim.words.join(' '), 'sherpa-onnx', 'Immediate interim text');
+            handleReadingSpeechTranscript(interim.words.join(' '), 'sherpa-onnx');
           }
         },
         onFinal: (transcript) => {
           if (sessionId !== readingSpeechSessionId) return;
-          provisionalReaderWordIndexes.value = new Set();
           if (!shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) {
             resetSherpaReadingFragment();
-            appendReadingSpeechDebug('Sherpa final ignored during lookup; fragment state reset at the endpoint.');
             return;
           }
           handleSherpaFinalTranscript(transcript);
@@ -1767,23 +1669,19 @@ async function startReadingSpeech() {
             readingSpeechMessage.value = 'Your highlighted words are kept. Tap Start listening when you are ready.';
           }
         },
-        onDebug: (message) => appendReadingSpeechDebug(message),
         onReady: () => {
           if (sessionId !== readingSpeechSessionId) return;
           readingSpeechStatus.value = 'listening';
           readingSpeechMessage.value = 'Sherpa is ready. Read naturally.';
           readingSpeechTransitioning.value = false;
-          appendReadingSpeechDebug('Sherpa streaming recognizer ready.');
         },
         onProgress: (message) => {
           if (sessionId !== readingSpeechSessionId) return;
           readingSpeechStatus.value = 'requesting';
           readingSpeechMessage.value = message;
-          appendReadingSpeechDebug(message);
         },
         onError: (message) => {
           if (sessionId !== readingSpeechSessionId) return;
-          appendReadingSpeechDebug(`ERROR: Sherpa: ${message}`);
           stopReadingSpeech('error');
           readingSpeechMessage.value = `Sherpa recognition stopped: ${message}`;
           readingSpeechTransitioning.value = false;
@@ -1792,7 +1690,6 @@ async function startReadingSpeech() {
     } else if (useLocalRecognition) {
       const handleWhisperTranscript = (transcript: string) => {
         if (sessionId !== readingSpeechSessionId || !shouldProcessReadingTranscript(readingSpeechSuppressedForLookup)) {
-          appendReadingSpeechDebug('Ignoring a recognition result while translation has priority.');
           return;
         }
         handleReadingSpeechTranscript(transcript, 'device-whisper');
@@ -1803,23 +1700,19 @@ async function startReadingSpeech() {
         onTranscript: (transcript) => {
           handleWhisperTranscript(transcript);
         },
-        onDebug: (message) => appendReadingSpeechDebug(message),
         onReady: () => {
           if (sessionId !== readingSpeechSessionId) return;
-          appendReadingSpeechDebug('Offline model ready. Start reading aloud.');
           readingSpeechStatus.value = 'listening';
           readingSpeechMessage.value = 'Read aloud. Recognition is ready.';
           readingSpeechTransitioning.value = false;
         },
         onProgress: (message) => {
           if (sessionId !== readingSpeechSessionId) return;
-          appendReadingSpeechDebug(message);
           readingSpeechStatus.value = 'requesting';
           readingSpeechMessage.value = message;
         },
         onError: (message) => {
           if (sessionId !== readingSpeechSessionId) return;
-          appendReadingSpeechDebug(`ERROR: ${message}`);
           stopReadingSpeech('error');
           readingSpeechMessage.value = `Offline speech recognition stopped: ${message}`;
           readingSpeechTransitioning.value = false;
@@ -1836,7 +1729,6 @@ async function startReadingSpeech() {
     readingSpeechCaptureUnavailable.value = isMicrophoneCaptureUnavailable(error);
     readingSpeechPermissionBlocked.value = !readingSpeechCaptureUnavailable.value && isMicrophonePermissionError(error);
     const technicalMessage = microphoneErrorDetails(error);
-    appendReadingSpeechDebug(`ERROR: microphone start failed: ${technicalMessage}`);
     readingSpeechMessage.value = readingSpeechCaptureUnavailable.value
       ? 'The iPad microphone service is unavailable. Fully close Mentor AI, reopen it, and try again.'
       : readingSpeechPermissionBlocked.value
@@ -1889,26 +1781,18 @@ function isMicrophonePermissionError(error: unknown) {
 function handleReadingSpeechTranscript(
   transcript: string,
   recognitionEngine: 'device-whisper' | 'browser' | 'sherpa-onnx' = 'browser',
-  debugLabel = 'Final text',
 ) {
   const whisperRecognition = recognitionEngine !== 'browser';
   const rawHeardWords = tokenizeReadingSpeech(transcript);
   if (whisperRecognition) updateReadingSpeechChunkPace(rawHeardWords.length);
-  appendReadingSpeechDebug(`${debugLabel} (${recognitionEngine}, ${rawHeardWords.length} words): "${transcript}"`);
   if (!rawHeardWords.length) return null;
-  const spokenCount = rawHeardWords.length;
-  readingSpeechLastTranscript.value = transcript;
   const confirmedWordIndexes = readingPageSpeech?.match(transcript) ?? [];
-  readingSpeechSpokenWords.value += spokenCount;
   if (!confirmedWordIndexes.length) {
-    readingSpeechLastDecision.value = 'No unmarked word on this page matched.';
     readingSpeechStatus.value = 'noise';
     readingSpeechMessage.value = 'No matching unread word on this page. Try again.';
     return null;
   }
   readingSpeechAnchor.value = readingPageSpeech!.nextIndex;
-  readingSpeechLastDecision.value = `Accepted ${confirmedWordIndexes.length} word${confirmedWordIndexes.length === 1 ? '' : 's'} on this page.`;
-  readingSpeechAcceptedWords.value += confirmedWordIndexes.length;
   const nextSpoken = new Set(spokenReaderWordIndexes.value);
   confirmedWordIndexes.forEach((wordIndex) => nextSpoken.add(wordIndex));
   spokenReaderWordIndexes.value = nextSpoken;
@@ -1928,8 +1812,7 @@ function handleReadingSpeechTranscript(
 function handleSherpaFinalTranscript(transcript: string) {
   const finalWords = tokenizeReadingSpeech(transcript);
   const remainingWords = finalWords.slice(readingSpeechSherpaProcessedWordCount);
-  appendReadingSpeechDebug(`Sherpa final text (${finalWords.length} words, ${readingSpeechSherpaProcessedWordCount} already processed): "${transcript}"`);
-  if (remainingWords.length) handleReadingSpeechTranscript(remainingWords.join(' '), 'sherpa-onnx', 'Unconfirmed final remainder');
+  if (remainingWords.length) handleReadingSpeechTranscript(remainingWords.join(' '), 'sherpa-onnx');
   resetSherpaReadingFragment();
 }
 
@@ -1950,7 +1833,6 @@ function getVisibleReaderWordAnchor() {
 async function startReadingSpeechMeter(stream: MediaStream, sessionId: number) {
   const AudioContextConstructor = window.AudioContext;
   if (!AudioContextConstructor) {
-    appendReadingSpeechDebug('Audio meter unavailable: AudioContext missing.');
     return;
   }
   const context = new AudioContextConstructor();
@@ -1976,7 +1858,6 @@ async function startReadingSpeechMeter(stream: MediaStream, sessionId: number) {
     }
     if (hasSignal !== readingSpeechLastSignalState) {
       readingSpeechLastSignalState = hasSignal;
-      appendReadingSpeechDebug(hasSignal ? `Sound detected: level=${sampledLevel.toFixed(2)}.` : 'Sound stopped.');
     }
   };
   readingSpeechMeterTimer = setInterval(update, 250);
@@ -1985,7 +1866,6 @@ function stopReadingSpeech(status: ReadingSpeechStatus) {
   const flushSherpaFinal = status === 'paused' && Boolean(sherpaReadingTranscriber);
   readingSpeechSherpaStopping = flushSherpaFinal;
   if (!flushSherpaFinal) readingSpeechSessionId += 1;
-  appendReadingSpeechDebug(`Stopping microphone: status=${status}.`);
   readingSpeechRecognition?.stop();
   readingSpeechRecognition = null;
   localReadingTranscriber?.stop();
@@ -1993,7 +1873,6 @@ function stopReadingSpeech(status: ReadingSpeechStatus) {
   sherpaReadingTranscriber?.stop(flushSherpaFinal);
   sherpaReadingTranscriber = null;
   readingSpeechSuppressedForLookup = false;
-  provisionalReaderWordIndexes.value = new Set();
   readingSpeechStream?.getTracks().forEach((track) => track.stop());
   readingSpeechStream = null;
   if (readingSpeechMeterTimer) clearInterval(readingSpeechMeterTimer);
@@ -2038,91 +1917,6 @@ function updateReadingSpeechPace(transcript: string) {
 
 function updateReadingSpeechChunkPace(wordCount: number) {
   if (wordCount > 0) smoothReadingSpeechPace(wordCount * 15);
-}
-
-function startReadingSpeechDebug(engine: string) {
-  readingSpeechDebugStartedAt = performance.now();
-  readingSpeechDebugBuffer = [];
-  readingSpeechDebugEntries.value = [];
-  readingSpeechDebugEntryCount.value = 0;
-  window.clearTimeout(readingSpeechDebugUiTimer);
-  readingSpeechDebugUiTimer = 0;
-  appendReadingSpeechDebug(`Start. Engine=${engine}; platform=${navigator.platform || 'unknown'}; standalone=${window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone)}; AudioWorklet=${typeof window.AudioContext !== 'undefined' && 'audioWorklet' in window.AudioContext.prototype}; AudioContext=${typeof window.AudioContext !== 'undefined'}.`);
-  appendReadingSpeechDebug(`Voice frame: viewport=${window.innerWidth}x${window.innerHeight}; fullscreen=${readingMode.value}; reducedMotion=${window.matchMedia('(prefers-reduced-motion: reduce)').matches}; animation=recording-pulse+voice-wave.`);
-}
-
-function appendReadingSpeechDebug(message: string) {
-  const elapsed = readingSpeechDebugStartedAt ? ((performance.now() - readingSpeechDebugStartedAt) / 1_000).toFixed(1) : '0.0';
-  readingSpeechDebugBuffer.push(`[+${elapsed}s] ${message}`);
-  if (readingSpeechDebugBuffer.length > 120) readingSpeechDebugBuffer.splice(0, readingSpeechDebugBuffer.length - 120);
-  if (readingSpeechDebugUiTimer) return;
-  readingSpeechDebugUiTimer = window.setTimeout(() => {
-    readingSpeechDebugUiTimer = 0;
-    readingSpeechDebugEntryCount.value = readingSpeechDebugBuffer.length;
-    readingSpeechDebugEntries.value = [...readingSpeechDebugBuffer];
-  }, 1_000);
-}
-
-function updateReadingSpeechDiagnosticDecision(transcript: string, matchedWordIndexes: readonly number[], interim: boolean) {
-  readingSpeechLastTranscript.value = transcript;
-  readingSpeechLastDecision.value = matchedWordIndexes.length
-    ? `${interim ? 'Interim' : 'Final'} exact prefix: ${matchedWordIndexes.length} word${matchedWordIndexes.length === 1 ? '' : 's'}.`
-    : `No exact prefix. Waiting for “${readerReferenceWords.value[readingSpeechAnchor.value] ?? 'end of book'}”.`;
-}
-
-function useSelectedWordAsSpeechAnchor() {
-  const wordIndex = selectedReaderWordIndex.value;
-  if (wordIndex === null || !Number.isInteger(wordIndex)) {
-    Notify.create({ type: 'warning', message: 'Tap the word you want to read first, then try again.' });
-    return;
-  }
-  setReadingSpeechAnchor(wordIndex, 'Anchor manually moved');
-}
-
-function setReadingSpeechAnchor(wordIndex: number, reason: string) {
-  readingPageSpeech?.moveTo(wordIndex);
-  readingSpeechAnchor.value = wordIndex;
-  sherpaReadingTranscriber?.reset();
-  resetSherpaReadingFragment();
-  provisionalReaderWordIndexes.value = new Set();
-  activeReaderWordIndexes.value = new Set();
-  readingSpeechLastDecision.value = `${reason}. Waiting for “${readerReferenceWords.value[wordIndex] ?? 'end of book'}”.`;
-  appendReadingSpeechDebug(`${reason} set reading anchor to word ${wordIndex}: "${readerReferenceWords.value[wordIndex] ?? ''}".`);
-}
-
-async function copyReadingSpeechDebugLog() {
-  const header = [
-    `Expected index: ${readingSpeechAnchor.value}`,
-    `Expected word: ${readerReferenceWords.value[readingSpeechAnchor.value] ?? 'end of book'}`,
-    `Last heard: ${readingSpeechLastTranscript.value || 'nothing'}`,
-    `Last decision: ${readingSpeechLastDecision.value}`,
-  ];
-  const logText = [...header, '', ...readingSpeechDebugBuffer].join('\n');
-  const textarea = document.createElement('textarea');
-  textarea.value = logText;
-  textarea.style.position = 'fixed';
-  textarea.style.left = '0';
-  textarea.style.top = '0';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
-  textarea.focus();
-  textarea.select();
-  textarea.setSelectionRange(0, textarea.value.length);
-  let copied = document.execCommand('copy');
-  textarea.remove();
-  if (!copied) {
-    try {
-      await navigator.clipboard.writeText(logText);
-      copied = true;
-    } catch {
-      copied = false;
-    }
-  }
-  Notify.create({
-    type: copied ? 'positive' : 'negative',
-    icon: copied ? 'content_copy' : 'error_outline',
-    message: copied ? 'Recognition log copied.' : 'Could not copy the recognition log.',
-  });
 }
 
 function applyReadingMode(value: boolean) {
@@ -2225,8 +2019,6 @@ function scheduleReadingDayRefresh() {
 function restoreDailySpokenWords(_bookId: string) {
   dailyReadingProgress.value = prepareDailyReadingProgress(dailyReadingProgress.value);
   spokenReaderWordIndexes.value = new Set();
-  readingSpeechAcceptedWords.value = 0;
-  readingSpeechSpokenWords.value = 0;
 }
 async function restoreSpokenReadingProgress(bookId: string) {
   restoreDailySpokenWords(bookId);
