@@ -36,7 +36,7 @@
               <div>
                 <p class="learning-start__eyebrow">Statistics · view only</p>
                 <h1>Your progress</h1>
-                <span>See what you have completed and what is still left.</span>
+                <span>See what you have completed and what is still left. Reading time also counts toward your level growth.</span>
               </div>
             </div>
             <div class="home-progress-list">
@@ -795,6 +795,7 @@ import {
   type LessonProgressState,
 } from 'src/services/lesson-category-progress';
 import { loadLearningActivityTotals } from 'src/services/learning-activity';
+import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { audioLibrary } from 'src/services/audio-library';
 import { storyLibrary } from 'src/services/story-library';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
@@ -1294,6 +1295,15 @@ const isRecommendedLessonPinned = computed(() =>
   pinnedHomeLessonKey.value === recommendedHomeLesson.value.templateKey,
 );
 const levelActivity = ref<LearningActivityTotals>({ listeningSeconds: 0, readingSeconds: 0, speakingSeconds: 0, totalSeconds: 0, updatedAt: null });
+const homeReadingProgress = ref<DailyReadingProgress>(createDailyReadingProgress());
+function refreshHomeReadingProgress() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('mentor-ai:daily-reading-progress') ?? 'null') as DailyReadingProgress | null;
+    homeReadingProgress.value = prepareDailyReadingProgress(saved, localReadingDate());
+  } catch {
+    homeReadingProgress.value = createDailyReadingProgress();
+  }
+}
 const homeProgressItems = computed(() => {
   const totals = appStore.statisticsSnapshots.reduce((summary, snapshot) => ({
     listeningSeconds: summary.listeningSeconds + (snapshot.listeningSeconds ?? 0),
@@ -1313,6 +1323,8 @@ const homeProgressItems = computed(() => {
   ]);
   const completedLessons = [...lessonKeys].filter((key) => lessonProgressState(key) === 'completed').length;
   const lessonTotal = lessonKeys.size;
+  const wordsRead = dailyWordsRead(homeReadingProgress.value);
+  const readingTarget = dailyReadingTargetWords(homeReadingProgress.value);
   return [
     {
       icon: 'headphones',
@@ -1321,6 +1333,14 @@ const homeProgressItems = computed(() => {
       total: formatDuration(listeningTotalSeconds),
       remaining: `${formatDuration(Math.max(0, listeningTotalSeconds - listenedSeconds))} left`,
       ratio: listeningTotalSeconds > 0 ? Math.min(1, listenedSeconds / listeningTotalSeconds) : 0,
+    },
+    {
+      icon: 'menu_book',
+      label: 'Reading',
+      done: `${wordsRead.toLocaleString()} words today · ${formatDuration(levelActivity.value.readingSeconds)} reading`,
+      total: `${readingTarget.toLocaleString()} words daily goal`,
+      remaining: `${Math.max(0, readingTarget - wordsRead).toLocaleString()} left`,
+      ratio: readingTarget > 0 ? Math.min(1, wordsRead / readingTarget) : 0,
     },
     {
       icon: 'task_alt',
@@ -1550,6 +1570,7 @@ onMounted(async () => {
   }
   await refreshLessonProgressStates();
   await refreshLevelActivity();
+  refreshHomeReadingProgress();
   await refreshNewLessonCatalog();
   if (!appStore.session && (route.query.training === 'listening' || route.query.training === 'speaking')) {
     await openTrainingLibrary(route.query.training);
@@ -1562,6 +1583,7 @@ onMounted(async () => {
   window.addEventListener('mentor-ai:prepare-app-update', handlePrepareAppUpdate);
   window.addEventListener('mentor-content-engagement', handleLessonEngagementChange);
   window.addEventListener('mentor-learning-activity-updated', refreshLevelActivity);
+  window.addEventListener('focus', refreshHomeReadingProgress);
 });
 
 onUnmounted(() => {
@@ -1575,6 +1597,7 @@ onUnmounted(() => {
   window.removeEventListener('mentor-ai:prepare-app-update', handlePrepareAppUpdate);
   window.removeEventListener('mentor-content-engagement', handleLessonEngagementChange);
   window.removeEventListener('mentor-learning-activity-updated', refreshLevelActivity);
+  window.removeEventListener('focus', refreshHomeReadingProgress);
 });
 
 async function refreshLevelActivity() { levelActivity.value = await loadLearningActivityTotals(); }

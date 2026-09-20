@@ -22,6 +22,15 @@ describe('level journey forecast', () => {
     assert.equal((faster.daysRemaining ?? Infinity) < (slower.daysRemaining ?? Infinity), true);
   });
 
+  it('counts personal reading time toward level growth', () => {
+    const now = new Date('2026-09-04T12:00:00Z');
+    const baseline = calculateLevelJourney(initialStudentModel, emptyActivity, [], now);
+    const reading = calculateLevelJourney(initialStudentModel, {
+      ...emptyActivity, readingSeconds: 10 * 3_600, totalSeconds: 10 * 3_600, updatedAt: now.toISOString(),
+    }, [], now);
+    assert.ok(reading.progressPercent > baseline.progressPercent);
+  });
+
   it('stops projecting days after a week without activity', () => {
     const journey = calculateLevelJourney(initialStudentModel, {
       ...emptyActivity, totalSeconds: 20 * 3_600, listeningSeconds: 20 * 3_600, updatedAt: '2026-08-20T12:00:00Z',
