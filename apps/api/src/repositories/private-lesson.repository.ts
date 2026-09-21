@@ -89,7 +89,7 @@ export const privateLessonRepository = {
   },
 
   async findByTemplateKey(templateKey: string): Promise<GeneratedLesson | null> {
-    return (await this.findAll()).find((lesson) => lesson.lessonTemplateKey === templateKey) ?? null;
+    return (await this.findAll()).find((lesson) => matchesLessonCatalogKey(lesson, templateKey)) ?? null;
   },
 
   async findNextForStudent(model: StudentModel, completedLessonIds: Set<string>): Promise<GeneratedLesson | null> {
@@ -152,6 +152,10 @@ export const privateLessonRepository = {
     return { importedCount: lessons.length };
   },
 };
+
+export function matchesLessonCatalogKey(lesson: Pick<GeneratedLesson, 'id' | 'lessonTemplateKey'>, key: string): boolean {
+  return (lesson.lessonTemplateKey ?? lesson.id) === key;
+}
 
 async function statExistingLessonLibrary() {
   try {

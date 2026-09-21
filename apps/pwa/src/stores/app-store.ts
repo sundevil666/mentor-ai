@@ -8,7 +8,6 @@ import {
   demoStudent,
   generateLessonFromPlan,
   initialStudentModel,
-  scoreExercise,
   updateStudentModelFromResults,
   type ActivitySnapshot,
   type DeviceSurface,
@@ -69,6 +68,7 @@ import { findOfflineLesson } from 'src/services/offline-library';
 import { selectRetainedUpdateNotifications } from 'src/services/update-notification-retention';
 import { resolveRestoredLessonSessions } from 'src/services/lesson-session-restoration';
 import { rewindLessonSession } from 'src/services/lesson-step-navigation';
+import { isLessonAnswerReady } from 'src/services/lesson-answer-readiness';
 
 interface LearningSessionState {
   id: string;
@@ -1438,6 +1438,7 @@ function createExerciseResult(
   responseTimeMs: number,
   evidenceId: string,
 ): ExerciseResult {
+  const correct = isLessonAnswerReady(exercise, response, lesson.localEvaluation);
   return {
     id: `result-${exercise.id}-${Date.now()}`,
     studentId,
@@ -1449,17 +1450,17 @@ function createExerciseResult(
     concept: lesson.concept,
     activityType: lesson.activityType,
     conceptLevel: lesson.conceptLevel,
-    correct: scoreExercise(exercise, response),
+    correct,
     attempts: 1,
     responseTimeMs,
     hintCount: 0,
     skipped: response.trim().length === 0,
     abandoned: false,
     repeatedMistake: false,
-    readingComprehensionScore: lesson.concept === 'reading' ? (scoreExercise(exercise, response) ? 1 : 0) : undefined,
-    unknownWords: lesson.concept === 'reading' && !scoreExercise(exercise, response) ? ['cafe'] : [],
+    readingComprehensionScore: lesson.concept === 'reading' ? (correct ? 1 : 0) : undefined,
+    unknownWords: lesson.concept === 'reading' && !correct ? ['cafe'] : [],
     vocabularyRecallStatus:
-      lesson.concept === 'vocabulary' ? (scoreExercise(exercise, response) ? 'recalled' : 'fragile') : undefined,
+      lesson.concept === 'vocabulary' ? (correct ? 'recalled' : 'fragile') : undefined,
     teacherDecision: lesson.teacherDecision.levelDecision,
     reasonForLevelDecision: lesson.teacherDecision.reason,
     lastPracticedAt: completedAt,

@@ -524,7 +524,7 @@ const router = useRouter();
 const primaryNavigationItems: Array<{
   label: string;
   icon: string;
-  tone: 'home' | 'listening' | 'speaking' | 'patterns' | 'audio' | 'stories';
+  tone: 'home' | 'grammar' | 'listening' | 'speaking' | 'patterns' | 'audio' | 'stories';
   to: RouteLocationRaw;
   isActive: () => boolean;
 }> = [
@@ -534,6 +534,13 @@ const primaryNavigationItems: Array<{
     tone: 'home',
     to: { name: 'dashboard', query: { training: 'home' } },
     isActive: () => route.name === 'dashboard' && activeDashboardTraining.value === undefined,
+  },
+  {
+    label: 'Grammar',
+    icon: 'spellcheck',
+    tone: 'grammar',
+    to: { name: 'dashboard', query: { training: 'grammar' } },
+    isActive: () => route.name === 'dashboard' && activeDashboardTraining.value === 'grammar',
   },
   {
     label: 'Listen',

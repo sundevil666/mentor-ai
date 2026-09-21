@@ -14,11 +14,12 @@ export function getLessonExerciseNavigation(
   repeatedLesson: boolean,
   currentExerciseIndex: number,
   completionReady: boolean,
+  requireCompletion = false,
 ) {
   return {
     showPrevious: repeatedLesson,
     previousDisabled: currentExerciseIndex <= 0,
     nextLabel: repeatedLesson ? 'Next' : 'Continue',
-    nextDisabled: !repeatedLesson && !completionReady,
+    nextDisabled: (!repeatedLesson || requireCompletion) && !completionReady,
   } as const;
 }

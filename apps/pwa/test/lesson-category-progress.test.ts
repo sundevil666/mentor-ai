@@ -4,7 +4,9 @@ import type { GeneratedLesson } from '@mentor-ai/shared';
 import {
   buildGeneratedLessonLinks,
   buildLessonCategoryProgress,
+  generatedLessonCategory,
   generatedLessonMode,
+  mergeAvailableLessonCatalog,
   sortGeneratedLessonsNewestFirst,
   type LessonProgressState,
 } from '../src/services/lesson-category-progress.js';
@@ -29,6 +31,14 @@ describe('lesson category progress', () => {
     );
   });
 
+  it('keeps an active or downloaded older lesson visible when the server catalog is unavailable', () => {
+    const cached = { id: 'older-grammar', createdAt: '2026-07-01T10:00:00.000Z' } as GeneratedLesson;
+    const active = { id: 'active-grammar', createdAt: '2026-09-21T10:00:00.000Z' } as GeneratedLesson;
+    assert.deepEqual(mergeAvailableLessonCatalog([], [cached], active, []).map((lesson) => lesson.id), [
+      'older-grammar', 'active-grammar',
+    ]);
+  });
+
   it('puts generated lessons into the category represented by their exercises', () => {
     const speakingLesson = {
       targetSkills: ['grammar', 'review'],
@@ -44,10 +54,17 @@ describe('lesson category progress', () => {
 
     assert.equal(generatedLessonMode(speakingLesson), 'speaking');
     assert.equal(generatedLessonMode(listeningLesson), 'listening');
-    assert.equal(generatedLessonMode({ targetSkills: ['grammar'], exercises: [] } as unknown as GeneratedLesson), 'speaking');
+    assert.equal(generatedLessonCategory({ targetSkills: ['grammar'], exercises: [] } as unknown as GeneratedLesson), 'grammar');
+    assert.equal(generatedLessonCategory({
+      targetSkills: ['grammar', 'review'],
+      exercises: [
+        { type: 'word-order', targetSkill: 'grammar' },
+        { type: 'dialogue-translation', targetSkill: 'speaking' },
+      ],
+    } as GeneratedLesson), 'grammar');
   });
 
-  it('gives every generated lesson a Home link to its actual Listen or Speak category', () => {
+  it('gives every generated lesson a Home link to its actual Grammar, Listen, or Speak category', () => {
     const catalog = [
       {
         id: 'spoken-conditional', lessonTemplateKey: 'conditional-lesson', title: 'Conditional practice',
@@ -68,20 +85,22 @@ describe('lesson category progress', () => {
 
     const homeLinks = buildGeneratedLessonLinks(catalog);
     const categoryLinks = {
-      listening: homeLinks.filter((lesson) => lesson.mode === 'listening'),
-      speaking: homeLinks.filter((lesson) => lesson.mode === 'speaking'),
+      grammar: homeLinks.filter((lesson) => lesson.category === 'grammar'),
+      listening: homeLinks.filter((lesson) => lesson.category === 'listening'),
+      speaking: homeLinks.filter((lesson) => lesson.category === 'speaking'),
     };
 
-    assert.deepEqual(homeLinks.map(({ templateKey, mode }) => [templateKey, mode]), [
+    assert.deepEqual(homeLinks.map(({ templateKey, category }) => [templateKey, category]), [
       ['conditional-lesson', 'speaking'],
       ['listening-lesson', 'listening'],
-      ['grammar-lesson', 'speaking'],
+      ['grammar-lesson', 'grammar'],
     ]);
+    assert.equal(homeLinks.find((lesson) => lesson.templateKey === 'grammar-lesson')?.mode, 'home');
     assert.deepEqual(
       homeLinks.map((lesson) => lesson.templateKey).sort(),
-      [...categoryLinks.listening, ...categoryLinks.speaking].map((lesson) => lesson.templateKey).sort(),
+      [...categoryLinks.grammar, ...categoryLinks.listening, ...categoryLinks.speaking].map((lesson) => lesson.templateKey).sort(),
     );
-    assert.equal(homeLinks.some((lesson) => (lesson.mode as string) === 'home'), false);
+    assert.equal(homeLinks.some((lesson) => (lesson.category as string) === 'home'), false);
   });
 
   it('distinguishes started, partially completed, and fully completed categories', () => {

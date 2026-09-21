@@ -2,9 +2,14 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { learningStateService, selectMasteredLessonIds } from '../dist/services/learning-state.service.js';
-import { parsePrivateLessonFallback } from '../dist/repositories/private-lesson.repository.js';
+import { matchesLessonCatalogKey, parsePrivateLessonFallback } from '../dist/repositories/private-lesson.repository.js';
 
 describe('learning state service', () => {
+  it('opens a catalog lesson by its ID when it has no template key', () => {
+    assert.equal(matchesLessonCatalogKey({ id: 'grammar-lesson' }, 'grammar-lesson'), true);
+    assert.equal(matchesLessonCatalogKey({ id: 'grammar-lesson' }, 'another-lesson'), false);
+    assert.equal(matchesLessonCatalogKey({ id: 'grammar-lesson', lessonTemplateKey: 'grammar-template' }, 'grammar-template'), true);
+  });
   it('reads valid private lessons from the protected environment fallback', () => {
     const lesson = {
       id: 'private-fallback-1', title: 'Fallback lesson', concept: 'learning', exercises: [], localEvaluation: [],

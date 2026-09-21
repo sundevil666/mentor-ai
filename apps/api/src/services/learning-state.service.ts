@@ -493,7 +493,7 @@ function summarizeLearningActivity(
 }
 
 function isLessonSuitableForContext(lesson: GeneratedLesson, context: LearningContext): boolean {
-  if (context.lessonTemplateKey && lesson.lessonTemplateKey !== context.lessonTemplateKey) {
+  if (context.lessonTemplateKey && (lesson.lessonTemplateKey ?? lesson.id) !== context.lessonTemplateKey) {
     return false;
   }
 

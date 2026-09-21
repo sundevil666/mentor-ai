@@ -62,7 +62,7 @@
 
           <article class="priority-link">
             <button type="button" class="priority-link__main" @click="startRecommendedHomeLesson">
-              <q-icon :name="recommendedHomeLesson.mode === 'listening' ? 'headphones' : 'record_voice_over'" size="26px" />
+              <q-icon :name="lessonCategoryIcon(recommendedHomeLesson.category)" size="26px" />
               <span>
                 <small>{{ recommendedHomeLesson.skillLabel }} · {{ recommendedPausedLesson ? 'Continue · ' + lessonSessionProgress(recommendedPausedLesson) + '%' : (isRecommendedLessonPinned ? 'Pinned lesson' : 'Do this first') + ' · ' + recommendedHomeLesson.minutes + ' min' }}</small>
                 <strong>{{ recommendedHomeLesson.title }}</strong>
@@ -91,9 +91,9 @@
             class="priority-link priority-link--resume"
           >
             <button type="button" class="priority-link__main" @click="resumePausedLesson(pausedLesson.id)">
-              <q-icon name="history" size="26px" />
+              <q-icon :name="lessonCategoryIcon(generatedLessonCategory(pausedLesson.lesson))" size="26px" />
               <span>
-                <small>{{ pausedLesson.context.mode === 'listening' ? 'Listening' : 'Speaking' }} · Continue where you stopped · {{ lessonSessionProgress(pausedLesson) }}%</small>
+                <small>{{ lessonCategoryLabel(generatedLessonCategory(pausedLesson.lesson)) }} · Continue where you stopped · {{ lessonSessionProgress(pausedLesson) }}%</small>
                 <strong>{{ pausedLesson.lesson.title }}</strong>
               </span>
               <q-icon name="arrow_forward" size="24px" />
@@ -120,7 +120,7 @@
               class="home-generated-links__item"
               @click="startHomeLesson(lesson)"
             >
-              <q-icon :name="lesson.mode === 'listening' ? 'headphones' : 'record_voice_over'" size="20px" />
+              <q-icon :name="lessonCategoryIcon(lesson.category)" size="20px" />
               <span><small>{{ lesson.skillLabel }}</small><strong>{{ lesson.title }}</strong></span>
               <q-icon name="arrow_forward" size="20px" />
             </button>
@@ -199,6 +199,7 @@
             >
               <q-tooltip>{{ lessonBackLabel }}</q-tooltip>
             </q-btn>
+            <span class="lesson-nav__category">{{ lessonCategoryLabel(generatedLessonCategory(appStore.session.lesson)) }}</span>
             <div class="lesson-nav__status">
               <span>{{ displayedLessonProgress }}% complete</span>
               <q-btn
@@ -422,6 +423,8 @@
                 v-else
                 v-model="answer"
                 :label="inputLabel"
+                :color="standardAnswerStatus === 'correct' ? 'positive' : undefined"
+                :class="`standard-answer--${standardAnswerStatus}`"
                 outlined
                 autofocus
                 @keyup.enter="submit"
@@ -440,7 +443,7 @@
                   @click="handleLessonBack"
                 />
                 <q-btn
-                  color="primary"
+                  :color="standardAnswerStatus === 'correct' ? 'positive' : 'primary'"
                   :label="exerciseNavigation.nextLabel"
                   unelevated
                   :disable="exerciseNavigation.nextDisabled"
@@ -688,7 +691,7 @@
 import type { GeneratedLesson, LearningActivityTotals, LearningContext, PreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { synchronizeDashboardLessonRoute } from 'src/services/navigation-category';
+import { synchronizeDashboardLessonRoute, type DashboardTrainingCategory } from 'src/services/navigation-category';
 import {
   chooseRecommendedTraining,
   createCurrentActivitySuggestion,
@@ -751,16 +754,20 @@ import {
   isOfflineSpeechLessonUpdateAvailable,
   markOfflineLessonOpened,
   readOfflineLessons,
+  readOfflineGeneratedLessons,
   registerOfflineSpeechLesson,
   replaceOfflineSpeechLesson,
 } from 'src/services/offline-library';
 import { fetchCurrentLesson } from 'src/services/api-client';
-import { fetchNewLessonCatalog } from 'src/services/offline-lesson-updates';
+import { downloadGeneratedLessonOffline, fetchNewLessonCatalog } from 'src/services/offline-lesson-updates';
 import {
   buildGeneratedLessonLinks,
+  generatedLessonCategory,
   generatedLessonMode,
+  mergeAvailableLessonCatalog,
   type LessonProgressState,
 } from 'src/services/lesson-category-progress';
+import { isLessonAnswerReady, requiresExactLessonAnswer } from 'src/services/lesson-answer-readiness';
 import { loadLearningActivityTotals } from 'src/services/learning-activity';
 import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { audioLibrary } from 'src/services/audio-library';
@@ -798,10 +805,10 @@ type ListeningSentenceItem = {
   startWordIndex: number;
   endWordIndex: number;
 };
-type TrainingLibraryKey = 'home' | 'listening' | 'speaking';
+type TrainingLibraryKey = 'home' | DashboardTrainingCategory;
 type LessonReturnDestination = TrainingLibraryKey | 'specific-lessons';
-type TrainingLibraryLesson = LessonChoice & { mode: 'listening' | 'speaking'; minutes: number };
-type HomeLesson = TrainingLibraryLesson & { skillLabel: string };
+type TrainingLibraryLesson = LessonChoice & { mode: 'home' | 'listening' | 'speaking'; minutes: number; concept?: GeneratedLesson['concept'] };
+type HomeLesson = TrainingLibraryLesson & { category: DashboardTrainingCategory; skillLabel: string };
 type PendingLessonUpdate = {
   choice: TrainingLibraryLesson;
   context: LearningContext;
@@ -837,6 +844,11 @@ const currentLessonFeedbackContentId = computed(() => (
 const lessonEngagementSummaries = ref(new Map<string, ContentEngagementSummary>());
 const libraryDownloadStatus = ref<Record<string, 'idle' | 'checking' | 'downloading' | 'ready' | 'error'>>({});
 const newLessonCatalog = ref<GeneratedLesson[]>([]);
+watch(() => appStore.session?.lesson, (lesson) => {
+  if (lesson && !newLessonCatalog.value.some((candidate) => candidate.id === lesson.id)) {
+    newLessonCatalog.value = [...newLessonCatalog.value, lesson];
+  }
+});
 const showLessonUpdateDialog = ref(false);
 const isLessonUpdateInstalling = ref(false);
 const lessonUpdateError = ref('');
@@ -956,13 +968,27 @@ const isRepeatedLesson = computed(() => canFinishRepeatedLesson(
   appStore.session?.lesson.lessonTemplateKey,
   lessonCompletionCounts.value,
 ));
+const standardAnswerReady = computed(() => Boolean(currentExercise.value && isLessonAnswerReady(
+  currentExercise.value,
+  answer.value,
+  appStore.session?.lesson.localEvaluation ?? [],
+)));
+const standardAnswerRequiresMatch = computed(() => Boolean(currentExercise.value && requiresExactLessonAnswer(
+  currentExercise.value,
+  appStore.session?.lesson.localEvaluation ?? [],
+)));
+const standardAnswerStatus = computed(() => {
+  if (isDialogueTranslationExercise.value || isListeningPlayer.value || !standardAnswerRequiresMatch.value || !answer.value.trim()) return 'idle';
+  return standardAnswerReady.value ? 'correct' : 'incorrect';
+});
 const exerciseNavigation = computed(() => getLessonExerciseNavigation(
   isRepeatedLesson.value,
   appStore.session?.currentExerciseIndex ?? 0,
   isListeningPlayer.value
     || (isDialogueTranslationExercise.value
       ? dialogueAnswerStatus.value === 'correct'
-      : answer.value.trim().length > 0),
+      : standardAnswerReady.value),
+  isDialogueTranslationExercise.value || standardAnswerRequiresMatch.value,
 ));
 const localSpeechRecognitionAvailable = computed(() => (
   typeof navigator !== 'undefined'
@@ -1137,12 +1163,18 @@ const remoteContinueOptions = computed(() =>
     detail: `${handoff.lesson.title} · ${Math.min(handoff.currentExerciseIndex + 1, handoff.lesson.exercises.length)}/${handoff.lesson.exercises.length}`,
   })),
 );
-const trainingLibraries: Record<'listening' | 'speaking', {
+const trainingLibraries: Record<DashboardTrainingCategory, {
   label: string;
   title: string;
   icon: string;
   lessons: TrainingLibraryLesson[];
 }> = {
+  grammar: {
+    label: 'Grammar',
+    title: 'Grammar lessons',
+    icon: 'spellcheck',
+    lessons: [],
+  },
   listening: {
     label: 'Listen',
     title: 'Listening lessons',
@@ -1164,15 +1196,17 @@ const trainingLibraries: Record<'listening' | 'speaking', {
 };
 const generatedHomeLessons = computed<HomeLesson[]>(() => buildGeneratedLessonLinks(newLessonCatalog.value));
 const lessonsByTrainingCategory = computed(() => ({
-  listening: [...generatedHomeLessons.value.filter((lesson) => lesson.mode === 'listening'), ...trainingLibraries.listening.lessons],
-  speaking: [...generatedHomeLessons.value.filter((lesson) => lesson.mode === 'speaking'), ...trainingLibraries.speaking.lessons],
+  grammar: generatedHomeLessons.value.filter((lesson) => lesson.category === 'grammar'),
+  listening: [...generatedHomeLessons.value.filter((lesson) => lesson.category === 'listening'), ...trainingLibraries.listening.lessons],
+  speaking: [...generatedHomeLessons.value.filter((lesson) => lesson.category === 'speaking'), ...trainingLibraries.speaking.lessons],
 }));
-const activeTrainingLibrary = computed(() => selectedLessonLibrary.value === 'speaking'
-  ? { ...trainingLibraries.speaking, lessons: lessonsByTrainingCategory.value.speaking }
-  : { ...trainingLibraries.listening, lessons: lessonsByTrainingCategory.value.listening });
+const activeTrainingLibrary = computed(() => {
+  const category = selectedLessonLibrary.value === 'home' ? 'grammar' : selectedLessonLibrary.value;
+  return { ...trainingLibraries[category], lessons: lessonsByTrainingCategory.value[category] };
+});
 const allHomeLessons = computed<HomeLesson[]>(() => [
-  ...trainingLibraries.listening.lessons.map((lesson) => ({ ...lesson, skillLabel: 'Listening' })),
-  ...trainingLibraries.speaking.lessons.map((lesson) => ({ ...lesson, skillLabel: 'Speaking' })),
+  ...trainingLibraries.listening.lessons.map((lesson) => ({ ...lesson, category: 'listening' as const, skillLabel: 'Listening' })),
+  ...trainingLibraries.speaking.lessons.map((lesson) => ({ ...lesson, category: 'speaking' as const, skillLabel: 'Speaking' })),
   ...generatedHomeLessons.value,
 ]);
 const lessonCompletionCounts = computed(() => {
@@ -1311,6 +1345,7 @@ const homeProgressItems = computed(() => {
 });
 const lessonBackLabel = computed(() => {
   if ((appStore.session?.currentExerciseIndex ?? 0) > 0) return 'Back to previous step';
+  if (lessonReturnDestination.value === 'grammar') return 'Back to Grammar lessons';
   if (lessonReturnDestination.value === 'listening') return 'Back to Listening lessons';
   if (lessonReturnDestination.value === 'speaking') return 'Back to Speaking lessons';
   if (lessonReturnDestination.value === 'specific-lessons') return 'Back to Specific lessons';
@@ -1330,7 +1365,15 @@ function deviceRecommendation(device: PreferredLessonDevice) {
         tooltip: 'iPhone is preferred for convenient listening on the move.',
       };
 }
-async function openTrainingLibrary(library: 'listening' | 'speaking') {
+function lessonCategoryIcon(category: DashboardTrainingCategory) {
+  return trainingLibraries[category].icon;
+}
+
+function lessonCategoryLabel(category: DashboardTrainingCategory) {
+  return trainingLibraries[category].label;
+}
+
+async function openTrainingLibrary(library: DashboardTrainingCategory) {
   if (appStore.session) await returnToLessonChoice();
   selectedLessonLibrary.value = library;
   await refreshLibraryDownloadStatuses(trainingLibraries[library].lessons);
@@ -1340,11 +1383,11 @@ async function openTrainingLibrary(library: 'listening' | 'speaking') {
 async function startLibraryLesson(lesson: TrainingLibraryLesson) {
   const context = createLearningContext(currentSuggestion.value, {
     mode: lesson.mode,
-    selectedConcept: 'learning',
+    selectedConcept: lesson.concept ?? 'learning',
     manualConceptChoice: true,
     lessonTemplateKey: lesson.templateKey,
   });
-  if (navigator.onLine) {
+  if (navigator.onLine && lesson.mode !== 'home') {
     try {
       const freshLesson = await fetchCurrentLesson(context, true);
       const speechTexts = getLessonOfflineSpeechTexts(freshLesson.exercises);
@@ -1364,7 +1407,7 @@ async function startLibraryLesson(lesson: TrainingLibraryLesson) {
 
 async function beginLibraryLesson(lesson: TrainingLibraryLesson, context: LearningContext) {
   recordLessonStart(lesson.templateKey);
-  markOfflineLessonOpened(lesson.templateKey, lesson.mode);
+  markOfflineLessonOpened(lesson.templateKey, lesson.mode === 'home' ? 'lessons' : lesson.mode);
   lessonReturnDestination.value = selectedLessonLibrary.value;
   answer.value = '';
   setForwardTransition();
@@ -1375,6 +1418,7 @@ async function beginLibraryLesson(lesson: TrainingLibraryLesson, context: Learni
 async function installPendingLessonUpdate() {
   const pending = pendingLessonUpdate.value;
   if (!pending || isLessonUpdateInstalling.value) return;
+  if (pending.choice.mode === 'home') return;
   isLessonUpdateInstalling.value = true;
   lessonUpdateError.value = '';
   try {
@@ -1402,10 +1446,15 @@ async function downloadLibraryLesson(lesson: TrainingLibraryLesson) {
   try {
     const generatedLesson = await appStore.loadLesson(createLearningContext(currentSuggestion.value, {
       mode: lesson.mode,
-      selectedConcept: 'learning',
+      selectedConcept: lesson.concept ?? 'learning',
       manualConceptChoice: true,
       lessonTemplateKey: lesson.templateKey,
     }), new Date().toISOString());
+    if (lesson.mode === 'home') {
+      await downloadGeneratedLessonOffline(generatedLesson);
+      libraryDownloadStatus.value[lesson.templateKey] = 'ready';
+      return;
+    }
     const texts = getLessonOfflineSpeechTexts(generatedLesson.exercises);
     const result = await preloadSpeechBatch(texts);
     libraryDownloadStatus.value[lesson.templateKey] = result.failed === 0 ? 'ready' : 'error';
@@ -1423,10 +1472,16 @@ async function refreshLibraryDownloadStatuses(lessons: TrainingLibraryLesson[]) 
     try {
       const generatedLesson = await appStore.loadLesson(createLearningContext(currentSuggestion.value, {
         mode: lesson.mode,
-        selectedConcept: 'learning',
+        selectedConcept: lesson.concept ?? 'learning',
         manualConceptChoice: true,
         lessonTemplateKey: lesson.templateKey,
       }), new Date().toISOString());
+      if (lesson.mode === 'home') {
+        libraryDownloadStatus.value[lesson.templateKey] = readOfflineLessons().some(
+          (item) => item.id === generatedLesson.id && item.category === 'lessons',
+        ) ? 'ready' : 'idle';
+        return;
+      }
       const texts = getLessonOfflineSpeechTexts(generatedLesson.exercises);
       const ready = await isSpeechBatchCached(texts);
       libraryDownloadStatus.value[lesson.templateKey] = ready ? 'ready' : 'idle';
@@ -1468,11 +1523,19 @@ function libraryDownloadIcon(templateKey: string) {
 }
 
 async function refreshNewLessonCatalog() {
+  let fetched: GeneratedLesson[] = [];
   try {
-    newLessonCatalog.value = await fetchNewLessonCatalog();
+    fetched = await fetchNewLessonCatalog();
   } catch {
-    newLessonCatalog.value = [];
+    // Previously downloaded lessons still belong in their categories while offline.
   }
+  const cached = await readOfflineGeneratedLessons().catch(() => []);
+  newLessonCatalog.value = mergeAvailableLessonCatalog(
+    fetched,
+    cached,
+    appStore.session?.lesson ?? null,
+    appStore.pausedSessions.map((session) => session.lesson),
+  );
 }
 
 onMounted(async () => {
@@ -1483,7 +1546,9 @@ onMounted(async () => {
   await refreshLevelActivity();
   refreshHomeReadingProgress();
   await refreshNewLessonCatalog();
-  if (!appStore.session && (route.query.training === 'listening' || route.query.training === 'speaking')) {
+  if (appStore.session) {
+    await syncActiveLessonNavigation();
+  } else if (route.query.training === 'grammar' || route.query.training === 'listening' || route.query.training === 'speaking') {
     await openTrainingLibrary(route.query.training);
   }
 
@@ -1516,8 +1581,8 @@ async function refreshLevelActivity() { levelActivity.value = await loadLearning
 watch(
   () => route.query.training,
   (training) => {
-    if (training === 'listening' || training === 'speaking') {
-      if (appStore.session?.context.mode === training) {
+    if (training === 'grammar' || training === 'listening' || training === 'speaking') {
+      if (appStore.session && generatedLessonCategory(appStore.session.lesson) === training) {
         selectedLessonLibrary.value = training;
         return;
       }
@@ -1678,7 +1743,7 @@ async function continueFromDevice(handoffId: string) {
 
 async function syncActiveLessonNavigation() {
   const training = await synchronizeDashboardLessonRoute(
-    appStore.session?.context.mode,
+    appStore.session ? generatedLessonCategory(appStore.session.lesson) : undefined,
     route.query.training,
     async (nextTraining) => {
       await router.replace({
@@ -1692,6 +1757,7 @@ async function syncActiveLessonNavigation() {
 }
 
 async function submit() {
+  if (exerciseNavigation.value.nextDisabled) return;
   if (answer.value.trim().length === 0) {
     if (!isRepeatedLesson.value) return;
     answer.value = currentExercise.value?.expectedResponse?.trim() ?? 'completed';
@@ -2354,6 +2420,9 @@ async function returnToLessonChoice(destination?: LessonReturnDestination) {
   await appStore.returnToLessonChoice();
   selectedLessonLibrary.value = returnDestination === 'specific-lessons' ? 'home' : returnDestination;
   isLessonLibraryVisible.value = returnDestination === 'specific-lessons';
+  if (route.query.training !== selectedLessonLibrary.value) {
+    await router.replace({ name: 'dashboard', query: { ...route.query, training: selectedLessonLibrary.value } });
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 

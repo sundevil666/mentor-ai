@@ -25,6 +25,19 @@ describe('offline lesson retention', () => {
     assert.equal(selectOfflineLesson(lessons, { ...context, lessonTemplateKey: 'polite-speaking' })?.lessonTemplateKey, 'polite-speaking');
   });
 
+  it('opens a grammar lesson by ID from its category while offline', () => {
+    const grammar = {
+      id: 'grammar-correction', concept: 'learning', lessonTemplateKey: undefined,
+      createdAt: '2026-09-21T10:00:00.000Z',
+      exercises: [{ id: 'fix', type: 'word-order', targetSkill: 'grammar' }],
+    } as GeneratedLesson;
+    const context: LearningContext = {
+      mode: 'home', selectedConcept: 'learning', lessonTemplateKey: 'grammar-correction',
+      isOffline: true, speechAvailable: false, availableMinutes: 8,
+    };
+    assert.equal(selectOfflineLesson([grammar], context)?.id, 'grammar-correction');
+  });
+
   it('selects lessons that were not opened within their category period', () => {
     const now = Date.parse('2026-08-23T12:00:00.000Z');
     const lessons: OfflineLesson[] = [

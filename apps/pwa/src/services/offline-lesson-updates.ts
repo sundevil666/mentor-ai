@@ -60,8 +60,7 @@ export function prioritizeNewLessons(lessons: GeneratedLesson[]) {
 }
 
 export async function fetchNewLessonCatalog() {
-  const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
-  return prioritizeNewLessons(await fetchOfflineLessons(since));
+  return prioritizeNewLessons(await fetchOfflineLessons(new Date(0).toISOString()));
 }
 
 export async function downloadGeneratedLessonOffline(lesson: GeneratedLesson) {

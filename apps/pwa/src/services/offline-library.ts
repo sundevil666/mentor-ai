@@ -103,6 +103,10 @@ export async function findOfflineLesson(context: LearningContext): Promise<Gener
   if (match) markOfflineLessonOpened(match.id, 'lessons');
   return match;
 }
+export async function readOfflineGeneratedLessons(): Promise<GeneratedLesson[]> {
+  const db = await getMentorDb();
+  return (await db.getAll('lessons')) as GeneratedLesson[];
+}
 export function selectOfflineLesson(lessons: GeneratedLesson[], context: LearningContext): GeneratedLesson | null {
   const matchesMode = (lesson: GeneratedLesson) => context.mode === 'listening'
     ? lesson.exercises.some((exercise) => exercise.targetSkill === 'listening' || exercise.type === 'listening-text')
@@ -111,9 +115,9 @@ export function selectOfflineLesson(lessons: GeneratedLesson[], context: Learnin
       : true;
   return lessons
     .filter((lesson) => (
-      (!context.lessonTemplateKey || lesson.lessonTemplateKey === context.lessonTemplateKey)
+      (!context.lessonTemplateKey || (lesson.lessonTemplateKey ?? lesson.id) === context.lessonTemplateKey)
       && (!context.selectedConcept || lesson.concept === context.selectedConcept)
-      && matchesMode(lesson)
+      && (Boolean(context.lessonTemplateKey) || matchesMode(lesson))
     ))
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] ?? null;
 }

@@ -59,10 +59,18 @@ describe('dashboard navigation category', () => {
     const listening = await synchronizeDashboardLessonRoute('listening', 'home', async (training) => {
       replacements.push(training);
     });
+    const grammar = await synchronizeDashboardLessonRoute('grammar', 'home', async (training) => {
+      replacements.push(training);
+    });
 
     assert.equal(speaking, 'speaking');
     assert.equal(listening, 'listening');
-    assert.deepEqual(replacements, ['speaking', 'listening']);
+    assert.equal(grammar, 'grammar');
+    assert.deepEqual(replacements, ['speaking', 'listening', 'grammar']);
+  });
+
+  it('keeps Grammar as a category even when the lesson uses the internal home mode', () => {
+    assert.equal(resolveDashboardTrainingCategory('grammar', 'home'), 'grammar');
   });
 
   it('does not replace an already matching lesson category route', async () => {

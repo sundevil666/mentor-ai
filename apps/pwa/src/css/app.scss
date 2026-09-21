@@ -60,6 +60,7 @@ body.body--dark {
 }
 
 .category-theme--home { --category-accent: #008b7a; --category-soft: #ddf7f0; --category-border: #87d9c8; --category-glow: #28d7bd; --category-image: url('/category-backgrounds/home.webp'); }
+.category-theme--grammar { --category-accent: #7155b9; --category-soft: #eee8fa; --category-border: #bca9e4; --category-glow: #9b7de0; --category-image: url('/category-backgrounds/home.webp'); }
 .category-theme--listening { --category-accent: #1769dc; --category-soft: #e3efff; --category-border: #91bdf5; --category-glow: #2d8cff; --category-image: url('/category-backgrounds/listening.webp'); }
 .category-theme--speaking { --category-accent: #d03d70; --category-soft: #ffe5ee; --category-border: #f1a1bd; --category-glow: #ff5f92; --category-image: url('/category-backgrounds/speaking.webp'); }
 .category-theme--patterns { --category-accent: #7340d8; --category-soft: #efe5ff; --category-border: #bea1f1; --category-glow: #9b67ff; --category-image: url('/category-backgrounds/patterns.webp'); }
@@ -67,6 +68,7 @@ body.body--dark {
 .category-theme--stories { --category-accent: #198754; --category-soft: #e1f5e9; --category-border: #8fd3a9; --category-glow: #37c978; --category-image: url('/category-backgrounds/stories.webp'); }
 
 body.body--dark .category-theme--home { --category-accent: #70d7ca; --category-soft: #173c36; --category-border: #356e65; }
+body.body--dark .category-theme--grammar { --category-accent: #c4aff0; --category-soft: #312846; --category-border: #655283; }
 body.body--dark .category-theme--listening { --category-accent: #83b9f1; --category-soft: #182f48; --category-border: #355b7f; }
 body.body--dark .category-theme--speaking { --category-accent: #ee9fba; --category-soft: #412534; --category-border: #744458; }
 body.body--dark .category-theme--patterns { --category-accent: #c3a4ef; --category-soft: #332846; --category-border: #5d4a7b; }
@@ -317,6 +319,14 @@ body .q-menu {
 
 .lesson-nav__status {
   margin-left: auto;
+}
+
+.lesson-nav__category {
+  color: var(--category-accent);
+  font-size: .82rem;
+  font-weight: 800;
+  margin-left: 56px;
+  text-transform: uppercase;
 }
 
 .q-notifications__list--top {
@@ -939,6 +949,14 @@ body .q-menu {
 
 .dialogue-answer--incorrect .q-field__control {
   background: color-mix(in srgb, var(--q-negative) 7%, transparent);
+}
+
+.standard-answer--correct .q-field__control {
+  background: color-mix(in srgb, var(--q-positive) 10%, var(--app-surface));
+}
+
+.standard-answer--correct .q-field__control::before {
+  border-color: var(--q-positive) !important;
 }
 
 .handoff-actions {
@@ -1792,7 +1810,7 @@ body.body--dark .home-progress-item__copy span { color: #cbd5e1; }
   box-shadow: 0 18px 42px rgba(17, 24, 39, 0.16);
   display: grid;
   gap: 6px;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   left: 50%;
   max-width: 520px;
   padding: 8px;
@@ -1827,6 +1845,7 @@ body.body--dark .home-progress-item__copy span { color: #cbd5e1; }
 }
 
 .mobile-start-dock__button--home { --dock-accent: #008b7a; --dock-soft: #ddf7f0; }
+.mobile-start-dock__button--grammar { --dock-accent: #7155b9; --dock-soft: #eee8fa; }
 .mobile-start-dock__button--listening { --dock-accent: #1769dc; --dock-soft: #e3efff; }
 .mobile-start-dock__button--speaking { --dock-accent: #d03d70; --dock-soft: #ffe5ee; }
 .mobile-start-dock__button--patterns { --dock-accent: #7340d8; --dock-soft: #efe5ff; }
@@ -1834,6 +1853,7 @@ body.body--dark .home-progress-item__copy span { color: #cbd5e1; }
 .mobile-start-dock__button--stories { --dock-accent: #198754; --dock-soft: #e1f5e9; }
 
 body.body--dark .mobile-start-dock__button--home { --dock-accent: #70d7ca; --dock-soft: #173c36; }
+body.body--dark .mobile-start-dock__button--grammar { --dock-accent: #c4aff0; --dock-soft: #312846; }
 body.body--dark .mobile-start-dock__button--listening { --dock-accent: #83b9f1; --dock-soft: #182f48; }
 body.body--dark .mobile-start-dock__button--speaking { --dock-accent: #ee9fba; --dock-soft: #412534; }
 body.body--dark .mobile-start-dock__button--patterns { --dock-accent: #c3a4ef; --dock-soft: #332846; }
@@ -4055,7 +4075,7 @@ body.body--dark .personal-reader__lookup-error {
     padding: 8px 8px max(8px, env(safe-area-inset-bottom));
     transform: none;
     width: 100%;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 
   .mobile-start-dock__button {
