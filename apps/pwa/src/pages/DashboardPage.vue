@@ -731,6 +731,7 @@ import {
 } from 'src/services/local-reading-transcriber';
 import {
   chooseBestDialogueTranscript,
+  dialoguePreviewStatus,
   getDialogueExpectedSegments,
   isConfidentDialogueAnswer,
   resolveDialogueExpectedText,
@@ -1741,6 +1742,7 @@ async function recordDialogueAnswer() {
         },
         onProgress: (message) => { speechRecognitionProgress.value = `${message}. Keep this screen open.`; },
         onError: (message) => {
+          if (dialogueAnswerStatus.value === 'correct') return;
           speechRecognitionError.value = message;
           stopDialogueSpeechRecording();
         },
@@ -1772,13 +1774,17 @@ function startDialogueLiveTranscript(recognitionRunId: number) {
   dialogueLiveRecognition = startContinuousSpeechRecognition({
     lang: 'en-US',
     onInterim: (transcript) => {
-      if (recognitionRunId !== dialogueRecognitionRunId) return;
+      if (recognitionRunId !== dialogueRecognitionRunId || dialogueAnswerStatus.value === 'correct') return;
       answer.value = [...finalParts, transcript].filter(Boolean).join(' ').trim();
+      if (dialoguePreviewStatus(answer.value, dialogueExpectedText.value, false) === 'correct') {
+        applyDialogueTranscript(answer.value, recognitionRunId);
+      }
     },
     onFinal: (transcript) => {
-      if (recognitionRunId !== dialogueRecognitionRunId) return;
+      if (recognitionRunId !== dialogueRecognitionRunId || dialogueAnswerStatus.value === 'correct') return;
       finalParts.push(transcript);
       answer.value = finalParts.join(' ').trim();
+      applyDialogueTranscript(answer.value, recognitionRunId);
     },
     onError: () => {
       // Browser recognition is only a low-latency preview. Local Whisper still
@@ -1790,7 +1796,7 @@ function startDialogueLiveTranscript(recognitionRunId: number) {
 }
 
 function applyDialogueTranscript(transcript: string, recognitionRunId: number) {
-  if (recognitionRunId !== dialogueRecognitionRunId || !transcript.trim()) return;
+  if (recognitionRunId !== dialogueRecognitionRunId || !transcript.trim() || dialogueAnswerStatus.value === 'correct') return;
   const expected = dialogueExpectedText.value;
   const bestTranscript = chooseBestDialogueTranscript(answer.value, transcript, expected);
   const matchesExpected = isConfidentDialogueAnswer(bestTranscript, expected);
@@ -1801,6 +1807,9 @@ function applyDialogueTranscript(transcript: string, recognitionRunId: number) {
 }
 
 function stopDialogueSpeechRecording() {
+  if (dialogueAnswerStatus.value === 'idle' && answer.value.trim()) {
+    applyDialogueTranscript(answer.value, dialogueRecognitionRunId);
+  }
   dialogueLiveRecognition?.stop();
   dialogueLiveRecognition = null;
   dialogueLocalTranscriber?.stop();

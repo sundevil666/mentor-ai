@@ -121,6 +121,12 @@ export function isConfidentDialogueAnswer(transcript: string, expected: string):
   return coverage >= (target.length <= 12 ? 1 : 0.9) && extraWords <= 1;
 }
 
+export function dialoguePreviewStatus(transcript: string, expected: string, isFinal: boolean): 'idle' | 'correct' | 'incorrect' {
+  if (!transcript.trim()) return 'idle';
+  if (isConfidentDialogueAnswer(transcript, expected)) return 'correct';
+  return isFinal ? 'incorrect' : 'idle';
+}
+
 export function chooseBestDialogueTranscript(current: string, candidate: string, expected: string): string {
   if (!current.trim()) return candidate.trim();
   const currentScore = dialogueAnswerCoverage(current, expected);

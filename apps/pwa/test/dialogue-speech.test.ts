@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   chooseBestDialogueTranscript,
   dialogueAnswerCoverage,
+  dialoguePreviewStatus,
   getDialogueExpectedSegments,
   isConfidentDialogueAnswer,
   resolveDialogueExpectedText,
@@ -44,6 +45,16 @@ describe('dialogue speech recognition', () => {
       0,
     );
     assert.equal(isConfidentDialogueAnswer('If he was president, he would solve this problem.', expected), false);
+  });
+
+  it('accepts the exact browser transcript shown in the answer field before local transcription finishes', () => {
+    const expected = 'If he were president he would solve this problem';
+    const recognized = 'if he were president he would solve this problem';
+
+    assert.equal(dialoguePreviewStatus(recognized, expected, false), 'correct');
+    assert.equal(dialoguePreviewStatus(recognized, expected, true), 'correct');
+    assert.equal(dialoguePreviewStatus('if he were president', expected, false), 'idle');
+    assert.equal(dialoguePreviewStatus('if he were president', expected, true), 'incorrect');
   });
 
   it('measures expected words without rewarding invented words', () => {
