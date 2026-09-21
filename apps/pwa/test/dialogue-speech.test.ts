@@ -47,6 +47,16 @@ describe('dialogue speech recognition', () => {
     assert.equal(isConfidentDialogueAnswer('If he was president, he would solve this problem.', expected), false);
   });
 
+  it('accepts theater and theatre as the same recognized word without marking the model word wrong', () => {
+    const expected = 'I want this play to be performed in the school theatre';
+    const recognized = 'I want this play to be performed in the school theater';
+
+    assert.equal(dialoguePreviewStatus(recognized, expected, true), 'correct');
+    assert.equal(isConfidentDialogueAnswer(expected, recognized), true);
+    assert.equal(getDialogueExpectedSegments(recognized, expected).filter((segment) => segment.matched === false).length, 0);
+    assert.equal(isConfidentDialogueAnswer('I want this play to be performed in the school cafeteria', expected), false);
+  });
+
   it('accepts the exact browser transcript shown in the answer field before local transcription finishes', () => {
     const expected = 'If he were president he would solve this problem';
     const recognized = 'if he were president he would solve this problem';

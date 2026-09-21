@@ -21,10 +21,13 @@ const numberWords: Record<string, string> = {
   '19': 'nineteen',
   '20': 'twenty',
 };
+const spellingVariants: Record<string, string> = {
+  theatre: 'theater',
+};
 
 function normalizeWord(word: string): string {
   const normalized = word.toLocaleLowerCase('en');
-  return numberWords[normalized] ?? normalized;
+  return numberWords[normalized] ?? spellingVariants[normalized] ?? normalized;
 }
 
 function words(text: string): string[] {
