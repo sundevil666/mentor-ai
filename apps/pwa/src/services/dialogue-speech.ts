@@ -21,8 +21,20 @@ const numberWords: Record<string, string> = {
   '19': 'nineteen',
   '20': 'twenty',
 };
+// Speech recognition can write the same spoken word in either spelling.
 const spellingVariants: Record<string, string> = {
+  analyse: 'analyze',
+  cancelled: 'canceled',
+  centre: 'center',
+  colour: 'color',
+  favourite: 'favorite',
+  grey: 'gray',
+  honour: 'honor',
+  neighbour: 'neighbor',
+  organise: 'organize',
+  realise: 'realize',
   theatre: 'theater',
+  travelling: 'traveling',
 };
 
 function normalizeWord(word: string): string {
@@ -32,6 +44,8 @@ function normalizeWord(word: string): string {
 
 function words(text: string): string[] {
   const expanded = text.toLocaleLowerCase('en')
+    .replace(/\bgonna\b/g, 'going to')
+    .replace(/\bwanna\b/g, 'want to')
     .replace(/\b(he|she|it|that|there|who|what|where|when|why|how)'d\b/g, '$1 would')
     .replace(/\b(i|you|we|they)'d\b/g, '$1 would')
     .replace(/\b(he|she|it|that|there|who|what|where|when|why|how)'s\b/g, '$1 is')

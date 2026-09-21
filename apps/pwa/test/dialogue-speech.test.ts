@@ -57,6 +57,37 @@ describe('dialogue speech recognition', () => {
     assert.equal(isConfidentDialogueAnswer('I want this play to be performed in the school cafeteria', expected), false);
   });
 
+  it('accepts supported regional spellings in both directions for assessment and highlighting', () => {
+    const variants = [
+      ['analyze', 'analyse'],
+      ['canceled', 'cancelled'],
+      ['center', 'centre'],
+      ['color', 'colour'],
+      ['favorite', 'favourite'],
+      ['gray', 'grey'],
+      ['honor', 'honour'],
+      ['neighbor', 'neighbour'],
+      ['organize', 'organise'],
+      ['realize', 'realise'],
+      ['theater', 'theatre'],
+      ['traveling', 'travelling'],
+    ];
+
+    for (const [american, british] of variants) {
+      assert.equal(dialoguePreviewStatus(american!, british!, true), 'correct', `${american}/${british}`);
+      assert.equal(dialoguePreviewStatus(british!, american!, true), 'correct', `${british}/${american}`);
+      assert.deepEqual(getDialogueExpectedSegments(american!, british!), [{ text: british, matched: true }]);
+      assert.deepEqual(getDialogueExpectedSegments(british!, american!), [{ text: american, matched: true }]);
+    }
+  });
+
+  it('accepts common spoken reductions without accepting a different word', () => {
+    assert.equal(isConfidentDialogueAnswer('I wanna go to the theatre', 'I want to go to the theater'), true);
+    assert.equal(isConfidentDialogueAnswer('I am gonna watch the play', 'I am going to watch the play'), true);
+    assert.equal(isConfidentDialogueAnswer('I want to go to the teacher', 'I want to go to the theater'), false);
+    assert.equal(isConfidentDialogueAnswer('If he where president', 'If he were president'), false);
+  });
+
   it('accepts the exact browser transcript shown in the answer field before local transcription finishes', () => {
     const expected = 'If he were president he would solve this problem';
     const recognized = 'if he were president he would solve this problem';
