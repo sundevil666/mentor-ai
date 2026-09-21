@@ -64,7 +64,7 @@
             <button type="button" class="priority-link__main" @click="startRecommendedHomeLesson">
               <q-icon :name="recommendedHomeLesson.mode === 'listening' ? 'headphones' : 'record_voice_over'" size="26px" />
               <span>
-                <small>{{ recommendedPausedLesson ? 'Continue · ' + lessonSessionProgress(recommendedPausedLesson) + '%' : (isRecommendedLessonPinned ? 'Pinned lesson' : 'Do this first') + ' · ' + recommendedHomeLesson.minutes + ' min' }}</small>
+                <small>{{ recommendedHomeLesson.skillLabel }} · {{ recommendedPausedLesson ? 'Continue · ' + lessonSessionProgress(recommendedPausedLesson) + '%' : (isRecommendedLessonPinned ? 'Pinned lesson' : 'Do this first') + ' · ' + recommendedHomeLesson.minutes + ' min' }}</small>
                 <strong>{{ recommendedHomeLesson.title }}</strong>
               </span>
               <q-icon name="arrow_forward" size="24px" />
@@ -93,7 +93,7 @@
             <button type="button" class="priority-link__main" @click="resumePausedLesson(pausedLesson.id)">
               <q-icon name="history" size="26px" />
               <span>
-                <small>Continue where you stopped · {{ lessonSessionProgress(pausedLesson) }}%</small>
+                <small>{{ pausedLesson.context.mode === 'listening' ? 'Listening' : 'Speaking' }} · Continue where you stopped · {{ lessonSessionProgress(pausedLesson) }}%</small>
                 <strong>{{ pausedLesson.lesson.title }}</strong>
               </span>
               <q-icon name="arrow_forward" size="24px" />
@@ -111,50 +111,6 @@
             </div>
           </article>
 
-          <section class="new-lessons" aria-labelledby="new-lessons-title">
-            <div class="new-lessons__heading">
-              <div>
-                <p class="learning-start__eyebrow">Personal practice</p>
-                <h2 id="new-lessons-title">New lessons</h2>
-              </div>
-              <span>{{ newLessonCatalog.length }}</span>
-            </div>
-            <p v-if="newLessonCatalog.length === 0" class="new-lessons__empty">
-              New lessons are temporarily unavailable. The app will retry automatically.
-            </p>
-            <article
-              v-for="lesson in newLessonCatalog"
-              :key="lesson.id"
-              class="new-lesson-link"
-              :class="{ 'new-lesson-link--first': lesson.doFirst }"
-            >
-              <button type="button" class="new-lesson-link__main" @click="startNewLesson(lesson)">
-                <q-icon :name="lesson.doFirst ? 'priority_high' : 'school'" size="24px" />
-                <span>
-                  <small>{{ lesson.doFirst ? 'Do this first' : `Priority ${lesson.priority ?? 0}` }} · {{ lesson.estimatedMinutes }} min</small>
-                  <strong>{{ lesson.title }}</strong>
-                  <span>{{ lesson.purpose }}</span>
-                </span>
-                <q-icon name="arrow_forward" size="22px" />
-              </button>
-              <div class="new-lesson-link__offline">
-                <q-icon :name="newLessonOfflineStatus[lesson.id] === 'ready' ? 'offline_pin' : 'cloud_queue'" />
-                <span>{{ newLessonOfflineLabel(lesson.id) }}</span>
-                <q-btn
-                  :aria-label="newLessonOfflineStatus[lesson.id] === 'ready' ? `Remove ${lesson.title} from offline storage` : `Download ${lesson.title} offline`"
-                  :color="newLessonOfflineStatus[lesson.id] === 'ready' ? 'negative' : 'primary'"
-                  dense
-                  flat
-                  no-caps
-                  :loading="newLessonOfflineStatus[lesson.id] === 'working'"
-                  :icon="newLessonOfflineStatus[lesson.id] === 'ready' ? 'delete_outline' : 'download_for_offline'"
-                  :label="newLessonOfflineStatus[lesson.id] === 'ready' ? undefined : 'Download offline'"
-                  :round="newLessonOfflineStatus[lesson.id] === 'ready'"
-                  @click="toggleNewLessonOffline(lesson)"
-                />
-              </div>
-            </article>
-          </section>
           </template>
 
           <section v-else class="training-library">
@@ -386,7 +342,7 @@
                   />
                   <q-btn
                     class="dialogue-drill__continue"
-                    color="primary"
+                    :color="dialogueAnswerStatus === 'correct' ? 'positive' : 'primary'"
                     :label="exerciseNavigation.nextLabel"
                     unelevated
                     :disable="exerciseNavigation.nextDisabled"
@@ -781,14 +737,9 @@ import {
   readOfflineLessons,
   registerOfflineSpeechLesson,
   replaceOfflineSpeechLesson,
-  removeOfflineLesson,
 } from 'src/services/offline-library';
-import { confirmOfflineRemoval } from 'src/services/offline-removal-confirmation';
 import { fetchCurrentLesson } from 'src/services/api-client';
-import {
-  downloadGeneratedLessonOffline,
-  fetchNewLessonCatalog,
-} from 'src/services/offline-lesson-updates';
+import { fetchNewLessonCatalog } from 'src/services/offline-lesson-updates';
 import {
   generatedLessonMode,
   sortGeneratedLessonsNewestFirst,
@@ -870,7 +821,6 @@ const currentLessonFeedbackContentId = computed(() => (
 const lessonEngagementSummaries = ref(new Map<string, ContentEngagementSummary>());
 const libraryDownloadStatus = ref<Record<string, 'idle' | 'checking' | 'downloading' | 'ready' | 'error'>>({});
 const newLessonCatalog = ref<GeneratedLesson[]>([]);
-const newLessonOfflineStatus = ref<Record<string, 'idle' | 'working' | 'ready' | 'error'>>({});
 const showLessonUpdateDialog = ref(false);
 const isLessonUpdateInstalling = ref(false);
 const lessonUpdateError = ref('');
@@ -1513,57 +1463,11 @@ function libraryDownloadIcon(templateKey: string) {
 async function refreshNewLessonCatalog() {
   try {
     newLessonCatalog.value = await fetchNewLessonCatalog();
-    const downloadedIds = new Set(readOfflineLessons()
-      .filter((item) => item.category === 'lessons')
-      .map((item) => item.id));
-    for (const lesson of newLessonCatalog.value) {
-      newLessonOfflineStatus.value[lesson.id] = downloadedIds.has(lesson.id) ? 'ready' : 'idle';
-    }
   } catch {
     newLessonCatalog.value = [];
   }
 }
 
-async function toggleNewLessonOffline(lesson: GeneratedLesson) {
-  if (newLessonOfflineStatus.value[lesson.id] === 'working') return;
-  const saved = readOfflineLessons().find((item) => item.id === lesson.id && item.category === 'lessons');
-  if (saved && !(await confirmOfflineRemoval(lesson.title))) return;
-  newLessonOfflineStatus.value[lesson.id] = 'working';
-  try {
-    if (saved) {
-      await removeOfflineLesson(saved);
-      newLessonOfflineStatus.value[lesson.id] = 'idle';
-      return;
-    }
-    await downloadGeneratedLessonOffline(lesson);
-    newLessonOfflineStatus.value[lesson.id] = 'ready';
-  } catch (error) {
-    console.error('New lesson offline action failed.', error);
-    newLessonOfflineStatus.value[lesson.id] = 'error';
-  }
-}
-
-function newLessonOfflineLabel(lessonId: string) {
-  const status = newLessonOfflineStatus.value[lessonId];
-  if (status === 'ready') return 'Available offline';
-  if (status === 'working') return 'Updating offline copy…';
-  if (status === 'error') return 'Offline action failed — try again';
-  return 'Not downloaded';
-}
-
-async function startNewLesson(lesson: GeneratedLesson) {
-  lessonReturnDestination.value = 'home';
-  activeEngagementContentId.value = lesson.lessonTemplateKey ?? lesson.id;
-  recordLessonStart(activeEngagementContentId.value);
-  setForwardTransition();
-  await appStore.startLesson(createLearningContext(currentSuggestion.value, {
-    mode: generatedLessonMode(lesson),
-    selectedConcept: lesson.concept,
-    manualConceptChoice: true,
-    lessonTemplateKey: lesson.lessonTemplateKey,
-  }), true);
-  await syncActiveLessonNavigation();
-}
 onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();

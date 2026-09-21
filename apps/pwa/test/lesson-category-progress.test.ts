@@ -43,6 +43,7 @@ describe('lesson category progress', () => {
 
     assert.equal(generatedLessonMode(speakingLesson), 'speaking');
     assert.equal(generatedLessonMode(listeningLesson), 'listening');
+    assert.equal(generatedLessonMode({ targetSkills: ['grammar'], exercises: [] } as unknown as GeneratedLesson), 'speaking');
   });
 
   it('distinguishes started, partially completed, and fully completed categories', () => {

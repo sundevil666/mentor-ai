@@ -29,7 +29,7 @@ export function generatedLessonMode(lesson: GeneratedLesson): LearningMode {
 
   if (lesson.targetSkills.includes('listening')) return 'listening';
   if (lesson.targetSkills.includes('speaking')) return 'speaking';
-  return 'home';
+  return 'speaking';
 }
 
 export function sortGeneratedLessonsNewestFirst(lessons: GeneratedLesson[]): GeneratedLesson[] {

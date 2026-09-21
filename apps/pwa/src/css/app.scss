@@ -925,7 +925,8 @@ body .q-menu {
 }
 
 .dialogue-answer--correct .q-field__control {
-  background: color-mix(in srgb, var(--q-positive) 7%, transparent);
+  background: color-mix(in srgb, var(--q-positive) 14%, var(--app-surface));
+  box-shadow: 0 0 0 2px var(--q-positive);
 }
 
 .dialogue-answer-field {
@@ -933,7 +934,7 @@ body .q-menu {
 }
 
 .dialogue-answer--correct .q-field__control::before {
-  border-color: var(--q-positive);
+  border-color: var(--q-positive) !important;
 }
 
 .dialogue-answer--incorrect .q-field__control {

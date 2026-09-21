@@ -35,6 +35,17 @@ describe('dialogue speech recognition', () => {
     );
   });
 
+  it('accepts spoken contractions for a conditional and highlights the model answer', () => {
+    const expected = 'If he were president, he would solve this problem.';
+    const heard = "If he were president, he'd solve this problem.";
+    assert.equal(isConfidentDialogueAnswer(heard, expected), true);
+    assert.equal(
+      getDialogueExpectedSegments(heard, expected).filter((segment) => segment.matched === false).length,
+      0,
+    );
+    assert.equal(isConfidentDialogueAnswer('If he was president, he would solve this problem.', expected), false);
+  });
+
   it('measures expected words without rewarding invented words', () => {
     assert.equal(dialogueAnswerCoverage('What time do you start work today, thank you', 'What time do you start work today?'), 1);
     assert.equal(isConfidentDialogueAnswer('What time do you start work today, thank you very much', 'What time do you start work today?'), false);
