@@ -111,6 +111,21 @@
             </div>
           </article>
 
+          <section v-if="otherGeneratedHomeLessons.length" class="home-generated-links" aria-label="Personal lessons">
+            <p class="learning-start__eyebrow">Personal lessons</p>
+            <button
+              v-for="lesson in otherGeneratedHomeLessons"
+              :key="lesson.templateKey"
+              type="button"
+              class="home-generated-links__item"
+              @click="startHomeLesson(lesson)"
+            >
+              <q-icon :name="lesson.mode === 'listening' ? 'headphones' : 'record_voice_over'" size="20px" />
+              <span><small>{{ lesson.skillLabel }}</small><strong>{{ lesson.title }}</strong></span>
+              <q-icon name="arrow_forward" size="20px" />
+            </button>
+          </section>
+
           </template>
 
           <section v-else class="training-library">
@@ -741,8 +756,8 @@ import {
 import { fetchCurrentLesson } from 'src/services/api-client';
 import { fetchNewLessonCatalog } from 'src/services/offline-lesson-updates';
 import {
+  buildGeneratedLessonLinks,
   generatedLessonMode,
-  sortGeneratedLessonsNewestFirst,
   type LessonProgressState,
 } from 'src/services/lesson-category-progress';
 import { loadLearningActivityTotals } from 'src/services/learning-activity';
@@ -1146,20 +1161,7 @@ const trainingLibraries: Record<'listening' | 'speaking', {
     ],
   },
 };
-const generatedHomeLessons = computed<HomeLesson[]>(() => sortGeneratedLessonsNewestFirst(newLessonCatalog.value)
-  .map((lesson) => {
-    const mode = generatedLessonMode(lesson);
-    if (mode !== 'listening' && mode !== 'speaking') return null;
-    return {
-      templateKey: lesson.lessonTemplateKey ?? lesson.id,
-      title: lesson.title,
-      focus: lesson.purpose,
-      mode,
-      minutes: lesson.estimatedMinutes,
-      skillLabel: mode === 'listening' ? 'Listening' : 'Speaking',
-    };
-  })
-  .filter((lesson): lesson is HomeLesson => lesson !== null));
+const generatedHomeLessons = computed<HomeLesson[]>(() => buildGeneratedLessonLinks(newLessonCatalog.value));
 const lessonsByTrainingCategory = computed(() => ({
   listening: [...generatedHomeLessons.value.filter((lesson) => lesson.mode === 'listening'), ...trainingLibraries.listening.lessons],
   speaking: [...generatedHomeLessons.value.filter((lesson) => lesson.mode === 'speaking'), ...trainingLibraries.speaking.lessons],
@@ -1229,6 +1231,10 @@ const recommendedHomeLesson = computed(() =>
   allHomeLessons.value.find((lesson) => lesson.templateKey === pinnedHomeLessonKey.value)
     ?? homeLessonQueue.value[0]!,
 );
+const otherGeneratedHomeLessons = computed(() => generatedHomeLessons.value.filter(
+  (lesson) => lesson.templateKey !== recommendedHomeLesson.value.templateKey
+    && !appStore.pausedSessions.some((session) => session.lesson.lessonTemplateKey === lesson.templateKey),
+));
 const recommendedPausedLesson = computed(() => appStore.pausedSessions.find(
   (session) => session.lesson.lessonTemplateKey === recommendedHomeLesson.value.templateKey,
 ));

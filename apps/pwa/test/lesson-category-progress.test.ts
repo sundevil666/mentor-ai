@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { GeneratedLesson } from '@mentor-ai/shared';
 import {
+  buildGeneratedLessonLinks,
   buildLessonCategoryProgress,
   generatedLessonMode,
   sortGeneratedLessonsNewestFirst,
@@ -44,6 +45,43 @@ describe('lesson category progress', () => {
     assert.equal(generatedLessonMode(speakingLesson), 'speaking');
     assert.equal(generatedLessonMode(listeningLesson), 'listening');
     assert.equal(generatedLessonMode({ targetSkills: ['grammar'], exercises: [] } as unknown as GeneratedLesson), 'speaking');
+  });
+
+  it('gives every generated lesson a Home link to its actual Listen or Speak category', () => {
+    const catalog = [
+      {
+        id: 'spoken-conditional', lessonTemplateKey: 'conditional-lesson', title: 'Conditional practice',
+        purpose: 'Say a conditional sentence', estimatedMinutes: 8, createdAt: '2026-09-21T10:00:00.000Z',
+        targetSkills: ['grammar'], exercises: [{ type: 'dialogue-translation', targetSkill: 'grammar' }],
+      },
+      {
+        id: 'listening-lesson', title: 'Hear the conversation', purpose: 'Understand a conversation',
+        estimatedMinutes: 6, createdAt: '2026-09-20T10:00:00.000Z',
+        targetSkills: ['listening'], exercises: [{ type: 'listening-comprehension', targetSkill: 'listening' }],
+      },
+      {
+        id: 'grammar-lesson', title: 'Grammar practice', purpose: 'Practice a sentence',
+        estimatedMinutes: 5, createdAt: '2026-09-19T10:00:00.000Z',
+        targetSkills: ['grammar'], exercises: [],
+      },
+    ] as GeneratedLesson[];
+
+    const homeLinks = buildGeneratedLessonLinks(catalog);
+    const categoryLinks = {
+      listening: homeLinks.filter((lesson) => lesson.mode === 'listening'),
+      speaking: homeLinks.filter((lesson) => lesson.mode === 'speaking'),
+    };
+
+    assert.deepEqual(homeLinks.map(({ templateKey, mode }) => [templateKey, mode]), [
+      ['conditional-lesson', 'speaking'],
+      ['listening-lesson', 'listening'],
+      ['grammar-lesson', 'speaking'],
+    ]);
+    assert.deepEqual(
+      homeLinks.map((lesson) => lesson.templateKey).sort(),
+      [...categoryLinks.listening, ...categoryLinks.speaking].map((lesson) => lesson.templateKey).sort(),
+    );
+    assert.equal(homeLinks.some((lesson) => (lesson.mode as string) === 'home'), false);
   });
 
   it('distinguishes started, partially completed, and fully completed categories', () => {

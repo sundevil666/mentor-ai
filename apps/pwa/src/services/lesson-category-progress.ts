@@ -2,6 +2,15 @@ import type { GeneratedLesson, LearningMode, SkillArea } from '@mentor-ai/shared
 
 export type LessonProgressState = 'new' | 'started' | 'completed';
 export type LessonCategoryState = 'new' | 'started' | 'progress' | 'complete';
+export type GeneratedLessonCategory = 'listening' | 'speaking';
+export interface GeneratedLessonLink {
+  templateKey: string;
+  title: string;
+  focus: string;
+  mode: GeneratedLessonCategory;
+  minutes: number;
+  skillLabel: 'Listening' | 'Speaking';
+}
 
 const categories: Array<{ key: SkillArea; label: string; icon: string }> = [
   { key: 'grammar', label: 'Grammar', icon: 'spellcheck' },
@@ -36,6 +45,20 @@ export function sortGeneratedLessonsNewestFirst(lessons: GeneratedLesson[]): Gen
   return [...lessons].sort((left, right) => (
     right.createdAt.localeCompare(left.createdAt) || left.id.localeCompare(right.id)
   ));
+}
+
+export function buildGeneratedLessonLinks(lessons: GeneratedLesson[]): GeneratedLessonLink[] {
+  return sortGeneratedLessonsNewestFirst(lessons).map((lesson) => {
+    const mode = generatedLessonMode(lesson) === 'listening' ? 'listening' : 'speaking';
+    return {
+      templateKey: lesson.lessonTemplateKey ?? lesson.id,
+      title: lesson.title,
+      focus: lesson.purpose,
+      mode,
+      minutes: lesson.estimatedMinutes,
+      skillLabel: mode === 'listening' ? 'Listening' : 'Speaking',
+    };
+  });
 }
 
 export function buildLessonCategoryProgress(
