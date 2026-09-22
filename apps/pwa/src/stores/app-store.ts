@@ -1137,8 +1137,10 @@ export const useAppStore = defineStore('app', {
         const localStatisticsForAccount = this.statisticsSnapshots
           .filter((snapshot) => snapshot.studentId === this.studentId || snapshot.studentId === demoStudent.id)
           .map((snapshot) => ({ ...snapshot, studentId: this.studentId }));
-        const sharedStatistics = state.statisticsSnapshots?.length === 0 && localStatisticsForAccount.length > 0
-          ? await synchronizeStatisticsSnapshots(localStatisticsForAccount)
+        const remoteIds = new Set((state.statisticsSnapshots ?? []).map((snapshot) => snapshot.id));
+        const missingLocalStatistics = localStatisticsForAccount.filter((snapshot) => !remoteIds.has(snapshot.id));
+        const sharedStatistics = missingLocalStatistics.length > 0
+          ? await synchronizeStatisticsSnapshots(missingLocalStatistics).catch(() => [])
           : [];
         await this.applySharedStudentState(state.studentModel, state.recommendation);
         await this.replaceStatisticsSnapshotsFromServer([...sharedStatistics, ...(state.statisticsSnapshots ?? [])]);
@@ -1151,6 +1153,11 @@ export const useAppStore = defineStore('app', {
       const merged = new Map<string, StatisticsSnapshot>();
       for (const snapshot of snapshots) {
         if (snapshot.studentId === this.studentId && snapshot.id) merged.set(snapshot.id, snapshot);
+      }
+      for (const snapshot of this.statisticsSnapshots) {
+        if ((snapshot.studentId === this.studentId || snapshot.studentId === demoStudent.id) && snapshot.id && !merged.has(snapshot.id)) {
+          merged.set(snapshot.id, { ...snapshot, studentId: this.studentId });
+        }
       }
       const db = await mentorDb;
       await db.clear('statistics');
