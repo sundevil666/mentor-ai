@@ -591,7 +591,6 @@
                 <q-tooltip>{{ isListeningPaused ? 'Resume' : isListeningStarting || isListeningSpeaking ? 'Pause' : 'Play' }}</q-tooltip>
               </q-btn>
               <q-btn
-                v-if="!isRepeatedLesson"
                 aria-label="Start from the beginning"
                 color="primary"
                 flat
@@ -2026,9 +2025,8 @@ async function jumpWord(direction: -1 | 1) {
 }
 
 async function resetListeningToBeginning() {
-  stopListeningAudio();
-  activeWordIndex.value = 0;
-  activeWordEndIndex.value = 0;
+  if (await requireCurrentLessonUpdateBeforePlayback()) return;
+  await startListeningAtWord(0);
   await scrollActiveListeningPhraseIntoView();
 }
 
