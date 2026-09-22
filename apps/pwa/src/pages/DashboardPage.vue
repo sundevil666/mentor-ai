@@ -45,6 +45,7 @@
                 <div class="home-progress-item__copy">
                   <strong>{{ item.label }}</strong>
                   <span>{{ item.done }} of {{ item.total }}</span>
+                  <span v-if="item.detail">{{ item.detail }}</span>
                   <q-linear-progress :value="item.ratio" color="primary" track-color="grey-3" rounded size="7px" />
                 </div>
                 <b>{{ item.remaining }}</b>
@@ -1311,6 +1312,7 @@ const homeProgressItems = computed(() => {
   ]);
   const completedLessons = [...lessonKeys].filter((key) => lessonProgressState(key) === 'completed').length;
   const lessonTotal = lessonKeys.size;
+  const completedSessions = appStore.completedLessonsCount;
   const wordsRead = dailyWordsRead(homeReadingProgress.value);
   const readingTarget = dailyReadingTargetWords(homeReadingProgress.value);
   return [
@@ -1333,10 +1335,11 @@ const homeProgressItems = computed(() => {
     {
       icon: 'task_alt',
       label: 'Lessons',
-      done: `${completedLessons} done`,
-      total: `${lessonTotal} lessons`,
-      remaining: `${Math.max(0, lessonTotal - completedLessons)} left`,
-      ratio: lessonTotal > 0 ? completedLessons / lessonTotal : 0,
+      done: `${completedSessions} done`,
+      total: `${lessonTotal} lesson goal`,
+      detail: `${completedLessons} different lessons completed`,
+      remaining: `${Math.max(0, lessonTotal - completedSessions)} to goal`,
+      ratio: lessonTotal > 0 ? Math.min(1, completedSessions / lessonTotal) : 0,
     },
   ];
 });
