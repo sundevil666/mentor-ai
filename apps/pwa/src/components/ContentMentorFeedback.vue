@@ -34,6 +34,7 @@ import {
   type ContentEngagementSummary,
 } from 'src/services/content-engagement';
 import { useAppStore } from 'src/stores/app-store';
+import { reconcileLessonCompletionSummary } from 'src/services/content-engagement-summary';
 
 const props = withDefaults(defineProps<{
   category: ContentProgressCategory;
@@ -44,6 +45,12 @@ const props = withDefaults(defineProps<{
 });
 const appStore = useAppStore();
 const summary = ref<ContentEngagementSummary>({ starts: 0, finishes: 0, fullPlays: 0 });
+const displayedSummary = computed(() => props.category === 'lesson'
+  ? reconcileLessonCompletionSummary(
+    summary.value,
+    appStore.statisticsSnapshots.filter((snapshot) => (snapshot.lessonTemplateKey ?? snapshot.lessonId) === props.contentId).length,
+  )
+  : summary.value);
 const feedbackOptions = computed<Array<{ label: string; value: ContentFeedbackValue }>>(() => [
   { label: 'Everything is clear', value: 'clear' },
   { label: 'Mostly clear — repeat later', value: 'mostly-clear' },
@@ -56,7 +63,7 @@ const feedbackOptions = computed<Array<{ label: string; value: ContentFeedbackVa
 ]);
 const statisticsLabel = computed(() => {
   const lastLabel = props.category === 'lesson' ? 'full completions' : 'full plays';
-  return `${summary.value.starts} starts · ${summary.value.finishes} finishes · ${summary.value.fullPlays} ${lastLabel}`;
+  return `${displayedSummary.value.starts} starts · ${displayedSummary.value.finishes} finishes · ${displayedSummary.value.fullPlays} ${lastLabel}`;
 });
 const showSelect = computed(() => !props.hideSelectAfterFeedback || !summary.value.feedback);
 

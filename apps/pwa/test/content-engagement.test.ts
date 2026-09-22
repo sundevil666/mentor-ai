@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { ContentEngagementEvent } from '@mentor-ai/shared';
-import { summarizeContentEngagement } from '../src/services/content-engagement-summary.js';
+import { reconcileLessonCompletionSummary, summarizeContentEngagement } from '../src/services/content-engagement-summary.js';
 
 function event(
   id: string,
@@ -35,5 +35,15 @@ test('summarizes playback counts and keeps the newest mentor feedback', () => {
     finishes: 1,
     fullPlays: 1,
     feedback: 'enjoy-listening',
+  });
+});
+
+test('completed lesson statistics repair missing engagement counts without double counting', () => {
+  const missing = { starts: 17, finishes: 0, fullPlays: 0 };
+  assert.deepEqual(reconcileLessonCompletionSummary(missing, 1), {
+    starts: 17, finishes: 1, fullPlays: 1,
+  });
+  assert.deepEqual(reconcileLessonCompletionSummary({ starts: 17, finishes: 1, fullPlays: 1 }, 1), {
+    starts: 17, finishes: 1, fullPlays: 1,
   });
 });

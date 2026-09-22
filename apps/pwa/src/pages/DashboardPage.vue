@@ -1605,8 +1605,6 @@ watch(
     const contentId = activeEngagementContentId.value;
     if (!completedAt || !contentId) return;
     activeEngagementContentId.value = null;
-    void recordContentEngagement({ studentId: appStore.studentId, category: 'lesson', contentId, type: 'finished' });
-    void recordContentEngagement({ studentId: appStore.studentId, category: 'lesson', contentId, type: 'full-play' });
   },
 );
 

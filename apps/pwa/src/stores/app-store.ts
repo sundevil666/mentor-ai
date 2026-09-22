@@ -56,6 +56,7 @@ import {
 } from 'src/services/user-preferences';
 import { formatDisplayDate } from 'src/services/date-format';
 import { saveContentProgress } from 'src/services/content-progress';
+import { recordContentEngagement } from 'src/services/content-engagement';
 import { recordLearningActivity } from 'src/services/learning-activity';
 import {
   fetchMyShiftActivity,
@@ -894,6 +895,16 @@ export const useAppStore = defineStore('app', {
       await statisticsPersistence;
       await this.persistSyncQueue(completedSession);
 
+      const contentId = completedSession.context.lessonTemplateKey
+        ?? completedSession.lesson.lessonTemplateKey
+        ?? completedSession.lesson.id;
+      try {
+        await recordContentEngagement({ studentId: this.studentId, category: 'lesson', contentId, type: 'finished' });
+        await recordContentEngagement({ studentId: this.studentId, category: 'lesson', contentId, type: 'full-play' });
+      } catch (error) {
+        logDiagnostic('lesson.engagement_save_failed', { reason: getErrorMessage(error) }, 'warn');
+      }
+
       await this.pruneLocalStorage();
 
       logDiagnostic('lesson.completed', {
@@ -971,7 +982,7 @@ export const useAppStore = defineStore('app', {
         activeSeconds,
         listeningSeconds: sourceSession.context.mode === 'listening' ? activeSeconds : 0,
         spokenWords,
-        lessonTemplateKey: sourceSession.lesson.lessonTemplateKey,
+        lessonTemplateKey: sourceSession.context.lessonTemplateKey ?? sourceSession.lesson.lessonTemplateKey,
         fatigueSignal: this.studentModel.fatigue,
         learningMode: sourceSession.context.mode,
         workShift: sourceSession.context.workShift,

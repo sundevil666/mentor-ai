@@ -7,6 +7,17 @@ export interface ContentEngagementSummary {
   feedback?: ContentFeedbackValue;
 }
 
+export function reconcileLessonCompletionSummary(
+  summary: ContentEngagementSummary,
+  completedSessions: number,
+): ContentEngagementSummary {
+  return {
+    ...summary,
+    finishes: Math.max(summary.finishes, completedSessions),
+    fullPlays: Math.max(summary.fullPlays, completedSessions),
+  };
+}
+
 export function summarizeContentEngagement(events: ContentEngagementEvent[]) {
   const summaries = new Map<string, ContentEngagementSummary>();
   const sorted = [...events].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
