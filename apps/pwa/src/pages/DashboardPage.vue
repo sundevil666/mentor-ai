@@ -334,6 +334,14 @@
                   :disable="!speechRecognitionAvailable"
                   @click="recordDialogueAnswer"
                 />
+                <q-btn
+                  class="dialogue-drill__continue"
+                  :color="dialogueAnswerStatus === 'correct' ? 'positive' : 'primary'"
+                  :label="exerciseNavigation.nextLabel"
+                  unelevated
+                  :disable="exerciseNavigation.nextDisabled"
+                  @click="submit"
+                />
                 <q-btn class="dialogue-drill__play-button" color="primary" flat icon="volume_up" round @click="playAudio">
                   <q-tooltip>Play native answer</q-tooltip>
                 </q-btn>
@@ -344,9 +352,8 @@
                     <small>{{ speechSupportMessage }}</small>
                   </span>
                 </span>
-                <div class="dialogue-drill__step-navigation">
+                <div v-if="exerciseNavigation.showPrevious" class="dialogue-drill__step-navigation">
                   <q-btn
-                    v-if="exerciseNavigation.showPrevious"
                     color="primary"
                     flat
                     icon="arrow_back"
@@ -354,14 +361,6 @@
                     no-caps
                     :disable="exerciseNavigation.previousDisabled"
                     @click="handleLessonBack"
-                  />
-                  <q-btn
-                    class="dialogue-drill__continue"
-                    :color="dialogueAnswerStatus === 'correct' ? 'positive' : 'primary'"
-                    :label="exerciseNavigation.nextLabel"
-                    unelevated
-                    :disable="exerciseNavigation.nextDisabled"
-                    @click="submit"
                   />
                 </div>
               </div>
