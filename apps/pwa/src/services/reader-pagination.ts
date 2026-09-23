@@ -54,6 +54,24 @@ export function chooseReaderStopWordIndex(input: {
   return input.pageWordIndex;
 }
 
+export function chooseReaderPersistedWordIndex(input: {
+  pageWordIndex: number;
+  resumeWordIndex: number;
+}) {
+  return input.resumeWordIndex >= 0 ? input.resumeWordIndex : input.pageWordIndex;
+}
+
+export function shouldRecordCompletedReaderPage(input: {
+  currentPageIndex: number;
+  destinationPageIndex: number;
+  resumePageIndex: number;
+}) {
+  if (input.destinationPageIndex <= input.currentPageIndex) return false;
+  return input.resumePageIndex < 0
+    || input.currentPageIndex >= input.resumePageIndex
+    || input.destinationPageIndex > input.resumePageIndex;
+}
+
 export function chooseReaderSpeechAnchor(input: {
   destinationPageWordIndex: number;
   visibleWordIndex: number;

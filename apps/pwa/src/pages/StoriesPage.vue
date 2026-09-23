@@ -559,7 +559,7 @@ import { syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
 import { isSpeechRecognitionAvailable, startContinuousSpeechRecognition, type ContinuousSpeechRecognition } from 'src/services/speech-recognition';
 import { startLocalReadingTranscriber, type LocalReadingTranscriber } from 'src/services/local-reading-transcriber';
 import { isSherpaReaderExperiment, startSherpaReadingTranscriber, type SherpaReadingTranscriber } from 'src/services/sherpa-reading-transcriber';
-import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop, chooseReaderSpeechStartAnchor, chooseReaderStopWordIndex } from 'src/services/reader-pagination';
+import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop, chooseReaderPersistedWordIndex, chooseReaderSpeechStartAnchor, chooseReaderStopWordIndex, shouldRecordCompletedReaderPage } from 'src/services/reader-pagination';
 import { calculateReaderDragOffset, detectReaderSwipe, isReaderHorizontalDrag, isReaderHorizontalWheel, normalizeReaderWheelDelta, readerTouchDestination, readerWheelDestination, readerWheelTurnQuietMs, isReaderWheelTurnContinuation, shouldCommitReaderWheel, type ReaderSwipePoint } from 'src/services/reader-swipe';
 import { beginReaderLookupInteraction, shouldProcessReadingTranscript } from 'src/services/reader-lookup-interaction';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
@@ -1108,11 +1108,17 @@ function goToBookPage(pageIndex: number | null, smooth = true) {
   const destinationPageIndex = Math.max(0, Math.min(readerPageCount.value - 1, pageIndex));
   if (destinationPageIndex !== currentBookPageIndex.value) {
     saveReadingPageSpeech();
-    if (destinationPageIndex > currentBookPageIndex.value) recordCompletedReaderPage(currentBookPageIndex.value);
+    const resumePageIndex = getReaderWordPageIndex(resumeWordIndex.value);
+    if (shouldRecordCompletedReaderPage({
+      currentPageIndex: currentBookPageIndex.value,
+      destinationPageIndex,
+      resumePageIndex,
+    })) recordCompletedReaderPage(currentBookPageIndex.value);
   }
   persistBookProgress();
   currentBookPageIndex.value = destinationPageIndex;
   selectedBookChapterIndex.value = resolveBookChapterIndex(destinationPageIndex);
+  markReadingDevicePositionChanged();
   scrollToReaderPage(smooth);
   persistBookProgress();
   const destinationWordIndex = getReaderPageWordAnchor(destinationPageIndex);
@@ -1122,7 +1128,6 @@ function goToBookPage(pageIndex: number | null, smooth = true) {
   resetSherpaReadingFragment();
   activeReaderWordIndexes.value = new Set();
   void persistReaderNavigationProgress();
-  markReadingDevicePositionChanged();
   void readingActivityTimer.checkpoint();
 }
 async function goToBookChapter(chapterIndex: number | null) {
@@ -2000,7 +2005,10 @@ function persistBookProgress(updatedAt = new Date().toISOString()) {
   if (!book || typeof localStorage === 'undefined') return;
   const previous = readBookProgress(book.id, selectedBookPages.value.length);
   const progressRatio = getCurrentReaderProgressRatio();
-  const wordPosition = getStableReaderWordPosition();
+  const wordPosition = chooseReaderPersistedWordIndex({
+    pageWordIndex: getStableReaderWordPosition(),
+    resumeWordIndex: resumeWordIndex.value,
+  });
   readerFurthestWordPosition.value = Math.max(readerFurthestWordPosition.value, wordPosition);
   localStorage.setItem(bookProgressKey(book.id), JSON.stringify({
     version: 3,

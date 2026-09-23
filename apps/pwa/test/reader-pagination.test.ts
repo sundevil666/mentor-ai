@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop, chooseReaderSpeechAnchor, chooseReaderSpeechStartAnchor, chooseReaderStopWordIndex } from '../src/services/reader-pagination.js';
+import { calculateReaderPageCount, calculateReaderPaginationGeometry, calculateReaderResumeScrollTop, chooseReaderPersistedWordIndex, chooseReaderSpeechAnchor, chooseReaderSpeechStartAnchor, chooseReaderStopWordIndex, shouldRecordCompletedReaderPage } from '../src/services/reader-pagination.js';
 
 test('reader columns advance by exactly one viewport after accounting for nested padding', () => {
   const geometry = calculateReaderPaginationGeometry({
@@ -68,6 +68,44 @@ test('saving keeps the active highlight when it belongs to the current page', ()
     highlightedWordPageIndex: 4,
     pageWordIndex: 88,
   }), 93);
+});
+
+test('closing preserves the exact saved stop instead of replacing it with the page start', () => {
+  assert.equal(chooseReaderPersistedWordIndex({
+    pageWordIndex: 80,
+    resumeWordIndex: 93,
+  }), 93);
+});
+
+test('closing falls back to the visible page when no exact stop exists', () => {
+  assert.equal(chooseReaderPersistedWordIndex({
+    pageWordIndex: 80,
+    resumeWordIndex: -1,
+  }), 80);
+});
+
+test('moving forward to a restored marker does not count the earlier page as read', () => {
+  assert.equal(shouldRecordCompletedReaderPage({
+    currentPageIndex: 3,
+    destinationPageIndex: 4,
+    resumePageIndex: 4,
+  }), false);
+});
+
+test('moving forward after reaching the restored marker counts the completed page', () => {
+  assert.equal(shouldRecordCompletedReaderPage({
+    currentPageIndex: 4,
+    destinationPageIndex: 5,
+    resumePageIndex: 4,
+  }), true);
+});
+
+test('normal forward paging without a restored marker still counts the completed page', () => {
+  assert.equal(shouldRecordCompletedReaderPage({
+    currentPageIndex: 3,
+    destinationPageIndex: 4,
+    resumePageIndex: -1,
+  }), true);
 });
 
 test('speech follows the destination page before a smooth scroll finishes', () => {
