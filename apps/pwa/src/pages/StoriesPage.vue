@@ -1321,11 +1321,14 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
   const text = normalizeReaderSelection(rawText);
   if (!text || !selectedBook.value) return;
   const interactionBook = selectedBook.value;
+  const contextText = getReaderLookupContext(text, wordIndex);
   const interactionRecord = recordInteraction ? recordReaderVocabularyInteraction({
     studentId: appStore.studentId,
     bookId: interactionBook.id,
     chapterId: selectedBookPages.value[currentBookChapterIndex.value]?.chapterId,
     text,
+    contextText,
+    pageIndex: currentBookPageIndex.value,
     translationRequested: true,
     pronunciationRequested: speakImmediately,
   }).catch(() => undefined) : Promise.resolve();
@@ -1389,6 +1392,37 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
       if (readingSpeechActive.value) readingSpeechMessage.value = 'Read aloud. Recognition is ready.';
     }
   }
+}
+
+function getReaderLookupContext(selectedText: string, wordIndex: number | null) {
+  if (wordIndex !== null) {
+    const tokens = renderedBookPages.value.flatMap((page) => page.paragraphs.flat());
+    const selectedTokenIndex = tokens.findIndex((token) => token.wordIndex === wordIndex);
+    if (selectedTokenIndex >= 0) {
+      let start = selectedTokenIndex;
+      let end = selectedTokenIndex;
+      while (start > 0 && !/[.!?]/.test(tokens[start - 1]?.text ?? '')) start -= 1;
+      while (end + 1 < tokens.length) {
+        end += 1;
+        if (/[.!?]/.test(tokens[end]?.text ?? '')) break;
+      }
+      return normalizeReaderSelection(tokens.slice(start, end + 1).map((token) => token.text).join(''));
+    }
+  }
+  const selection = window.getSelection();
+  const paragraph = selection?.anchorNode instanceof Element
+    ? selection.anchorNode.closest('p')
+    : selection?.anchorNode?.parentElement?.closest('p');
+  const paragraphText = normalizeReaderSelection(paragraph?.textContent ?? '');
+  if (!paragraphText) return undefined;
+  const selectedIndex = paragraphText.toLocaleLowerCase('en').indexOf(selectedText.toLocaleLowerCase('en'));
+  if (selectedIndex < 0) return paragraphText;
+  const before = paragraphText.slice(0, selectedIndex);
+  const after = paragraphText.slice(selectedIndex + selectedText.length);
+  const start = Math.max(before.lastIndexOf('.'), before.lastIndexOf('!'), before.lastIndexOf('?')) + 1;
+  const followingStops = [after.indexOf('.'), after.indexOf('!'), after.indexOf('?')].filter((index) => index >= 0);
+  const end = selectedIndex + selectedText.length + (followingStops.length ? Math.min(...followingStops) + 1 : after.length);
+  return normalizeReaderSelection(paragraphText.slice(start, end));
 }
 function showReaderLookupError(error: unknown) {
   readerLookupSignInRequired.value = error instanceof ReaderTranslationSignInRequiredError;

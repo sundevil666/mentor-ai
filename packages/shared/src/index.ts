@@ -419,6 +419,21 @@ export interface ReaderVocabularyItem {
   phonetic?: string;
   lookupCount: number;
   pronunciationCount?: number;
+  lookupDays?: string[];
+  contexts?: ReaderVocabularyContext[];
+  syncMode?: 'delta-v1';
+  syncBatchId?: string;
+  appliedSyncBatchIds?: string[];
+  firstLookedUpAt: string;
+  lastLookedUpAt: string;
+}
+
+export interface ReaderVocabularyContext {
+  text: string;
+  bookId: string;
+  chapterId?: string;
+  pageIndex?: number;
+  lookupCount: number;
   firstLookedUpAt: string;
   lastLookedUpAt: string;
 }

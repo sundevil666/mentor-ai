@@ -553,6 +553,58 @@ describe('learning state service', () => {
     assert.equal(saved?.lastLookedUpAt, '2026-09-12T10:00:00.000Z');
   });
 
+  it('adds each acknowledged vocabulary outbox batch exactly once and keeps bounded context', async () => {
+    const id = `reader-vocabulary:demo-student:charge-${Date.now()}`;
+    const firstBatch = {
+      id,
+      studentId: 'demo-student',
+      bookId: 'book-context',
+      chapterId: 'chapter-context',
+      text: 'charge',
+      normalizedText: 'charge',
+      kind: 'word',
+      translation: 'обвинение',
+      lookupCount: 2,
+      pronunciationCount: 0,
+      lookupDays: ['2026-09-20'],
+      contexts: [{
+        text: 'He was charged with theft.',
+        bookId: 'book-context',
+        chapterId: 'chapter-context',
+        pageIndex: 4,
+        lookupCount: 2,
+        firstLookedUpAt: '2026-09-20T10:00:00.000Z',
+        lastLookedUpAt: '2026-09-20T11:00:00.000Z',
+      }],
+      syncMode: 'delta-v1',
+      syncBatchId: 'batch-one',
+      firstLookedUpAt: '2026-09-20T10:00:00.000Z',
+      lastLookedUpAt: '2026-09-20T11:00:00.000Z',
+    };
+
+    await learningStateService.mergeReaderVocabularyItems([firstBatch]);
+    await learningStateService.mergeReaderVocabularyItems([firstBatch]);
+    const merged = await learningStateService.mergeReaderVocabularyItems([{
+      ...firstBatch,
+      lookupCount: 1,
+      lookupDays: ['2026-09-22'],
+      contexts: [{ ...firstBatch.contexts[0], lookupCount: 1, lastLookedUpAt: '2026-09-22T11:00:00.000Z' }],
+      syncBatchId: 'batch-two',
+      firstLookedUpAt: '2026-09-22T11:00:00.000Z',
+      lastLookedUpAt: '2026-09-22T11:00:00.000Z',
+    }]);
+    const saved = merged.find((candidate) => candidate.id === id);
+
+    assert.equal(saved?.lookupCount, 3);
+    assert.equal(saved?.contexts?.[0]?.lookupCount, 3);
+    assert.deepEqual(saved?.lookupDays, ['2026-09-20', '2026-09-22']);
+    assert.equal(saved?.syncBatchId, 'batch-two');
+    assert.deepEqual(saved?.appliedSyncBatchIds, ['batch-one', 'batch-two']);
+
+    const retriedOldBatch = await learningStateService.mergeReaderVocabularyItems([firstBatch]);
+    assert.equal(retriedOldBatch.find((candidate) => candidate.id === id)?.lookupCount, 3);
+  });
+
   it('keeps an imported book available for another device on the same account', async () => {
     const id = `cloud-book-${Date.now()}`;
     const timestamp = '2026-08-29T12:00:00.000Z';

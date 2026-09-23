@@ -43,7 +43,9 @@ export const getReaderPhonetic: RequestHandler = async (req, res, next) => {
 export const synchronizeReaderVocabulary: RequestHandler = async (req, res, next) => {
   try {
     const items = Array.isArray(req.body?.items) ? req.body.items as ReaderVocabularyItem[] : [];
-    res.json({ data: await learningStateService.mergeReaderVocabularyItems(items, req.authUser) });
+    const merged = await learningStateService.mergeReaderVocabularyItems(items, req.authUser);
+    const incomingIds = new Set(items.map((item) => item.id));
+    res.json({ data: merged.filter((item) => incomingIds.has(item.id)) });
   } catch (error) {
     next(error);
   }

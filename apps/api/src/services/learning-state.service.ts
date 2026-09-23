@@ -212,16 +212,40 @@ export const learningStateService = {
       if (!safe) continue;
       const current = merged.get(safe.id);
       if (!current) {
-        merged.set(safe.id, safe);
+        merged.set(safe.id, safe.syncMode === 'delta-v1' && safe.syncBatchId
+          ? { ...safe, appliedSyncBatchIds: [safe.syncBatchId] }
+          : safe);
         continue;
       }
+      const appliedSyncBatchIds = current.appliedSyncBatchIds ?? (current.syncBatchId ? [current.syncBatchId] : []);
+      const applyDelta = safe.syncMode === 'delta-v1'
+        && Boolean(safe.syncBatchId)
+        && !appliedSyncBatchIds.includes(safe.syncBatchId!);
+      const retryingAppliedDelta = safe.syncMode === 'delta-v1' && !applyDelta;
       merged.set(safe.id, {
         ...current,
         ...safe,
         translation: safe.translation || current.translation,
         phonetic: safe.phonetic || current.phonetic,
-        lookupCount: Math.max(current.lookupCount, safe.lookupCount),
-        pronunciationCount: Math.max(current.pronunciationCount ?? 0, safe.pronunciationCount ?? 0),
+        lookupCount: retryingAppliedDelta
+          ? current.lookupCount
+          : applyDelta
+            ? current.lookupCount + safe.lookupCount
+            : Math.max(current.lookupCount, safe.lookupCount),
+        pronunciationCount: retryingAppliedDelta
+          ? current.pronunciationCount
+          : applyDelta
+            ? (current.pronunciationCount ?? 0) + (safe.pronunciationCount ?? 0)
+            : Math.max(current.pronunciationCount ?? 0, safe.pronunciationCount ?? 0),
+        lookupDays: [...new Set([...(current.lookupDays ?? []), ...(safe.lookupDays ?? [])])].sort().slice(-30),
+        contexts: retryingAppliedDelta
+          ? current.contexts
+          : mergeReaderVocabularyContexts(current.contexts, safe.contexts, applyDelta),
+        syncMode: safe.syncMode ?? current.syncMode,
+        syncBatchId: applyDelta ? safe.syncBatchId : current.syncBatchId,
+        appliedSyncBatchIds: applyDelta && safe.syncBatchId
+          ? [...new Set([...appliedSyncBatchIds, safe.syncBatchId])].slice(-32)
+          : appliedSyncBatchIds,
         firstLookedUpAt: current.firstLookedUpAt < safe.firstLookedUpAt ? current.firstLookedUpAt : safe.firstLookedUpAt,
         lastLookedUpAt: current.lastLookedUpAt > safe.lastLookedUpAt ? current.lastLookedUpAt : safe.lastLookedUpAt,
       });
@@ -954,9 +978,60 @@ function sanitizeReaderVocabularyItem(item: ReaderVocabularyItem, studentId: str
     phonetic: item.phonetic?.replace(/\s+/g, ' ').trim().slice(0, 160) || undefined,
     lookupCount: Math.max(0, Math.min(10_000, Math.floor(item.lookupCount || 0))),
     pronunciationCount: Math.max(0, Math.min(10_000, Math.floor(item.pronunciationCount || 0))),
+    lookupDays: Array.isArray(item.lookupDays)
+      ? [...new Set(item.lookupDays.filter((day) => /^\d{4}-\d{2}-\d{2}$/.test(day)))].sort().slice(-30)
+      : undefined,
+    contexts: Array.isArray(item.contexts)
+      ? item.contexts.map((context) => sanitizeReaderVocabularyContext(context, item.bookId)).filter((context) => context !== undefined).slice(0, 5)
+      : undefined,
+    syncMode: item.syncMode === 'delta-v1' && item.syncBatchId ? 'delta-v1' : undefined,
+    syncBatchId: item.syncMode === 'delta-v1' && item.syncBatchId ? item.syncBatchId.slice(0, 160) : undefined,
     firstLookedUpAt: item.firstLookedUpAt,
     lastLookedUpAt: item.lastLookedUpAt,
   };
+}
+
+function sanitizeReaderVocabularyContext(
+  context: NonNullable<ReaderVocabularyItem['contexts']>[number],
+  fallbackBookId: string,
+) {
+  const text = typeof context?.text === 'string' ? context.text.replace(/\s+/g, ' ').trim().slice(0, 500) : '';
+  if (!text || !Number.isFinite(Date.parse(context.firstLookedUpAt)) || !Number.isFinite(Date.parse(context.lastLookedUpAt))) return undefined;
+  return {
+    text,
+    bookId: (context.bookId || fallbackBookId).slice(0, 160),
+    chapterId: context.chapterId?.slice(0, 160),
+    pageIndex: Number.isInteger(context.pageIndex) && (context.pageIndex ?? -1) >= 0 ? Math.min(100_000, context.pageIndex!) : undefined,
+    lookupCount: Math.max(1, Math.min(10_000, Math.floor(context.lookupCount || 1))),
+    firstLookedUpAt: context.firstLookedUpAt,
+    lastLookedUpAt: context.lastLookedUpAt,
+  };
+}
+
+function mergeReaderVocabularyContexts(
+  current: ReaderVocabularyItem['contexts'],
+  incoming: ReaderVocabularyItem['contexts'],
+  additive: boolean,
+) {
+  const key = (context: NonNullable<ReaderVocabularyItem['contexts']>[number]) => [
+    context.bookId,
+    context.chapterId ?? '',
+    context.pageIndex ?? '',
+    context.text.toLocaleLowerCase('en'),
+  ].join(':');
+  const merged = new Map((current ?? []).map((context) => [key(context), context]));
+  for (const context of incoming ?? []) {
+    const previous = merged.get(key(context));
+    merged.set(key(context), previous ? {
+      ...previous,
+      lookupCount: additive
+        ? previous.lookupCount + context.lookupCount
+        : Math.max(previous.lookupCount, context.lookupCount),
+      firstLookedUpAt: previous.firstLookedUpAt < context.firstLookedUpAt ? previous.firstLookedUpAt : context.firstLookedUpAt,
+      lastLookedUpAt: previous.lastLookedUpAt > context.lastLookedUpAt ? previous.lastLookedUpAt : context.lastLookedUpAt,
+    } : context);
+  }
+  return [...merged.values()].sort((left, right) => right.lastLookedUpAt.localeCompare(left.lastLookedUpAt)).slice(0, 5);
 }
 
 function sanitizeReadingTranscriptChunk(item: ReadingTranscriptChunk, studentId: string): ReadingTranscriptChunk | undefined {

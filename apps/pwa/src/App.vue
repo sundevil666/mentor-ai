@@ -429,9 +429,10 @@ async function runDailyServerMaintenance(force = false) {
       fetchTranslationUsage(),
     ]);
     window.dispatchEvent(new Event('mentor-ai:daily-server-maintenance-finished'));
-    if ([2, 3, 4, 6].some((index) => syncResults[index]?.status === 'rejected')
+    if ([2, 3, 4, 6, 7, 8].some((index) => syncResults[index]?.status === 'rejected')
       || (await pendingLearningActivityCount()) > 0
-      || (await (await mentorDb).count('reading-transcript-outbox')) > 0) {
+      || (await (await mentorDb).count('reading-transcript-outbox')) > 0
+      || (await (await mentorDb).count('vocabulary-practice-items')) > 0) {
       throw new Error('Learning data remains queued for synchronization');
     }
   }, { force }).catch(() => undefined);
