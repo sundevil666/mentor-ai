@@ -64,7 +64,7 @@ export function sanitizePersonalReadingBookArchive(
   if (!archive?.book?.id || !archive.source?.id || !Array.isArray(archive.chapters) || !Array.isArray(archive.pages)) return undefined;
   const book = archive.book;
   if (
-    (book.format !== 'epub' && book.format !== 'txt') ||
+    (book.format !== 'epub' && book.format !== 'fb2' && book.format !== 'txt') ||
     book.rightsConfirmed !== true ||
     book.language !== 'en' ||
     !Number.isFinite(Date.parse(book.importedAt)) ||

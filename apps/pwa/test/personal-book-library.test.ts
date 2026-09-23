@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { strToU8, zipSync } from 'fflate';
-import { buildEpubBook, buildPlainTextBook, createFallbackPersonalBookSource, deriveChapterTitle, normalizePersonalBookArchive, resolveArchivePath, splitPlainTextIntoChapters } from '../src/services/personal-book-library.js';
+import { buildEpubBook, buildFb2Book, buildPlainTextBook, createFallbackPersonalBookSource, deriveChapterTitle, normalizePersonalBookArchive, resolveArchivePath, splitPlainTextIntoChapters } from '../src/services/personal-book-library.js';
 
 describe('personal book library', () => {
   it('splits large plain text at paragraph boundaries', () => {
@@ -80,6 +80,27 @@ describe('personal book library', () => {
     assert.deepEqual(imported.chapters.map((chapter) => chapter.title), ['Opening', 'Next']);
     assert.match(imported.pages[0]?.text ?? '', /Hello reader/);
     assert.match(imported.pages[1]?.text ?? '', /story continues/);
+  });
+
+  it('imports FB2 metadata and top-level sections in order', () => {
+    const imported = buildFb2Book(`<?xml version="1.0" encoding="utf-8"?>
+      <FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0">
+        <description><title-info><book-title>FB2 Story</book-title><author><first-name>Jane</first-name><last-name>Reader</last-name></author></title-info></description>
+        <body>
+          <section><title><p>Chapter One</p></title><p>Hello &amp; welcome.</p><section><p>Nested scene.</p></section></section>
+          <section><title><p>Chapter Two</p></title><p>The story continues.</p></section>
+        </body>
+      </FictionBook>`, 'story.fb2');
+    assert.equal(imported.book.title, 'FB2 Story');
+    assert.equal(imported.book.author, 'Jane Reader');
+    assert.equal(imported.book.format, 'fb2');
+    assert.deepEqual(imported.chapters.map((chapter) => chapter.title), ['Chapter One', 'Chapter Two']);
+    assert.match(imported.pages[0]?.text ?? '', /Hello & welcome/);
+    assert.match(imported.pages[0]?.text ?? '', /Nested scene/);
+  });
+
+  it('rejects an FB2 file without readable content', () => {
+    assert.throws(() => buildFb2Book('<FictionBook><body><section><image href="#cover"/></section></body></FictionBook>', 'empty.fb2'), /No readable chapters/);
   });
 
   it('ignores placeholder EPUB titles and derives the real chapter heading from its text', () => {

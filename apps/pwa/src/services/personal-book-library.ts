@@ -1,7 +1,7 @@
 import type { PersonalReadingBook, PersonalReadingBookArchive, ReadingChapter, ReadingImportSource, ReadingPage } from '@mentor-ai/shared';
 import { strFromU8, unzipSync } from 'fflate';
 
-export type PersonalBookFormat = 'epub' | 'txt';
+export type PersonalBookFormat = 'epub' | 'fb2' | 'txt';
 
 export type PersonalBook = PersonalReadingBook;
 
@@ -22,10 +22,12 @@ export async function importPersonalBook(file: File): Promise<PersonalBook> {
 
   if (extension === 'txt' || file.type === 'text/plain') {
     imported = buildPlainTextBook(await file.text(), file.name);
+  } else if (extension === 'fb2' || file.type === 'application/x-fictionbook+xml') {
+    imported = buildFb2Book(decodeFb2(new Uint8Array(await file.arrayBuffer())), file.name);
   } else if (extension === 'epub' || file.type === 'application/epub+zip') {
     imported = buildEpubBook(new Uint8Array(await file.arrayBuffer()), file.name);
   } else {
-    throw new Error('Choose a DRM-free EPUB or UTF-8 TXT file.');
+    throw new Error('Choose a DRM-free EPUB, FB2, or UTF-8 TXT file.');
   }
 
   await saveImportedBook(imported);
@@ -121,13 +123,46 @@ export function buildEpubBook(bytes: Uint8Array, fileName: string): ImportedPers
   return buildRecords({ title, author, fileName, format: 'epub', sections });
 }
 
+export function buildFb2Book(xml: string, fileName: string): ImportedPersonalBook {
+  const fictionBook = xml.match(/<(?:(?:[\w-]+):)?FictionBook\b/i);
+  if (!fictionBook) throw new Error('This FB2 file could not be opened. It may be damaged or use an unsupported format.');
+
+  const title = firstElementText(xml, 'book-title') || fileName.replace(/\.[^.]+$/, '') || 'Imported book';
+  const authorBlock = firstElementContent(firstElementContent(xml, 'title-info'), 'author');
+  const author = [firstElementText(authorBlock, 'first-name'), firstElementText(authorBlock, 'middle-name'), firstElementText(authorBlock, 'last-name')]
+    .filter(Boolean)
+    .join(' ') || undefined;
+  const bodies = elementContents(xml, 'body');
+  const mainBody = bodies.find((body) => !/^\s*<[^>]*\bname=["'](?:notes|comments)["']/i.test(body)) ?? bodies[0] ?? '';
+  const sectionDocuments = topLevelSectionDocuments(mainBody);
+  const documents = sectionDocuments.length > 0 ? sectionDocuments : [mainBody];
+  const sections = documents.map((document, index) => {
+    const text = extractDocumentText(document);
+    const heading = firstElementText(document, 'title');
+    return { title: chooseChapterTitle('', heading, text, index), text };
+  }).filter((section) => section.text);
+
+  if (sections.length === 0) throw new Error('No readable chapters were found in this FB2 file.');
+  return buildRecords({ title, author, fileName, format: 'fb2', sections });
+}
+
+function decodeFb2(bytes: Uint8Array): string {
+  const declaration = new TextDecoder('latin1').decode(bytes.subarray(0, Math.min(bytes.length, 512)));
+  const encoding = declaration.match(/<\?xml[^>]*\bencoding=["']([^"']+)["']/i)?.[1]?.trim().toLowerCase() || 'utf-8';
+  try {
+    return new TextDecoder(encoding).decode(bytes);
+  } catch {
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+}
+
 export async function listPersonalBooks(): Promise<PersonalBook[]> {
   const db = await getMentorDb();
   const storedBooks = await db.getAll('reading-books') as PersonalBook[];
   await Promise.all(storedBooks.map((book) => loadPersonalBook(book.id)));
   const books = await db.getAll('reading-books') as PersonalBook[];
   return books
-    .filter((book) => book && (book.format === 'epub' || book.format === 'txt'))
+    .filter((book) => book && (book.format === 'epub' || book.format === 'fb2' || book.format === 'txt'))
     .sort((left, right) => (right.lastOpenedAt ?? right.importedAt).localeCompare(left.lastOpenedAt ?? left.importedAt));
 }
 
@@ -347,6 +382,37 @@ function firstElementText(xml: string, localName: string): string {
   return match ? decodeEntities(stripMarkup(match[1] ?? '')).trim() : '';
 }
 
+function firstElementContent(xml: string, localName: string): string {
+  return xml.match(new RegExp(`<(?:(?:[\\w-]+):)?${localName}\\b[^>]*>([\\s\\S]*?)<\\/(?:(?:[\\w-]+):)?${localName}>`, 'i'))?.[1] ?? '';
+}
+
+function elementContents(xml: string, localName: string): string[] {
+  return [...xml.matchAll(new RegExp(`<(?:(?:[\\w-]+):)?${localName}\\b[^>]*>([\\s\\S]*?)<\\/(?:(?:[\\w-]+):)?${localName}>`, 'gi'))]
+    .map((match) => match[1] ?? '');
+}
+
+function topLevelSectionDocuments(body: string): string[] {
+  const documents: string[] = [];
+  const tags = /<\/?(?:(?:[\w-]+):)?section\b[^>]*>/gi;
+  let depth = 0;
+  let start = -1;
+  for (const match of body.matchAll(tags)) {
+    const tag = match[0];
+    const index = match.index ?? 0;
+    if (!tag.startsWith('</')) {
+      if (depth === 0) start = index;
+      depth += 1;
+    } else if (depth > 0) {
+      depth -= 1;
+      if (depth === 0 && start >= 0) {
+        documents.push(body.slice(start, index + tag.length));
+        start = -1;
+      }
+    }
+  }
+  return documents;
+}
+
 function extractDocumentText(document: string): string {
   const withoutNoise = document
     .replace(/<head\b[\s\S]*?<\/head>/gi, '')
@@ -374,7 +440,9 @@ function decodeEntities(value: string): string {
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'");
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&#(\d+);/g, (_, value: string) => String.fromCodePoint(Number(value)))
+    .replace(/&#x([\da-f]+);/gi, (_, value: string) => String.fromCodePoint(Number.parseInt(value, 16)));
 }
 
 async function getMentorDb() {

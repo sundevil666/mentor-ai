@@ -144,7 +144,8 @@
       </section>
 
       <section v-else-if="!isAudioLibrary && !selectedBook && activeReadingCategory === 'fiction'" class="personal-books" aria-label="Fiction books">
-        <input ref="bookFileInput" class="personal-books__file-input" type="file" accept=".epub,.txt,application/epub+zip,text/plain" @change="handleBookFileSelection">
+        <input ref="bookFileInput" class="personal-books__file-input" type="file" accept=".epub,.fb2,.txt,application/epub+zip,application/x-fictionbook+xml,text/plain" @change="handleBookFileSelection">
+        <p class="personal-books__formats">Supported formats: EPUB, FB2, TXT. Maximum file size: 30 MB.</p>
 
         <div v-if="personalBooks.length" class="personal-book-list">
           <div
@@ -163,7 +164,7 @@
         <div v-else class="personal-books__empty">
           <q-icon name="library_books" size="64px" />
           <h2>No books yet</h2>
-          <p>Tap + to import your first EPUB or TXT book.</p>
+          <p>Tap + to import your first book.</p>
         </div>
       </section>
 

@@ -331,7 +331,7 @@ export interface ReadingPage {
 
 export interface PersonalReadingBook extends ReadingBook {
   fileName: string;
-  format: 'epub' | 'txt';
+  format: 'epub' | 'fb2' | 'txt';
   rightsConfirmed: true;
   lastOpenedAt?: string;
 }

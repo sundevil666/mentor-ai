@@ -2014,6 +2014,13 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   gap: 14px;
 }
 
+.personal-books__formats {
+  color: var(--app-muted-strong);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
 .personal-books__empty h2 {
   color: var(--app-text-strong);
   font-size: 1.25rem;

@@ -34,6 +34,11 @@ describe('personal reading book cloud storage', () => {
     assert.deepEqual(sanitizePersonalReadingBookArchive(archive), archive);
   });
 
+  it('accepts a valid private FB2 archive', () => {
+    const archive = createArchive({ fileName: 'cloud-book.fb2', format: 'fb2' });
+    assert.deepEqual(sanitizePersonalReadingBookArchive(archive), archive);
+  });
+
   it('rejects a page belonging to another book', () => {
     const archive = createArchive();
     archive.pages[0].bookId = 'another-book';
