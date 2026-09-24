@@ -214,6 +214,15 @@ export async function markPersonalBookOpened(book: PersonalBook): Promise<void> 
   await db.put('reading-books', { ...book, lastOpenedAt: new Date().toISOString() });
 }
 
+export async function savePersonalBookDifficultyAssessment(bookId: string, difficultyAssessment: PersonalBook['difficultyAssessment']): Promise<PersonalBook> {
+  const db = await getMentorDb();
+  const book = await db.get('reading-books', bookId) as PersonalBook | undefined;
+  if (!book) throw new Error('This book is no longer available on this device.');
+  const updated = { ...book, difficultyAssessment, updatedAt: new Date().toISOString() };
+  await db.put('reading-books', updated);
+  return updated;
+}
+
 export async function deletePersonalBook(bookId: string): Promise<void> {
   const db = await getMentorDb();
   const transaction = db.transaction(['reading-sources', 'reading-books', 'reading-chapters', 'reading-pages'], 'readwrite');

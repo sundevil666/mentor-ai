@@ -334,6 +334,20 @@ export interface PersonalReadingBook extends ReadingBook {
   format: 'epub' | 'fb2' | 'txt';
   rightsConfirmed: true;
   lastOpenedAt?: string;
+  difficultyAssessment?: BookDifficultyAssessment;
+}
+
+export type BookReadingRecommendation = 'read' | 'rewrite';
+
+export interface BookDifficultyAssessment {
+  version: 1;
+  recommendation: BookReadingRecommendation;
+  score: number;
+  confidence: 'low' | 'medium' | 'high';
+  sampledWords: number;
+  personalEvidenceCount: number;
+  reasons: string[];
+  analyzedAt: string;
 }
 
 export interface PersonalReadingBookArchive {

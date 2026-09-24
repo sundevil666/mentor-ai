@@ -2049,7 +2049,7 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   border-radius: var(--app-radius-md);
   box-shadow: 0 8px 22px rgba(17, 24, 39, 0.06);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   overflow: hidden;
 }
 
@@ -2077,11 +2077,27 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   font-size: 26px;
 }
 
-.personal-book-row__open span {
+.personal-book-row__content {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.personal-book-row__content strong,
+.personal-book-row__content small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.personal-book-row__content small {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.personal-book-row__recommendation--read { color: var(--q-positive) !important; }
+.personal-book-row__recommendation--rewrite { color: var(--q-warning) !important; }
 
 .personal-book-row > .q-btn {
   margin-right: 8px;

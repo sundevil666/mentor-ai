@@ -155,8 +155,26 @@
           >
             <button class="personal-book-row__open" type="button" @click="openBook(book.id)">
               <q-icon name="menu_book" />
-              <span>{{ book.title }}</span>
+              <span class="personal-book-row__content">
+                <strong>{{ book.title }}</strong>
+                <small v-if="book.difficultyAssessment" :class="`personal-book-row__recommendation--${book.difficultyAssessment.recommendation}`">
+                  {{ book.difficultyAssessment.recommendation === 'read' ? 'Read freely' : 'Rewrite and translate' }}
+                  · {{ book.difficultyAssessment.score }}/100 · {{ book.difficultyAssessment.confidence }} confidence
+                </small>
+                <small v-else>Difficulty has not been assessed yet</small>
+              </span>
             </button>
+            <q-btn
+              :aria-label="`Analyze difficulty of ${book.title}`"
+              color="primary"
+              flat
+              icon="psychology"
+              round
+              :loading="assessingBookIds.has(book.id)"
+              @click="analyzeBookDifficulty(book)"
+            >
+              <q-tooltip>Analyze difficulty again</q-tooltip>
+            </q-btn>
             <q-btn :aria-label="`Delete ${book.title}`" color="negative" flat icon="delete_outline" round @click="confirmDeleteBook(book)" />
           </div>
         </div>
@@ -544,11 +562,12 @@ import { confirmOfflineRemoval } from 'src/services/offline-removal-confirmation
 import { deleteOfflineStory, formatStoryDuration, formatStorySize, getCachedStoryUrls, saveStoryOffline, storyLibrary, type LibraryStory } from 'src/services/story-library';
 import { useAppStore } from 'src/stores/app-store';
 import { configureCaptureAudioSession, configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
-import { deletePersonalBook, importPersonalBook, listPersonalBookArchives, listPersonalBooks, loadPersonalBook, markPersonalBookOpened, mergePersonalBookArchives, type PersonalBook } from 'src/services/personal-book-library';
+import { deletePersonalBook, importPersonalBook, listPersonalBookArchives, listPersonalBooks, loadPersonalBook, markPersonalBookOpened, mergePersonalBookArchives, savePersonalBookDifficultyAssessment, type PersonalBook } from 'src/services/personal-book-library';
 import { personalBookSyncControl } from 'src/services/personal-book-sync-control';
 import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot, ReaderTranslationSignInRequiredError, synchronizePersonalReadingBooks, updateReadingDeviceSession } from 'src/services/api-client';
 import { getAuthToken } from 'src/services/auth';
-import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
+import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
+import { assessBookDifficulty } from 'src/services/book-difficulty-assessment';
 import { readerWordContext } from 'src/services/reader-word-context';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, millisecondsUntilNextReadingDay, prepareDailyReadingProgress, recordDailyReadWords, type DailyReadingProgress } from 'src/services/daily-reading-progress';
@@ -666,6 +685,7 @@ const pendingBookFile = ref<File | null>(null);
 const showImportConfirmation = ref(false);
 const rightsConfirmed = ref(false);
 const importingBook = ref(false);
+const assessingBookIds = ref(new Set<string>());
 const audioElement = ref<HTMLAudioElement | null>(null);
 const cachedUrls = ref(new Set<string>());
 const engagementSummaries = ref(new Map<string, ContentEngagementSummary>());
@@ -881,6 +901,7 @@ async function confirmBookImport() {
   importingBook.value = true;
   try {
     const book = await importPersonalBook(file);
+    await analyzeBookDifficulty(book, false);
     personalBooks.value = await listPersonalBooks();
     const signedIn = Boolean(getAuthToken());
     const cloudSynced = signedIn && await syncPersonalBooks().then(() => true).catch(() => false);
@@ -898,6 +919,43 @@ async function confirmBookImport() {
     Notify.create({ type: 'negative', message: error instanceof Error ? error.message : 'Could not import this book.' });
   } finally {
     importingBook.value = false;
+  }
+}
+
+async function analyzeBookDifficulty(book: PersonalBook, notify = true) {
+  if (assessingBookIds.value.has(book.id)) return;
+  assessingBookIds.value = new Set(assessingBookIds.value).add(book.id);
+  try {
+    const archive = await loadPersonalBook(book.id);
+    if (!archive) throw new Error('This book is no longer available on this device.');
+    const vocabulary = await listReaderVocabulary(appStore.studentId);
+    const assessment = assessBookDifficulty({
+      pages: archive.pages,
+      vocabulary,
+      pageSpeech: readReadingPageSummaries(appStore.studentId, book.id),
+    });
+    await savePersonalBookDifficultyAssessment(book.id, assessment);
+    personalBooks.value = await listPersonalBooks();
+    if (selectedBook.value?.id === book.id) selectedBook.value = personalBooks.value.find((item) => item.id === book.id) ?? selectedBook.value;
+    void syncPersonalBooks().catch(() => undefined);
+    if (notify) {
+      Notify.create({
+        type: assessment.recommendation === 'read' ? 'positive' : 'warning',
+        icon: assessment.recommendation === 'read' ? 'menu_book' : 'edit_note',
+        message: assessment.recommendation === 'read'
+          ? `${book.title}: read freely. Difficulty ${assessment.score}/100 (${assessment.confidence} confidence).`
+          : `${book.title}: better to rewrite and translate. Difficulty ${assessment.score}/100 (${assessment.confidence} confidence).`,
+        caption: assessment.reasons.join(' '),
+        timeout: 8000,
+      });
+    }
+  } catch (error) {
+    if (notify) Notify.create({ type: 'negative', message: error instanceof Error ? error.message : 'Could not analyze this book.' });
+    else throw error;
+  } finally {
+    const next = new Set(assessingBookIds.value);
+    next.delete(book.id);
+    assessingBookIds.value = next;
   }
 }
 
