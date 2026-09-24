@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { ContentProgress, PersonalReadingBook } from '@mentor-ai/shared';
-import { personalBookReadingStatus } from '../src/services/personal-book-status.js';
+import { personalBookAction, personalBookReadingStatus, sortPersonalBooksByActivity } from '../src/services/personal-book-status.js';
 
 const book: PersonalReadingBook = {
   id: 'book', title: 'Book', level: 'unknown', language: 'en', sourceId: 'source', pageCount: 1,
@@ -26,5 +26,26 @@ describe('personal book reading status', () => {
   it('marks synchronized and local completion as finished', () => {
     assert.equal(personalBookReadingStatus(book, progress({ completed: true })), 'finished');
     assert.equal(personalBookReadingStatus(book, undefined, 1), 'finished');
+  });
+
+  it('separates read and rewrite recommendations while keeping unassessed books readable', () => {
+    assert.equal(personalBookAction(book), 'read');
+    assert.equal(personalBookAction({ ...book, difficultyAssessment: {
+      version: 1, recommendation: 'rewrite', score: 80, confidence: 'medium', sampledWords: 100,
+      personalEvidenceCount: 12, reasons: ['Dense text.'], analyzedAt: '2026-09-24T00:00:00.000Z',
+    } }), 'rewrite');
+  });
+
+  it('puts the most recently started books first and finished books last', () => {
+    const olderStarted = { ...book, id: 'older', lastOpenedAt: '2026-09-20T00:00:00.000Z' };
+    const newerStarted = { ...book, id: 'newer', lastOpenedAt: '2026-09-24T00:00:00.000Z' };
+    const untouched = { ...book, id: 'untouched', importedAt: '2026-09-25T00:00:00.000Z' };
+    const finished = { ...book, id: 'finished', lastOpenedAt: '2026-09-26T00:00:00.000Z' };
+    assert.deepEqual(
+      sortPersonalBooksByActivity([finished, untouched, olderStarted, newerStarted], {
+        older: 'started', newer: 'started', untouched: 'new', finished: 'finished',
+      }).map((item) => item.id),
+      ['newer', 'older', 'untouched', 'finished'],
+    );
   });
 });

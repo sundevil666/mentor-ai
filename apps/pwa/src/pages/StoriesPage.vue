@@ -147,9 +147,22 @@
         <input ref="bookFileInput" class="personal-books__file-input" type="file" accept=".epub,.fb2,.txt,application/epub+zip,application/x-fictionbook+xml,text/plain" @change="handleBookFileSelection">
         <p class="personal-books__formats">Supported formats: EPUB, FB2, TXT. Maximum file size: 30 MB.</p>
 
-        <div v-if="personalBooks.length" class="personal-book-list">
+        <q-tabs
+          v-if="personalBooks.length"
+          v-model="activeBookAction"
+          class="personal-books__action-tabs"
+          active-color="primary"
+          align="justify"
+          indicator-color="primary"
+          no-caps
+        >
+          <q-tab name="read" icon="menu_book" :label="`To read (${readBookCount})`" />
+          <q-tab name="rewrite" icon="edit_note" :label="`To rewrite (${rewriteBookCount})`" />
+        </q-tabs>
+
+        <div v-if="displayedPersonalBooks.length" class="personal-book-list">
           <div
-            v-for="book in personalBooks"
+            v-for="book in displayedPersonalBooks"
             :key="book.id"
             class="personal-book-row"
           >
@@ -159,7 +172,7 @@
                 <strong>{{ book.title }}</strong>
                 <span class="personal-book-row__statuses">
                   <small :class="`personal-book-row__reading-status--${personalBookStatuses[book.id] ?? 'new'}`">
-                    {{ personalBookReadingStatusLabel(personalBookStatuses[book.id] ?? 'new') }}
+                    {{ completedBookStatusLabel(book) }}
                   </small>
                   <small v-if="book.difficultyAssessment" :class="`personal-book-row__recommendation--${book.difficultyAssessment.recommendation}`">
                     {{ book.difficultyAssessment.recommendation === 'read' ? 'Read' : 'Rewrite' }}
@@ -184,6 +197,11 @@
               <q-btn :aria-label="`Delete ${book.title}`" color="negative" flat icon="delete_outline" round @click="confirmDeleteBook(book)" />
             </div>
           </div>
+        </div>
+
+        <div v-else-if="personalBooks.length" class="personal-books__filtered-empty">
+          <q-icon :name="activeBookAction === 'read' ? 'menu_book' : 'edit_note'" size="38px" />
+          <p>{{ activeBookAction === 'read' ? 'No books to read in this list.' : 'No books to rewrite in this list.' }}</p>
         </div>
 
         <div v-else class="personal-books__empty">
@@ -575,7 +593,7 @@ import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot,
 import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { assessBookDifficulty } from 'src/services/book-difficulty-assessment';
-import { personalBookReadingStatus, personalBookReadingStatusLabel, type PersonalBookReadingStatus } from 'src/services/personal-book-status';
+import { personalBookAction, personalBookReadingStatus, personalBookReadingStatusLabel, sortPersonalBooksByActivity, type PersonalBookAction, type PersonalBookReadingStatus } from 'src/services/personal-book-status';
 import { readerWordContext } from 'src/services/reader-word-context';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, millisecondsUntilNextReadingDay, prepareDailyReadingProgress, recordDailyReadWords, type DailyReadingProgress } from 'src/services/daily-reading-progress';
@@ -686,6 +704,7 @@ let readingSpeechSuppressedForLookup = false;
 const dailyReadingProgress = ref<DailyReadingProgress>(readDailyReadingProgress());
 const personalBooks = ref<PersonalBook[]>([]);
 const personalBookStatuses = ref<Record<string, PersonalBookReadingStatus>>({});
+const activeBookAction = ref<PersonalBookAction>('read');
 const bookSyncing = ref(false);
 const bookSyncError = ref('');
 const cloudBookCount = ref<number | null>(null);
@@ -734,6 +753,18 @@ const readingCategories = computed(() => ([
     label: `Fiction (${personalBooks.value.length})`,
   },
 ]));
+const readBookCount = computed(() => personalBooks.value.filter((book) => personalBookAction(book) === 'read').length);
+const rewriteBookCount = computed(() => personalBooks.value.filter((book) => personalBookAction(book) === 'rewrite').length);
+const displayedPersonalBooks = computed(() => sortPersonalBooksByActivity(
+  personalBooks.value.filter((book) => personalBookAction(book) === activeBookAction.value),
+  personalBookStatuses.value,
+));
+
+function completedBookStatusLabel(book: PersonalBook) {
+  const status = personalBookStatuses.value[book.id] ?? 'new';
+  if (status === 'finished' && personalBookAction(book) === 'rewrite') return 'Written';
+  return personalBookReadingStatusLabel(status);
+}
 const bookSyncStatus = computed(() => {
   if (!getAuthToken()) return 'Sign in with Google to synchronize books across devices.';
   if (bookSyncing.value) return `Syncing ${personalBooks.value.length} local book${personalBooks.value.length === 1 ? '' : 's'}…`;

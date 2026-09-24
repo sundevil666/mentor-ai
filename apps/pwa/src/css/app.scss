@@ -2042,6 +2042,26 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   gap: 8px;
 }
 
+.personal-books__action-tabs {
+  background: var(--app-surface);
+  border: 1px solid var(--category-border);
+  border-radius: var(--app-radius-md);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.personal-books__filtered-empty {
+  align-items: center;
+  color: var(--app-text-muted);
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  padding: 40px 16px;
+  text-align: center;
+}
+
+.personal-books__filtered-empty p { margin: 0; }
+
 .personal-book-row {
   align-items: center;
   background: var(--app-surface);
