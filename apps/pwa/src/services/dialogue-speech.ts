@@ -1,26 +1,9 @@
-const numberWords: Record<string, string> = {
-  '0': 'zero',
-  '1': 'one',
-  '2': 'two',
-  '3': 'three',
-  '4': 'four',
-  '5': 'five',
-  '6': 'six',
-  '7': 'seven',
-  '8': 'eight',
-  '9': 'nine',
-  '10': 'ten',
-  '11': 'eleven',
-  '12': 'twelve',
-  '13': 'thirteen',
-  '14': 'fourteen',
-  '15': 'fifteen',
-  '16': 'sixteen',
-  '17': 'seventeen',
-  '18': 'eighteen',
-  '19': 'nineteen',
-  '20': 'twenty',
-};
+const smallNumberWords = [
+  'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+  'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen',
+  'seventeen', 'eighteen', 'nineteen',
+];
+const tensNumberWords = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
 // Speech recognition can write the same spoken word in either spelling.
 const spellingVariants: Record<string, string> = {
   analyse: 'analyze',
@@ -37,9 +20,29 @@ const spellingVariants: Record<string, string> = {
   travelling: 'traveling',
 };
 
-function normalizeWord(word: string): string {
+function integerToWords(value: number): string[] {
+  if (value < 20) return [smallNumberWords[value]!];
+  if (value < 100) {
+    const remainder = value % 10;
+    return [tensNumberWords[Math.floor(value / 10)]!, ...(remainder ? integerToWords(remainder) : [])];
+  }
+  if (value < 1_000) {
+    const remainder = value % 100;
+    return [...integerToWords(Math.floor(value / 100)), 'hundred', ...(remainder ? integerToWords(remainder) : [])];
+  }
+  if (value < 1_000_000) {
+    const remainder = value % 1_000;
+    return [...integerToWords(Math.floor(value / 1_000)), 'thousand', ...(remainder ? integerToWords(remainder) : [])];
+  }
+  return [String(value)];
+}
+
+function normalizeWord(word: string): string[] {
   const normalized = word.toLocaleLowerCase('en');
-  return numberWords[normalized] ?? spellingVariants[normalized] ?? normalized;
+  if (/^\d{1,3}(?:,\d{3})*$/.test(normalized)) {
+    return integerToWords(Number(normalized.replaceAll(',', '')));
+  }
+  return [spellingVariants[normalized] ?? normalized];
 }
 
 function words(text: string): string[] {
@@ -55,8 +58,8 @@ function words(text: string): string[] {
     .replace(/\bcan't\b/g, 'cannot')
     .replace(/\bwon't\b/g, 'will not')
     .replace(/\b([a-z]+)n't\b/g, '$1 not');
-  return (expanded.match(/[a-z]+(?:'[a-z]+)?|\d+/g) ?? [])
-    .map(normalizeWord);
+  return (expanded.match(/[a-z]+(?:'[a-z]+)?|\d{1,3}(?:,\d{3})*|\d+/g) ?? [])
+    .flatMap(normalizeWord);
 }
 
 export interface DialogueExpectedSegment {
@@ -72,7 +75,7 @@ export function resolveDialogueExpectedText(exercise: {
 }
 
 export function getDialogueExpectedSegments(transcript: string, expected: string): DialogueExpectedSegment[] {
-  const expectedMatches = [...expected.matchAll(/[a-z]+(?:'[a-z]+)?|\d+/gi)];
+  const expectedMatches = [...expected.matchAll(/[a-z]+(?:'[a-z]+)?|\d{1,3}(?:,\d{3})*|\d+/gi)];
   if (!expectedMatches.length) return expected ? [{ text: expected, matched: null }] : [];
 
   const target = expectedMatches.flatMap((match) => words(match[0]));

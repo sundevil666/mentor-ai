@@ -36,6 +36,23 @@ describe('dialogue speech recognition', () => {
     );
   });
 
+  it('accepts tens written as digits or words in both directions', () => {
+    const written = 'The bride was late for the wedding by forty minutes.';
+    const recognized = 'The bride was late for the wedding by 40 minutes.';
+
+    assert.equal(isConfidentDialogueAnswer(recognized, written), true);
+    assert.equal(isConfidentDialogueAnswer(written, recognized), true);
+    assert.equal(dialoguePreviewStatus(recognized, written, true), 'correct');
+    assert.equal(getDialogueExpectedSegments(recognized, written).filter((segment) => segment.matched === false).length, 0);
+    assert.equal(getDialogueExpectedSegments(written, recognized).filter((segment) => segment.matched === false).length, 0);
+  });
+
+  it('normalizes compound numbers instead of only single number words', () => {
+    assert.equal(isConfidentDialogueAnswer('It took 42 minutes', 'It took forty-two minutes'), true);
+    assert.equal(isConfidentDialogueAnswer('There were 1,125 people', 'There were one thousand one hundred twenty five people'), true);
+    assert.equal(isConfidentDialogueAnswer('It took 40 minutes', 'It took fourteen minutes'), false);
+  });
+
   it('accepts spoken contractions for a conditional and highlights the model answer', () => {
     const expected = 'If he were president, he would solve this problem.';
     const heard = "If he were president, he'd solve this problem.";
