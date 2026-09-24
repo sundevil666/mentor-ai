@@ -2049,7 +2049,7 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   border-radius: var(--app-radius-md);
   box-shadow: 0 8px 22px rgba(17, 24, 39, 0.06);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   overflow: hidden;
 }
 
@@ -2084,29 +2084,47 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
 }
 
 .personal-book-row__content strong,
-.personal-book-row__content small {
+.personal-book-row__difficulty {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.personal-book-row__content small {
+.personal-book-row__difficulty {
   color: var(--app-text-muted);
   font-size: 12px;
   font-weight: 700;
 }
 
-.personal-book-row__recommendation--read { color: var(--q-positive) !important; }
-.personal-book-row__recommendation--rewrite { color: var(--q-warning) !important; }
+.personal-book-row__statuses { display: flex; flex-wrap: wrap; gap: 6px; }
+.personal-book-row__statuses small { border-radius: 999px; font-size: 11px; font-weight: 800; padding: 3px 8px; }
+.personal-book-row__reading-status--new { background: var(--category-soft); color: var(--app-text-muted); }
+.personal-book-row__reading-status--started { background: rgba(33, 150, 243, .14); color: var(--q-primary); }
+.personal-book-row__reading-status--finished { background: rgba(33, 186, 69, .14); color: var(--q-positive); }
 
-.personal-book-row > .q-btn {
-  margin-right: 8px;
+.personal-book-row__recommendation--read { background: rgba(33, 186, 69, .14); color: var(--q-positive) !important; }
+.personal-book-row__recommendation--rewrite { background: rgba(242, 192, 55, .16); color: var(--q-warning) !important; }
+
+.personal-book-row__actions {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+  padding-right: 8px;
 }
 
 .personal-book-row__open:hover,
 .personal-book-row__open:focus-visible {
   background: var(--category-soft);
   outline: none;
+}
+
+@media (max-width: 520px) {
+  .personal-book-row { grid-template-columns: minmax(0, 1fr); }
+  .personal-book-row__actions {
+    border-top: 1px solid var(--category-border);
+    justify-content: space-between;
+    padding: 8px 10px;
+  }
 }
 
 .personal-books__add-button {

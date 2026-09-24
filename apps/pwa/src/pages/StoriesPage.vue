@@ -157,25 +157,32 @@
               <q-icon name="menu_book" />
               <span class="personal-book-row__content">
                 <strong>{{ book.title }}</strong>
-                <small v-if="book.difficultyAssessment" :class="`personal-book-row__recommendation--${book.difficultyAssessment.recommendation}`">
-                  {{ book.difficultyAssessment.recommendation === 'read' ? 'Read freely' : 'Rewrite and translate' }}
-                  · {{ book.difficultyAssessment.score }}/100 · {{ book.difficultyAssessment.confidence }} confidence
+                <span class="personal-book-row__statuses">
+                  <small :class="`personal-book-row__reading-status--${personalBookStatuses[book.id] ?? 'new'}`">
+                    {{ personalBookReadingStatusLabel(personalBookStatuses[book.id] ?? 'new') }}
+                  </small>
+                  <small v-if="book.difficultyAssessment" :class="`personal-book-row__recommendation--${book.difficultyAssessment.recommendation}`">
+                    {{ book.difficultyAssessment.recommendation === 'read' ? 'Read' : 'Rewrite' }}
+                  </small>
+                </span>
+                <small v-if="book.difficultyAssessment" class="personal-book-row__difficulty">
+                  Difficulty {{ book.difficultyAssessment.score }}/100 · {{ book.difficultyAssessment.confidence }} confidence
                 </small>
-                <small v-else>Difficulty has not been assessed yet</small>
               </span>
             </button>
-            <q-btn
-              :aria-label="`Analyze difficulty of ${book.title}`"
-              color="primary"
-              flat
-              icon="psychology"
-              round
-              :loading="assessingBookIds.has(book.id)"
-              @click="analyzeBookDifficulty(book)"
-            >
-              <q-tooltip>Analyze difficulty again</q-tooltip>
-            </q-btn>
-            <q-btn :aria-label="`Delete ${book.title}`" color="negative" flat icon="delete_outline" round @click="confirmDeleteBook(book)" />
+            <div class="personal-book-row__actions">
+              <q-btn
+                :aria-label="`Check difficulty of ${book.title}`"
+                color="primary"
+                icon="psychology"
+                label="Check difficulty"
+                no-caps
+                outline
+                :loading="assessingBookIds.has(book.id)"
+                @click="analyzeBookDifficulty(book)"
+              />
+              <q-btn :aria-label="`Delete ${book.title}`" color="negative" flat icon="delete_outline" round @click="confirmDeleteBook(book)" />
+            </div>
           </div>
         </div>
 
@@ -568,6 +575,7 @@ import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot,
 import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { assessBookDifficulty } from 'src/services/book-difficulty-assessment';
+import { personalBookReadingStatus, personalBookReadingStatusLabel, type PersonalBookReadingStatus } from 'src/services/personal-book-status';
 import { readerWordContext } from 'src/services/reader-word-context';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, millisecondsUntilNextReadingDay, prepareDailyReadingProgress, recordDailyReadWords, type DailyReadingProgress } from 'src/services/daily-reading-progress';
@@ -677,6 +685,7 @@ let readingSpeechPaceSampleAt = 0;
 let readingSpeechSuppressedForLookup = false;
 const dailyReadingProgress = ref<DailyReadingProgress>(readDailyReadingProgress());
 const personalBooks = ref<PersonalBook[]>([]);
+const personalBookStatuses = ref<Record<string, PersonalBookReadingStatus>>({});
 const bookSyncing = ref(false);
 const bookSyncError = ref('');
 const cloudBookCount = ref<number | null>(null);
@@ -831,6 +840,7 @@ onMounted(async () => {
     await refreshCompletedStories();
   } else {
     personalBooks.value = await listPersonalBooks();
+    await refreshPersonalBookStatuses();
   }
   document.addEventListener('visibilitychange', handleVisibilityChange);
   window.addEventListener('online', handleBookSyncWakeup);
@@ -903,6 +913,7 @@ async function confirmBookImport() {
     const book = await importPersonalBook(file);
     await analyzeBookDifficulty(book, false);
     personalBooks.value = await listPersonalBooks();
+    await refreshPersonalBookStatuses();
     const signedIn = Boolean(getAuthToken());
     const cloudSynced = signedIn && await syncPersonalBooks().then(() => true).catch(() => false);
     cancelBookImport();
@@ -936,6 +947,7 @@ async function analyzeBookDifficulty(book: PersonalBook, notify = true) {
     });
     await savePersonalBookDifficultyAssessment(book.id, assessment);
     personalBooks.value = await listPersonalBooks();
+    await refreshPersonalBookStatuses();
     if (selectedBook.value?.id === book.id) selectedBook.value = personalBooks.value.find((item) => item.id === book.id) ?? selectedBook.value;
     void syncPersonalBooks().catch(() => undefined);
     if (notify) {
@@ -970,6 +982,7 @@ function syncPersonalBooks(): Promise<void> {
     cloudBookCount.value = cloudBooks.length;
     await mergePersonalBookArchives(cloudBooks);
     personalBooks.value = await listPersonalBooks();
+    await refreshPersonalBookStatuses();
   })().catch((error) => {
     bookSyncError.value = error instanceof Error ? error.message : 'Unknown synchronization error.';
     throw error;
@@ -978,6 +991,15 @@ function syncPersonalBooks(): Promise<void> {
     personalBookSyncPromise = null;
   });
   return personalBookSyncPromise;
+}
+
+async function refreshPersonalBookStatuses() {
+  const entries = await Promise.all(personalBooks.value.map(async (book) => {
+    const progress = await loadContentProgress('reading', book.id);
+    const localProgress = readBookProgress(book.id, book.chapterCount);
+    return [book.id, personalBookReadingStatus(book, progress, localProgress.furthestProgressRatio)] as const;
+  }));
+  personalBookStatuses.value = Object.fromEntries(entries);
 }
 
 function handleBookSyncWakeup() {
@@ -1094,6 +1116,7 @@ async function openBook(bookId: string) {
   readerStopHistory.value = readReaderStopHistory(loaded.book.id);
   await markPersonalBookOpened(loaded.book);
   personalBooks.value = await listPersonalBooks();
+  await refreshPersonalBookStatuses();
   await nextTick();
   await repaginateReader(localBookProgress);
   if (shouldUseSyncedReaderPosition(localBookProgress.updatedAt, syncedReaderPositionUpdatedAt)) {
@@ -1110,6 +1133,7 @@ function closeBook() {
   stopReadingDeviceHeartbeat();
   void readingActivityTimer.stop();
   persistBookProgress();
+  void refreshPersonalBookStatuses();
   saveReadingPageSpeech();
   stopReaderPagination();
   applyReadingMode(false);
@@ -2548,6 +2572,7 @@ async function removeBook(book: PersonalBook) {
     localStorage.removeItem(readerMarkerKey(book.id));
     localStorage.removeItem(readerStopHistoryKey(book.id));
     personalBooks.value = await listPersonalBooks();
+    await refreshPersonalBookStatuses();
     Notify.create({ type: 'positive', message: `${book.title} was removed from this device.` });
   } catch {
     Notify.create({ type: 'negative', message: 'Could not delete this book.' });
