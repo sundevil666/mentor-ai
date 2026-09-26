@@ -5,8 +5,8 @@ export type PersonalBookAction = 'read' | 'rewrite';
 export type PersonalBookKanbanColumn = PersonalBookAction | 'done';
 
 export function bookReaderDifficultyRatingLabel(rating: BookReaderDifficultyRating | undefined) {
-  if (rating === 'very-hard') return 'Very hard';
-  if (rating === 'hard') return 'Hard';
+  if (rating === 'very-hard') return 'Unbearable';
+  if (rating === 'hard') return 'Hard, but manageable';
   if (rating === 'comfortable') return 'Comfortable';
   if (rating === 'easy') return 'Easy';
   return 'How does it feel?';
@@ -33,8 +33,8 @@ export function personalBookReadingStatusLabel(status: PersonalBookReadingStatus
 
 export function personalBookAction(book: PersonalReadingBook): PersonalBookAction {
   const rating = book.difficultyAssessment?.readerRating;
-  if (rating === 'easy' || rating === 'comfortable') return 'read';
-  if (rating === 'hard' || rating === 'very-hard') return 'rewrite';
+  if (rating === 'easy' || rating === 'comfortable' || rating === 'hard') return 'read';
+  if (rating === 'very-hard') return 'rewrite';
   return book.difficultyAssessment?.recommendation === 'rewrite' ? 'rewrite' : 'read';
 }
 

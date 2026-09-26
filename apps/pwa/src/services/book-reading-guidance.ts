@@ -52,40 +52,20 @@ export function applyReadingReview(
     ? Math.max(0, (Date.parse(now) - Date.parse(evidence.lastProgressAt)) / 86_400_000)
     : Infinity;
   const stalled = progressRatio > 0 && progressRatio < 0.995 && progressDelta < 0.01 && inactiveDays >= 7;
-  const ratingAdjustment: Record<BookReaderDifficultyRating, number> = {
-    'very-hard': 24,
-    hard: 12,
-    comfortable: -5,
-    easy: -12,
-  };
+  // Text difficulty is an objective analysis result. Reader experience is
+  // stored separately and calibrates the personal level, not this score.
   const initialScore = assessment.initialScore ?? assessment.score;
-  const evidenceScore = Math.round(clamp(
-    initialScore + (evidence.rating ? ratingAdjustment[evidence.rating] : 0) + (stalled ? 10 : 0) - (progressDelta >= 0.08 ? 6 : 0),
-    0,
-    100,
-  ));
-  const score = evidence.rating === 'very-hard' ? Math.max(80, evidenceScore)
-    : evidence.rating === 'hard' ? Math.max(65, evidenceScore)
-      : evidence.rating === 'comfortable' ? Math.min(55, evidenceScore)
-        : evidence.rating === 'easy' ? Math.min(45, evidenceScore)
-          : evidenceScore;
   const recommendation = evidence.rating
-    ? (evidence.rating === 'very-hard' || evidence.rating === 'hard' ? 'rewrite' : 'read')
-    : score >= 58 ? 'rewrite' : 'read';
-  const reasons = assessment.reasons.filter((reason) => !reason.startsWith('Weekly check:'));
-  if (evidence.rating) reasons.push(`Weekly check: you rated this book ${evidence.rating.replace('-', ' ')}.`);
-  if (stalled) reasons.push('Weekly check: reading progress has stalled for at least seven days.');
-  else if (progressDelta >= 0.08) reasons.push(`Weekly check: you advanced ${Math.round(progressDelta * 100)}% since the previous review.`);
+    ? (evidence.rating === 'very-hard' ? 'rewrite' : 'read')
+    : assessment.recommendation;
 
   return {
     ...assessment,
-    score,
+    score: initialScore,
     initialScore,
     recommendation,
-    confidence: evidence.rating || progressDelta > 0 ? 'high' : assessment.confidence,
+    reasons: [...assessment.reasons],
     personalEvidenceCount: assessment.personalEvidenceCount + (evidence.rating ? 1 : 0),
-    reasons,
-    analyzedAt: now,
     readerRating: evidence.rating ?? assessment.readerRating,
     lastReviewedProgressRatio: progressRatio,
     nextReviewAt: new Date(Date.parse(now) + bookDifficultyReviewIntervalMs).toISOString(),

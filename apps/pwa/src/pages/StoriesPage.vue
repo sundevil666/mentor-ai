@@ -191,13 +191,13 @@
                   :class="`personal-book-row__difficulty--${bookFitPrediction(book)?.band}`"
                 >
                   <span class="personal-book-row__difficulty-heading">
-                    <span>Difficulty</span>
+                    <span>Text difficulty</span>
                     <strong>{{ bookFitPrediction(book)?.calibratedDifficulty }}<small>/100</small></strong>
                   </span>
                   <span class="personal-book-row__difficulty-track" aria-hidden="true">
                     <span :style="{ width: `${bookFitPrediction(book)?.calibratedDifficulty ?? 0}%` }" />
                   </span>
-                  <span class="personal-book-row__fit-label">{{ bookFitPrediction(book)?.label }}</span>
+                  <span class="personal-book-row__fit-label">Your fit: {{ bookFitPrediction(book)?.label }}</span>
                 </span>
               </span>
             </button>
@@ -624,11 +624,11 @@
         <q-card-section>
           <div class="text-h6">How does this book feel?</div>
           <p class="q-mb-none">{{ difficultyReviewBook?.title }}</p>
-          <p class="text-caption q-mb-none">Your answer is combined with actual reading progress. You can change it at any time.</p>
+          <p class="text-caption q-mb-none">Your answer calibrates your reading level but does not change the book's text difficulty score. You can change it at any time.</p>
         </q-card-section>
         <q-card-section class="book-difficulty-review-dialog__choices q-pt-none">
-          <q-btn color="negative" :icon="difficultyReviewBook?.difficultyAssessment?.readerRating === 'very-hard' ? 'check' : undefined" label="Very hard → To rewrite" no-caps :outline="difficultyReviewBook?.difficultyAssessment?.readerRating !== 'very-hard'" :unelevated="difficultyReviewBook?.difficultyAssessment?.readerRating === 'very-hard'" @click="submitBookDifficultyReview('very-hard')" />
-          <q-btn color="warning" :icon="difficultyReviewBook?.difficultyAssessment?.readerRating === 'hard' ? 'check' : undefined" label="Hard → To rewrite" no-caps :outline="difficultyReviewBook?.difficultyAssessment?.readerRating !== 'hard'" :unelevated="difficultyReviewBook?.difficultyAssessment?.readerRating === 'hard'" @click="submitBookDifficultyReview('hard')" />
+          <q-btn color="negative" :icon="difficultyReviewBook?.difficultyAssessment?.readerRating === 'very-hard' ? 'drive_file_move' : 'edit_note'" label="Unbearable — move to translation" no-caps :outline="difficultyReviewBook?.difficultyAssessment?.readerRating !== 'very-hard'" :unelevated="difficultyReviewBook?.difficultyAssessment?.readerRating === 'very-hard'" @click="submitBookDifficultyReview('very-hard')" />
+          <q-btn color="warning" :icon="difficultyReviewBook?.difficultyAssessment?.readerRating === 'hard' ? 'check' : undefined" label="Hard, but manageable — keep reading" no-caps :outline="difficultyReviewBook?.difficultyAssessment?.readerRating !== 'hard'" :unelevated="difficultyReviewBook?.difficultyAssessment?.readerRating === 'hard'" @click="submitBookDifficultyReview('hard')" />
           <q-btn color="positive" :icon="difficultyReviewBook?.difficultyAssessment?.readerRating === 'comfortable' ? 'check' : undefined" label="Comfortable → To read" no-caps :outline="difficultyReviewBook?.difficultyAssessment?.readerRating !== 'comfortable'" :unelevated="difficultyReviewBook?.difficultyAssessment?.readerRating === 'comfortable'" @click="submitBookDifficultyReview('comfortable')" />
           <q-btn color="primary" :icon="difficultyReviewBook?.difficultyAssessment?.readerRating === 'easy' ? 'check' : undefined" label="Easy → To read" no-caps :outline="difficultyReviewBook?.difficultyAssessment?.readerRating !== 'easy'" :unelevated="difficultyReviewBook?.difficultyAssessment?.readerRating === 'easy'" @click="submitBookDifficultyReview('easy')" />
         </q-card-section>
@@ -1170,8 +1170,10 @@ async function submitBookDifficultyReview(rating: BookReaderDifficultyRating) {
     Notify.create({
       type: reviewed.recommendation === 'rewrite' ? 'warning' : 'positive',
       message: reviewed.recommendation === 'rewrite'
-        ? 'This book now belongs in To rewrite: translate it slowly in writing.'
-        : 'This book still fits fluent reading. A free next-book suggestion is ready in the library.',
+        ? 'Marked unbearable and moved to To rewrite for written translation.'
+        : rating === 'hard'
+          ? 'Saved as hard but manageable. The book stays in To read.'
+          : 'Your reading fit is saved. A free next-book suggestion is ready in the library.',
     });
   } catch (error) {
     Notify.create({ type: 'negative', message: error instanceof Error ? error.message : 'Could not save your book rating.' });

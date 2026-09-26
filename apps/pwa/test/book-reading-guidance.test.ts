@@ -14,18 +14,27 @@ describe('book reading guidance', () => {
     assert.equal(isBookDifficultyReviewDue(assessment, new Date('2026-09-08T00:00:00.000Z')), true);
   });
 
-  it('moves a self-rated very hard book to rewriting', () => {
+  it('moves only an unbearable book to rewriting without changing its text score', () => {
     const result = applyReadingReview(assessment, { progressRatio: 0.03, rating: 'very-hard', now: '2026-09-08T00:00:00.000Z' });
     assert.equal(result.recommendation, 'rewrite');
     assert.equal(result.readerRating, 'very-hard');
-    assert.equal(result.confidence, 'high');
+    assert.equal(result.score, assessment.score);
+    assert.equal(result.confidence, assessment.confidence);
   });
 
-  it('lets an explicit comfortable rating override a pessimistic text estimate', () => {
+  it('keeps a personal rating separate from the objective text estimate', () => {
     const result = applyReadingReview({ ...assessment, score: 82, initialScore: 82 }, {
       progressRatio: 0.2, rating: 'comfortable', now: '2026-09-08T00:00:00.000Z',
     });
     assert.equal(result.recommendation, 'read');
+    assert.equal(result.score, 82);
+  });
+
+  it('keeps a hard but manageable book in reading', () => {
+    const result = applyReadingReview(assessment, { progressRatio: 0.1, rating: 'hard', now: '2026-09-08T00:00:00.000Z' });
+    assert.equal(result.recommendation, 'read');
+    assert.equal(result.score, assessment.score);
+    assert.notEqual(result.reasons, assessment.reasons);
   });
 
   it('detects a started book with no weekly progress as stalled', () => {
@@ -33,7 +42,7 @@ describe('book reading guidance', () => {
       progressRatio: 0.2, lastProgressAt: '2026-09-01T00:00:00.000Z', now: '2026-09-10T00:00:00.000Z',
     });
     assert.equal(result.readingState, 'stalled');
-    assert.ok(result.reasons.some((reason) => reason.includes('stalled')));
+    assert.deepEqual(result.reasons, assessment.reasons);
   });
 
   it('recommends a free next book close to a slightly higher difficulty', () => {

@@ -19,27 +19,16 @@ export function assessBookDifficulty(input: BookDifficultyInput): BookDifficulty
   const sentenceLength = ratio(words.length, Math.max(1, sample.sentenceCount));
   const diversity = ratio(uniqueWords.size, words.length);
 
-  const difficultVocabulary = input.vocabulary.filter((item) => (item.lookupCount + (item.pronunciationCount ?? 0)) > 0);
-  const difficultWords = new Set(difficultVocabulary.map((item) => normalizeWord(item.normalizedText)).filter(Boolean));
-  const personalMatches = words.filter((word) => difficultWords.has(word)).length;
-  const vocabularyInteractions = difficultVocabulary.reduce((sum, item) => sum + item.lookupCount + (item.pronunciationCount ?? 0), 0);
-  const speech = Object.values(input.pageSpeech ?? {});
-  const speechWords = speech.reduce((sum, page) => sum + page.totalWords, 0);
-  const speechMisses = speech.reduce((sum, page) => sum + page.missedWords.length, 0);
-  const personalEvidenceCount = vocabularyInteractions + speechWords;
-
   const textScore = clamp(
     18 + uncommonRatio * 85 + longRatio * 120 + Math.max(0, sentenceLength - 12) * 1.25 + diversity * 20,
     0,
     100,
   );
-  const matchPenalty = Math.min(22, ratio(personalMatches, words.length) * 900);
-  const speechPenalty = speechWords >= 80 ? Math.min(22, ratio(speechMisses, speechWords) * 65) : 0;
-  const score = Math.round(clamp(textScore + matchPenalty + speechPenalty, 0, 100));
+  const score = Math.round(textScore);
   const recommendation = score >= 58 ? 'rewrite' : 'read';
-  const confidence = personalEvidenceCount >= 500 || vocabularyInteractions >= 30
+  const confidence = words.length >= 10_000
     ? 'high'
-    : personalEvidenceCount >= 80 || vocabularyInteractions >= 10
+    : words.length >= 3_000
       ? 'medium'
       : 'low';
   const reasons = [
@@ -47,9 +36,7 @@ export function assessBookDifficulty(input: BookDifficultyInput): BookDifficulty
       ? 'The text has enough dense or uncommon language to interrupt fluent reading.'
       : 'The text should allow mostly continuous reading without stopping at every sentence.',
   ];
-  if (personalMatches > 0) reasons.push(`${personalMatches} sampled words match vocabulary that has already caused difficulty.`);
-  if (speechWords >= 80) reasons.push(`Your reading history in this book includes ${speechMisses} missed words out of ${speechWords} tracked words.`);
-  if (confidence === 'low') reasons.push('There is little personal reading evidence, so this estimate relies mainly on the book text.');
+  if (confidence === 'low') reasons.push('The text sample is short, so this objective estimate has low confidence.');
 
   return {
     version: 1,
@@ -58,7 +45,7 @@ export function assessBookDifficulty(input: BookDifficultyInput): BookDifficulty
     initialScore: score,
     confidence,
     sampledWords: words.length,
-    personalEvidenceCount,
+    personalEvidenceCount: 0,
     reasons,
     analyzedAt: input.now ?? new Date().toISOString(),
     lastReviewedProgressRatio: 0,

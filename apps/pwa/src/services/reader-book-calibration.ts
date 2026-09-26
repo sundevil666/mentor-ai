@@ -26,7 +26,7 @@ export function calibrateReaderFromBooks(
     if (!assessment) continue;
     const raw = assessment.initialScore ?? assessment.score;
     if (assessment.readerRating) {
-      const offset = { 'very-hard': -18, hard: -8, comfortable: 8, easy: 18 }[assessment.readerRating];
+      const offset = { 'very-hard': -15, hard: -6, comfortable: 6, easy: 15 }[assessment.readerRating];
       observations.push({ ability: raw + offset, weight: 2 });
     }
     if (assessment.readingState === 'stalled') observations.push({ ability: raw - 14, weight: 1.5 });
@@ -50,16 +50,10 @@ export function calibrateReaderFromBooks(
 export function predictBookFit(
   assessment: Pick<BookDifficultyAssessment, 'score' | 'initialScore' | 'readerRating' | 'readingState' | 'recommendation'>,
   calibration: ReaderBookCalibration,
-  status: PersonalBookReadingStatus = 'new',
+  _status: PersonalBookReadingStatus = 'new',
 ): BookFitPrediction {
   const raw = assessment.initialScore ?? assessment.score;
-  const ratingAdjustment = assessment.readerRating
-    ? { 'very-hard': 18, hard: 10, comfortable: -5, easy: -12 }[assessment.readerRating]
-    : 0;
-  const behaviorAdjustment = assessment.readingState === 'stalled' ? 10
-    : status === 'finished' && assessment.recommendation === 'read' ? -4
-      : 0;
-  const calibratedDifficulty = Math.round(clamp(raw + ratingAdjustment + behaviorAdjustment, 0, 100));
+  const calibratedDifficulty = Math.round(clamp(raw, 0, 100));
   const gap = calibratedDifficulty - calibration.readerAbility;
   const band: BookFitBand = assessment.readerRating === 'easy' ? 'easy'
     : assessment.readerRating === 'comfortable' ? 'good-fit'

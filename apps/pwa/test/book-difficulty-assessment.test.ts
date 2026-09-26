@@ -16,10 +16,10 @@ describe('book difficulty assessment', () => {
     });
     assert.equal(result.recommendation, 'read');
     assert.equal(result.confidence, 'low');
-    assert.match(result.reasons.at(-1) ?? '', /relies mainly on the book text/);
+    assert.match(result.reasons.at(-1) ?? '', /text sample is short/);
   });
 
-  it('recommends rewriting dense prose and includes personal difficulty evidence', () => {
+  it('recommends rewriting dense prose without mixing in personal difficulty evidence', () => {
     const hard = 'The epistemological incongruities proliferated through incomprehensible bureaucratization, metamorphosing simultaneously into counterintuitive anthropomorphic manifestations.';
     const vocabulary: ReaderVocabularyItem[] = [{
       id: 'reader-vocabulary:student:epistemological',
@@ -36,21 +36,23 @@ describe('book difficulty assessment', () => {
     }];
     const result = assessBookDifficulty({ pages: [page(hard)], vocabulary });
     assert.equal(result.recommendation, 'rewrite');
-    assert.equal(result.confidence, 'medium');
-    assert.ok(result.reasons.some((reason) => reason.includes('match vocabulary')));
+    assert.equal(result.confidence, 'low');
+    assert.equal(result.personalEvidenceCount, 0);
+    assert.ok(result.reasons.every((reason) => !reason.includes('vocabulary')));
   });
 
-  it('uses existing page-reading misses when an old book is analyzed again', () => {
+  it('does not let page-reading misses alter objective text difficulty', () => {
     const text = Array.from({ length: 100 }, () => 'time').join(' ');
-    const result = assessBookDifficulty({
+    const baseline = assessBookDifficulty({ pages: [page(text)], vocabulary: [] });
+    const withReadingHistory = assessBookDifficulty({
       pages: [page(text)],
       vocabulary: [],
       pageSpeech: {
         0: { pageIndex: 0, totalWords: 100, correctWords: 55, missedWords: Array.from({ length: 45 }, (_, index) => ({ index, word: 'time' })) },
       },
     });
-    assert.equal(result.confidence, 'medium');
-    assert.ok(result.score >= 40);
-    assert.ok(result.reasons.some((reason) => reason.includes('45 missed words')));
+    assert.equal(withReadingHistory.score, baseline.score);
+    assert.equal(withReadingHistory.confidence, baseline.confidence);
+    assert.deepEqual(withReadingHistory.reasons, baseline.reasons);
   });
 });

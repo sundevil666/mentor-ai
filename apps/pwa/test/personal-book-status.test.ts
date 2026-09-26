@@ -20,8 +20,8 @@ function progress(input: Partial<ContentProgress>): ContentProgress {
 describe('personal book reading status', () => {
   it('shows the saved reader difficulty choice in the rating control', () => {
     assert.equal(bookReaderDifficultyRatingLabel(undefined), 'How does it feel?');
-    assert.equal(bookReaderDifficultyRatingLabel('very-hard'), 'Very hard');
-    assert.equal(bookReaderDifficultyRatingLabel('hard'), 'Hard');
+    assert.equal(bookReaderDifficultyRatingLabel('very-hard'), 'Unbearable');
+    assert.equal(bookReaderDifficultyRatingLabel('hard'), 'Hard, but manageable');
     assert.equal(bookReaderDifficultyRatingLabel('comfortable'), 'Comfortable');
     assert.equal(bookReaderDifficultyRatingLabel('easy'), 'Easy');
   });
@@ -52,6 +52,10 @@ describe('personal book reading status', () => {
     assert.equal(personalBookAction({ ...book, difficultyAssessment: {
       version: 1, recommendation: 'read', score: 35, confidence: 'high', sampledWords: 100,
       personalEvidenceCount: 1, reasons: [], analyzedAt: '2026-09-24T00:00:00.000Z', readerRating: 'hard',
+    } }), 'read');
+    assert.equal(personalBookAction({ ...book, difficultyAssessment: {
+      version: 1, recommendation: 'read', score: 35, confidence: 'high', sampledWords: 100,
+      personalEvidenceCount: 1, reasons: [], analyzedAt: '2026-09-24T00:00:00.000Z', readerRating: 'very-hard',
     } }), 'rewrite');
   });
 
