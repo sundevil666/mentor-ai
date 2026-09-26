@@ -180,9 +180,16 @@
                     {{ book.difficultyAssessment.recommendation === 'read' ? 'Read' : 'Rewrite' }}
                   </small>
                 </span>
-                <small v-if="book.difficultyAssessment" class="personal-book-row__difficulty">
-                  Difficulty {{ book.difficultyAssessment.score }}/100 · {{ book.difficultyAssessment.confidence }} confidence
-                </small>
+                <span v-if="book.difficultyAssessment" class="personal-book-row__difficulty">
+                  <span class="personal-book-row__difficulty-heading">
+                    <span>Difficulty</span>
+                    <strong>{{ book.difficultyAssessment.score }}<small>/100</small></strong>
+                  </span>
+                  <span class="personal-book-row__difficulty-track" aria-hidden="true">
+                    <span :style="{ width: `${book.difficultyAssessment.score}%` }" />
+                  </span>
+                  <small>{{ book.difficultyAssessment.confidence }} confidence</small>
+                </span>
               </span>
             </button>
             <div class="personal-book-row__actions">
@@ -196,14 +203,20 @@
               />
               <q-btn
                 :aria-label="`Check difficulty of ${book.title}`"
+                :class="{
+                  'personal-book-row__difficulty-check--pending': !book.difficultyAssessment,
+                  'personal-book-row__difficulty-check--complete': book.difficultyAssessment,
+                }"
                 color="primary"
                 icon="psychology"
-                label="Check difficulty"
-                no-caps
-                outline
+                round
+                :flat="Boolean(book.difficultyAssessment)"
+                :unelevated="!book.difficultyAssessment"
                 :loading="assessingBookIds.has(book.id)"
                 @click="analyzeBookDifficulty(book)"
-              />
+              >
+                <q-tooltip>{{ book.difficultyAssessment ? 'Check difficulty again' : 'Check difficulty' }}</q-tooltip>
+              </q-btn>
               <q-btn :aria-label="`Delete ${book.title}`" color="negative" flat icon="delete_outline" round @click="confirmDeleteBook(book)" />
             </div>
           </div>
@@ -1045,11 +1058,21 @@ async function analyzeBookDifficulty(book: PersonalBook, notify = true) {
     const archive = await loadPersonalBook(book.id);
     if (!archive) throw new Error('This book is no longer available on this device.');
     const vocabulary = await listReaderVocabulary(appStore.studentId);
-    const assessment = assessBookDifficulty({
+    const freshAssessment = assessBookDifficulty({
       pages: archive.pages,
       vocabulary,
       pageSpeech: readReadingPageSummaries(appStore.studentId, book.id),
     });
+    const previousAssessment = archive.book.difficultyAssessment;
+    const progress = readBookProgress(book.id, archive.pages.length);
+    const assessment = previousAssessment?.readerRating
+      ? applyReadingReview(freshAssessment, {
+        progressRatio: progress.furthestProgressRatio ?? progress.progressRatio ?? 0,
+        lastProgressAt: progress.updatedAt ?? archive.book.lastOpenedAt,
+        rating: previousAssessment.readerRating,
+        now: freshAssessment.analyzedAt,
+      })
+      : freshAssessment;
     await savePersonalBookDifficultyAssessment(book.id, assessment);
     personalBooks.value = await listPersonalBooks();
     await refreshPersonalBookStatuses();

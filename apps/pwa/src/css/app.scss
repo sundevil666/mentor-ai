@@ -2180,8 +2180,7 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   min-width: 0;
 }
 
-.personal-book-row__content strong,
-.personal-book-row__difficulty {
+.personal-book-row__content > strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2189,8 +2188,44 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
 
 .personal-book-row__difficulty {
   color: var(--app-text-muted);
-  font-size: 12px;
+  display: grid;
+  font-size: 11px;
   font-weight: 700;
+  gap: 3px;
+  max-width: 280px;
+}
+
+.personal-book-row__difficulty-heading {
+  align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+}
+
+.personal-book-row__difficulty-heading strong {
+  color: var(--app-text-strong);
+  font-size: 17px;
+  line-height: 1;
+}
+
+.personal-book-row__difficulty-heading strong small {
+  color: var(--app-text-muted);
+  font-size: 10px;
+  margin-left: 2px;
+}
+
+.personal-book-row__difficulty-track {
+  background: color-mix(in srgb, var(--category-accent) 16%, transparent);
+  border-radius: 999px;
+  display: block;
+  height: 5px;
+  overflow: hidden;
+}
+
+.personal-book-row__difficulty-track > span {
+  background: linear-gradient(90deg, var(--q-positive), var(--q-warning), var(--q-negative));
+  border-radius: inherit;
+  display: block;
+  height: 100%;
 }
 
 .personal-book-row__statuses { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -2207,6 +2242,24 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   display: flex;
   gap: 4px;
   padding-right: 8px;
+}
+
+.personal-book-row__difficulty-check--complete { opacity: .58; }
+.personal-book-row__difficulty-check--complete:hover,
+.personal-book-row__difficulty-check--complete:focus-visible { opacity: 1; }
+
+.personal-book-row__difficulty-check--pending {
+  animation: difficulty-check-pulse 1.8s ease-in-out infinite;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--q-primary) 42%, transparent);
+}
+
+@keyframes difficulty-check-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--q-primary) 38%, transparent); transform: scale(1); }
+  50% { box-shadow: 0 0 0 7px transparent; transform: scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .personal-book-row__difficulty-check--pending { animation: none; }
 }
 
 .personal-books__next-recommendation {
