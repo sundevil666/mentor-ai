@@ -24,6 +24,9 @@ export function personalBookReadingStatusLabel(status: PersonalBookReadingStatus
 }
 
 export function personalBookAction(book: PersonalReadingBook): PersonalBookAction {
+  const rating = book.difficultyAssessment?.readerRating;
+  if (rating === 'easy' || rating === 'comfortable') return 'read';
+  if (rating === 'hard' || rating === 'very-hard') return 'rewrite';
   return book.difficultyAssessment?.recommendation === 'rewrite' ? 'rewrite' : 'read';
 }
 

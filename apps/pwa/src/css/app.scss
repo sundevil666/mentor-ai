@@ -2098,6 +2098,23 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   margin: 0;
 }
 
+.personal-books__ability {
+  align-items: center;
+  background: color-mix(in srgb, var(--category-accent) 9%, var(--app-surface));
+  border: 1px solid color-mix(in srgb, var(--category-accent) 28%, transparent);
+  border-radius: 14px;
+  color: var(--app-text-muted);
+  display: flex;
+  gap: 10px;
+  padding: 10px 14px;
+}
+
+.personal-books__ability > .q-icon { color: var(--category-accent); font-size: 24px; }
+.personal-books__ability > span { display: grid; line-height: 1.05; }
+.personal-books__ability strong { color: var(--app-text-strong); font-size: 18px; }
+.personal-books__ability > small:last-child { margin-left: auto; text-align: right; }
+.personal-books__ability--low { opacity: .72; }
+
 .personal-books__empty h2 {
   color: var(--app-text-strong);
   font-size: 1.25rem;
@@ -2222,11 +2239,36 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
 }
 
 .personal-book-row__difficulty-track > span {
-  background: linear-gradient(90deg, var(--q-positive), var(--q-warning), var(--q-negative));
+  background: currentColor;
   border-radius: inherit;
   display: block;
   height: 100%;
 }
+
+.personal-book-row__difficulty--easy { color: #35b98a; }
+.personal-book-row__difficulty--good-fit { color: var(--q-positive); }
+.personal-book-row__difficulty--stretch { color: var(--q-warning); }
+.personal-book-row__difficulty--too-hard { color: var(--q-negative); }
+
+.personal-book-row__fit-label {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .02em;
+}
+
+.personal-books__recommendation-fit {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  margin: 0 0 10px;
+  padding: 5px 9px;
+}
+
+.personal-book-row__fit-label--easy { background: rgba(53, 185, 138, .14); color: #35b98a; }
+.personal-book-row__fit-label--good-fit { background: rgba(33, 186, 69, .14); color: var(--q-positive); }
+.personal-book-row__fit-label--stretch { background: rgba(242, 192, 55, .16); color: var(--q-warning); }
+.personal-book-row__fit-label--too-hard { background: rgba(193, 52, 52, .14); color: var(--q-negative); }
 
 .personal-book-row__statuses { display: flex; flex-wrap: wrap; gap: 6px; }
 .personal-book-row__statuses small { border-radius: 999px; font-size: 11px; font-weight: 800; padding: 3px 8px; }
@@ -2290,6 +2332,8 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
     padding: 8px 10px;
   }
   .book-difficulty-review-dialog__choices { grid-template-columns: 1fr; }
+  .personal-books__ability { align-items: flex-start; flex-wrap: wrap; }
+  .personal-books__ability > small:last-child { margin-left: 34px; text-align: left; width: 100%; }
 }
 
 .personal-books__add-button {

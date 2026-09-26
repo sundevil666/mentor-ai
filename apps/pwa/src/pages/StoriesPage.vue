@@ -146,6 +146,11 @@
       <section v-else-if="!isAudioLibrary && !selectedBook && activeReadingCategory === 'fiction'" class="personal-books" aria-label="Fiction books">
         <input ref="bookFileInput" class="personal-books__file-input" type="file" accept=".epub,.fb2,.txt,application/epub+zip,application/x-fictionbook+xml,text/plain" @change="handleBookFileSelection">
         <p class="personal-books__formats">Supported formats: EPUB, FB2, TXT. Maximum file size: 30 MB.</p>
+        <div class="personal-books__ability" :class="`personal-books__ability--${readerBookCalibration.confidence}`">
+          <q-icon name="auto_graph" />
+          <span><small>Your reading fit</small><strong>{{ readerBookCalibration.readerAbility }}/100</strong></span>
+          <small>Calibrated from {{ readerBookCalibration.evidenceCount }} real {{ readerBookCalibration.evidenceCount === 1 ? 'signal' : 'signals' }}</small>
+        </div>
 
         <q-tabs
           v-if="personalBooks.length"
@@ -176,19 +181,23 @@
                   <small :class="`personal-book-row__reading-status--${personalBookStatuses[book.id] ?? 'new'}`">
                     {{ completedBookStatusLabel(book) }}
                   </small>
-                  <small v-if="book.difficultyAssessment" :class="`personal-book-row__recommendation--${book.difficultyAssessment.recommendation}`">
-                    {{ book.difficultyAssessment.recommendation === 'read' ? 'Read' : 'Rewrite' }}
+                  <small v-if="book.difficultyAssessment" :class="`personal-book-row__recommendation--${personalBookAction(book)}`">
+                    {{ personalBookAction(book) === 'read' ? 'Read' : 'Rewrite' }}
                   </small>
                 </span>
-                <span v-if="book.difficultyAssessment" class="personal-book-row__difficulty">
+                <span
+                  v-if="book.difficultyAssessment"
+                  class="personal-book-row__difficulty"
+                  :class="`personal-book-row__difficulty--${bookFitPrediction(book)?.band}`"
+                >
                   <span class="personal-book-row__difficulty-heading">
                     <span>Difficulty</span>
-                    <strong>{{ book.difficultyAssessment.score }}<small>/100</small></strong>
+                    <strong>{{ bookFitPrediction(book)?.calibratedDifficulty }}<small>/100</small></strong>
                   </span>
                   <span class="personal-book-row__difficulty-track" aria-hidden="true">
-                    <span :style="{ width: `${book.difficultyAssessment.score}%` }" />
+                    <span :style="{ width: `${bookFitPrediction(book)?.calibratedDifficulty ?? 0}%` }" />
                   </span>
-                  <small>{{ book.difficultyAssessment.confidence }} confidence</small>
+                  <span class="personal-book-row__fit-label">{{ bookFitPrediction(book)?.label }}</span>
                 </span>
               </span>
             </button>
@@ -238,6 +247,9 @@
             <div class="text-overline">A good next step</div>
             <div class="text-h6">{{ nextFreeBookRecommendation.title }}</div>
             <p class="q-mb-sm">{{ nextFreeBookRecommendation.author }} · target difficulty {{ nextFreeBookRecommendation.targetDifficulty }}/100</p>
+            <p class="personal-books__recommendation-fit" :class="`personal-book-row__fit-label--${nextFreeBookFit?.band}`">
+              {{ nextFreeBookFit?.label }} for your current {{ readerBookCalibration.readerAbility }}/100 reading fit
+            </p>
             <p class="text-caption">Free legal edition when permitted in your country. Check the source's copyright note before downloading.</p>
             <q-btn
               color="primary"
@@ -609,10 +621,10 @@
           <p class="text-caption q-mb-none">Your answer is combined with actual reading progress. You can change it at any time.</p>
         </q-card-section>
         <q-card-section class="book-difficulty-review-dialog__choices q-pt-none">
-          <q-btn color="negative" label="Very hard" no-caps outline @click="submitBookDifficultyReview('very-hard')" />
-          <q-btn color="warning" label="Hard" no-caps outline @click="submitBookDifficultyReview('hard')" />
-          <q-btn color="positive" label="Comfortable" no-caps outline @click="submitBookDifficultyReview('comfortable')" />
-          <q-btn color="primary" label="Easy" no-caps outline @click="submitBookDifficultyReview('easy')" />
+          <q-btn color="negative" label="Very hard → To rewrite" no-caps outline @click="submitBookDifficultyReview('very-hard')" />
+          <q-btn color="warning" label="Hard → To rewrite" no-caps outline @click="submitBookDifficultyReview('hard')" />
+          <q-btn color="positive" label="Comfortable → To read" no-caps outline @click="submitBookDifficultyReview('comfortable')" />
+          <q-btn color="primary" label="Easy → To read" no-caps outline @click="submitBookDifficultyReview('easy')" />
         </q-card-section>
         <q-card-actions align="right"><q-btn flat label="Not now" no-caps v-close-popup /></q-card-actions>
       </q-card>
@@ -665,7 +677,8 @@ import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot,
 import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { assessBookDifficulty } from 'src/services/book-difficulty-assessment';
-import { applyReadingReview, isBookDifficultyReviewDue, recommendNextFreeBook } from 'src/services/book-reading-guidance';
+import { applyReadingReview, isBookDifficultyReviewDue, preserveBookLaneOnDifficultyCheck, recommendNextFreeBook } from 'src/services/book-reading-guidance';
+import { calibrateReaderFromBooks, predictBookFit, predictUnseenBookFit } from 'src/services/reader-book-calibration';
 import { personalBookAction, personalBookKanbanColumn, personalBookReadingStatus, personalBookReadingStatusLabel, sortPersonalBooksByActivity, type PersonalBookKanbanColumn, type PersonalBookReadingStatus } from 'src/services/personal-book-status';
 import { readerWordContext } from 'src/services/reader-word-context';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
@@ -833,6 +846,12 @@ const personalBookColumn = (book: PersonalBook) => personalBookKanbanColumn(book
 const readBookCount = computed(() => personalBooks.value.filter((book) => personalBookColumn(book) === 'read').length);
 const rewriteBookCount = computed(() => personalBooks.value.filter((book) => personalBookColumn(book) === 'rewrite').length);
 const doneBookCount = computed(() => personalBooks.value.filter((book) => personalBookColumn(book) === 'done').length);
+const readerBookCalibration = computed(() => calibrateReaderFromBooks(personalBooks.value, personalBookStatuses.value));
+function bookFitPrediction(book: PersonalBook) {
+  return book.difficultyAssessment
+    ? predictBookFit(book.difficultyAssessment, readerBookCalibration.value, personalBookStatuses.value[book.id] ?? 'new')
+    : null;
+}
 const displayedPersonalBooks = computed(() => sortPersonalBooksByActivity(
   personalBooks.value.filter((book) => activeBookSection.value !== 'recommendations' && personalBookColumn(book) === activeBookSection.value),
   personalBookStatuses.value,
@@ -843,9 +862,12 @@ const nextFreeBookRecommendation = computed(() => {
   ));
   const source = flowingBooks.sort((left, right) => (right.difficultyAssessment?.analyzedAt ?? '').localeCompare(left.difficultyAssessment?.analyzedAt ?? ''))[0];
   return source?.difficultyAssessment
-    ? recommendNextFreeBook(source.difficultyAssessment.score, personalBooks.value.map((book) => book.title))
+    ? recommendNextFreeBook(readerBookCalibration.value.readerAbility, personalBooks.value.map((book) => book.title))
     : null;
 });
+const nextFreeBookFit = computed(() => nextFreeBookRecommendation.value
+  ? predictUnseenBookFit(nextFreeBookRecommendation.value.targetDifficulty, readerBookCalibration.value)
+  : null);
 
 function completedBookStatusLabel(book: PersonalBook) {
   const status = personalBookStatuses.value[book.id] ?? 'new';
@@ -1029,7 +1051,7 @@ async function confirmBookImport() {
   importingBook.value = true;
   try {
     const book = await importPersonalBook(file);
-    await analyzeBookDifficulty(book, false);
+    await analyzeBookDifficulty(book, false, true);
     personalBooks.value = await listPersonalBooks();
     await refreshPersonalBookStatuses();
     const signedIn = Boolean(getAuthToken());
@@ -1051,7 +1073,7 @@ async function confirmBookImport() {
   }
 }
 
-async function analyzeBookDifficulty(book: PersonalBook, notify = true) {
+async function analyzeBookDifficulty(book: PersonalBook, notify = true, allowPlacementChange = false) {
   if (assessingBookIds.value.has(book.id)) return;
   assessingBookIds.value = new Set(assessingBookIds.value).add(book.id);
   try {
@@ -1065,7 +1087,7 @@ async function analyzeBookDifficulty(book: PersonalBook, notify = true) {
     });
     const previousAssessment = archive.book.difficultyAssessment;
     const progress = readBookProgress(book.id, archive.pages.length);
-    const assessment = previousAssessment?.readerRating
+    const reviewedAssessment = previousAssessment?.readerRating
       ? applyReadingReview(freshAssessment, {
         progressRatio: progress.furthestProgressRatio ?? progress.progressRatio ?? 0,
         lastProgressAt: progress.updatedAt ?? archive.book.lastOpenedAt,
@@ -1073,6 +1095,11 @@ async function analyzeBookDifficulty(book: PersonalBook, notify = true) {
         now: freshAssessment.analyzedAt,
       })
       : freshAssessment;
+    const assessment = preserveBookLaneOnDifficultyCheck(
+      reviewedAssessment,
+      personalBookAction(book),
+      allowPlacementChange || Boolean(previousAssessment?.readerRating),
+    );
     await savePersonalBookDifficultyAssessment(book.id, assessment);
     personalBooks.value = await listPersonalBooks();
     await refreshPersonalBookStatuses();
@@ -1088,6 +1115,13 @@ async function analyzeBookDifficulty(book: PersonalBook, notify = true) {
         caption: assessment.reasons.join(' '),
         timeout: 8000,
       });
+      if (!allowPlacementChange) {
+        Notify.create({
+          type: 'info',
+          message: 'Difficulty updated without moving the book. Use “How does it feel?” to change its column.',
+          timeout: 5000,
+        });
+      }
     }
   } catch (error) {
     if (notify) Notify.create({ type: 'negative', message: error instanceof Error ? error.message : 'Could not analyze this book.' });

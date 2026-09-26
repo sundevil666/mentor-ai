@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { BookDifficultyAssessment } from '@mentor-ai/shared';
-import { applyReadingReview, isBookDifficultyReviewDue, recommendNextFreeBook } from '../src/services/book-reading-guidance.js';
+import { applyReadingReview, isBookDifficultyReviewDue, preserveBookLaneOnDifficultyCheck, recommendNextFreeBook } from '../src/services/book-reading-guidance.js';
 
 const assessment: BookDifficultyAssessment = {
   version: 1, recommendation: 'read', score: 46, confidence: 'low', sampledWords: 1000,
@@ -55,5 +55,11 @@ describe('book reading guidance', () => {
       'The Adventures of Sherlock Holmes', 'Pride and Prejudice',
     ]);
     assert.equal(result, null);
+  });
+
+  it('does not move a book when the user only checks its difficulty again', () => {
+    const machineResult = { ...assessment, recommendation: 'rewrite' as const, score: 72 };
+    assert.equal(preserveBookLaneOnDifficultyCheck(machineResult, 'read', false).recommendation, 'read');
+    assert.equal(preserveBookLaneOnDifficultyCheck(machineResult, 'read', true).recommendation, 'rewrite');
   });
 });

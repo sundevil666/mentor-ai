@@ -36,6 +36,17 @@ describe('personal book reading status', () => {
     } }), 'rewrite');
   });
 
+  it('uses the reader rating to repair an outdated machine-selected column', () => {
+    assert.equal(personalBookAction({ ...book, difficultyAssessment: {
+      version: 1, recommendation: 'rewrite', score: 70, confidence: 'high', sampledWords: 100,
+      personalEvidenceCount: 1, reasons: [], analyzedAt: '2026-09-24T00:00:00.000Z', readerRating: 'comfortable',
+    } }), 'read');
+    assert.equal(personalBookAction({ ...book, difficultyAssessment: {
+      version: 1, recommendation: 'read', score: 35, confidence: 'high', sampledWords: 100,
+      personalEvidenceCount: 1, reasons: [], analyzedAt: '2026-09-24T00:00:00.000Z', readerRating: 'hard',
+    } }), 'rewrite');
+  });
+
   it('moves both read and rewrite books to done after completion', () => {
     const rewriteBook: PersonalReadingBook = { ...book, difficultyAssessment: {
       version: 1, recommendation: 'rewrite', score: 80, confidence: 'medium', sampledWords: 100,

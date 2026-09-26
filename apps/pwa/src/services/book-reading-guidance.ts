@@ -1,4 +1,5 @@
 import type { BookDifficultyAssessment, BookReaderDifficultyRating, PersonalReadingBook } from '@mentor-ai/shared';
+import type { PersonalBookAction } from './personal-book-status';
 
 export const bookDifficultyReviewIntervalMs = 7 * 24 * 60 * 60 * 1000;
 
@@ -29,6 +30,14 @@ export function isBookDifficultyReviewDue(assessment: BookDifficultyAssessment |
   if (!assessment) return false;
   const dueAt = Date.parse(assessment.nextReviewAt ?? assessment.analyzedAt) + (assessment.nextReviewAt ? 0 : bookDifficultyReviewIntervalMs);
   return Number.isFinite(dueAt) && now.getTime() >= dueAt;
+}
+
+export function preserveBookLaneOnDifficultyCheck(
+  assessment: BookDifficultyAssessment,
+  currentAction: PersonalBookAction,
+  allowPlacementChange: boolean,
+): BookDifficultyAssessment {
+  return allowPlacementChange ? assessment : { ...assessment, recommendation: currentAction };
 }
 
 export function applyReadingReview(
