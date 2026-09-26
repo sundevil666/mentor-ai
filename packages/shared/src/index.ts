@@ -343,12 +343,19 @@ export interface BookDifficultyAssessment {
   version: 1;
   recommendation: BookReadingRecommendation;
   score: number;
+  initialScore?: number;
   confidence: 'low' | 'medium' | 'high';
   sampledWords: number;
   personalEvidenceCount: number;
   reasons: string[];
   analyzedAt: string;
+  readerRating?: BookReaderDifficultyRating;
+  lastReviewedProgressRatio?: number;
+  nextReviewAt?: string;
+  readingState?: 'not-started' | 'active' | 'stalled';
 }
+
+export type BookReaderDifficultyRating = 'very-hard' | 'hard' | 'comfortable' | 'easy';
 
 export interface PersonalReadingBookArchive {
   source: ReadingImportSource;

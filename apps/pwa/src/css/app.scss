@@ -2132,6 +2132,20 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
   padding-right: 8px;
 }
 
+.personal-books__next-recommendation {
+  background: linear-gradient(135deg, var(--category-soft), transparent);
+  border-color: var(--category-border);
+  border-radius: 18px;
+  margin-top: 18px;
+}
+
+.book-difficulty-review-dialog { width: min(92vw, 480px); }
+.book-difficulty-review-dialog__choices {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .personal-book-row__open:hover,
 .personal-book-row__open:focus-visible {
   background: var(--category-soft);
@@ -2145,6 +2159,7 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
     justify-content: space-between;
     padding: 8px 10px;
   }
+  .book-difficulty-review-dialog__choices { grid-template-columns: 1fr; }
 }
 
 .personal-books__add-button {

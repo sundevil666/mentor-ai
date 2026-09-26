@@ -185,6 +185,14 @@
             </button>
             <div class="personal-book-row__actions">
               <q-btn
+                :aria-label="`Rate how ${book.title} feels to read`"
+                flat
+                icon="rate_review"
+                label="How does it feel?"
+                no-caps
+                @click="openBookDifficultyReview(book)"
+              />
+              <q-btn
                 :aria-label="`Check difficulty of ${book.title}`"
                 color="primary"
                 icon="psychology"
@@ -209,6 +217,24 @@
           <h2>No books yet</h2>
           <p>Tap + to import your first book.</p>
         </div>
+
+        <q-card v-if="activeBookAction === 'read' && nextFreeBookRecommendation" class="personal-books__next-recommendation" flat bordered>
+          <q-card-section>
+            <div class="text-overline">A good next step</div>
+            <div class="text-h6">{{ nextFreeBookRecommendation.title }}</div>
+            <p class="q-mb-sm">{{ nextFreeBookRecommendation.author }} · target difficulty {{ nextFreeBookRecommendation.targetDifficulty }}/100</p>
+            <p class="text-caption">Free legal edition when permitted in your country. Check the source's copyright note before downloading.</p>
+            <q-btn
+              color="primary"
+              icon="download"
+              label="Open free edition"
+              no-caps
+              :href="nextFreeBookRecommendation.url"
+              target="_blank"
+              rel="noopener noreferrer"
+            />
+          </q-card-section>
+        </q-card>
       </section>
 
       <section v-else-if="selectedBook && selectedBookPages.length" class="personal-reader" :class="{ 'personal-reader--focus': readingMode }" :style="[readerSidebarStyle, readerSpeechFrameStyle]" aria-label="Book reader">
@@ -329,6 +355,15 @@
                   </div>
 
                   <q-separator />
+                  <q-btn
+                    align="left"
+                    class="full-width"
+                    icon="rate_review"
+                    label="Rate book difficulty"
+                    no-caps
+                    outline
+                    @click="openBookDifficultyReview(selectedBook)"
+                  />
                   <q-btn
                     align="left"
                     class="full-width"
@@ -547,6 +582,23 @@
       </q-card>
     </q-dialog>
 
+    <q-dialog v-model="showDifficultyReview">
+      <q-card class="book-difficulty-review-dialog">
+        <q-card-section>
+          <div class="text-h6">How does this book feel?</div>
+          <p class="q-mb-none">{{ difficultyReviewBook?.title }}</p>
+          <p class="text-caption q-mb-none">Your answer is combined with actual reading progress. You can change it at any time.</p>
+        </q-card-section>
+        <q-card-section class="book-difficulty-review-dialog__choices q-pt-none">
+          <q-btn color="negative" label="Very hard" no-caps outline @click="submitBookDifficultyReview('very-hard')" />
+          <q-btn color="warning" label="Hard" no-caps outline @click="submitBookDifficultyReview('hard')" />
+          <q-btn color="positive" label="Comfortable" no-caps outline @click="submitBookDifficultyReview('comfortable')" />
+          <q-btn color="primary" label="Easy" no-caps outline @click="submitBookDifficultyReview('easy')" />
+        </q-card-section>
+        <q-card-actions align="right"><q-btn flat label="Not now" no-caps v-close-popup /></q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <q-dialog v-model="bookResumeDialog" persistent>
       <q-card class="book-resume-dialog">
         <q-card-section>
@@ -575,6 +627,7 @@
 import { Dialog, Notify } from 'quasar';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { ReaderTextLookup, ReadingChapter, ReadingDeviceSession, ReadingPage } from '@mentor-ai/shared';
+import type { BookReaderDifficultyRating } from '@mentor-ai/shared';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import AppDetailLayout from 'src/components/AppDetailLayout.vue';
 import AppAudioDock from 'src/components/AppAudioDock.vue';
@@ -593,6 +646,7 @@ import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot,
 import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { assessBookDifficulty } from 'src/services/book-difficulty-assessment';
+import { applyReadingReview, isBookDifficultyReviewDue, recommendNextFreeBook } from 'src/services/book-reading-guidance';
 import { personalBookAction, personalBookReadingStatus, personalBookReadingStatusLabel, sortPersonalBooksByActivity, type PersonalBookAction, type PersonalBookReadingStatus } from 'src/services/personal-book-status';
 import { readerWordContext } from 'src/services/reader-word-context';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
@@ -714,6 +768,8 @@ const showImportConfirmation = ref(false);
 const rightsConfirmed = ref(false);
 const importingBook = ref(false);
 const assessingBookIds = ref(new Set<string>());
+const showDifficultyReview = ref(false);
+const difficultyReviewBook = ref<PersonalBook | null>(null);
 const audioElement = ref<HTMLAudioElement | null>(null);
 const cachedUrls = ref(new Set<string>());
 const engagementSummaries = ref(new Map<string, ContentEngagementSummary>());
@@ -759,6 +815,15 @@ const displayedPersonalBooks = computed(() => sortPersonalBooksByActivity(
   personalBooks.value.filter((book) => personalBookAction(book) === activeBookAction.value),
   personalBookStatuses.value,
 ));
+const nextFreeBookRecommendation = computed(() => {
+  const flowingBooks = personalBooks.value.filter((book) => book.difficultyAssessment?.recommendation === 'read' && (
+    book.difficultyAssessment.readerRating === 'easy' || book.difficultyAssessment.readerRating === 'comfortable'
+  ));
+  const source = flowingBooks.sort((left, right) => (right.difficultyAssessment?.analyzedAt ?? '').localeCompare(left.difficultyAssessment?.analyzedAt ?? ''))[0];
+  return source?.difficultyAssessment
+    ? recommendNextFreeBook(source.difficultyAssessment.score, personalBooks.value.map((book) => book.title))
+    : null;
+});
 
 function completedBookStatusLabel(book: PersonalBook) {
   const status = personalBookStatuses.value[book.id] ?? 'new';
@@ -1002,6 +1067,45 @@ async function analyzeBookDifficulty(book: PersonalBook, notify = true) {
   }
 }
 
+function openBookDifficultyReview(book: PersonalBook | null) {
+  if (!book) return;
+  difficultyReviewBook.value = book;
+  showDifficultyReview.value = true;
+}
+
+async function submitBookDifficultyReview(rating: BookReaderDifficultyRating) {
+  const book = difficultyReviewBook.value;
+  if (!book) return;
+  try {
+    let current = personalBooks.value.find((item) => item.id === book.id) ?? book;
+    if (!current.difficultyAssessment) {
+      await analyzeBookDifficulty(current, false);
+      current = personalBooks.value.find((item) => item.id === book.id) ?? current;
+    }
+    if (!current.difficultyAssessment) throw new Error('The initial book analysis is not available.');
+    const progress = readBookProgress(current.id, current.pageCount);
+    const reviewed = applyReadingReview(current.difficultyAssessment, {
+      progressRatio: progress.furthestProgressRatio ?? progress.progressRatio ?? 0,
+      lastProgressAt: progress.updatedAt ?? current.lastOpenedAt,
+      rating,
+    });
+    await savePersonalBookDifficultyAssessment(current.id, reviewed);
+    personalBooks.value = await listPersonalBooks();
+    if (selectedBook.value?.id === current.id) selectedBook.value = personalBooks.value.find((item) => item.id === current.id) ?? selectedBook.value;
+    showDifficultyReview.value = false;
+    difficultyReviewBook.value = null;
+    void syncPersonalBooks().catch(() => undefined);
+    Notify.create({
+      type: reviewed.recommendation === 'rewrite' ? 'warning' : 'positive',
+      message: reviewed.recommendation === 'rewrite'
+        ? 'This book now belongs in To rewrite: translate it slowly in writing.'
+        : 'This book still fits fluent reading. A free next-book suggestion is ready in the library.',
+    });
+  } catch (error) {
+    Notify.create({ type: 'negative', message: error instanceof Error ? error.message : 'Could not save your book rating.' });
+  }
+}
+
 function syncPersonalBooks(): Promise<void> {
   if (!getAuthToken()) return Promise.resolve();
   if (personalBookSyncPromise) return personalBookSyncPromise;
@@ -1158,6 +1262,7 @@ async function openBook(bookId: string) {
   startReaderPagination();
   startReadingDeviceHeartbeat();
   readingActivityTimer.start();
+  if (isBookDifficultyReviewDue(loaded.book.difficultyAssessment)) openBookDifficultyReview(loaded.book);
 }
 function closeBook() {
   void publishReadingDeviceSession('closed');

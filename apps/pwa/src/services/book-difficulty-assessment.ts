@@ -55,11 +55,15 @@ export function assessBookDifficulty(input: BookDifficultyInput): BookDifficulty
     version: 1,
     recommendation,
     score,
+    initialScore: score,
     confidence,
     sampledWords: words.length,
     personalEvidenceCount,
     reasons,
     analyzedAt: input.now ?? new Date().toISOString(),
+    lastReviewedProgressRatio: 0,
+    nextReviewAt: new Date(Date.parse(input.now ?? new Date().toISOString()) + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    readingState: 'not-started',
   };
 }
 
