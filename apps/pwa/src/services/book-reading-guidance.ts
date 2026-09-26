@@ -84,13 +84,21 @@ export function applyReadingReview(
   };
 }
 
-export function recommendNextFreeBook(currentDifficulty: number, excludedTitles: readonly string[] = []): FreeBookRecommendation {
-  const excluded = new Set(excludedTitles.map((title) => title.trim().toLocaleLowerCase('en')));
+export function recommendNextFreeBook(currentDifficulty: number, excludedTitles: readonly string[] = []): FreeBookRecommendation | null {
+  const excluded = new Set(excludedTitles.map(normalizeBookTitle));
   const target = clamp(currentDifficulty + 5, 20, 65);
   return [...freeReadingLadder]
-    .filter((book) => !excluded.has(book.title.toLocaleLowerCase('en')))
+    .filter((book) => !excluded.has(normalizeBookTitle(book.title)))
     .sort((left, right) => Math.abs(left.targetDifficulty - target) - Math.abs(right.targetDifficulty - target))[0]
-    ?? freeReadingLadder[0]!;
+    ?? null;
+}
+
+function normalizeBookTitle(title: string) {
+  return title
+    .toLocaleLowerCase('en')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
 }
 
 function clamp(value: number, minimum: number, maximum: number) {

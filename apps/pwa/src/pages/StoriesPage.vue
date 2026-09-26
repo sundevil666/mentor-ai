@@ -149,7 +149,7 @@
 
         <q-tabs
           v-if="personalBooks.length"
-          v-model="activeBookAction"
+          v-model="activeBookSection"
           class="personal-books__action-tabs"
           active-color="primary"
           align="justify"
@@ -158,9 +158,10 @@
         >
           <q-tab name="read" icon="menu_book" :label="`To read (${readBookCount})`" />
           <q-tab name="rewrite" icon="edit_note" :label="`To rewrite (${rewriteBookCount})`" />
+          <q-tab name="recommendations" icon="recommend" :label="`Recommendations (${nextFreeBookRecommendation ? 1 : 0})`" />
         </q-tabs>
 
-        <div v-if="displayedPersonalBooks.length" class="personal-book-list">
+        <div v-if="activeBookSection !== 'recommendations' && displayedPersonalBooks.length" class="personal-book-list">
           <div
             v-for="book in displayedPersonalBooks"
             :key="book.id"
@@ -207,18 +208,18 @@
           </div>
         </div>
 
-        <div v-else-if="personalBooks.length" class="personal-books__filtered-empty">
-          <q-icon :name="activeBookAction === 'read' ? 'menu_book' : 'edit_note'" size="38px" />
-          <p>{{ activeBookAction === 'read' ? 'No books to read in this list.' : 'No books to rewrite in this list.' }}</p>
+        <div v-else-if="activeBookSection !== 'recommendations' && personalBooks.length" class="personal-books__filtered-empty">
+          <q-icon :name="activeBookSection === 'read' ? 'menu_book' : 'edit_note'" size="38px" />
+          <p>{{ activeBookSection === 'read' ? 'No books to read in this list.' : 'No books to rewrite in this list.' }}</p>
         </div>
 
-        <div v-else class="personal-books__empty">
+        <div v-else-if="!personalBooks.length" class="personal-books__empty">
           <q-icon name="library_books" size="64px" />
           <h2>No books yet</h2>
           <p>Tap + to import your first book.</p>
         </div>
 
-        <q-card v-if="activeBookAction === 'read' && nextFreeBookRecommendation" class="personal-books__next-recommendation" flat bordered>
+        <q-card v-if="activeBookSection === 'recommendations' && nextFreeBookRecommendation" class="personal-books__next-recommendation" flat bordered>
           <q-card-section>
             <div class="text-overline">A good next step</div>
             <div class="text-h6">{{ nextFreeBookRecommendation.title }}</div>
@@ -235,6 +236,10 @@
             />
           </q-card-section>
         </q-card>
+        <div v-else-if="activeBookSection === 'recommendations'" class="personal-books__filtered-empty">
+          <q-icon name="recommend" size="38px" />
+          <p>Rate a book as comfortable or easy to get your next recommendation.</p>
+        </div>
       </section>
 
       <section v-else-if="selectedBook && selectedBookPages.length" class="personal-reader" :class="{ 'personal-reader--focus': readingMode }" :style="[readerSidebarStyle, readerSpeechFrameStyle]" aria-label="Book reader">
@@ -758,7 +763,8 @@ let readingSpeechSuppressedForLookup = false;
 const dailyReadingProgress = ref<DailyReadingProgress>(readDailyReadingProgress());
 const personalBooks = ref<PersonalBook[]>([]);
 const personalBookStatuses = ref<Record<string, PersonalBookReadingStatus>>({});
-const activeBookAction = ref<PersonalBookAction>('read');
+type PersonalBookSection = PersonalBookAction | 'recommendations';
+const activeBookSection = ref<PersonalBookSection>('read');
 const bookSyncing = ref(false);
 const bookSyncError = ref('');
 const cloudBookCount = ref<number | null>(null);
@@ -812,7 +818,7 @@ const readingCategories = computed(() => ([
 const readBookCount = computed(() => personalBooks.value.filter((book) => personalBookAction(book) === 'read').length);
 const rewriteBookCount = computed(() => personalBooks.value.filter((book) => personalBookAction(book) === 'rewrite').length);
 const displayedPersonalBooks = computed(() => sortPersonalBooksByActivity(
-  personalBooks.value.filter((book) => personalBookAction(book) === activeBookAction.value),
+  personalBooks.value.filter((book) => activeBookSection.value !== 'recommendations' && personalBookAction(book) === activeBookSection.value),
   personalBookStatuses.value,
 ));
 const nextFreeBookRecommendation = computed(() => {

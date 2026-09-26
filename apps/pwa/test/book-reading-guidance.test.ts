@@ -38,7 +38,22 @@ describe('book reading guidance', () => {
 
   it('recommends a free next book close to a slightly higher difficulty', () => {
     const result = recommendNextFreeBook(38, ['The Wonderful Wizard of Oz']);
+    assert.ok(result);
     assert.equal(result.title, 'The Secret Garden');
     assert.match(result.url, /^https:\/\/www\.gutenberg\.org\/ebooks\//);
+  });
+
+  it('removes an imported recommendation even when title punctuation differs', () => {
+    const result = recommendNextFreeBook(57, ['Pride & Prejudice']);
+    assert.ok(result);
+    assert.notEqual(result.title, 'Pride and Prejudice');
+  });
+
+  it('returns no recommendation when every catalog book is already imported', () => {
+    const result = recommendNextFreeBook(40, [
+      "Alice's Adventures in Wonderland", 'The Wonderful Wizard of Oz', 'The Secret Garden',
+      'The Adventures of Sherlock Holmes', 'Pride and Prejudice',
+    ]);
+    assert.equal(result, null);
   });
 });
