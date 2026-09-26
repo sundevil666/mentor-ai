@@ -410,6 +410,11 @@
             </q-btn>
           </div>
 
+          <header class="personal-reader__book-heading">
+            <h1>{{ selectedBook.title }}</h1>
+            <p>{{ selectedBook.author }}</p>
+          </header>
+
           <section class="personal-reader__speech-coach" :class="`personal-reader__speech-coach--${readingSpeechStatus}`" aria-live="polite" aria-label="Reading pronunciation coach">
             <div class="personal-reader__reading-actions">
               <button

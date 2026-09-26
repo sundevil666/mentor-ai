@@ -3032,6 +3032,35 @@ body.body--dark .personal-reader__sidebar {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+.personal-reader__book-heading {
+  min-width: 0;
+}
+
+.personal-reader__book-heading h1,
+.personal-reader__book-heading p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.personal-reader__book-heading h1 {
+  color: var(--app-text);
+  font-size: 1.15em;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.personal-reader__book-heading p {
+  color: var(--app-muted-strong);
+  font-size: 0.8em;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-top: 4px;
+}
+
+body.body--dark .personal-reader__book-heading h1 {
+  color: #f5f0e8;
+}
+
 .personal-reader__settings-menu {
   display: grid;
   gap: 14px;
