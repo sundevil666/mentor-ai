@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { ContentProgress, PersonalReadingBook } from '@mentor-ai/shared';
-import { personalBookAction, personalBookReadingStatus, sortPersonalBooksByActivity } from '../src/services/personal-book-status.js';
+import { personalBookAction, personalBookKanbanColumn, personalBookReadingStatus, sortPersonalBooksByActivity } from '../src/services/personal-book-status.js';
 
 const book: PersonalReadingBook = {
   id: 'book', title: 'Book', level: 'unknown', language: 'en', sourceId: 'source', pageCount: 1,
@@ -34,6 +34,17 @@ describe('personal book reading status', () => {
       version: 1, recommendation: 'rewrite', score: 80, confidence: 'medium', sampledWords: 100,
       personalEvidenceCount: 12, reasons: ['Dense text.'], analyzedAt: '2026-09-24T00:00:00.000Z',
     } }), 'rewrite');
+  });
+
+  it('moves both read and rewrite books to done after completion', () => {
+    const rewriteBook: PersonalReadingBook = { ...book, difficultyAssessment: {
+      version: 1, recommendation: 'rewrite', score: 80, confidence: 'medium', sampledWords: 100,
+      personalEvidenceCount: 12, reasons: ['Dense text.'], analyzedAt: '2026-09-24T00:00:00.000Z',
+    } };
+    assert.equal(personalBookKanbanColumn(book, 'started'), 'read');
+    assert.equal(personalBookKanbanColumn(rewriteBook, 'started'), 'rewrite');
+    assert.equal(personalBookKanbanColumn(book, 'finished'), 'done');
+    assert.equal(personalBookKanbanColumn(rewriteBook, 'finished'), 'done');
   });
 
   it('puts the most recently started books first and finished books last', () => {

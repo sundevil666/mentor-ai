@@ -2,6 +2,7 @@ import type { ContentProgress, PersonalReadingBook } from '@mentor-ai/shared';
 
 export type PersonalBookReadingStatus = 'new' | 'started' | 'finished';
 export type PersonalBookAction = 'read' | 'rewrite';
+export type PersonalBookKanbanColumn = PersonalBookAction | 'done';
 
 export function personalBookReadingStatus(
   book: PersonalReadingBook,
@@ -24,6 +25,13 @@ export function personalBookReadingStatusLabel(status: PersonalBookReadingStatus
 
 export function personalBookAction(book: PersonalReadingBook): PersonalBookAction {
   return book.difficultyAssessment?.recommendation === 'rewrite' ? 'rewrite' : 'read';
+}
+
+export function personalBookKanbanColumn(
+  book: PersonalReadingBook,
+  status: PersonalBookReadingStatus,
+): PersonalBookKanbanColumn {
+  return status === 'finished' ? 'done' : personalBookAction(book);
 }
 
 export function sortPersonalBooksByActivity(

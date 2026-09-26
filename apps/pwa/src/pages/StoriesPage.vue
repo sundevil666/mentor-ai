@@ -159,6 +159,7 @@
           <q-tab name="read" icon="menu_book" :label="`To read (${readBookCount})`" />
           <q-tab name="rewrite" icon="edit_note" :label="`To rewrite (${rewriteBookCount})`" />
           <q-tab name="recommendations" icon="recommend" :label="`Recommendations (${nextFreeBookRecommendation ? 1 : 0})`" />
+          <q-tab name="done" icon="inventory_2" :label="`Done (${doneBookCount})`" />
         </q-tabs>
 
         <div v-if="activeBookSection !== 'recommendations' && displayedPersonalBooks.length" class="personal-book-list">
@@ -209,8 +210,8 @@
         </div>
 
         <div v-else-if="activeBookSection !== 'recommendations' && personalBooks.length" class="personal-books__filtered-empty">
-          <q-icon :name="activeBookSection === 'read' ? 'menu_book' : 'edit_note'" size="38px" />
-          <p>{{ activeBookSection === 'read' ? 'No books to read in this list.' : 'No books to rewrite in this list.' }}</p>
+          <q-icon :name="activeBookSection === 'read' ? 'menu_book' : activeBookSection === 'rewrite' ? 'edit_note' : 'inventory_2'" size="38px" />
+          <p>{{ activeBookSection === 'read' ? 'No books to read in this list.' : activeBookSection === 'rewrite' ? 'No books to rewrite in this list.' : 'No completed books yet.' }}</p>
         </div>
 
         <div v-else-if="!personalBooks.length" class="personal-books__empty">
@@ -652,7 +653,7 @@ import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { assessBookDifficulty } from 'src/services/book-difficulty-assessment';
 import { applyReadingReview, isBookDifficultyReviewDue, recommendNextFreeBook } from 'src/services/book-reading-guidance';
-import { personalBookAction, personalBookReadingStatus, personalBookReadingStatusLabel, sortPersonalBooksByActivity, type PersonalBookAction, type PersonalBookReadingStatus } from 'src/services/personal-book-status';
+import { personalBookAction, personalBookKanbanColumn, personalBookReadingStatus, personalBookReadingStatusLabel, sortPersonalBooksByActivity, type PersonalBookKanbanColumn, type PersonalBookReadingStatus } from 'src/services/personal-book-status';
 import { readerWordContext } from 'src/services/reader-word-context';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, millisecondsUntilNextReadingDay, prepareDailyReadingProgress, recordDailyReadWords, type DailyReadingProgress } from 'src/services/daily-reading-progress';
@@ -763,7 +764,7 @@ let readingSpeechSuppressedForLookup = false;
 const dailyReadingProgress = ref<DailyReadingProgress>(readDailyReadingProgress());
 const personalBooks = ref<PersonalBook[]>([]);
 const personalBookStatuses = ref<Record<string, PersonalBookReadingStatus>>({});
-type PersonalBookSection = PersonalBookAction | 'recommendations';
+type PersonalBookSection = PersonalBookKanbanColumn | 'recommendations';
 const activeBookSection = ref<PersonalBookSection>('read');
 const bookSyncing = ref(false);
 const bookSyncError = ref('');
@@ -815,10 +816,12 @@ const readingCategories = computed(() => ([
     label: `Fiction (${personalBooks.value.length})`,
   },
 ]));
-const readBookCount = computed(() => personalBooks.value.filter((book) => personalBookAction(book) === 'read').length);
-const rewriteBookCount = computed(() => personalBooks.value.filter((book) => personalBookAction(book) === 'rewrite').length);
+const personalBookColumn = (book: PersonalBook) => personalBookKanbanColumn(book, personalBookStatuses.value[book.id] ?? 'new');
+const readBookCount = computed(() => personalBooks.value.filter((book) => personalBookColumn(book) === 'read').length);
+const rewriteBookCount = computed(() => personalBooks.value.filter((book) => personalBookColumn(book) === 'rewrite').length);
+const doneBookCount = computed(() => personalBooks.value.filter((book) => personalBookColumn(book) === 'done').length);
 const displayedPersonalBooks = computed(() => sortPersonalBooksByActivity(
-  personalBooks.value.filter((book) => activeBookSection.value !== 'recommendations' && personalBookAction(book) === activeBookSection.value),
+  personalBooks.value.filter((book) => activeBookSection.value !== 'recommendations' && personalBookColumn(book) === activeBookSection.value),
   personalBookStatuses.value,
 ));
 const nextFreeBookRecommendation = computed(() => {
