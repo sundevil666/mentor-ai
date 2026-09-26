@@ -5,12 +5,12 @@
         <button
           class="app-version-badge"
           type="button"
-          :aria-label="`Copy Mentor AI version ${appVersion}`"
-          @click="copyAppVersion"
+          :aria-label="`Open Mentor AI version history. Current version ${appVersion}`"
+          @click="$router.push({ name: 'version-history' })"
         >
           <span class="app-version-badge__wide">{{ appVersionWideLabel }}</span>
           <span class="app-version-badge__compact">{{ appVersionCompactLabel }}</span>
-          <q-tooltip>Copy Mentor AI version {{ appVersion }}</q-tooltip>
+          <q-tooltip>What changed in Mentor AI {{ appVersion }}</q-tooltip>
         </button>
         <div class="app-header__center">
           <q-btn
@@ -393,28 +393,6 @@ const appVersionCompactLabel = appBuildVersion
   ? `v${appBuildVersion.slice(0, 7)}`
   : `v${appReleaseVersion}`;
 
-async function copyAppVersion() {
-  let copied = false;
-  try {
-    await navigator.clipboard.writeText(appVersion);
-    copied = true;
-  } catch {
-    const textarea = document.createElement('textarea');
-    textarea.value = appVersion;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-    copied = document.execCommand('copy');
-    textarea.remove();
-  }
-
-  Notify.create({
-    type: copied ? 'positive' : 'negative',
-    icon: copied ? 'content_copy' : 'error_outline',
-    message: copied ? `Version ${appVersion} copied.` : 'Could not copy the app version.',
-  });
-}
 const isDarkTheme = ref(false);
 const googleClientId = ref<string | null>(null);
 const googleSignInButton = ref<HTMLElement | null>(null);

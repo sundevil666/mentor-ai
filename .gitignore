@@ -32,3 +32,4 @@ speech-recordings/
 recordings/
 private-lessons/
 .vercel
+apps/pwa/public/git-history.json

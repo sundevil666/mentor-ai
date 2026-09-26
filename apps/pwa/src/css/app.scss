@@ -557,7 +557,8 @@ body .q-menu {
 }
 
 .settings-page,
-.statistics-page {
+.statistics-page,
+.version-history-page {
   align-items: flex-start;
   display: flex;
   min-height: calc(100vh - 51px);
@@ -566,6 +567,13 @@ body .q-menu {
 }
 
 .settings-page--detail {
+  box-sizing: border-box;
+  height: calc(100dvh - 55px - env(safe-area-inset-top));
+  min-height: 0 !important;
+  overflow: hidden;
+}
+
+.version-history-page {
   box-sizing: border-box;
   height: calc(100dvh - 55px - env(safe-area-inset-top));
   min-height: 0 !important;
@@ -581,7 +589,8 @@ body .q-menu {
 }
 
 .settings-shell,
-.statistics-shell {
+.statistics-shell,
+.version-history-shell {
   display: grid;
   gap: 16px;
   margin: 0 auto;
@@ -593,8 +602,11 @@ body .q-menu {
   max-width: 760px;
 }
 
+.version-history-shell { max-width: 760px; }
+
 .settings-header,
-.statistics-header {
+.statistics-header,
+.version-history-header {
   align-items: center;
   display: flex;
   gap: 14px;
@@ -602,9 +614,11 @@ body .q-menu {
 
 .settings-header { justify-content: flex-start; }
 .statistics-header { justify-content: space-between; }
+.version-history-header { justify-content: flex-start; }
 
 .settings-header p,
-.statistics-header p {
+.statistics-header p,
+.version-history-header > div > p {
   color: var(--app-accent);
   font-size: 0.875rem;
   font-weight: 700;
@@ -612,12 +626,75 @@ body .q-menu {
 }
 
 .settings-header h1,
-.statistics-header h1 {
+.statistics-header h1,
+.version-history-header h1 {
   color: var(--app-text-strong);
   font-size: 2.25rem;
   line-height: 1.1;
   margin: 0;
 }
+
+.version-history-intro {
+  color: var(--app-muted-strong);
+  margin: 0;
+}
+
+.commit-list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.commit-card {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+}
+
+.commit-card__meta {
+  align-items: center;
+  color: var(--app-muted);
+  display: flex;
+  font-size: 0.78rem;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.commit-card__meta a,
+.commit-card__meta code { color: var(--app-primary); font-weight: 800; }
+.commit-card__meta a { align-items: center; display: inline-flex; gap: 3px; text-decoration: none; }
+.commit-card p { color: var(--app-text-strong); font-weight: 650; margin: 0; overflow-wrap: anywhere; }
+
+.version-history-state {
+  align-items: center;
+  color: var(--app-muted-strong);
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  min-height: 220px;
+  text-align: center;
+}
+
+.version-history-state--error { color: var(--q-negative); }
+
+.version-history-pagination {
+  align-items: center;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  justify-content: center;
+  padding: 8px 12px;
+}
+
+.version-history-pagination > span { color: var(--app-muted); font-size: 0.78rem; }
 
 .settings-section {
   background: var(--app-surface);
@@ -3900,13 +3977,15 @@ body.body--dark .personal-reader__lookup-error {
   }
 
   .settings-page,
-  .statistics-page {
+  .statistics-page,
+  .version-history-page {
     padding: 14px max(16px, env(safe-area-inset-right)) calc(104px + env(safe-area-inset-bottom))
       max(16px, env(safe-area-inset-left));
   }
 
   .settings-shell,
-  .statistics-shell {
+  .statistics-shell,
+  .version-history-shell {
     gap: 14px;
   }
 
@@ -4362,7 +4441,8 @@ body.body--dark .personal-reader__lookup-error {
 @media (min-width: 375px) and (max-width: 430px) {
   .learning-shell,
   .settings-shell,
-  .statistics-shell {
+  .statistics-shell,
+  .version-history-shell {
     max-width: 398px;
   }
 

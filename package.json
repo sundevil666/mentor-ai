@@ -16,6 +16,7 @@
     "build:pwa": "npm run build --workspace @mentor-ai/pwa && npm run optimize:pwa-assets",
     "build:api": "npm run build --workspace @mentor-ai/api",
     "prepare:pwa-update-manifest": "node scripts/write-pwa-update-manifest.mjs",
+    "prepare:git-history": "node scripts/write-git-history.mjs",
     "optimize:pwa-assets": "node scripts/optimize-pwa-assets.mjs",
     "check:deployment-output": "node scripts/check-deployment-output.mjs",
     "lint": "npm run lint --workspaces",
