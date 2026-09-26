@@ -2290,6 +2290,12 @@ body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --
 .personal-book-row__difficulty-check--complete:hover,
 .personal-book-row__difficulty-check--complete:focus-visible { opacity: 1; }
 
+.personal-book-row__rating--selected {
+  background: var(--category-soft);
+  color: var(--q-primary);
+  font-weight: 700;
+}
+
 .personal-book-row__difficulty-check--pending {
   animation: difficulty-check-pulse 1.8s ease-in-out infinite;
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--q-primary) 42%, transparent);

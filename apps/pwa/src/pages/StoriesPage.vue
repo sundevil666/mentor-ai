@@ -204,9 +204,10 @@
             <div class="personal-book-row__actions">
               <q-btn
                 :aria-label="`Rate how ${book.title} feels to read`"
+                :class="{ 'personal-book-row__rating--selected': book.difficultyAssessment?.readerRating }"
                 flat
-                icon="rate_review"
-                label="How does it feel?"
+                :icon="book.difficultyAssessment?.readerRating ? 'check_circle' : 'rate_review'"
+                :label="bookReaderDifficultyRatingLabel(book.difficultyAssessment?.readerRating)"
                 no-caps
                 @click="openBookDifficultyReview(book)"
               />
@@ -626,10 +627,10 @@
           <p class="text-caption q-mb-none">Your answer is combined with actual reading progress. You can change it at any time.</p>
         </q-card-section>
         <q-card-section class="book-difficulty-review-dialog__choices q-pt-none">
-          <q-btn color="negative" label="Very hard → To rewrite" no-caps outline @click="submitBookDifficultyReview('very-hard')" />
-          <q-btn color="warning" label="Hard → To rewrite" no-caps outline @click="submitBookDifficultyReview('hard')" />
-          <q-btn color="positive" label="Comfortable → To read" no-caps outline @click="submitBookDifficultyReview('comfortable')" />
-          <q-btn color="primary" label="Easy → To read" no-caps outline @click="submitBookDifficultyReview('easy')" />
+          <q-btn color="negative" :icon="difficultyReviewBook?.difficultyAssessment?.readerRating === 'very-hard' ? 'check' : undefined" label="Very hard → To rewrite" no-caps :outline="difficultyReviewBook?.difficultyAssessment?.readerRating !== 'very-hard'" :unelevated="difficultyReviewBook?.difficultyAssessment?.readerRating === 'very-hard'" @click="submitBookDifficultyReview('very-hard')" />
+          <q-btn color="warning" :icon="difficultyReviewBook?.difficultyAssessment?.readerRating === 'hard' ? 'check' : undefined" label="Hard → To rewrite" no-caps :outline="difficultyReviewBook?.difficultyAssessment?.readerRating !== 'hard'" :unelevated="difficultyReviewBook?.difficultyAssessment?.readerRating === 'hard'" @click="submitBookDifficultyReview('hard')" />
+          <q-btn color="positive" :icon="difficultyReviewBook?.difficultyAssessment?.readerRating === 'comfortable' ? 'check' : undefined" label="Comfortable → To read" no-caps :outline="difficultyReviewBook?.difficultyAssessment?.readerRating !== 'comfortable'" :unelevated="difficultyReviewBook?.difficultyAssessment?.readerRating === 'comfortable'" @click="submitBookDifficultyReview('comfortable')" />
+          <q-btn color="primary" :icon="difficultyReviewBook?.difficultyAssessment?.readerRating === 'easy' ? 'check' : undefined" label="Easy → To read" no-caps :outline="difficultyReviewBook?.difficultyAssessment?.readerRating !== 'easy'" :unelevated="difficultyReviewBook?.difficultyAssessment?.readerRating === 'easy'" @click="submitBookDifficultyReview('easy')" />
         </q-card-section>
         <q-card-actions align="right"><q-btn flat label="Not now" no-caps v-close-popup /></q-card-actions>
       </q-card>
@@ -684,7 +685,7 @@ import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, listReaderVoc
 import { assessBookDifficulty } from 'src/services/book-difficulty-assessment';
 import { applyReadingReview, isBookDifficultyReviewDue, preserveBookLaneOnDifficultyCheck, recommendNextFreeBook } from 'src/services/book-reading-guidance';
 import { calibrateReaderFromBooks, predictBookFit, predictUnseenBookFit } from 'src/services/reader-book-calibration';
-import { personalBookAction, personalBookKanbanColumn, personalBookReadingStatus, personalBookReadingStatusLabel, sortPersonalBooksByActivity, type PersonalBookKanbanColumn, type PersonalBookReadingStatus } from 'src/services/personal-book-status';
+import { bookReaderDifficultyRatingLabel, personalBookAction, personalBookKanbanColumn, personalBookReadingStatus, personalBookReadingStatusLabel, sortPersonalBooksByActivity, type PersonalBookKanbanColumn, type PersonalBookReadingStatus } from 'src/services/personal-book-status';
 import { readerWordContext } from 'src/services/reader-word-context';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, millisecondsUntilNextReadingDay, prepareDailyReadingProgress, recordDailyReadWords, type DailyReadingProgress } from 'src/services/daily-reading-progress';

@@ -1,8 +1,16 @@
-import type { ContentProgress, PersonalReadingBook } from '@mentor-ai/shared';
+import type { BookReaderDifficultyRating, ContentProgress, PersonalReadingBook } from '@mentor-ai/shared';
 
 export type PersonalBookReadingStatus = 'new' | 'started' | 'finished';
 export type PersonalBookAction = 'read' | 'rewrite';
 export type PersonalBookKanbanColumn = PersonalBookAction | 'done';
+
+export function bookReaderDifficultyRatingLabel(rating: BookReaderDifficultyRating | undefined) {
+  if (rating === 'very-hard') return 'Very hard';
+  if (rating === 'hard') return 'Hard';
+  if (rating === 'comfortable') return 'Comfortable';
+  if (rating === 'easy') return 'Easy';
+  return 'How does it feel?';
+}
 
 export function personalBookReadingStatus(
   book: PersonalReadingBook,

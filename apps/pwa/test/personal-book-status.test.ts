@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { ContentProgress, PersonalReadingBook } from '@mentor-ai/shared';
-import { personalBookAction, personalBookKanbanColumn, personalBookReadingStatus, sortPersonalBooksByActivity } from '../src/services/personal-book-status.js';
+import { bookReaderDifficultyRatingLabel, personalBookAction, personalBookKanbanColumn, personalBookReadingStatus, sortPersonalBooksByActivity } from '../src/services/personal-book-status.js';
 
 const book: PersonalReadingBook = {
   id: 'book', title: 'Book', level: 'unknown', language: 'en', sourceId: 'source', pageCount: 1,
@@ -18,6 +18,14 @@ function progress(input: Partial<ContentProgress>): ContentProgress {
 }
 
 describe('personal book reading status', () => {
+  it('shows the saved reader difficulty choice in the rating control', () => {
+    assert.equal(bookReaderDifficultyRatingLabel(undefined), 'How does it feel?');
+    assert.equal(bookReaderDifficultyRatingLabel('very-hard'), 'Very hard');
+    assert.equal(bookReaderDifficultyRatingLabel('hard'), 'Hard');
+    assert.equal(bookReaderDifficultyRatingLabel('comfortable'), 'Comfortable');
+    assert.equal(bookReaderDifficultyRatingLabel('easy'), 'Easy');
+  });
+
   it('keeps an untouched import new', () => assert.equal(personalBookReadingStatus(book, undefined), 'new'));
   it('marks an opened or advanced book as started', () => {
     assert.equal(personalBookReadingStatus({ ...book, lastOpenedAt: '2026-09-24T01:00:00.000Z' }, undefined), 'started');
