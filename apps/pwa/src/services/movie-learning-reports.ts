@@ -1,5 +1,5 @@
 import type { MovieLearningReport } from '@mentor-ai/shared';
-import { synchronizeMovieLearningReports } from './api-client.js';
+import { fetchMovieLearningReports, synchronizeMovieLearningReports } from './api-client.js';
 import { mentorDb } from './indexed-db.js';
 import { createMovieReport, synchronizeMovieReports, type MovieReportStorage } from './movie-learning-report-outbox.js';
 
@@ -40,6 +40,21 @@ export async function syncMovieLearningReports() {
   const count = await synchronizeMovieReports(indexedDbStorage, synchronizeMovieLearningReports, navigator.onLine);
   dispatchUpdated();
   return count;
+}
+
+export async function refreshMovieLearningReportsFromCloud() {
+  if (!navigator.onLine) return 0;
+  const [local, remote] = await Promise.all([indexedDbStorage.list(), fetchMovieLearningReports()]);
+  const localById = new Map(local.map((report) => [report.id, report]));
+  let merged = 0;
+  for (const report of remote) {
+    const current = localById.get(report.id);
+    if (current && current.updatedAt > report.updatedAt) continue;
+    await indexedDbStorage.put({ ...report, synchronizedAt: report.updatedAt });
+    merged += 1;
+  }
+  if (merged) dispatchUpdated();
+  return merged;
 }
 
 async function pruneReports(storage: MovieReportStorage) {

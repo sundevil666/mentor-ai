@@ -13,6 +13,7 @@ import {
   mergeLearningActivityEvents,
   mergeApplicationTelemetryEvents,
   mergeMovieLearningReports,
+  listMovieLearningReports,
   replyToMovieChat,
   synchronizeLearningEvents,
   upsertSessionHandoff,
@@ -39,6 +40,7 @@ learningStateRouter.post('/learning-activity-synchronize', mergeLearningActivity
 learningStateRouter.get('/learning-activity-totals', getLearningActivityTotals);
 learningStateRouter.post('/application-telemetry-synchronize', mergeApplicationTelemetryEvents);
 learningStateRouter.post('/movie-learning-reports-synchronize', mergeMovieLearningReports);
+learningStateRouter.get('/movie-learning-reports-synchronize', listMovieLearningReports);
 learningStateRouter.post('/movie-chat', replyToMovieChat);
 learningStateRouter.get('/configuration', getConfiguration);
 learningStateRouter.post('/synchronization', synchronizeLearningEvents);

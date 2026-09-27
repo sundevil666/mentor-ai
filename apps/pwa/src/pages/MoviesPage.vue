@@ -9,6 +9,7 @@
       <section class="movies-learning-workspace">
         <q-tabs v-model="activeTab" vertical class="movies-learning-tabs" active-color="primary" indicator-color="primary" no-caps>
           <q-tab name="discuss" icon="chat" label="Discuss" />
+          <q-tab name="memory" icon="psychology" label="Memory" />
           <q-tab name="report" icon="assignment_turned_in" label="Send report">
             <q-badge v-if="pendingCount" color="deep-orange-7" floating>{{ pendingCount }}</q-badge>
           </q-tab>
@@ -37,6 +38,36 @@
               <q-card-section class="movie-chat-composer">
                 <q-input v-model="chatDraft" outlined autogrow label="Message" maxlength="4000" :disable="chatSending" @keydown.enter.exact.prevent="submitChatMessage" />
                 <q-btn color="primary" round icon="send" aria-label="Send message" :disable="!canSendChat" :loading="chatSending" @click="submitChatMessage" />
+              </q-card-section>
+            </q-card>
+          </section>
+        </q-tab-panel>
+
+        <q-tab-panel name="memory">
+          <section class="movie-memory-layout">
+            <q-card flat bordered class="movies-learning-card">
+              <q-card-section>
+                <div class="text-h6">Coach context</div>
+                <p class="text-body2 text-grey-7">The stable instruction used for every film conversation.</p>
+              </q-card-section>
+              <q-card-section class="movie-memory-fields">
+                <q-input :model-value="movieCoachPrompt" outlined readonly autogrow label="Coach prompt" />
+                <q-input v-model="userMemory" class="movie-user-memory-input" outlined autogrow label="My additional context" hint="Add preferences, goals, difficult accents or anything the coach should remember." maxlength="4000" counter />
+                <div class="movie-memory-actions">
+                  <span>Saved on this device and included in every film-chat request.</span>
+                  <q-btn color="primary" no-caps icon="save" label="Save my context" @click="persistUserMemory" />
+                </div>
+              </q-card-section>
+            </q-card>
+
+            <q-card flat bordered class="movies-learning-card">
+              <q-card-section>
+                <div class="text-h6">Learning memory</div>
+                <p class="text-body2 text-grey-7">Built from local reports first, then merged with synchronized reports from the database.</p>
+              </q-card-section>
+              <q-card-section class="movie-memory-fields">
+                <q-input :model-value="movieMemory" outlined readonly autogrow label="Shared film context" />
+                <span class="movie-memory-status">{{ reports.length }} reports in context · {{ pendingCount }} waiting for database</span>
               </q-card-section>
             </q-card>
           </section>
@@ -86,11 +117,12 @@ import type { MovieLearningReport } from '@mentor-ai/shared';
 import { Notify } from 'quasar';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useAppStore } from 'src/stores/app-store';
-import { appendMovieChatMessage, loadMovieChatMessages, sendMovieChatMessage, type LocalMovieChatMessage } from 'src/services/movie-chat';
-import { loadMovieLearningReports, pendingMovieLearningReportCount, saveMovieLearningReport, syncMovieLearningReports } from 'src/services/movie-learning-reports';
+import { appendMovieChatMessage, loadMovieChatMessages, loadMovieChatUserMemory, saveMovieChatUserMemory, sendMovieChatMessage, type LocalMovieChatMessage } from 'src/services/movie-chat';
+import { buildMovieChatMemory, movieCoachPrompt } from 'src/services/movie-chat-memory';
+import { loadMovieLearningReports, pendingMovieLearningReportCount, refreshMovieLearningReportsFromCloud, saveMovieLearningReport, syncMovieLearningReports } from 'src/services/movie-learning-reports';
 
 const appStore = useAppStore();
-const activeTab = ref<'discuss' | 'report'>('discuss');
+const activeTab = ref<'discuss' | 'memory' | 'report'>('discuss');
 const chatDraft = ref('');
 const chatMessages = ref<LocalMovieChatMessage[]>([]);
 const chatSending = ref(false);
@@ -102,14 +134,25 @@ const reports = ref<MovieLearningReport[]>([]);
 const pendingCount = ref(0);
 const saving = ref(false);
 const syncing = ref(false);
+const userMemory = ref('');
 const canSave = computed(() => Boolean(movieTitle.value.trim() && watchedAt.value && reportText.value.trim()));
 const canSendChat = computed(() => Boolean(chatDraft.value.trim() && appStore.isOnline && !chatSending.value));
+const movieMemory = computed(() => buildMovieChatMemory(userMemory.value, reports.value));
 
 onMounted(async () => {
+  userMemory.value = loadMovieChatUserMemory();
   chatMessages.value = await loadMovieChatMessages();
   await refreshReports();
   await scrollChatToEnd();
+  if (appStore.isOnline) {
+    await refreshMovieLearningReportsFromCloud().then(refreshReports).catch(() => undefined);
+  }
 });
+
+function persistUserMemory() {
+  saveMovieChatUserMemory(userMemory.value);
+  Notify.create({ type: 'positive', icon: 'save', message: 'Your film-learning context was saved on this device.' });
+}
 
 async function submitChatMessage() {
   if (!canSendChat.value) return;
@@ -120,7 +163,7 @@ async function submitChatMessage() {
     await appendMovieChatMessage('user', content);
     chatMessages.value = await loadMovieChatMessages();
     await scrollChatToEnd();
-    const response = await sendMovieChatMessage(chatMessages.value);
+    const response = await sendMovieChatMessage(chatMessages.value, movieMemory.value);
     await appendMovieChatMessage('assistant', response.reply);
     chatMessages.value = await loadMovieChatMessages();
     await scrollChatToEnd();
@@ -173,6 +216,12 @@ async function retrySync(showResult = true) {
 .movies-learning-panels { background: transparent; }
 .movies-learning-panels :deep(.q-tab-panel) { padding: 0; }
 .movie-chat-layout { margin: 0 auto; max-width: 900px; }
+.movie-memory-layout { display: grid; gap: 20px; }
+.movie-memory-fields { display: grid; gap: 16px; padding-top: 0; }
+.movie-user-memory-input { margin-bottom: 12px; }
+.movie-memory-actions { align-items: center; display: grid; gap: 12px 16px; grid-template-columns: minmax(0, 1fr) auto; }
+.movie-memory-actions .q-btn { white-space: nowrap; }
+.movie-memory-actions span, .movie-memory-status { color: var(--app-muted-strong); font-size: 0.86rem; }
 .movies-learning-grid { display: grid; gap: 24px; grid-template-columns: minmax(360px, 0.85fr) minmax(420px, 1.15fr); }
 .movies-learning-card, .movie-report-card { background: var(--app-surface); border-color: var(--app-border); border-radius: 18px; }
 .movies-learning-form { display: grid; gap: 16px; }
@@ -195,4 +244,8 @@ async function retrySync(showResult = true) {
 .movies-learning-history__heading small, .movie-report-card span { color: var(--app-muted-strong); }
 .movie-report-card p { line-height: 1.6; margin: 14px 0 0; white-space: pre-wrap; }
 .movies-learning-empty { align-items: center; border: 1px dashed var(--app-border-strong); border-radius: 18px; color: var(--app-muted-strong); display: grid; gap: 8px; justify-items: center; padding: 48px 24px; text-align: center; }
+@media (max-width: 760px) {
+  .movie-memory-actions { grid-template-columns: 1fr; }
+  .movie-memory-actions .q-btn { justify-self: start; }
+}
 </style>

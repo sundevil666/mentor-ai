@@ -68,6 +68,10 @@ export const mergeMovieLearningReports: RequestHandler = sendData((req) =>
   ),
 );
 
+export const listMovieLearningReports: RequestHandler = sendData((req) =>
+  learningStateService.listMovieLearningReports(req.authUser),
+);
+
 export const replyToMovieChat: RequestHandler = sendData((req) =>
   createMovieChatReply(
     Array.isArray(req.body?.messages) ? req.body.messages as MovieChatMessage[] : [],

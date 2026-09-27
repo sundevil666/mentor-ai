@@ -125,9 +125,11 @@ describe('learning state service', () => {
 
     const saved = await learningStateService.mergeMovieLearningReports([valid, invalid]);
     const retry = await learningStateService.mergeMovieLearningReports([valid]);
+    const listed = await learningStateService.listMovieLearningReports();
 
     assert.deepEqual(saved.map((report) => report.id), [valid.id]);
     assert.deepEqual(retry.map((report) => report.id), [valid.id]);
+    assert.equal(listed.some((report) => report.id === valid.id), true);
   });
 
   it('returns student state and generates a current lesson', async () => {

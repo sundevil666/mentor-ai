@@ -224,6 +224,13 @@ export const learningStateService = {
     return accepted;
   },
 
+  async listMovieLearningReports(user?: AuthenticatedUser) {
+    const state = await learningStateRepository.read(user);
+    return state.movieLearningReports
+      .filter((report) => report.studentId === state.student.id)
+      .sort((left, right) => right.watchedAt.localeCompare(left.watchedAt));
+  },
+
   async mergeReaderVocabularyItems(incoming: ReaderVocabularyItem[], user?: AuthenticatedUser) {
     const state = await learningStateRepository.read(user);
     const merged = new Map(state.readerVocabularyItems.map((item) => [item.id, item]));

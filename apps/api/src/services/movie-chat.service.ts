@@ -13,6 +13,7 @@ export const movieCoachInstructions = `You are a personal English coach for lear
 
 export async function createMovieChatReply(
   messages: MovieChatMessage[],
+  memory = '',
   request: typeof fetch = fetch,
 ) {
   const history = boundedHistory(messages);
@@ -20,6 +21,10 @@ export async function createMovieChatReply(
     throw new Error('A user message is required.');
   }
   if (!config.openAiApiKey) throw new Error('Movie chat is not configured on the server.');
+  const compactMemory = sanitizeText(memory, 8_000);
+  const instructions = compactMemory
+    ? `${movieCoachInstructions}\n\nLearner memory:\n${compactMemory}`
+    : movieCoachInstructions;
 
   const response = await request('https://api.openai.com/v1/responses', {
     method: 'POST',
@@ -29,7 +34,7 @@ export async function createMovieChatReply(
     },
     body: JSON.stringify({
       model: config.openAiMovieChatModel,
-      instructions: movieCoachInstructions,
+      instructions,
       input: history,
       max_output_tokens: 1_200,
       store: false,

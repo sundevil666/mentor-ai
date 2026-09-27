@@ -16,7 +16,21 @@ module.exports = async (request, response) => {
       }
       const messages = Array.isArray(body?.messages) ? body.messages : [];
       const { createMovieChatReply } = await import('../apps/api/src/services/movie-chat.service.js');
-      sendJson(response, 200, await createMovieChatReply(messages));
+      sendJson(response, 200, await createMovieChatReply(messages, typeof body?.memory === 'string' ? body.memory : ''));
+      return;
+    }
+    if (request.query?.action === 'movie-reports') {
+      const { learningStateService } = await import('../apps/api/src/services/learning-state.service.js');
+      if (request.method === 'GET') {
+        sendJson(response, 200, await learningStateService.listMovieLearningReports(user));
+        return;
+      }
+      if (request.method === 'POST') {
+        const reports = Array.isArray(body?.reports) ? body.reports : [];
+        sendJson(response, 200, await learningStateService.mergeMovieLearningReports(reports, user));
+        return;
+      }
+      sendJson(response, 405, { message: 'Method not allowed.' });
       return;
     }
     if (request.query?.action === 'books') {

@@ -416,13 +416,22 @@ export async function synchronizeMovieLearningReports(
   return ((await response.json()) as ApiResponse<MovieLearningReport[]>).data;
 }
 
+export async function fetchMovieLearningReports(): Promise<MovieLearningReport[]> {
+  const response = await fetch(`${apiBaseUrl}/api/movie-learning-reports-synchronize`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error('Movie learning reports could not be loaded.');
+  return ((await response.json()) as ApiResponse<MovieLearningReport[]>).data;
+}
+
 export async function requestMovieChatReply(
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  memory: string,
 ): Promise<{ reply: string; model: string }> {
   const response = await fetch(`${apiBaseUrl}/api/movie-chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, memory }),
   });
   const body = await response.json().catch(() => null) as ApiResponse<{ reply: string; model: string }> | { error?: { message?: string } } | null;
   if (!response.ok || !body || !('data' in body)) {
