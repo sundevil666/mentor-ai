@@ -9,6 +9,16 @@ module.exports = async (request, response) => {
     }
 
     const body = await readJsonBody(request);
+    if (request.query?.action === 'movie-chat') {
+      if (request.method !== 'POST') {
+        sendJson(response, 405, { message: 'Method not allowed.' });
+        return;
+      }
+      const messages = Array.isArray(body?.messages) ? body.messages : [];
+      const { createMovieChatReply } = await import('../apps/api/src/services/movie-chat.service.js');
+      sendJson(response, 200, await createMovieChatReply(messages));
+      return;
+    }
     if (request.query?.action === 'books') {
       if (!user) {
         sendJson(response, 401, { message: 'Google sign-in is required for cloud book synchronization.' });

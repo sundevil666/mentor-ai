@@ -25,6 +25,10 @@
       "dest": "/api/synchronization?action=reading-resume"
     },
     {
+      "src": "^/api/movie-chat$",
+      "dest": "/api/synchronization?action=movie-chat"
+    },
+    {
       "src": "^/app-update\\.json$",
       "headers": {
         "Cache-Control": "no-store, max-age=0"

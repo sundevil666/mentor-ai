@@ -35,9 +35,12 @@ describe('movie chat service', () => {
   });
 
   it('publishes the movie chat through the Vercel serverless endpoint', () => {
-    const serverlessRoute = readFileSync(new URL('../../../api/movie-chat.js', import.meta.url), 'utf8');
+    const serverlessRoute = readFileSync(new URL('../../../api/synchronization.js', import.meta.url), 'utf8');
+    const vercelConfiguration = readFileSync(new URL('../../../vercel.json', import.meta.url), 'utf8');
 
     assert.match(serverlessRoute, /createMovieChatReply\(messages\)/);
-    assert.match(serverlessRoute, /request\.method !== 'POST'/);
+    assert.match(serverlessRoute, /action === 'movie-chat'/);
+    assert.match(vercelConfiguration, /\/api\/movie-chat/);
+    assert.match(vercelConfiguration, /\/api\/synchronization\?action=movie-chat/);
   });
 });
