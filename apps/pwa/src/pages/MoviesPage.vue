@@ -4,17 +4,17 @@
       <header class="movies-learning-header">
         <p>Learning from films</p>
         <h1>Movies</h1>
-        <span>Discuss what to watch, then save the final learning report for Mentor AI.</span>
       </header>
 
-      <q-tabs v-model="activeTab" align="left" class="movies-learning-tabs" active-color="primary" indicator-color="primary" no-caps>
-        <q-tab name="discuss" icon="chat" label="Discuss" />
-        <q-tab name="report" icon="assignment_turned_in" label="Send report">
-          <q-badge v-if="pendingCount" color="deep-orange-7" floating>{{ pendingCount }}</q-badge>
-        </q-tab>
-      </q-tabs>
+      <section class="movies-learning-workspace">
+        <q-tabs v-model="activeTab" vertical class="movies-learning-tabs" active-color="primary" indicator-color="primary" no-caps>
+          <q-tab name="discuss" icon="chat" label="Discuss" />
+          <q-tab name="report" icon="assignment_turned_in" label="Send report">
+            <q-badge v-if="pendingCount" color="deep-orange-7" floating>{{ pendingCount }}</q-badge>
+          </q-tab>
+        </q-tabs>
 
-      <q-tab-panels v-model="activeTab" animated class="movies-learning-panels">
+        <q-tab-panels v-model="activeTab" animated class="movies-learning-panels">
         <q-tab-panel name="discuss">
           <section class="movie-chat-layout">
             <q-card flat bordered class="movies-learning-card movie-chat-card">
@@ -75,7 +75,8 @@
             </section>
           </section>
         </q-tab-panel>
-      </q-tab-panels>
+        </q-tab-panels>
+      </section>
     </section>
   </q-page>
 </template>
@@ -161,15 +162,16 @@ async function retrySync(showResult = true) {
 </script>
 
 <style scoped>
-.movies-learning-page { padding: 28px 24px 120px; }
+.movies-learning-page { padding: 18px 24px 120px; }
 .movies-learning-shell { margin: 0 auto; max-width: 1180px; }
-.movies-learning-header { margin-bottom: 18px; }
+.movies-learning-header { margin-bottom: 12px; }
 .movies-learning-header p { color: var(--app-primary); font-weight: 800; margin: 0 0 4px; text-transform: uppercase; }
 .movies-learning-header h1 { font-size: clamp(2rem, 4vw, 3rem); margin: 0; }
-.movies-learning-header span { color: var(--app-muted-strong); display: block; margin-top: 8px; }
-.movies-learning-tabs { border-bottom: 1px solid var(--app-border); }
+.movies-learning-workspace { display: grid; gap: 20px; grid-template-columns: 150px minmax(0, 1fr); }
+.movies-learning-tabs { align-self: start; border-right: 1px solid var(--app-border); }
+.movies-learning-tabs :deep(.q-tab) { justify-content: flex-start; min-height: 58px; }
 .movies-learning-panels { background: transparent; }
-.movies-learning-panels :deep(.q-tab-panel) { padding: 24px 0 0; }
+.movies-learning-panels :deep(.q-tab-panel) { padding: 0; }
 .movie-chat-layout { margin: 0 auto; max-width: 900px; }
 .movies-learning-grid { display: grid; gap: 24px; grid-template-columns: minmax(360px, 0.85fr) minmax(420px, 1.15fr); }
 .movies-learning-card, .movie-report-card { background: var(--app-surface); border-color: var(--app-border); border-radius: 18px; }
