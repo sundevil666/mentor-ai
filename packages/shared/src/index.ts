@@ -604,10 +604,20 @@ export interface ContentEngagementEvent {
   createdAt: string;
 }
 
-export type LearningActivityKind = 'listening' | 'reading' | 'speaking';
+export const learningActivityKinds = [
+  'grammar',
+  'listening',
+  'speaking',
+  'phrases',
+  'audio',
+  'reading',
+  'vocabulary',
+] as const;
 
-/** Small append-only chunks of real active practice. Devices keep these in an
- * outbox while offline and delete them only after the server acknowledges them. */
+export type LearningActivityKind = typeof learningActivityKinds[number];
+
+/** Bounded per-device category aggregates of real active practice. Devices keep
+ * the current batch in an outbox and delete it only after server acknowledgement. */
 export interface LearningActivityEvent {
   id: string;
   studentId: string;
@@ -620,9 +630,13 @@ export interface LearningActivityEvent {
 }
 
 export interface LearningActivityTotals {
+  grammarSeconds: number;
   listeningSeconds: number;
-  readingSeconds: number;
   speakingSeconds: number;
+  phrasesSeconds: number;
+  audioSeconds: number;
+  readingSeconds: number;
+  vocabularySeconds: number;
   totalSeconds: number;
   updatedAt: string | null;
 }

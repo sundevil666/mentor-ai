@@ -12,6 +12,7 @@ import {
   type LearningEvent,
   type LearningActivityEvent,
   type LearningActivityTotals,
+  learningActivityKinds,
   type PersonalReadingBookArchive,
   type ReaderVocabularyItem,
   type ReadingTranscriptChunk,
@@ -485,9 +486,9 @@ export function selectMasteredLessonIds(results: ExerciseResult[]): Set<string> 
 
 function sanitizeLearningActivityEvent(candidate: LearningActivityEvent, studentId: string): LearningActivityEvent | null {
   if (!candidate || candidate.studentId !== studentId || typeof candidate.id !== 'string'
-    || !['listening', 'reading', 'speaking'].includes(candidate.kind)
+    || !learningActivityKinds.includes(candidate.kind)
     || typeof candidate.contentId !== 'string' || candidate.contentId.length === 0
-    || !Number.isFinite(candidate.activeSeconds) || candidate.activeSeconds < 1 || candidate.activeSeconds > 60
+    || !Number.isFinite(candidate.activeSeconds) || candidate.activeSeconds < 1 || candidate.activeSeconds > 86_400
     || Number.isNaN(Date.parse(candidate.startedAt)) || Number.isNaN(Date.parse(candidate.endedAt))
     || typeof candidate.sourceDeviceId !== 'string') return null;
   return { ...candidate, activeSeconds: Math.round(candidate.activeSeconds) };
@@ -498,7 +499,17 @@ function summarizeLearningActivity(
   progress: ContentProgress[],
   statisticsSnapshots: StatisticsSnapshot[],
 ): LearningActivityTotals {
-  const totals = { ...activityTotals };
+  const totals: LearningActivityTotals = {
+    grammarSeconds: activityTotals.grammarSeconds ?? 0,
+    listeningSeconds: activityTotals.listeningSeconds ?? 0,
+    speakingSeconds: activityTotals.speakingSeconds ?? 0,
+    phrasesSeconds: activityTotals.phrasesSeconds ?? 0,
+    audioSeconds: activityTotals.audioSeconds ?? 0,
+    readingSeconds: activityTotals.readingSeconds ?? 0,
+    vocabularySeconds: activityTotals.vocabularySeconds ?? 0,
+    totalSeconds: activityTotals.totalSeconds ?? 0,
+    updatedAt: activityTotals.updatedAt ?? null,
+  };
 
   // Existing synchronized resume progress provides a conservative one-time
   // baseline for activity completed before active-time tracking was released.
@@ -509,10 +520,13 @@ function summarizeLearningActivity(
   const lessonListeningBaseline = statisticsSnapshots.reduce((sum, snapshot) => sum + Math.max(0, snapshot.listeningSeconds ?? 0), 0);
   const lessonSpeakingBaseline = statisticsSnapshots.filter((snapshot) => snapshot.learningMode === 'speaking')
     .reduce((sum, snapshot) => sum + Math.max(0, snapshot.activeSeconds ?? 0), 0);
-  totals.listeningSeconds = Math.max(totals.listeningSeconds, Math.round(listeningBaseline + lessonListeningBaseline));
+  // Legacy clients counted library audio inside listening. Only add the part of
+  // the progress baseline that is not already represented there.
+  totals.audioSeconds = Math.max(totals.audioSeconds, Math.round(Math.max(0, listeningBaseline - totals.listeningSeconds)));
+  totals.listeningSeconds = Math.max(totals.listeningSeconds, Math.round(lessonListeningBaseline));
   totals.readingSeconds = Math.max(totals.readingSeconds, Math.round(readingWords / 200 * 60));
   totals.speakingSeconds = Math.max(totals.speakingSeconds, Math.round(lessonSpeakingBaseline));
-  totals.totalSeconds = totals.listeningSeconds + totals.readingSeconds + totals.speakingSeconds;
+  totals.totalSeconds = learningActivityKinds.reduce((sum, kind) => sum + totals[`${kind}Seconds`], 0);
   return totals;
 }
 

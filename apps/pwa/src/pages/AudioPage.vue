@@ -130,7 +130,7 @@ import AudioLibraryTabs from 'src/components/AudioLibraryTabs.vue';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
 
 const appStore = useAppStore();
-const listeningTimer = new ActiveLearningTimer({ studentId: () => appStore.studentId, kind: 'listening', contentId: () => selectedAudio.value?.id ?? 'audio' });
+const listeningTimer = new ActiveLearningTimer({ studentId: () => appStore.studentId, kind: 'audio', contentId: () => selectedAudio.value?.id ?? 'audio' });
 const audioElement = ref<HTMLAudioElement | null>(null);
 const selectedAudio = ref<LibraryAudio | null>(null);
 const cachedUrls = ref<Set<string>>(new Set());

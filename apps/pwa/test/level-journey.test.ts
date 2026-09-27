@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import { initialStudentModel } from '@mentor-ai/shared';
 import { calculateLevelJourney } from '../src/services/level-journey.js';
 
-const emptyActivity = { listeningSeconds: 0, readingSeconds: 0, speakingSeconds: 0, totalSeconds: 0, updatedAt: null };
+const emptyActivity = { grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null };
 
 describe('level journey forecast', () => {
   it('shows a paused A0 to A1 route without recent activity', () => {
@@ -29,6 +29,25 @@ describe('level journey forecast', () => {
       ...emptyActivity, readingSeconds: 10 * 3_600, totalSeconds: 10 * 3_600, updatedAt: now.toISOString(),
     }, [], now);
     assert.ok(reading.progressPercent > baseline.progressPercent);
+  });
+
+  it('puts every visible learning category on the progress scale', () => {
+    const now = new Date('2026-09-04T12:00:00Z');
+    for (const field of ['grammarSeconds', 'listeningSeconds', 'speakingSeconds', 'phrasesSeconds', 'audioSeconds', 'readingSeconds', 'vocabularySeconds'] as const) {
+      const journey = calculateLevelJourney(initialStudentModel, {
+        ...emptyActivity, [field]: 8 * 3_600, totalSeconds: 8 * 3_600, updatedAt: now.toISOString(),
+      }, [], now);
+      assert.ok(journey.progressPercent > calculateLevelJourney(initialStudentModel, emptyActivity, [], now).progressPercent, field);
+    }
+  });
+
+  it('shows the next weekly forecast review while progress remains live', () => {
+    const now = new Date('2026-09-04T12:00:00Z');
+    const journey = calculateLevelJourney(initialStudentModel, {
+      ...emptyActivity, readingSeconds: 3_600, totalSeconds: 3_600, updatedAt: now.toISOString(),
+    }, [], now);
+    assert.match(journey.reviewLabel, /^forecast review in [1-7]d$/);
+    assert.ok(Date.parse(journey.nextReviewAt) > now.getTime());
   });
 
   it('stops projecting days after a week without activity', () => {

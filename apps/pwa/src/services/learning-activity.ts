@@ -5,7 +5,8 @@ import { preferLocalTotals } from './learning-activity-totals';
 
 const deviceKey = 'mentor-ai-device-id';
 const summaryId = 'current';
-const maxChunkSeconds = 60;
+const maxCheckpointSeconds = 60;
+const batchKey = 'mentor-ai:learning-activity-batch';
 let activeActivitySync: Promise<LearningActivityTotals> | null = null;
 
 export async function recordLearningActivity(input: {
@@ -16,28 +17,22 @@ export async function recordLearningActivity(input: {
   startedAt?: string;
   endedAt?: string;
 }) {
-  let remainingSeconds = Math.max(1, Math.round(input.activeSeconds));
+  const activeSeconds = Math.max(1, Math.round(input.activeSeconds));
   const endedAt = input.endedAt ?? new Date().toISOString();
   const db = await mentorDb;
-  let chunkEnd = Date.parse(endedAt);
-  let latestEvent: LearningActivityEvent | undefined;
-  while (remainingSeconds > 0) {
-    const activeSeconds = Math.min(maxChunkSeconds, remainingSeconds);
-    const chunkStart = chunkEnd - activeSeconds * 1_000;
-    latestEvent = {
-      id: `activity:${crypto.randomUUID()}`,
+  const id = `activity:${getDeviceId()}:${getBatchId()}:${input.kind}`;
+  const previous = await db.get('learning-activity-outbox', id) as LearningActivityEvent | undefined;
+  const latestEvent: LearningActivityEvent = {
+      id,
       studentId: input.studentId,
       kind: input.kind,
-      contentId: input.contentId,
-      activeSeconds,
+      contentId: 'daily-category-total',
+      activeSeconds: (previous?.activeSeconds ?? 0) + activeSeconds,
       sourceDeviceId: getDeviceId(),
-      startedAt: new Date(chunkStart).toISOString(),
-      endedAt: new Date(chunkEnd).toISOString(),
-    };
-    await db.put('learning-activity-outbox', latestEvent);
-    remainingSeconds -= activeSeconds;
-    chunkEnd = chunkStart;
-  }
+      startedAt: previous?.startedAt ?? input.startedAt ?? new Date(Date.parse(endedAt) - activeSeconds * 1_000).toISOString(),
+      endedAt,
+  };
+  await db.put('learning-activity-outbox', latestEvent);
   window.dispatchEvent(new Event('mentor-learning-activity-updated'));
   return latestEvent!;
 }
@@ -46,7 +41,7 @@ export async function loadLearningActivityTotals(): Promise<LearningActivityTota
   const db = await mentorDb;
   const remote = await db.get('learning-activity-summary', summaryId) as (LearningActivityTotals & { id: string }) | undefined;
   const pending = await db.getAll('learning-activity-outbox') as LearningActivityEvent[];
-  const totals: LearningActivityTotals = remote ?? emptyTotals();
+  const totals: LearningActivityTotals = normalizeTotals(remote);
   return pending.reduce((result, event) => addSeconds(result, event.kind, event.activeSeconds, event.endedAt), totals);
 }
 
@@ -70,6 +65,7 @@ async function performLearningActivitySync(): Promise<LearningActivityTotals> {
     window.dispatchEvent(new Event('mentor-learning-activity-updated'));
     return loadLearningActivityTotals();
   }
+  rotateBatchId();
   const result = await synchronizeLearningActivity(pending);
   const acknowledged = new Set(result.acknowledgedIds);
   for (const event of pending) if (acknowledged.has(event.id)) await db.delete('learning-activity-outbox', event.id);
@@ -88,7 +84,7 @@ export class ActiveLearningTimer {
 
   async checkpoint(now = Date.now(), force = false) {
     if (!this.lastRecordedAt) return;
-    const elapsed = Math.min(maxChunkSeconds, Math.floor((now - this.lastRecordedAt) / 1_000));
+    const elapsed = Math.min(maxCheckpointSeconds, Math.floor((now - this.lastRecordedAt) / 1_000));
     if (elapsed < (force ? 1 : 15)) return;
     this.lastRecordedAt = now;
     await recordLearningActivity({
@@ -113,11 +109,31 @@ function addSeconds(totals: LearningActivityTotals, kind: LearningActivityKind, 
 }
 
 function emptyTotals(): LearningActivityTotals {
-  return { listeningSeconds: 0, readingSeconds: 0, speakingSeconds: 0, totalSeconds: 0, updatedAt: null };
+  return {
+    grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0,
+    audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null,
+  };
+}
+
+function normalizeTotals(value?: Partial<LearningActivityTotals>): LearningActivityTotals {
+  const totals = { ...emptyTotals(), ...value };
+  totals.totalSeconds = totals.grammarSeconds + totals.listeningSeconds + totals.speakingSeconds
+    + totals.phrasesSeconds + totals.audioSeconds + totals.readingSeconds + totals.vocabularySeconds;
+  return totals;
 }
 
 function getDeviceId() {
   let id = localStorage.getItem(deviceKey);
   if (!id) { id = crypto.randomUUID(); localStorage.setItem(deviceKey, id); }
   return id;
+}
+
+function getBatchId() {
+  let id = localStorage.getItem(batchKey);
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem(batchKey, id); }
+  return id;
+}
+
+function rotateBatchId() {
+  localStorage.setItem(batchKey, crypto.randomUUID());
 }

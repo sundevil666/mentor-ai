@@ -1283,7 +1283,7 @@ function wasLessonCompleted(session: typeof appStore.pausedSessions[number]) {
 const isRecommendedLessonPinned = computed(() =>
   pinnedHomeLessonKey.value === recommendedHomeLesson.value.templateKey,
 );
-const levelActivity = ref<LearningActivityTotals>({ listeningSeconds: 0, readingSeconds: 0, speakingSeconds: 0, totalSeconds: 0, updatedAt: null });
+const levelActivity = ref<LearningActivityTotals>({ grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null });
 const homeReadingProgress = ref<DailyReadingProgress>(createDailyReadingProgress());
 function refreshHomeReadingProgress() {
   try {

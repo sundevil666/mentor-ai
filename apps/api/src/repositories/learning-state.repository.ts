@@ -78,7 +78,10 @@ const demoState: LearningStateRecord = {
   readingTranscriptChunks: [],
   readingDeviceSessions: [],
   learningActivityEvents: [],
-  learningActivityTotals: { listeningSeconds: 0, readingSeconds: 0, speakingSeconds: 0, totalSeconds: 0, updatedAt: null },
+  learningActivityTotals: {
+    grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0,
+    audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null,
+  },
 };
 
 export const learningStateRepository = {
@@ -263,7 +266,7 @@ export const learningStateRepository = {
         return {
           studentId: row.student_id,
           learningActivityEvents: row.learning_activity_events ?? [],
-          learningActivityTotals: row.learning_activity_totals ?? { ...demoState.learningActivityTotals },
+          learningActivityTotals: { ...demoState.learningActivityTotals, ...(row.learning_activity_totals ?? {}) },
           contentProgress: row.content_progress ?? [],
           statisticsSnapshots: row.statistics_snapshots ?? [],
         };
@@ -302,7 +305,7 @@ export const learningStateRepository = {
       const row = result.rows[0];
       if (row) {
         return {
-          learningActivityTotals: row.learning_activity_totals ?? { ...demoState.learningActivityTotals },
+          learningActivityTotals: { ...demoState.learningActivityTotals, ...(row.learning_activity_totals ?? {}) },
           contentProgress: row.content_progress ?? [],
           statisticsSnapshots: row.statistics_snapshots ?? [],
         };
@@ -468,7 +471,7 @@ function normalizeState(state: Partial<LearningStateRecord>, user?: Authenticate
     readingTranscriptChunks: state.readingTranscriptChunks ?? [],
     readingDeviceSessions: state.readingDeviceSessions ?? [],
     learningActivityEvents: state.learningActivityEvents ?? [],
-    learningActivityTotals: state.learningActivityTotals ?? defaultState.learningActivityTotals,
+    learningActivityTotals: { ...defaultState.learningActivityTotals, ...state.learningActivityTotals },
   };
 }
 

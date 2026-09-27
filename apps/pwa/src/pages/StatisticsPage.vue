@@ -14,16 +14,32 @@
           <strong>{{ formatDuration(activityTotals.totalSeconds) }}</strong>
         </div>
         <div class="metric-tile">
-          <span>Listening</span>
+          <span>Grammar</span>
+          <strong>{{ formatDuration(activityTotals.grammarSeconds) }}</strong>
+        </div>
+        <div class="metric-tile">
+          <span>Lesson listening</span>
           <strong>{{ formatDuration(activityTotals.listeningSeconds) }}</strong>
+        </div>
+        <div class="metric-tile">
+          <span>Speaking</span>
+          <strong>{{ formatDuration(activityTotals.speakingSeconds) }}</strong>
+        </div>
+        <div class="metric-tile">
+          <span>Phrases</span>
+          <strong>{{ formatDuration(activityTotals.phrasesSeconds) }}</strong>
+        </div>
+        <div class="metric-tile">
+          <span>Audio</span>
+          <strong>{{ formatDuration(activityTotals.audioSeconds) }}</strong>
         </div>
         <div class="metric-tile">
           <span>Reading</span>
           <strong>{{ formatDuration(activityTotals.readingSeconds) }}</strong>
         </div>
         <div class="metric-tile">
-          <span>Speaking</span>
-          <strong>{{ formatDuration(activityTotals.speakingSeconds) }}</strong>
+          <span>Vocabulary</span>
+          <strong>{{ formatDuration(activityTotals.vocabularySeconds) }}</strong>
         </div>
         <div class="metric-tile">
           <span>Lessons</span>
@@ -102,7 +118,7 @@ import { loadLearningActivityTotals, syncLearningActivity } from 'src/services/l
 import type { LearningActivityTotals } from '@mentor-ai/shared';
 
 const appStore = useAppStore();
-const activityTotals = ref<LearningActivityTotals>({ listeningSeconds: 0, readingSeconds: 0, speakingSeconds: 0, totalSeconds: 0, updatedAt: null });
+const activityTotals = ref<LearningActivityTotals>({ grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null });
 
 const serverSummary = computed(() => {
   const snapshots = appStore.statisticsSnapshots;

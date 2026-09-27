@@ -1,7 +1,8 @@
-import type { LearningActivityTotals, StatisticsSnapshot, StudentModel } from '@mentor-ai/shared';
+import { learningActivityKinds, type LearningActivityTotals, type StatisticsSnapshot, type StudentModel } from '@mentor-ai/shared';
 
 const dayMs = 86_400_000;
 const inactiveAfterDays = 7;
+const reviewIntervalDays = 7;
 
 export interface LevelJourney {
   currentLevel: string;
@@ -10,6 +11,8 @@ export interface LevelJourney {
   daysRemaining: number | null;
   daysLabel: string;
   paceLabel: string;
+  reviewLabel: string;
+  nextReviewAt: string;
   tooltip: string;
 }
 
@@ -28,12 +31,19 @@ export function calculateLevelJourney(
   const skillProgress = clamp((averageSkill - stage.start) / (stage.end - stage.start));
   const snapshotSeconds = statistics.reduce((sum, snapshot) => sum + Math.max(0, snapshot.activeSeconds ?? 0), 0);
   const totalHours = Math.max(0, activity.totalSeconds, snapshotSeconds) / 3_600;
-  const practiceProgress = clamp(totalHours / stage.guidedHours);
-  // Quality evidence remains primary, while real listening/reading/speaking
-  // makes the route visibly move even between completed assessments.
+  const categoryTargetHours = stage.guidedHours / learningActivityKinds.length;
+  const categoryProgress = learningActivityKinds.map((kind) => clamp(
+    Math.max(0, activity[`${kind}Seconds`] ?? 0) / 3_600 / categoryTargetHours,
+  ));
+  const practiceProgress = categoryProgress.reduce((sum, value) => sum + value, 0) / categoryProgress.length;
+  // Quality evidence remains primary, while balanced real activity from every
+  // learning category makes the route move between completed assessments.
   const progress = clamp(skillProgress * 0.75 + practiceProgress * 0.25);
   const progressPercent = Math.min(99, Math.round(progress * 100));
   const firstEvidenceAt = earliestEvidenceDate(studentModel, statistics, now);
+  const nextReviewAt = nextReviewDate(firstEvidenceAt, now);
+  const reviewDays = Math.max(1, Math.ceil((nextReviewAt.getTime() - now.getTime()) / dayMs));
+  const reviewLabel = `forecast review in ${reviewDays}d`;
   const elapsedDays = Math.max(1, (now.getTime() - firstEvidenceAt.getTime()) / dayMs + 1);
   const recentSnapshots = statistics.filter((snapshot) => {
     const timestamp = Date.parse(snapshot.createdAt);
@@ -60,8 +70,16 @@ export function calculateLevelJourney(
     daysRemaining,
     daysLabel,
     paceLabel,
-    tooltip: `${progressPercent}% from ${stage.currentLevel} to ${stage.nextLevel}. ${paceLabel}. The estimate changes with activity and learning results.`,
+    reviewLabel,
+    nextReviewAt: nextReviewAt.toISOString(),
+    tooltip: `${progressPercent}% from ${stage.currentLevel} to ${stage.nextLevel}. ${paceLabel}. Live progress uses all learning categories; the forecast is reviewed weekly (${reviewLabel}).`,
   };
+}
+
+function nextReviewDate(firstEvidenceAt: Date, now: Date) {
+  const elapsed = Math.max(0, now.getTime() - firstEvidenceAt.getTime());
+  const completedIntervals = Math.floor(elapsed / (reviewIntervalDays * dayMs));
+  return new Date(firstEvidenceAt.getTime() + (completedIntervals + 1) * reviewIntervalDays * dayMs);
 }
 
 function averageSkillScore(model: StudentModel) {

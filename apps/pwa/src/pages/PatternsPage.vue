@@ -311,9 +311,12 @@ import { confirmOfflineRemoval } from 'src/services/offline-removal-confirmation
 import { configurePlaybackAudioSession } from 'src/services/audio-session';
 import AppAudioDock from 'src/components/AppAudioDock.vue';
 import AppDetailLayout from 'src/components/AppDetailLayout.vue';
+import { useAppStore } from 'src/stores/app-store';
+import { ActiveLearningTimer } from 'src/services/learning-activity';
 
 const route = useRoute();
 const router = useRouter();
+const appStore = useAppStore();
 const selectedPattern = computed(() => patternLibrary.find((item) => item.id === route.query.pattern));
 const selectedExpression = computed(() => route.query.expression === expressionPractice.id ? expressionPractice : undefined);
 const selectedPractice = computed(() => selectedPattern.value ?? selectedExpression.value);
@@ -348,8 +351,10 @@ const progress = computed(() => completedCount.value / (selectedPractice.value?.
 const playlistProgress = computed(() => playlistCompleted.value / (selectedPractice.value?.examples.length ?? 1));
 const patternOffline = computed(() => playlistOffline.value && examplesOffline.value);
 const expressionCompleted = computed(() => completedExpressionIds.value.size === expressionLibrary.length);
+const phrasesTimer = new ActiveLearningTimer({ studentId: () => appStore.studentId, kind: 'phrases', contentId: () => selectedPractice.value?.id ?? 'phrases' });
 
 watch(selectedPractice, async (nextPractice) => {
+  await phrasesTimer.stop();
   stopPlaylist();
   playlistCurrentTime.value = 0;
   playlistDuration.value = 0;
@@ -363,6 +368,7 @@ watch(selectedPractice, async (nextPractice) => {
     ? localStorage.getItem(`mentor-ai:pattern-repeat:${nextPractice.id}`) !== 'false'
     : true;
   if (!nextPractice) return;
+  phrasesTimer.start();
   const cached = await getCachedPatternPlaylist(nextPractice);
   if (selectedPractice.value?.id === nextPractice.id && cached) setPlaylistBlob(cached);
   const phrasesCached = await isSpeechBatchCached(nextPractice.examples.map((example) => example.phrase));
@@ -373,6 +379,7 @@ watch(selectedPractice, async (nextPractice) => {
 }, { immediate: true });
 
 onBeforeUnmount(() => {
+  void phrasesTimer.stop();
   stopSpeech();
   playlistAudio.value?.pause();
   revokePlaylistUrl();
@@ -403,6 +410,7 @@ function readCompletedExpressionIds() {
 }
 
 async function playExpression(expression: EnglishExpression) {
+  void phrasesTimer.checkpoint();
   stopPlaylist(); stopSpeech(); playingId.value = expression.id;
   const started = await speakWithPreferredVoice(expression.phrase, {
     mediaTitle: 'Everyday expressions',
@@ -429,6 +437,7 @@ function closeDetail() {
 }
 
 function toggleAnswer(id: string) {
+  void phrasesTimer.checkpoint();
   const next = new Set(revealedIds.value);
   if (next.has(id)) next.delete(id); else next.add(id);
   revealedIds.value = next;
@@ -437,6 +446,7 @@ function toggleAnswer(id: string) {
 function toggleCompleted(id: string) {
   const practice = selectedPractice.value;
   if (!practice) return;
+  void phrasesTimer.checkpoint();
   const next = new Set(completedIds.value);
   if (next.has(id)) next.delete(id); else next.add(id);
   completedIds.value = next;
@@ -460,6 +470,7 @@ function handlePlaylistEnded() {
 async function playExample(example: PhrasePatternExample) {
   const practice = selectedPractice.value;
   if (!practice) return;
+  void phrasesTimer.checkpoint();
   stopPlaylist(); stopSpeech(); playingId.value = example.id;
   const started = await speakWithPreferredVoice(example.phrase, { mediaTitle: practice.title, onEnd: () => { playingId.value = null; }, onError: showAudioError });
   if (!started) playingId.value = null;

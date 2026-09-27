@@ -17,6 +17,7 @@ import {
   type LearningSessionHandoff,
   type LearningEvent,
   type LearningContext,
+  type LearningActivityKind,
   type Observation,
   type Recommendation,
   type SpeechResult,
@@ -999,14 +1000,16 @@ export const useAppStore = defineStore('app', {
 
       const db = await mentorDb;
       await db.put('statistics', toStorageRecord({ ...snapshot, userId: this.studentId }));
-      if (activeSeconds > 0 && (sourceSession.context.mode === 'listening' || sourceSession.context.mode === 'speaking')) {
-        await recordLearningActivity({
+      if (activeSeconds > 0) {
+        const activityKinds = lessonActivityKinds(sourceSession);
+        const secondsPerKind = Math.max(1, Math.round(activeSeconds / activityKinds.length));
+        await Promise.all(activityKinds.map((kind) => recordLearningActivity({
           studentId: this.studentId,
-          kind: sourceSession.context.mode,
+          kind,
           contentId: sourceSession.lesson.id,
-          activeSeconds,
+          activeSeconds: secondsPerKind,
           endedAt: createdAt,
-        });
+        })));
       }
       await db.put('concept-evidence', toStorageRecord({
         id: `concept-${sourceSession.id}-${createdAt}`,
@@ -1561,6 +1564,18 @@ function now(): string {
 
 function countWords(value: string): number {
   return value.trim().match(/[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu)?.length ?? 0;
+}
+
+function lessonActivityKinds(session: LearningSessionState): LearningActivityKind[] {
+  if (session.context.mode === 'listening' || session.context.mode === 'speaking') return [session.context.mode];
+  const kinds = new Set<LearningActivityKind>();
+  for (const skill of session.lesson.targetSkills) {
+    if (skill === 'grammar' || skill === 'listening' || skill === 'speaking' || skill === 'vocabulary') kinds.add(skill);
+  }
+  for (const result of session.results) {
+    if (result.targetSkill === 'grammar' || result.targetSkill === 'listening' || result.targetSkill === 'speaking' || result.targetSkill === 'vocabulary') kinds.add(result.targetSkill);
+  }
+  return kinds.size ? [...kinds] : ['vocabulary'];
 }
 
 function createSessionId(createdAt: string): string {

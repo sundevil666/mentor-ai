@@ -70,12 +70,19 @@ describe('learning state service', () => {
       id: `activity-reading-${stamp}`, studentId: 'demo-student', kind: 'reading', contentId: 'book-1',
       activeSeconds: 45, sourceDeviceId: 'tablet', startedAt: '2026-09-04T08:02:00.000Z', endedAt: '2026-09-04T08:02:45.000Z',
     };
-    const first = await learningStateService.mergeLearningActivityEvents([listening, reading]);
+    const phrases = {
+      id: `activity-phrases-${stamp}`, studentId: 'demo-student', kind: 'phrases', contentId: 'daily-category-total',
+      activeSeconds: 600, sourceDeviceId: 'phone', startedAt: '2026-09-04T08:03:00.000Z', endedAt: '2026-09-04T08:13:00.000Z',
+    };
+    const first = await learningStateService.mergeLearningActivityEvents([listening, reading, phrases]);
     const retry = await learningStateService.mergeLearningActivityEvents([listening]);
-    assert.deepEqual(first.acknowledgedIds, [listening.id, reading.id]);
+    assert.deepEqual(first.acknowledgedIds, [listening.id, reading.id, phrases.id]);
     assert.equal(retry.totals.listeningSeconds >= 60, true);
     assert.equal(retry.totals.readingSeconds >= 45, true);
-    assert.equal(retry.totals.totalSeconds, retry.totals.listeningSeconds + retry.totals.readingSeconds + retry.totals.speakingSeconds);
+    assert.equal(retry.totals.phrasesSeconds >= 600, true);
+    assert.equal(retry.totals.totalSeconds, retry.totals.grammarSeconds + retry.totals.listeningSeconds
+      + retry.totals.speakingSeconds + retry.totals.phrasesSeconds + retry.totals.audioSeconds
+      + retry.totals.readingSeconds + retry.totals.vocabularySeconds);
   });
 
   it('deduplicates valid application telemetry and rejects another student data', async () => {

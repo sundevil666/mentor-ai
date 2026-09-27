@@ -38,7 +38,7 @@
           <q-tooltip>{{ appStore.isOnline ? 'Online' : 'Offline' }}</q-tooltip>
         </q-btn>
         <span class="level-trend header-level-trend">
-          {{ levelTrend.currentLevel }}→{{ levelTrend.nextLevel }} · {{ levelTrend.daysLabel }}
+          {{ levelTrend.currentLevel }}→{{ levelTrend.nextLevel }} · {{ levelTrend.daysLabel }} · {{ levelTrend.reviewLabel }}
           <q-tooltip>{{ levelTrend.tooltip }}</q-tooltip>
         </span>
         <q-btn
@@ -398,18 +398,20 @@ const googleClientId = ref<string | null>(null);
 const googleSignInButton = ref<HTMLElement | null>(null);
 const showGoogleSignIn = ref(false);
 const routeTransitionName = ref('route-slide-forward');
-const levelActivity = ref<LearningActivityTotals>({ listeningSeconds: 0, readingSeconds: 0, speakingSeconds: 0, totalSeconds: 0, updatedAt: null });
+const levelActivity = ref<LearningActivityTotals>({ grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null });
+const levelTrendNow = ref(new Date());
 const pendingActivityCount = ref(0);
 const pendingReadingTranscriptCount = ref(0);
 const isManualSyncRunning = ref(false);
 const pendingUploadCount = computed(() => appStore.pendingSyncCount + pendingActivityCount.value + pendingReadingTranscriptCount.value);
-const levelTrend = computed(() => calculateLevelJourney(appStore.studentModel, levelActivity.value, appStore.statisticsSnapshots));
+const levelTrend = computed(() => calculateLevelJourney(appStore.studentModel, levelActivity.value, appStore.statisticsSnapshots, levelTrendNow.value));
 const deferredInstallPrompt = ref<BeforeInstallPromptEvent | null>(null);
 const isPwaInstalled = ref(false);
 const showInstallHelp = ref(false);
 const offlineLessonState = ref<OfflineLessonUpdateState>(getOfflineLessonUpdateState());
 const translationUsage = ref<TranslationUsage | null>(null);
 let unsubscribeOfflineLessonUpdates: (() => void) | undefined;
+let levelTrendClock: ReturnType<typeof setInterval> | undefined;
 const showInstallButton = computed(() => !isPwaInstalled.value);
 const translationUsageRatio = computed(() => Math.min(1, (translationUsage.value?.percentUsed ?? 0) / 100));
 const translationUsagePercent = computed(() => Math.round(translationUsage.value?.percentUsed ?? 0));
@@ -567,6 +569,7 @@ async function handleHomeNavigation() {
 }
 
 onMounted(async () => {
+  levelTrendClock = setInterval(() => { levelTrendNow.value = new Date(); }, 60_000);
   await cleanupExpiredOfflineLessons();
   unsubscribeOfflineLessonUpdates = subscribeOfflineLessonUpdates((nextState) => { offlineLessonState.value = nextState; });
   isPwaInstalled.value = isStandalonePwa();
@@ -597,6 +600,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  if (levelTrendClock) clearInterval(levelTrendClock);
   window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   window.removeEventListener('appinstalled', handleAppInstalled);
   window.removeEventListener('online', handleApplicationOnline);
