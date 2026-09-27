@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { readFileSync } from 'node:fs';
 import { boundedHistory, createMovieChatReply, movieCoachInstructions } from '../dist/services/movie-chat.service.js';
 import { config } from '../dist/config/env.js';
 
@@ -31,5 +32,12 @@ describe('movie chat service', () => {
     } finally {
       config.openAiApiKey = previousKey;
     }
+  });
+
+  it('publishes the movie chat through the Vercel serverless endpoint', () => {
+    const serverlessRoute = readFileSync(new URL('../../../api/movie-chat.js', import.meta.url), 'utf8');
+
+    assert.match(serverlessRoute, /createMovieChatReply\(messages\)/);
+    assert.match(serverlessRoute, /request\.method !== 'POST'/);
   });
 });
