@@ -109,6 +109,27 @@ describe('learning state service', () => {
     assert.equal(second.find((event) => event.id === valid.id)?.errorCode, 'MediaError');
   });
 
+  it('stores valid movie learning reports and rejects another student data', async () => {
+    const stamp = Date.now();
+    const valid = {
+      id: `movie-report-${stamp}`,
+      studentId: 'demo-student',
+      movieTitle: 'Arrival',
+      watchedAt: '2026-09-27',
+      report: 'Fast connected speech was difficult.',
+      sourceDeviceId: 'desktop-test',
+      createdAt: new Date(stamp).toISOString(),
+      updatedAt: new Date(stamp).toISOString(),
+    };
+    const invalid = { ...valid, id: `movie-report-invalid-${stamp}`, studentId: 'another-student' };
+
+    const saved = await learningStateService.mergeMovieLearningReports([valid, invalid]);
+    const retry = await learningStateService.mergeMovieLearningReports([valid]);
+
+    assert.deepEqual(saved.map((report) => report.id), [valid.id]);
+    assert.deepEqual(retry.map((report) => report.id), [valid.id]);
+  });
+
   it('returns student state and generates a current lesson', async () => {
     const studentState = await learningStateService.getStudentState();
     const lesson = await learningStateService.getCurrentLesson();

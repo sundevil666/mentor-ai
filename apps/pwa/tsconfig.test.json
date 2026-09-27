@@ -23,6 +23,8 @@
     "src/services/lesson-category-progress.ts",
     "src/services/level-journey.ts",
     "src/services/lesson-step-navigation.ts",
+    "src/services/movie-learning-reports.ts",
+    "src/services/movie-learning-report-outbox.ts",
     "src/services/offline-library.ts",
     "src/services/offline-lesson-updates.ts",
     "src/services/navigation-category.ts",

@@ -31,6 +31,18 @@ export type ActivityPace = 'passive' | 'steady' | 'active' | 'deep';
 
 export type DeviceSurface = 'mobile' | 'desktop';
 
+export interface MovieLearningReport {
+  id: string;
+  studentId: string;
+  movieTitle: string;
+  watchedAt: string;
+  report: string;
+  sourceDeviceId: string;
+  createdAt: string;
+  updatedAt: string;
+  synchronizedAt?: string;
+}
+
 export type PreferredLessonDevice = 'iphone' | 'mac';
 
 export interface WorkShiftSchedule {

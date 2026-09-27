@@ -12,6 +12,7 @@ import {
   type LearningEvent,
   type LearningActivityEvent,
   type LearningActivityTotals,
+  type MovieLearningReport,
   learningActivityKinds,
   type PersonalReadingBookArchive,
   type ReaderVocabularyItem,
@@ -203,6 +204,24 @@ export const learningStateService = {
       .slice(-10_000);
     await learningStateRepository.write({ ...state, applicationTelemetryEvents }, user);
     return applicationTelemetryEvents;
+  },
+
+  async mergeMovieLearningReports(incoming: MovieLearningReport[], user?: AuthenticatedUser) {
+    const state = await learningStateRepository.read(user);
+    const merged = new Map(state.movieLearningReports.map((report) => [report.id, report]));
+    const accepted: MovieLearningReport[] = [];
+    for (const candidate of incoming) {
+      const safe = sanitizeMovieLearningReport(candidate, state.student.id);
+      if (!safe) continue;
+      const current = merged.get(safe.id);
+      if (!current || safe.updatedAt >= current.updatedAt) merged.set(safe.id, safe);
+      accepted.push(merged.get(safe.id)!);
+    }
+    const movieLearningReports = [...merged.values()]
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+      .slice(-2_000);
+    await learningStateRepository.write({ ...state, movieLearningReports }, user);
+    return accepted;
   },
 
   async mergeReaderVocabularyItems(incoming: ReaderVocabularyItem[], user?: AuthenticatedUser) {
@@ -926,6 +945,34 @@ function sanitizeApplicationTelemetryEvent(
     errorCode: event.errorCode?.slice(0, 160),
     appVersion: event.appVersion.slice(0, 80),
     occurredAt: event.occurredAt,
+  };
+}
+
+function sanitizeMovieLearningReport(
+  candidate: MovieLearningReport,
+  studentId: string,
+): MovieLearningReport | undefined {
+  const movieTitle = typeof candidate.movieTitle === 'string' ? candidate.movieTitle.replace(/\s+/g, ' ').trim().slice(0, 160) : '';
+  const report = typeof candidate.report === 'string' ? candidate.report.trim().slice(0, 20_000) : '';
+  if (
+    candidate.studentId !== studentId ||
+    !candidate.id ||
+    !candidate.sourceDeviceId ||
+    !movieTitle ||
+    !report ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(candidate.watchedAt) ||
+    !Number.isFinite(Date.parse(candidate.createdAt)) ||
+    !Number.isFinite(Date.parse(candidate.updatedAt))
+  ) return undefined;
+  return {
+    id: candidate.id.slice(0, 180),
+    studentId,
+    movieTitle,
+    watchedAt: candidate.watchedAt,
+    report,
+    sourceDeviceId: candidate.sourceDeviceId.slice(0, 160),
+    createdAt: candidate.createdAt,
+    updatedAt: candidate.updatedAt,
   };
 }
 

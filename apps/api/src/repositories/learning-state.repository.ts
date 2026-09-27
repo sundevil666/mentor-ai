@@ -13,6 +13,7 @@ import {
   type LearningEvent,
   type LearningActivityEvent,
   type LearningActivityTotals,
+  type MovieLearningReport,
   type Observation,
   type PersonalReadingBookArchive,
   type Recommendation,
@@ -49,6 +50,7 @@ interface LearningStateRecord {
   contentProgress: ContentProgress[];
   contentEngagementEvents: ContentEngagementEvent[];
   applicationTelemetryEvents: ApplicationTelemetryEvent[];
+  movieLearningReports: MovieLearningReport[];
   readerVocabularyItems: ReaderVocabularyItem[];
   personalReadingBooks: PersonalReadingBookArchive[];
   readingTranscriptChunks: ReadingTranscriptChunk[];
@@ -73,6 +75,7 @@ const demoState: LearningStateRecord = {
   contentProgress: [],
   contentEngagementEvents: [],
   applicationTelemetryEvents: [],
+  movieLearningReports: [],
   readerVocabularyItems: [],
   personalReadingBooks: [],
   readingTranscriptChunks: [],
@@ -466,6 +469,7 @@ function normalizeState(state: Partial<LearningStateRecord>, user?: Authenticate
     contentProgress: state.contentProgress ?? [],
     contentEngagementEvents: state.contentEngagementEvents ?? [],
     applicationTelemetryEvents: state.applicationTelemetryEvents ?? [],
+    movieLearningReports: state.movieLearningReports ?? [],
     readerVocabularyItems: state.readerVocabularyItems ?? [],
     personalReadingBooks: state.personalReadingBooks ?? [],
     readingTranscriptChunks: state.readingTranscriptChunks ?? [],

@@ -9,6 +9,7 @@ import StoragePage from 'pages/StoragePage.vue';
 import AudioPage from 'pages/AudioPage.vue';
 import PatternsPage from 'pages/PatternsPage.vue';
 import VersionHistoryPage from 'pages/VersionHistoryPage.vue';
+import MoviesPage from 'pages/MoviesPage.vue';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -49,6 +50,12 @@ const routes: RouteRecordRaw[] = [
         name: 'reading',
         component: StoriesPage,
         props: { libraryMode: 'reading' },
+        meta: { routeOrder: 1 },
+      },
+      {
+        path: 'movies',
+        name: 'movies',
+        component: MoviesPage,
         meta: { routeOrder: 1 },
       },
       { path: 'videos', redirect: (to) => ({ name: 'audio-stories', query: to.query, hash: to.hash }) },

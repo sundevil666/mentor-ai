@@ -1,5 +1,5 @@
 import type { RequestHandler } from 'express';
-import type { ApplicationTelemetryEvent, ContentEngagementEvent, ContentProgress, ExerciseResult, LearningActivityEvent, LearningContext, LearningEvent, LearningSessionHandoff, ReadingDeviceSession, SpeechResult, StatisticsSnapshot } from '@mentor-ai/shared';
+import type { ApplicationTelemetryEvent, ContentEngagementEvent, ContentProgress, ExerciseResult, LearningActivityEvent, LearningContext, LearningEvent, LearningSessionHandoff, MovieLearningReport, ReadingDeviceSession, SpeechResult, StatisticsSnapshot } from '@mentor-ai/shared';
 import { learningStateService } from '../services/learning-state.service.js';
 import { sendData } from './http-response.js';
 
@@ -56,6 +56,13 @@ export const getLearningActivityTotals: RequestHandler = sendData((req) =>
 export const mergeApplicationTelemetryEvents: RequestHandler = sendData((req) =>
   learningStateService.mergeApplicationTelemetryEvents(
     Array.isArray(req.body?.telemetryEvents) ? req.body.telemetryEvents as ApplicationTelemetryEvent[] : [],
+    req.authUser,
+  ),
+);
+
+export const mergeMovieLearningReports: RequestHandler = sendData((req) =>
+  learningStateService.mergeMovieLearningReports(
+    Array.isArray(req.body?.reports) ? req.body.reports as MovieLearningReport[] : [],
     req.authUser,
   ),
 );

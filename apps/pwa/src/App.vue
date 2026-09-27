@@ -81,6 +81,7 @@ import { runServerMaintenance } from 'src/services/server-maintenance';
 import { syncReaderVocabulary } from 'src/services/reader-vocabulary';
 import { updateOfflineLessons } from 'src/services/offline-lesson-updates';
 import { fetchTranslationUsage } from 'src/services/api-client';
+import { pendingMovieLearningReportCount, syncMovieLearningReports } from 'src/services/movie-learning-reports';
 
 const appStore = useAppStore();
 const router = useRouter();
@@ -399,7 +400,8 @@ function handleServiceWorkerMessage(event: MessageEvent) {
 async function handleServerMaintenanceWakeup() {
   const hasPendingActivity = (await pendingLearningActivityCount().catch(() => 0)) > 0;
   const hasPendingTranscripts = (await mentorDb.then((db) => db.count('reading-transcript-outbox')).catch(() => 0)) > 0;
-  void runDailyServerMaintenance(hasPendingActivity || hasPendingTranscripts || appStore.pendingSyncCount > 0);
+  const hasPendingMovieReports = (await pendingMovieLearningReportCount().catch(() => 0)) > 0;
+  void runDailyServerMaintenance(hasPendingActivity || hasPendingTranscripts || hasPendingMovieReports || appStore.pendingSyncCount > 0);
 }
 
 async function runDailyServerMaintenance(force = false) {
@@ -416,6 +418,7 @@ async function runDailyServerMaintenance(force = false) {
       syncReadingTranscripts(),
       syncReadingPageSpeech(appStore.studentId),
       syncReaderVocabulary(appStore.studentId),
+      syncMovieLearningReports(),
       updateOfflineLessons(appStore.loadLesson.bind(appStore)).then(async (offlineUpdate) => {
         if (offlineUpdate.downloaded > 0) {
           await appStore.recordLessonUpdateNotification(
@@ -429,10 +432,11 @@ async function runDailyServerMaintenance(force = false) {
       fetchTranslationUsage(),
     ]);
     window.dispatchEvent(new Event('mentor-ai:daily-server-maintenance-finished'));
-    if ([2, 3, 4, 6, 7, 8].some((index) => syncResults[index]?.status === 'rejected')
+    if ([2, 3, 4, 6, 7, 8, 9].some((index) => syncResults[index]?.status === 'rejected')
       || (await pendingLearningActivityCount()) > 0
       || (await (await mentorDb).count('reading-transcript-outbox')) > 0
-      || (await (await mentorDb).count('vocabulary-practice-items')) > 0) {
+      || (await (await mentorDb).count('vocabulary-practice-items')) > 0
+      || (await pendingMovieLearningReportCount()) > 0) {
       throw new Error('Learning data remains queued for synchronization');
     }
   }, { force }).catch(() => undefined);

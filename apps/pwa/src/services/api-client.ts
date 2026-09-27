@@ -9,6 +9,7 @@ import type {
   LearningActivityEvent,
   LearningActivityTotals,
   LearningActivitySyncResult,
+  MovieLearningReport,
   LearningSessionHandoff,
   LearningEvent,
   PersonalReadingBookArchive,
@@ -401,6 +402,18 @@ export async function synchronizeApplicationTelemetry(
   });
   if (!response.ok) throw new Error('Application telemetry synchronization failed.');
   return ((await response.json()) as ApiResponse<ApplicationTelemetryEvent[]>).data;
+}
+
+export async function synchronizeMovieLearningReports(
+  reports: MovieLearningReport[],
+): Promise<MovieLearningReport[]> {
+  const response = await fetch(`${apiBaseUrl}/api/movie-learning-reports-synchronize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ reports }),
+  });
+  if (!response.ok) throw new Error('Movie learning report synchronization failed.');
+  return ((await response.json()) as ApiResponse<MovieLearningReport[]>).data;
 }
 
 export async function saveReadingTranscripts(chunks: ReadingTranscriptChunk[]): Promise<ReadingTranscriptChunk[]> {

@@ -1887,7 +1887,7 @@ body.body--dark .home-progress-item__copy span { color: #cbd5e1; }
   box-shadow: 0 18px 42px rgba(17, 24, 39, 0.16);
   display: grid;
   gap: 6px;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   left: 50%;
   max-width: 520px;
   padding: 8px;
@@ -1928,6 +1928,7 @@ body.body--dark .home-progress-item__copy span { color: #cbd5e1; }
 .mobile-start-dock__button--patterns { --dock-accent: #7340d8; --dock-soft: #efe5ff; }
 .mobile-start-dock__button--audio { --dock-accent: #cf6814; --dock-soft: #fff0dd; }
 .mobile-start-dock__button--stories { --dock-accent: #198754; --dock-soft: #e1f5e9; }
+.mobile-start-dock__button--movies { --dock-accent: #b54634; --dock-soft: #ffebe7; }
 
 body.body--dark .mobile-start-dock__button--home { --dock-accent: #70d7ca; --dock-soft: #173c36; }
 body.body--dark .mobile-start-dock__button--grammar { --dock-accent: #c4aff0; --dock-soft: #312846; }
@@ -1936,6 +1937,7 @@ body.body--dark .mobile-start-dock__button--speaking { --dock-accent: #ee9fba; -
 body.body--dark .mobile-start-dock__button--patterns { --dock-accent: #c3a4ef; --dock-soft: #332846; }
 body.body--dark .mobile-start-dock__button--audio { --dock-accent: #efad70; --dock-soft: #422e1f; }
 body.body--dark .mobile-start-dock__button--stories { --dock-accent: #8dcea3; --dock-soft: #20382a; }
+body.body--dark .mobile-start-dock__button--movies { --dock-accent: #f1a08f; --dock-soft: #442721; }
 
 .mobile-start-dock__button:hover,
 .mobile-start-dock__button:focus-visible {
@@ -4404,6 +4406,10 @@ body.body--dark .personal-reader__lookup-error {
     transform: none;
     width: 100%;
     grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+
+  .desktop-navigation-only {
+    display: none;
   }
 
   .mobile-start-dock__button {

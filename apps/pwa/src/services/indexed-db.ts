@@ -1,6 +1,6 @@
 import { openDB } from 'idb';
 
-export const mentorDb = openDB('mentor-ai', 16, {
+export const mentorDb = openDB('mentor-ai', 17, {
   upgrade(db, oldVersion) {
     if (!db.objectStoreNames.contains('lessons')) {
       db.createObjectStore('lessons', { keyPath: 'id' });
@@ -102,6 +102,10 @@ export const mentorDb = openDB('mentor-ai', 16, {
 
     if (!db.objectStoreNames.contains('reading-transcript-outbox')) {
       db.createObjectStore('reading-transcript-outbox', { keyPath: 'id' });
+    }
+
+    if (!db.objectStoreNames.contains('movie-learning-reports')) {
+      db.createObjectStore('movie-learning-reports', { keyPath: 'id' });
     }
   },
 });

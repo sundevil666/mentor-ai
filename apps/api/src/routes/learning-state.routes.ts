@@ -12,6 +12,7 @@ import {
   mergeContentEngagementEvents,
   mergeLearningActivityEvents,
   mergeApplicationTelemetryEvents,
+  mergeMovieLearningReports,
   synchronizeLearningEvents,
   upsertSessionHandoff,
   upsertReadingDeviceSession,
@@ -36,5 +37,6 @@ learningStateRouter.post('/content-engagement-synchronize', mergeContentEngageme
 learningStateRouter.post('/learning-activity-synchronize', mergeLearningActivityEvents);
 learningStateRouter.get('/learning-activity-totals', getLearningActivityTotals);
 learningStateRouter.post('/application-telemetry-synchronize', mergeApplicationTelemetryEvents);
+learningStateRouter.post('/movie-learning-reports-synchronize', mergeMovieLearningReports);
 learningStateRouter.get('/configuration', getConfiguration);
 learningStateRouter.post('/synchronization', synchronizeLearningEvents);

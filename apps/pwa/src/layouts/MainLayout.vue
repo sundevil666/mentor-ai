@@ -284,7 +284,7 @@
         <button
           v-if="item.tone === 'home'"
           class="mobile-start-dock__button"
-          :class="[`mobile-start-dock__button--${item.tone}`, { 'mobile-start-dock__button--active': item.isActive() }]"
+          :class="[`mobile-start-dock__button--${item.tone}`, { 'mobile-start-dock__button--active': item.isActive(), 'desktop-navigation-only': item.desktopOnly }]"
           type="button"
           @click="handleHomeNavigation"
         >
@@ -294,7 +294,7 @@
         <router-link
           v-else
           class="mobile-start-dock__button"
-          :class="[`mobile-start-dock__button--${item.tone}`, { 'mobile-start-dock__button--active': item.isActive() }]"
+          :class="[`mobile-start-dock__button--${item.tone}`, { 'mobile-start-dock__button--active': item.isActive(), 'desktop-navigation-only': item.desktopOnly }]"
           :to="item.to"
         >
           <q-icon :name="item.icon" size="24px" />
@@ -349,6 +349,7 @@ import { syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
 import { syncReadingPageSpeech } from 'src/services/reading-page-speech-outbox';
 import { syncReaderVocabulary } from 'src/services/reader-vocabulary';
 import { syncApplicationTelemetry } from 'src/services/application-telemetry';
+import { pendingMovieLearningReportCount, syncMovieLearningReports } from 'src/services/movie-learning-reports';
 import { mentorDb } from 'src/services/indexed-db';
 import { calculateLevelJourney } from 'src/services/level-journey';
 import {
@@ -402,8 +403,9 @@ const levelActivity = ref<LearningActivityTotals>({ grammarSeconds: 0, listening
 const levelTrendNow = ref(new Date());
 const pendingActivityCount = ref(0);
 const pendingReadingTranscriptCount = ref(0);
+const pendingMovieReportCount = ref(0);
 const isManualSyncRunning = ref(false);
-const pendingUploadCount = computed(() => appStore.pendingSyncCount + pendingActivityCount.value + pendingReadingTranscriptCount.value);
+const pendingUploadCount = computed(() => appStore.pendingSyncCount + pendingActivityCount.value + pendingReadingTranscriptCount.value + pendingMovieReportCount.value);
 const levelTrend = computed(() => calculateLevelJourney(appStore.studentModel, levelActivity.value, appStore.statisticsSnapshots, levelTrendNow.value));
 const deferredInstallPrompt = ref<BeforeInstallPromptEvent | null>(null);
 const isPwaInstalled = ref(false);
@@ -504,7 +506,8 @@ const router = useRouter();
 const primaryNavigationItems: Array<{
   label: string;
   icon: string;
-  tone: 'home' | 'grammar' | 'listening' | 'speaking' | 'patterns' | 'audio' | 'stories';
+  tone: 'home' | 'grammar' | 'listening' | 'speaking' | 'patterns' | 'audio' | 'stories' | 'movies';
+  desktopOnly?: boolean;
   to: RouteLocationRaw;
   isActive: () => boolean;
 }> = [
@@ -557,6 +560,14 @@ const primaryNavigationItems: Array<{
     to: { name: 'reading' },
     isActive: () => route.name === 'reading',
   },
+  {
+    label: 'Movies',
+    icon: 'movie',
+    tone: 'movies',
+    desktopOnly: true,
+    to: { name: 'movies' },
+    isActive: () => route.name === 'movies',
+  },
 ];
 
 async function handleHomeNavigation() {
@@ -582,6 +593,7 @@ onMounted(async () => {
   window.addEventListener('mentor-learning-activity-updated', refreshLevelActivity);
   window.addEventListener('mentor-learning-activity-updated', refreshPendingActivityCount);
   window.addEventListener('mentor-learning-upload-queue-updated', refreshPendingReadingTranscriptCount);
+  window.addEventListener('mentor-movie-reports-updated', refreshPendingMovieReportCount);
   window.addEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyServerMaintenanceFinished);
   window.addEventListener('error', handleRuntimeError);
   window.addEventListener('unhandledrejection', handleUnhandledRejection);
@@ -595,6 +607,7 @@ onMounted(async () => {
   await refreshLevelActivity();
   await refreshPendingActivityCount();
   await refreshPendingReadingTranscriptCount();
+  await refreshPendingMovieReportCount();
   await recordApplicationTelemetry({ studentId: appStore.studentId, type: 'app-opened', route: String(route.name ?? 'unknown') });
   await loadTranslationUsage();
 });
@@ -610,6 +623,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('mentor-learning-activity-updated', refreshLevelActivity);
   window.removeEventListener('mentor-learning-activity-updated', refreshPendingActivityCount);
   window.removeEventListener('mentor-learning-upload-queue-updated', refreshPendingReadingTranscriptCount);
+  window.removeEventListener('mentor-movie-reports-updated', refreshPendingMovieReportCount);
   window.removeEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyServerMaintenanceFinished);
   window.removeEventListener('error', handleRuntimeError);
   window.removeEventListener('unhandledrejection', handleUnhandledRejection);
@@ -680,6 +694,9 @@ async function refreshPendingActivityCount() { pendingActivityCount.value = awai
 async function refreshPendingReadingTranscriptCount() {
   pendingReadingTranscriptCount.value = await (await mentorDb).count('reading-transcript-outbox');
 }
+async function refreshPendingMovieReportCount() {
+  pendingMovieReportCount.value = await pendingMovieLearningReportCount();
+}
 async function syncLearningDataNow() {
   if (isManualSyncRunning.value) return;
   if (!navigator.onLine) {
@@ -697,8 +714,9 @@ async function syncLearningDataNow() {
       syncReadingPageSpeech(appStore.studentId, Date.now(), undefined, true),
       syncReaderVocabulary(appStore.studentId),
       syncApplicationTelemetry(),
+      syncMovieLearningReports(),
     ]);
-    await Promise.all([refreshLevelActivity(), refreshPendingActivityCount(), refreshPendingReadingTranscriptCount()]);
+    await Promise.all([refreshLevelActivity(), refreshPendingActivityCount(), refreshPendingReadingTranscriptCount(), refreshPendingMovieReportCount()]);
     if (results.some((result) => result.status === 'rejected') || pendingUploadCount.value > 0) {
       Notify.create({ type: 'warning', icon: 'cloud_off', message: 'Some updates are still saved on this device. Try again later.' });
     } else {
