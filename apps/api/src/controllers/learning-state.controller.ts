@@ -2,6 +2,7 @@ import type { RequestHandler } from 'express';
 import type { ApplicationTelemetryEvent, ContentEngagementEvent, ContentProgress, ExerciseResult, LearningActivityEvent, LearningContext, LearningEvent, LearningSessionHandoff, MovieLearningReport, ReadingDeviceSession, SpeechResult, StatisticsSnapshot } from '@mentor-ai/shared';
 import { learningStateService } from '../services/learning-state.service.js';
 import { sendData } from './http-response.js';
+import { createMovieChatReply, type MovieChatMessage } from '../services/movie-chat.service.js';
 
 export const getStudentState: RequestHandler = sendData((req) => learningStateService.getStudentState(req.authUser));
 
@@ -64,6 +65,13 @@ export const mergeMovieLearningReports: RequestHandler = sendData((req) =>
   learningStateService.mergeMovieLearningReports(
     Array.isArray(req.body?.reports) ? req.body.reports as MovieLearningReport[] : [],
     req.authUser,
+  ),
+);
+
+export const replyToMovieChat: RequestHandler = sendData((req) =>
+  createMovieChatReply(
+    typeof req.body?.initialPrompt === 'string' ? req.body.initialPrompt : '',
+    Array.isArray(req.body?.messages) ? req.body.messages as MovieChatMessage[] : [],
   ),
 );
 

@@ -416,6 +416,22 @@ export async function synchronizeMovieLearningReports(
   return ((await response.json()) as ApiResponse<MovieLearningReport[]>).data;
 }
 
+export async function requestMovieChatReply(
+  initialPrompt: string,
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+): Promise<{ reply: string; model: string }> {
+  const response = await fetch(`${apiBaseUrl}/api/movie-chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ initialPrompt, messages }),
+  });
+  const body = await response.json().catch(() => null) as ApiResponse<{ reply: string; model: string }> | { error?: { message?: string } } | null;
+  if (!response.ok || !body || !('data' in body)) {
+    throw new Error(body && 'error' in body ? body.error?.message ?? 'Movie chat is unavailable.' : 'Movie chat is unavailable.');
+  }
+  return body.data;
+}
+
 export async function saveReadingTranscripts(chunks: ReadingTranscriptChunk[]): Promise<ReadingTranscriptChunk[]> {
   const response = await fetch(`${apiBaseUrl}/api/reader/reading-transcripts`, {
     method: 'POST',

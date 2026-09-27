@@ -2,74 +2,94 @@
   <q-page class="movies-learning-page">
     <section class="movies-learning-shell">
       <header class="movies-learning-header">
-        <div>
-          <p>Learning from films</p>
-          <h1>Movies</h1>
-          <span>Paste the compact report from your ChatGPT conversation. It is saved on this device first.</span>
-        </div>
-        <q-chip :color="pendingCount ? 'deep-orange-7' : 'positive'" text-color="white" :icon="pendingCount ? 'cloud_off' : 'cloud_done'">
-          {{ pendingCount ? `${pendingCount} waiting to upload` : 'Saved and synchronized' }}
-        </q-chip>
+        <p>Learning from films</p>
+        <h1>Movies</h1>
+        <span>Discuss what to watch, then save the final learning report for Mentor AI.</span>
       </header>
 
-      <section class="movies-learning-grid">
-        <q-card flat bordered class="movies-learning-card">
-          <q-card-section>
-            <div class="text-h6">Add a film report</div>
-            <p class="text-body2 text-grey-7">If the database is unavailable, nothing is lost. Use the header Send button later to retry.</p>
-          </q-card-section>
-          <q-form class="movies-learning-form" @submit.prevent="saveReport">
-            <q-input v-model="movieTitle" outlined label="Film or episode" maxlength="160" counter />
-            <q-input v-model="watchedAt" outlined label="Date watched" type="date" />
-            <q-input
-              v-model="reportText"
-              outlined
-              autogrow
-              label="ChatGPT learning report"
-              hint="Include difficult listening, useful phrases, weak vocabulary and suggested practice."
-              maxlength="20000"
-              counter
-            />
-            <q-btn
-              color="primary"
-              icon="save"
-              label="Save report"
-              no-caps
-              type="submit"
-              :disable="!canSave"
-              :loading="saving"
-            />
-          </q-form>
-        </q-card>
+      <q-tabs v-model="activeTab" align="left" class="movies-learning-tabs" active-color="primary" indicator-color="primary" no-caps>
+        <q-tab name="discuss" icon="chat" label="Discuss" />
+        <q-tab name="report" icon="assignment_turned_in" label="Send report">
+          <q-badge v-if="pendingCount" color="deep-orange-7" floating>{{ pendingCount }}</q-badge>
+        </q-tab>
+      </q-tabs>
 
-        <section class="movies-learning-history">
-          <div class="movies-learning-history__heading">
-            <div>
-              <span>Local learning history</span>
-              <small>{{ reports.length }} reports</small>
-            </div>
-            <q-btn flat round icon="sync" :disable="!pendingCount || !appStore.isOnline" :loading="syncing" @click="retrySync()">
-              <q-tooltip>Upload waiting reports</q-tooltip>
-            </q-btn>
-          </div>
-          <q-card v-for="report in reports" :key="report.id" flat bordered class="movie-report-card">
-            <q-card-section>
-              <div class="movie-report-card__heading">
-                <div><strong>{{ report.movieTitle }}</strong><span>{{ report.watchedAt }}</span></div>
-                <q-icon :name="report.synchronizedAt ? 'cloud_done' : 'cloud_off'" :color="report.synchronizedAt ? 'positive' : 'deep-orange-7'" size="22px">
-                  <q-tooltip>{{ report.synchronizedAt ? 'Stored in the learning database' : 'Saved on this device and waiting to upload' }}</q-tooltip>
-                </q-icon>
+      <q-tab-panels v-model="activeTab" animated class="movies-learning-panels">
+        <q-tab-panel name="discuss">
+          <section class="movie-chat-layout">
+            <q-card flat bordered class="movies-learning-card movie-chat-prompt">
+              <q-card-section>
+                <div class="text-h6">Chat instructions</div>
+                <p class="text-body2 text-grey-7">Paste your starting prompt once. It stays on this device and is included with each message.</p>
+              </q-card-section>
+              <q-card-section class="movie-chat-prompt__body">
+                <q-input v-model="initialPrompt" outlined autogrow label="Starting prompt" maxlength="6000" counter />
+                <div class="movie-chat-prompt__actions">
+                  <q-btn flat no-caps label="Use suggested prompt" @click="useSuggestedPrompt" />
+                  <q-btn color="primary" no-caps icon="save" label="Save prompt" :disable="!initialPrompt.trim()" @click="persistPrompt" />
+                </div>
+              </q-card-section>
+            </q-card>
+
+            <q-card flat bordered class="movies-learning-card movie-chat-card">
+              <q-card-section class="movie-chat-heading">
+                <div><div class="text-h6">Film chat</div><span>Messages stay locally. Only recent context is sent for each answer.</span></div>
+                <q-icon :name="appStore.isOnline ? 'wifi' : 'wifi_off'" :color="appStore.isOnline ? 'positive' : 'negative'" size="22px" />
+              </q-card-section>
+              <div ref="chatScroll" class="movie-chat-messages" aria-live="polite">
+                <article v-for="message in chatMessages" :key="message.id" class="movie-chat-message" :class="`movie-chat-message--${message.role}`">
+                  <strong>{{ message.role === 'user' ? 'You' : 'Movie coach' }}</strong>
+                  <p>{{ message.content }}</p>
+                </article>
+                <div v-if="!chatMessages.length" class="movies-learning-empty movie-chat-empty">
+                  <q-icon name="forum" size="42px" />
+                  <strong>Start with a film, mood or learning goal</strong>
+                  <span>The coach can recommend films, discuss difficult scenes and prepare the final report.</span>
+                </div>
+                <div v-if="chatSending" class="movie-chat-thinking"><q-spinner-dots color="primary" size="32px" /> Movie coach is thinking…</div>
               </div>
-              <p>{{ report.report }}</p>
-            </q-card-section>
-          </q-card>
-          <div v-if="!reports.length" class="movies-learning-empty">
-            <q-icon name="movie" size="42px" />
-            <strong>No film reports yet</strong>
-            <span>Your first saved ChatGPT report will appear here.</span>
-          </div>
-        </section>
-      </section>
+              <q-card-section class="movie-chat-composer">
+                <q-input v-model="chatDraft" outlined autogrow label="Message" maxlength="4000" :disable="chatSending" @keydown.enter.exact.prevent="submitChatMessage" />
+                <q-btn color="primary" round icon="send" aria-label="Send message" :disable="!canSendChat" :loading="chatSending" @click="submitChatMessage" />
+              </q-card-section>
+            </q-card>
+          </section>
+        </q-tab-panel>
+
+        <q-tab-panel name="report">
+          <section class="movies-learning-grid">
+            <q-card flat bordered class="movies-learning-card">
+              <q-card-section>
+                <div class="text-h6">Send the final report</div>
+                <p class="text-body2 text-grey-7">Paste the report from the chat. It is saved on this device first, even when the database is unavailable.</p>
+              </q-card-section>
+              <q-form class="movies-learning-form" @submit.prevent="saveReport">
+                <q-input v-model="movieTitle" outlined label="Film or episode" maxlength="160" counter />
+                <q-input v-model="watchedAt" outlined label="Date watched" type="date" />
+                <q-input v-model="reportText" outlined autogrow label="ChatGPT learning report" hint="Include difficult listening, useful phrases, weak vocabulary and suggested practice." maxlength="20000" counter />
+                <q-btn color="primary" icon="save" label="Save report" no-caps type="submit" :disable="!canSave" :loading="saving" />
+              </q-form>
+            </q-card>
+
+            <section class="movies-learning-history">
+              <div class="movies-learning-history__heading">
+                <div><span>Report status</span><small>{{ reports.length }} reports · {{ pendingCount }} waiting</small></div>
+                <q-btn flat round icon="sync" :disable="!pendingCount || !appStore.isOnline" :loading="syncing" @click="retrySync()"><q-tooltip>Upload waiting reports</q-tooltip></q-btn>
+              </div>
+              <q-card v-for="report in reports" :key="report.id" flat bordered class="movie-report-card">
+                <q-card-section>
+                  <div class="movie-report-card__heading">
+                    <div><strong>{{ report.movieTitle }}</strong><span>{{ report.watchedAt }}</span></div>
+                    <q-chip dense :color="report.synchronizedAt ? 'positive' : 'deep-orange-7'" text-color="white" :icon="report.synchronizedAt ? 'cloud_done' : 'cloud_off'">{{ report.synchronizedAt ? 'Sent to database' : 'Waiting to send' }}</q-chip>
+                  </div>
+                  <p>{{ report.report }}</p>
+                </q-card-section>
+              </q-card>
+              <div v-if="!reports.length" class="movies-learning-empty"><q-icon name="movie" size="42px" /><strong>No film reports yet</strong><span>Your first saved report will appear here.</span></div>
+            </section>
+          </section>
+        </q-tab-panel>
+      </q-tab-panels>
     </section>
   </q-page>
 </template>
@@ -77,16 +97,19 @@
 <script setup lang="ts">
 import type { MovieLearningReport } from '@mentor-ai/shared';
 import { Notify } from 'quasar';
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import { useAppStore } from 'src/stores/app-store';
-import {
-  loadMovieLearningReports,
-  pendingMovieLearningReportCount,
-  saveMovieLearningReport,
-  syncMovieLearningReports,
-} from 'src/services/movie-learning-reports';
+import { appendMovieChatMessage, loadMovieChatMessages, loadMovieChatPrompt, saveMovieChatPrompt, sendMovieChatMessage, type LocalMovieChatMessage } from 'src/services/movie-chat';
+import { loadMovieLearningReports, pendingMovieLearningReportCount, saveMovieLearningReport, syncMovieLearningReports } from 'src/services/movie-learning-reports';
 
+const suggestedPrompt = `You are my personal English coach for learning through films and series. Help me choose content appropriate for my listening level and interests. After I watch, discuss the scenes, language, accents, phrases and words I found difficult. Correct my English naturally and distinguish listening problems from vocabulary or grammar problems. Do not overwhelm me with long lists. When I ask for the final report, produce a compact report that I can paste into Mentor AI with: title, what I watched, listening difficulties, useful new phrases, weak phrases or words, grammar or pronunciation observations, what is already strong, and recommended practice.`;
 const appStore = useAppStore();
+const activeTab = ref<'discuss' | 'report'>('discuss');
+const initialPrompt = ref('');
+const chatDraft = ref('');
+const chatMessages = ref<LocalMovieChatMessage[]>([]);
+const chatSending = ref(false);
+const chatScroll = ref<HTMLElement | null>(null);
 const movieTitle = ref('');
 const watchedAt = ref(new Date().toISOString().slice(0, 10));
 const reportText = ref('');
@@ -95,68 +118,100 @@ const pendingCount = ref(0);
 const saving = ref(false);
 const syncing = ref(false);
 const canSave = computed(() => Boolean(movieTitle.value.trim() && watchedAt.value && reportText.value.trim()));
+const canSendChat = computed(() => Boolean(initialPrompt.value.trim() && chatDraft.value.trim() && appStore.isOnline && !chatSending.value));
 
-onMounted(refresh);
+onMounted(async () => {
+  initialPrompt.value = loadMovieChatPrompt();
+  chatMessages.value = await loadMovieChatMessages();
+  await refreshReports();
+  await scrollChatToEnd();
+});
 
-async function refresh() {
-  [reports.value, pendingCount.value] = await Promise.all([
-    loadMovieLearningReports(),
-    pendingMovieLearningReportCount(),
-  ]);
+function useSuggestedPrompt() { initialPrompt.value = suggestedPrompt; }
+function persistPrompt() {
+  saveMovieChatPrompt(initialPrompt.value);
+  Notify.create({ type: 'positive', icon: 'save', message: 'Chat instructions saved on this device.' });
 }
-
+async function submitChatMessage() {
+  if (!canSendChat.value) return;
+  saveMovieChatPrompt(initialPrompt.value);
+  const content = chatDraft.value.trim();
+  chatDraft.value = '';
+  chatSending.value = true;
+  try {
+    await appendMovieChatMessage('user', content);
+    chatMessages.value = await loadMovieChatMessages();
+    await scrollChatToEnd();
+    const response = await sendMovieChatMessage(initialPrompt.value, chatMessages.value);
+    await appendMovieChatMessage('assistant', response.reply);
+    chatMessages.value = await loadMovieChatMessages();
+    await scrollChatToEnd();
+  } catch (error) {
+    Notify.create({ type: 'warning', icon: 'cloud_off', message: error instanceof Error ? error.message : 'Movie chat is unavailable. Your message remains saved locally.' });
+  } finally { chatSending.value = false; }
+}
+async function scrollChatToEnd() {
+  await nextTick();
+  chatScroll.value?.scrollTo({ top: chatScroll.value.scrollHeight, behavior: 'smooth' });
+}
+async function refreshReports() {
+  [reports.value, pendingCount.value] = await Promise.all([loadMovieLearningReports(), pendingMovieLearningReportCount()]);
+}
 async function saveReport() {
   if (!canSave.value || saving.value) return;
   saving.value = true;
   try {
-    await saveMovieLearningReport({
-      studentId: appStore.studentId,
-      movieTitle: movieTitle.value,
-      watchedAt: watchedAt.value,
-      report: reportText.value,
-    });
+    await saveMovieLearningReport({ studentId: appStore.studentId, movieTitle: movieTitle.value, watchedAt: watchedAt.value, report: reportText.value });
     movieTitle.value = '';
     reportText.value = '';
-    await refresh();
+    await refreshReports();
     if (appStore.isOnline) await retrySync(false);
-    Notify.create({
-      type: pendingCount.value ? 'warning' : 'positive',
-      icon: pendingCount.value ? 'cloud_off' : 'cloud_done',
-      message: pendingCount.value ? 'Report saved on this device. Database upload will retry later.' : 'Film report saved and synchronized.',
-    });
-  } finally {
-    saving.value = false;
-  }
+    Notify.create({ type: pendingCount.value ? 'warning' : 'positive', icon: pendingCount.value ? 'cloud_off' : 'cloud_done', message: pendingCount.value ? 'Report saved locally and will be sent later.' : 'Film report sent to the database.' });
+  } finally { saving.value = false; }
 }
-
 async function retrySync(showResult = true) {
   if (syncing.value || !appStore.isOnline) return;
   syncing.value = true;
   try {
     await syncMovieLearningReports();
-    await refresh();
+    await refreshReports();
     if (showResult) Notify.create({ type: 'positive', icon: 'cloud_done', message: 'Film reports synchronized.' });
   } catch {
-    await refresh();
+    await refreshReports();
     if (showResult) Notify.create({ type: 'warning', icon: 'cloud_off', message: 'Reports remain safely stored on this device.' });
-  } finally {
-    syncing.value = false;
-  }
+  } finally { syncing.value = false; }
 }
 </script>
 
 <style scoped>
 .movies-learning-page { padding: 28px 24px 120px; }
 .movies-learning-shell { margin: 0 auto; max-width: 1180px; }
-.movies-learning-header { align-items: flex-start; display: flex; gap: 24px; justify-content: space-between; margin-bottom: 24px; }
+.movies-learning-header { margin-bottom: 18px; }
 .movies-learning-header p { color: var(--app-primary); font-weight: 800; margin: 0 0 4px; text-transform: uppercase; }
 .movies-learning-header h1 { font-size: clamp(2rem, 4vw, 3rem); margin: 0; }
 .movies-learning-header span { color: var(--app-muted-strong); display: block; margin-top: 8px; }
+.movies-learning-tabs { border-bottom: 1px solid var(--app-border); }
+.movies-learning-panels { background: transparent; }
+.movies-learning-panels :deep(.q-tab-panel) { padding: 24px 0 0; }
+.movie-chat-layout { display: grid; gap: 24px; grid-template-columns: minmax(300px, 0.72fr) minmax(480px, 1.28fr); }
 .movies-learning-grid { display: grid; gap: 24px; grid-template-columns: minmax(360px, 0.85fr) minmax(420px, 1.15fr); }
 .movies-learning-card, .movie-report-card { background: var(--app-surface); border-color: var(--app-border); border-radius: 18px; }
-.movies-learning-form { display: grid; gap: 16px; padding: 0 16px 20px; }
+.movie-chat-prompt__body, .movies-learning-form { display: grid; gap: 16px; }
+.movie-chat-prompt__actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.movie-chat-card { display: grid; grid-template-rows: auto minmax(320px, 1fr) auto; min-height: 620px; }
+.movie-chat-heading { align-items: center; border-bottom: 1px solid var(--app-border); display: flex; justify-content: space-between; }
+.movie-chat-heading span { color: var(--app-muted-strong); font-size: 0.86rem; }
+.movie-chat-messages { display: flex; flex-direction: column; gap: 12px; max-height: 520px; overflow-y: auto; padding: 18px; }
+.movie-chat-message { border-radius: 16px; max-width: 86%; padding: 12px 15px; }
+.movie-chat-message--user { align-self: flex-end; background: var(--app-primary); color: white; }
+.movie-chat-message--assistant { align-self: flex-start; background: var(--app-surface-active); border: 1px solid var(--app-border); }
+.movie-chat-message p { line-height: 1.55; margin: 5px 0 0; white-space: pre-wrap; }
+.movie-chat-thinking { align-items: center; color: var(--app-muted-strong); display: flex; gap: 8px; }
+.movie-chat-composer { align-items: flex-end; border-top: 1px solid var(--app-border); display: grid; gap: 10px; grid-template-columns: 1fr auto; }
+.movie-chat-empty { margin: auto; }
+.movies-learning-form { padding: 0 16px 20px; }
 .movies-learning-history { display: grid; gap: 12px; }
-.movies-learning-history__heading, .movie-report-card__heading { align-items: center; display: flex; justify-content: space-between; }
+.movies-learning-history__heading, .movie-report-card__heading { align-items: center; display: flex; gap: 12px; justify-content: space-between; }
 .movies-learning-history__heading > div, .movie-report-card__heading > div { display: grid; gap: 3px; }
 .movies-learning-history__heading span, .movie-report-card strong { font-size: 1.05rem; font-weight: 800; }
 .movies-learning-history__heading small, .movie-report-card span { color: var(--app-muted-strong); }

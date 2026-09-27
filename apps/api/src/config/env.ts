@@ -50,4 +50,6 @@ export const config = {
     .filter(Boolean),
   googleSessionSecret: process.env.GOOGLE_SESSION_SECRET,
   googleTranslateApiKey: process.env.GOOGLE_TRANSLATE_API_KEY,
+  openAiApiKey: process.env.OPENAI_API_KEY,
+  openAiMovieChatModel: process.env.OPENAI_MOVIE_CHAT_MODEL ?? 'gpt-5-mini',
 };
