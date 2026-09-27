@@ -17,20 +17,6 @@
       <q-tab-panels v-model="activeTab" animated class="movies-learning-panels">
         <q-tab-panel name="discuss">
           <section class="movie-chat-layout">
-            <q-card flat bordered class="movies-learning-card movie-chat-prompt">
-              <q-card-section>
-                <div class="text-h6">Chat instructions</div>
-                <p class="text-body2 text-grey-7">Paste your starting prompt once. It stays on this device and is included with each message.</p>
-              </q-card-section>
-              <q-card-section class="movie-chat-prompt__body">
-                <q-input v-model="initialPrompt" outlined autogrow label="Starting prompt" maxlength="6000" counter />
-                <div class="movie-chat-prompt__actions">
-                  <q-btn flat no-caps label="Use suggested prompt" @click="useSuggestedPrompt" />
-                  <q-btn color="primary" no-caps icon="save" label="Save prompt" :disable="!initialPrompt.trim()" @click="persistPrompt" />
-                </div>
-              </q-card-section>
-            </q-card>
-
             <q-card flat bordered class="movies-learning-card movie-chat-card">
               <q-card-section class="movie-chat-heading">
                 <div><div class="text-h6">Film chat</div><span>Messages stay locally. Only recent context is sent for each answer.</span></div>
@@ -99,13 +85,11 @@ import type { MovieLearningReport } from '@mentor-ai/shared';
 import { Notify } from 'quasar';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useAppStore } from 'src/stores/app-store';
-import { appendMovieChatMessage, loadMovieChatMessages, loadMovieChatPrompt, saveMovieChatPrompt, sendMovieChatMessage, type LocalMovieChatMessage } from 'src/services/movie-chat';
+import { appendMovieChatMessage, loadMovieChatMessages, sendMovieChatMessage, type LocalMovieChatMessage } from 'src/services/movie-chat';
 import { loadMovieLearningReports, pendingMovieLearningReportCount, saveMovieLearningReport, syncMovieLearningReports } from 'src/services/movie-learning-reports';
 
-const suggestedPrompt = `You are my personal English coach for learning through films and series. Help me choose content appropriate for my listening level and interests. After I watch, discuss the scenes, language, accents, phrases and words I found difficult. Correct my English naturally and distinguish listening problems from vocabulary or grammar problems. Do not overwhelm me with long lists. When I ask for the final report, produce a compact report that I can paste into Mentor AI with: title, what I watched, listening difficulties, useful new phrases, weak phrases or words, grammar or pronunciation observations, what is already strong, and recommended practice.`;
 const appStore = useAppStore();
 const activeTab = ref<'discuss' | 'report'>('discuss');
-const initialPrompt = ref('');
 const chatDraft = ref('');
 const chatMessages = ref<LocalMovieChatMessage[]>([]);
 const chatSending = ref(false);
@@ -118,23 +102,16 @@ const pendingCount = ref(0);
 const saving = ref(false);
 const syncing = ref(false);
 const canSave = computed(() => Boolean(movieTitle.value.trim() && watchedAt.value && reportText.value.trim()));
-const canSendChat = computed(() => Boolean(initialPrompt.value.trim() && chatDraft.value.trim() && appStore.isOnline && !chatSending.value));
+const canSendChat = computed(() => Boolean(chatDraft.value.trim() && appStore.isOnline && !chatSending.value));
 
 onMounted(async () => {
-  initialPrompt.value = loadMovieChatPrompt();
   chatMessages.value = await loadMovieChatMessages();
   await refreshReports();
   await scrollChatToEnd();
 });
 
-function useSuggestedPrompt() { initialPrompt.value = suggestedPrompt; }
-function persistPrompt() {
-  saveMovieChatPrompt(initialPrompt.value);
-  Notify.create({ type: 'positive', icon: 'save', message: 'Chat instructions saved on this device.' });
-}
 async function submitChatMessage() {
   if (!canSendChat.value) return;
-  saveMovieChatPrompt(initialPrompt.value);
   const content = chatDraft.value.trim();
   chatDraft.value = '';
   chatSending.value = true;
@@ -142,7 +119,7 @@ async function submitChatMessage() {
     await appendMovieChatMessage('user', content);
     chatMessages.value = await loadMovieChatMessages();
     await scrollChatToEnd();
-    const response = await sendMovieChatMessage(initialPrompt.value, chatMessages.value);
+    const response = await sendMovieChatMessage(chatMessages.value);
     await appendMovieChatMessage('assistant', response.reply);
     chatMessages.value = await loadMovieChatMessages();
     await scrollChatToEnd();
@@ -193,11 +170,10 @@ async function retrySync(showResult = true) {
 .movies-learning-tabs { border-bottom: 1px solid var(--app-border); }
 .movies-learning-panels { background: transparent; }
 .movies-learning-panels :deep(.q-tab-panel) { padding: 24px 0 0; }
-.movie-chat-layout { display: grid; gap: 24px; grid-template-columns: minmax(300px, 0.72fr) minmax(480px, 1.28fr); }
+.movie-chat-layout { margin: 0 auto; max-width: 900px; }
 .movies-learning-grid { display: grid; gap: 24px; grid-template-columns: minmax(360px, 0.85fr) minmax(420px, 1.15fr); }
 .movies-learning-card, .movie-report-card { background: var(--app-surface); border-color: var(--app-border); border-radius: 18px; }
-.movie-chat-prompt__body, .movies-learning-form { display: grid; gap: 16px; }
-.movie-chat-prompt__actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.movies-learning-form { display: grid; gap: 16px; }
 .movie-chat-card { display: grid; grid-template-rows: auto minmax(320px, 1fr) auto; min-height: 620px; }
 .movie-chat-heading { align-items: center; border-bottom: 1px solid var(--app-border); display: flex; justify-content: space-between; }
 .movie-chat-heading span { color: var(--app-muted-strong); font-size: 0.86rem; }

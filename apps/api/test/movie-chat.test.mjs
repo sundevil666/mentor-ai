@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { boundedHistory, createMovieChatReply } from '../dist/services/movie-chat.service.js';
+import { boundedHistory, createMovieChatReply, movieCoachInstructions } from '../dist/services/movie-chat.service.js';
 import { config } from '../dist/config/env.js';
 
 describe('movie chat service', () => {
@@ -20,12 +20,12 @@ describe('movie chat service', () => {
     config.openAiApiKey = 'test-key';
     let requestBody;
     try {
-      const result = await createMovieChatReply('Coach me through films.', [{ role: 'user', content: 'Recommend a film.' }], async (_url, init) => {
+      const result = await createMovieChatReply([{ role: 'user', content: 'Recommend a film.' }], async (_url, init) => {
         requestBody = JSON.parse(String(init?.body));
         return new Response(JSON.stringify({ output: [{ type: 'message', content: [{ type: 'output_text', text: 'Try Arrival.' }] }] }), { status: 200 });
       });
       assert.equal(result.reply, 'Try Arrival.');
-      assert.equal(requestBody.instructions, 'Coach me through films.');
+      assert.equal(requestBody.instructions, movieCoachInstructions);
       assert.equal(requestBody.store, false);
       assert.equal(requestBody.input[0].content, 'Recommend a film.');
     } finally {

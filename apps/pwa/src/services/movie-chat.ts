@@ -8,16 +8,7 @@ export interface LocalMovieChatMessage {
   createdAt: string;
 }
 
-const promptStorageKey = 'mentor-ai:movie-chat-prompt:v1';
 const maximumLocalMessages = 300;
-
-export function loadMovieChatPrompt() {
-  return localStorage.getItem(promptStorageKey) ?? '';
-}
-
-export function saveMovieChatPrompt(prompt: string) {
-  localStorage.setItem(promptStorageKey, prompt.trim().slice(0, 6_000));
-}
 
 export async function loadMovieChatMessages() {
   const messages = await (await mentorDb).getAll('movie-chat-messages') as LocalMovieChatMessage[];
@@ -36,8 +27,8 @@ export async function appendMovieChatMessage(role: LocalMovieChatMessage['role']
   return message;
 }
 
-export async function sendMovieChatMessage(initialPrompt: string, messages: LocalMovieChatMessage[]) {
-  return requestMovieChatReply(initialPrompt, messages.map(({ role, content }) => ({ role, content })));
+export async function sendMovieChatMessage(messages: LocalMovieChatMessage[]) {
+  return requestMovieChatReply(messages.map(({ role, content }) => ({ role, content })));
 }
 
 async function pruneMovieChatMessages() {

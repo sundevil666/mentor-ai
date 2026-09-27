@@ -1,5 +1,11 @@
-import 'dotenv/config';
+import { config as loadEnvironment } from 'dotenv';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { StorageMode } from '@mentor-ai/shared';
+
+const configDirectory = dirname(fileURLToPath(import.meta.url));
+loadEnvironment({ path: resolve(configDirectory, '../../../../.env.local') });
+loadEnvironment();
 
 const storageMode = (process.env.STORAGE_MODE ?? 'demo') as StorageMode;
 

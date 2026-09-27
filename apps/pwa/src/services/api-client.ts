@@ -417,13 +417,12 @@ export async function synchronizeMovieLearningReports(
 }
 
 export async function requestMovieChatReply(
-  initialPrompt: string,
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
 ): Promise<{ reply: string; model: string }> {
   const response = await fetch(`${apiBaseUrl}/api/movie-chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ initialPrompt, messages }),
+    body: JSON.stringify({ messages }),
   });
   const body = await response.json().catch(() => null) as ApiResponse<{ reply: string; model: string }> | { error?: { message?: string } } | null;
   if (!response.ok || !body || !('data' in body)) {

@@ -70,7 +70,6 @@ export const mergeMovieLearningReports: RequestHandler = sendData((req) =>
 
 export const replyToMovieChat: RequestHandler = sendData((req) =>
   createMovieChatReply(
-    typeof req.body?.initialPrompt === 'string' ? req.body.initialPrompt : '',
     Array.isArray(req.body?.messages) ? req.body.messages as MovieChatMessage[] : [],
   ),
 );
