@@ -53,79 +53,45 @@
             </div>
           </section>
 
-          <div class="home-lessons-heading">
-            <div>
-              <p class="learning-start__eyebrow">Lessons</p>
-              <h2>Choose a lesson to start</h2>
+          <article
+            v-if="currentInProgressLesson"
+            class="priority-link priority-link--resume"
+          >
+            <button type="button" class="priority-link__main" @click="resumePausedLesson(currentInProgressLesson.id)">
+              <q-icon :name="lessonCategoryIcon(generatedLessonCategory(currentInProgressLesson.lesson))" size="26px" />
+              <span>
+                <small>In progress · {{ lessonCategoryLabel(generatedLessonCategory(currentInProgressLesson.lesson)) }} · {{ lessonSessionProgress(currentInProgressLesson) }}%</small>
+                <strong>{{ currentInProgressLesson.lesson.title }}</strong>
+              </span>
+              <q-icon name="arrow_forward" size="24px" />
+            </button>
+            <div v-if="wasLessonCompleted(currentInProgressLesson)" class="priority-link__actions">
+              <q-btn
+                color="primary"
+                dense
+                flat
+                icon="done_all"
+                label="Finish"
+                no-caps
+                @click="finishRepeatedLesson(currentInProgressLesson.id)"
+              />
             </div>
-            <q-icon name="touch_app" size="25px" />
-          </div>
+          </article>
 
           <article class="priority-link">
             <button type="button" class="priority-link__main" @click="startRecommendedHomeLesson">
               <q-icon :name="lessonCategoryIcon(recommendedHomeLesson.category)" size="26px" />
               <span>
-                <small>{{ recommendedHomeLesson.skillLabel }} · {{ recommendedPausedLesson ? 'Continue · ' + lessonSessionProgress(recommendedPausedLesson) + '%' : (isRecommendedLessonPinned ? 'Pinned lesson' : 'Do this first') + ' · ' + recommendedHomeLesson.minutes + ' min' }}</small>
+                <small>Recommended · {{ recommendedHomeLesson.skillLabel }} · {{ isRecommendedLessonPinned ? 'Pinned lesson' : 'Do this next' }} · {{ recommendedHomeLesson.minutes }} min</small>
                 <strong>{{ recommendedHomeLesson.title }}</strong>
               </span>
               <q-icon name="arrow_forward" size="24px" />
             </button>
             <div class="priority-link__actions">
-              <q-btn
-                v-if="recommendedPausedLesson && wasLessonCompleted(recommendedPausedLesson)"
-                color="primary"
-                dense
-                flat
-                icon="done_all"
-                label="Finish"
-                no-caps
-                @click="finishRepeatedLesson(recommendedPausedLesson.id)"
-              />
               <q-btn dense flat no-caps color="primary" :icon="isRecommendedLessonPinned ? 'bookmark_remove' : 'push_pin'" :label="isRecommendedLessonPinned ? 'Unpin' : 'Pin'" @click="toggleRecommendedLessonPin" />
               <q-btn v-if="!isRecommendedLessonPinned" dense flat no-caps color="primary" icon="swap_horiz" label="Another" @click="suggestNextHomeLesson" />
             </div>
           </article>
-
-          <article
-            v-for="pausedLesson in inProgressLessons"
-            :key="pausedLesson.id"
-            class="priority-link priority-link--resume"
-          >
-            <button type="button" class="priority-link__main" @click="resumePausedLesson(pausedLesson.id)">
-              <q-icon :name="lessonCategoryIcon(generatedLessonCategory(pausedLesson.lesson))" size="26px" />
-              <span>
-                <small>{{ lessonCategoryLabel(generatedLessonCategory(pausedLesson.lesson)) }} · Continue where you stopped · {{ lessonSessionProgress(pausedLesson) }}%</small>
-                <strong>{{ pausedLesson.lesson.title }}</strong>
-              </span>
-              <q-icon name="arrow_forward" size="24px" />
-            </button>
-            <div v-if="wasLessonCompleted(pausedLesson)" class="priority-link__actions">
-              <q-btn
-                color="primary"
-                dense
-                flat
-                icon="done_all"
-                label="Finish"
-                no-caps
-                @click="finishRepeatedLesson(pausedLesson.id)"
-              />
-            </div>
-          </article>
-
-          <section v-if="otherGeneratedHomeLessons.length" class="home-generated-links" aria-label="Personal lessons">
-            <p class="learning-start__eyebrow">Personal lessons</p>
-            <button
-              v-for="lesson in otherGeneratedHomeLessons"
-              :key="lesson.templateKey"
-              type="button"
-              class="home-generated-links__item"
-              @click="startHomeLesson(lesson)"
-            >
-              <q-icon :name="lessonCategoryIcon(lesson.category)" size="20px" />
-              <span><small>{{ lesson.skillLabel }}</small><strong>{{ lesson.title }}</strong></span>
-              <q-icon name="arrow_forward" size="20px" />
-            </button>
-          </section>
 
           </template>
 
@@ -1261,19 +1227,17 @@ const homeLessonQueue = computed(() => {
   });
 });
 const recommendedHomeLesson = computed(() =>
-  allHomeLessons.value.find((lesson) => lesson.templateKey === pinnedHomeLessonKey.value)
+  homeLessonQueue.value.find((lesson) => (
+    lesson.templateKey === pinnedHomeLessonKey.value
+    && !appStore.pausedSessions.some((session) => session.lesson.lessonTemplateKey === lesson.templateKey)
+  ))
+    ?? homeLessonQueue.value.find((lesson) => (
+      !appStore.pausedSessions.some((session) => session.lesson.lessonTemplateKey === lesson.templateKey)
+    ))
     ?? homeLessonQueue.value[0]!,
 );
-const otherGeneratedHomeLessons = computed(() => generatedHomeLessons.value.filter(
-  (lesson) => lesson.templateKey !== recommendedHomeLesson.value.templateKey
-    && !appStore.pausedSessions.some((session) => session.lesson.lessonTemplateKey === lesson.templateKey),
-));
-const recommendedPausedLesson = computed(() => appStore.pausedSessions.find(
-  (session) => session.lesson.lessonTemplateKey === recommendedHomeLesson.value.templateKey,
-));
-const inProgressLessons = computed(() => [...appStore.pausedSessions]
-  .filter((session) => session.id !== recommendedPausedLesson.value?.id)
-  .sort((left, right) => right.startedAt.localeCompare(left.startedAt)));
+const currentInProgressLesson = computed(() => [...appStore.pausedSessions]
+  .sort((left, right) => right.startedAt.localeCompare(left.startedAt))[0]);
 function lessonSessionProgress(session: typeof appStore.pausedSessions[number]) {
   return calculateLessonSessionProgress(session.currentExerciseIndex, session.lesson.exercises.length);
 }
@@ -1686,10 +1650,6 @@ async function startHomeLesson(lesson: HomeLesson) {
 }
 
 async function startRecommendedHomeLesson() {
-  if (recommendedPausedLesson.value) {
-    await resumePausedLesson(recommendedPausedLesson.value.id);
-    return;
-  }
   await startHomeLesson(recommendedHomeLesson.value);
 }
 
