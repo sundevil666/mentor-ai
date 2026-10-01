@@ -76,7 +76,11 @@ module.exports = async (request, response) => {
       return;
     }
     if (Array.isArray(body?.activityEvents)) {
-      sendJson(response, 200, await learningStateService.mergeLearningActivityEvents(body.activityEvents, user));
+      sendJson(response, 200, await learningStateService.mergeLearningActivityEvents(
+        body.activityEvents,
+        user,
+        body.activityTotalsSnapshot,
+      ));
       return;
     }
     if (Array.isArray(body?.statisticsSnapshots)) {

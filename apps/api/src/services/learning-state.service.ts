@@ -149,7 +149,11 @@ export const learningStateService = {
     return contentEngagementEvents.filter((event) => event.studentId === state.student.id);
   },
 
-  async mergeLearningActivityEvents(incoming: LearningActivityEvent[], user?: AuthenticatedUser) {
+  async mergeLearningActivityEvents(
+    incoming: LearningActivityEvent[],
+    user?: AuthenticatedUser,
+    totalsSnapshot?: Partial<LearningActivityTotals>,
+  ) {
     const state = await learningStateRepository.readLearningActivityState(user);
     const merged = new Map(state.learningActivityEvents.map((event) => [event.id, event]));
     const learningActivityTotals = { ...state.learningActivityTotals };
@@ -164,6 +168,26 @@ export const learningStateService = {
         learningActivityTotals.totalSeconds += safe.activeSeconds;
         if (!learningActivityTotals.updatedAt || safe.endedAt > learningActivityTotals.updatedAt) learningActivityTotals.updatedAt = safe.endedAt;
       }
+    }
+    if (totalsSnapshot && typeof totalsSnapshot === 'object') {
+      for (const kind of learningActivityKinds) {
+        const value = totalsSnapshot[`${kind}Seconds`];
+        if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+          learningActivityTotals[`${kind}Seconds`] = Math.max(
+            learningActivityTotals[`${kind}Seconds`],
+            Math.round(value),
+          );
+        }
+      }
+      if (totalsSnapshot.updatedAt && Number.isFinite(Date.parse(totalsSnapshot.updatedAt))) {
+        if (!learningActivityTotals.updatedAt || totalsSnapshot.updatedAt > learningActivityTotals.updatedAt) {
+          learningActivityTotals.updatedAt = totalsSnapshot.updatedAt;
+        }
+      }
+      learningActivityTotals.totalSeconds = learningActivityKinds.reduce(
+        (sum, kind) => sum + learningActivityTotals[`${kind}Seconds`],
+        0,
+      );
     }
     const learningActivityEvents = [...merged.values()]
       .sort((left, right) => left.endedAt.localeCompare(right.endedAt))

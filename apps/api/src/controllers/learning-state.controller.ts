@@ -89,7 +89,11 @@ export const synchronizeLearningEvents: RequestHandler = async (req, res, next) 
       return;
     }
     if (Array.isArray(req.body?.activityEvents)) {
-      res.json({ data: await learningStateService.mergeLearningActivityEvents(req.body.activityEvents as LearningActivityEvent[], req.authUser) });
+      res.json({ data: await learningStateService.mergeLearningActivityEvents(
+        req.body.activityEvents as LearningActivityEvent[],
+        req.authUser,
+        req.body?.activityTotalsSnapshot,
+      ) });
       return;
     }
     if (Array.isArray(req.body?.statisticsSnapshots)) {

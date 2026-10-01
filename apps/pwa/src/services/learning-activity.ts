@@ -1,5 +1,5 @@
 import type { LearningActivityEvent, LearningActivityKind, LearningActivityTotals } from '@mentor-ai/shared';
-import { fetchLearningActivityTotals, synchronizeLearningActivity } from './api-client';
+import { synchronizeLearningActivity } from './api-client';
 import { readAuthSession } from './auth';
 import { mentorDb } from './indexed-db';
 import { buildActivityBaselineEvents, preferLocalTotals } from './learning-activity-totals';
@@ -64,12 +64,12 @@ async function performLearningActivitySync(): Promise<LearningActivityTotals> {
   let remoteTotals: LearningActivityTotals;
   if (pending.length > 0) {
     rotateBatchId();
-    const result = await synchronizeLearningActivity(pending);
+    const result = await synchronizeLearningActivity(pending, localTotals);
     const acknowledged = new Set(result.acknowledgedIds);
     for (const event of pending) if (acknowledged.has(event.id)) await db.delete('learning-activity-outbox', event.id);
     remoteTotals = result.totals;
   } else {
-    remoteTotals = await fetchLearningActivityTotals();
+    remoteTotals = (await synchronizeLearningActivity([], localTotals)).totals;
   }
 
   const studentId = readAuthSession()?.user.id;
@@ -78,7 +78,7 @@ async function performLearningActivitySync(): Promise<LearningActivityTotals> {
     : [];
   if (baselineEvents.length > 0) {
     for (const event of baselineEvents) await db.put('learning-activity-outbox', event);
-    const result = await synchronizeLearningActivity(baselineEvents);
+    const result = await synchronizeLearningActivity(baselineEvents, localTotals);
     const acknowledged = new Set(result.acknowledgedIds);
     for (const event of baselineEvents) if (acknowledged.has(event.id)) await db.delete('learning-activity-outbox', event.id);
     remoteTotals = result.totals;

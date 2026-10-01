@@ -103,11 +103,13 @@ describe('PWA API client', () => {
       calls.push({ url: String(url), init });
       return jsonResponse({ acknowledgedIds: ['activity-1'], totals: { listeningSeconds: 60, readingSeconds: 0, speakingSeconds: 0, totalSeconds: 60, updatedAt: '2026-09-04T08:01:00.000Z' } });
     };
+    const snapshot = { grammarSeconds: 30, listeningSeconds: 60, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 90, updatedAt: '2026-09-04T08:01:00.000Z' };
     const result = await synchronizeLearningActivity([{
       id: 'activity-1', studentId: 'demo-student', kind: 'listening', contentId: 'audio-1', activeSeconds: 60,
       sourceDeviceId: 'phone', startedAt: '2026-09-04T08:00:00.000Z', endedAt: '2026-09-04T08:01:00.000Z',
-    }]);
+    }], snapshot);
     assert.equal(calls[0]?.url, 'http://localhost:4000/api/synchronization');
+    assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)).activityTotalsSnapshot, snapshot);
     assert.equal(result.totals.listeningSeconds, 60);
   });
 

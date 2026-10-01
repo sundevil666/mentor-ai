@@ -85,6 +85,28 @@ describe('learning state service', () => {
       + retry.totals.readingSeconds + retry.totals.vocabularySeconds);
   });
 
+  it('merges a cumulative device snapshot by category without double counting retries', async () => {
+    const snapshot = {
+      grammarSeconds: 1_200,
+      listeningSeconds: 23_040,
+      speakingSeconds: 1_800,
+      phrasesSeconds: 600,
+      audioSeconds: 900,
+      readingSeconds: 28_020,
+      vocabularySeconds: 750,
+      totalSeconds: 56_310,
+      updatedAt: '2026-10-01T10:15:00.000Z',
+    };
+    const first = await learningStateService.mergeLearningActivityEvents([], undefined, snapshot);
+    const retry = await learningStateService.mergeLearningActivityEvents([], undefined, snapshot);
+    assert.equal(first.totals.listeningSeconds >= snapshot.listeningSeconds, true);
+    assert.equal(retry.totals.listeningSeconds, first.totals.listeningSeconds);
+    assert.equal(retry.totals.grammarSeconds, first.totals.grammarSeconds);
+    assert.equal(retry.totals.totalSeconds, retry.totals.grammarSeconds + retry.totals.listeningSeconds
+      + retry.totals.speakingSeconds + retry.totals.phrasesSeconds + retry.totals.audioSeconds
+      + retry.totals.readingSeconds + retry.totals.vocabularySeconds);
+  });
+
   it('deduplicates valid application telemetry and rejects another student data', async () => {
     const stamp = Date.now();
     const valid = {

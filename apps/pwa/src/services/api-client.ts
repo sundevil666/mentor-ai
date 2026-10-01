@@ -366,11 +366,12 @@ export async function synchronizeContentEngagement(
 
 export async function synchronizeLearningActivity(
   activityEvents: LearningActivityEvent[],
+  activityTotalsSnapshot?: LearningActivityTotals,
 ): Promise<LearningActivitySyncResult> {
   const response = await fetch(`${apiBaseUrl}/api/synchronization`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ activityEvents }),
+    body: JSON.stringify({ activityEvents, activityTotalsSnapshot }),
   });
   if (!response.ok) throw new Error('Learning activity synchronization failed.');
   return ((await response.json()) as ApiResponse<LearningActivitySyncResult>).data;
