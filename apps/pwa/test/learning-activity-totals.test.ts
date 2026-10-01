@@ -23,3 +23,12 @@ it('uploads only the unsynchronized part of a larger historic device total', () 
   ]);
   assert.equal(events[0]?.id, 'activity-baseline:phone-1:listening:2026-10-01T09:44:00Z');
 });
+
+it('preserves the historic device difference after current queued activity reaches the server', () => {
+  const empty = { grammarSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, vocabularySeconds: 0, readingSeconds: 0, speakingSeconds: 0 };
+  const local = { ...empty, listeningSeconds: 6 * 3_600 + 24 * 60, totalSeconds: 6 * 3_600 + 24 * 60, updatedAt: '2026-10-01T10:00:00Z' };
+  const remoteAfterPendingUpload = { ...empty, listeningSeconds: 3 * 3_600 + 60, totalSeconds: 3 * 3_600 + 60, updatedAt: '2026-10-01T10:00:00Z' };
+
+  const events = buildActivityBaselineEvents(local, remoteAfterPendingUpload, 'student-1', 'phone-1');
+  assert.equal(events[0]?.activeSeconds, 3 * 3_600 + 23 * 60);
+});

@@ -1182,7 +1182,7 @@ export const useAppStore = defineStore('app', {
     },
 
     async applySharedStudentState(studentModel: StudentModel, recommendation: Recommendation) {
-      if (studentModel.studentId !== this.studentId || studentModel.version < this.studentModel.version) {
+      if (studentModel.studentId !== this.studentId) {
         return;
       }
 

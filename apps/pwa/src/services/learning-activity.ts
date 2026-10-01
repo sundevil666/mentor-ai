@@ -59,32 +59,33 @@ export function syncLearningActivity(): Promise<LearningActivityTotals> {
 async function performLearningActivitySync(): Promise<LearningActivityTotals> {
   if (!navigator.onLine) return loadLearningActivityTotals();
   const db = await mentorDb;
-  const pending = await db.getAll('learning-activity-outbox') as LearningActivityEvent[];
-  if (pending.length === 0) {
-    const totals = await fetchLearningActivityTotals();
-    const localTotals = await loadLearningActivityTotals();
-    const studentId = readAuthSession()?.user.id;
-    const baselineEvents = studentId
-      ? buildActivityBaselineEvents(localTotals, totals, studentId, getDeviceId())
-      : [];
-    if (baselineEvents.length > 0) {
-      for (const event of baselineEvents) await db.put('learning-activity-outbox', event);
-      const result = await synchronizeLearningActivity(baselineEvents);
-      const acknowledged = new Set(result.acknowledgedIds);
-      for (const event of baselineEvents) if (acknowledged.has(event.id)) await db.delete('learning-activity-outbox', event.id);
-      await db.put('learning-activity-summary', { id: summaryId, ...result.totals });
-    } else {
-      await db.put('learning-activity-summary', { id: summaryId, ...preferLocalTotals(localTotals, totals) });
-    }
-    window.dispatchEvent(new Event('mentor-learning-activity-updated'));
-    return loadLearningActivityTotals();
-  }
-  rotateBatchId();
-  const result = await synchronizeLearningActivity(pending);
-  const acknowledged = new Set(result.acknowledgedIds);
-  for (const event of pending) if (acknowledged.has(event.id)) await db.delete('learning-activity-outbox', event.id);
   const localTotals = await loadLearningActivityTotals();
-  await db.put('learning-activity-summary', { id: summaryId, ...preferLocalTotals(localTotals, result.totals) });
+  const pending = await db.getAll('learning-activity-outbox') as LearningActivityEvent[];
+  let remoteTotals: LearningActivityTotals;
+  if (pending.length > 0) {
+    rotateBatchId();
+    const result = await synchronizeLearningActivity(pending);
+    const acknowledged = new Set(result.acknowledgedIds);
+    for (const event of pending) if (acknowledged.has(event.id)) await db.delete('learning-activity-outbox', event.id);
+    remoteTotals = result.totals;
+  } else {
+    remoteTotals = await fetchLearningActivityTotals();
+  }
+
+  const studentId = readAuthSession()?.user.id;
+  const baselineEvents = studentId
+    ? buildActivityBaselineEvents(localTotals, remoteTotals, studentId, getDeviceId())
+    : [];
+  if (baselineEvents.length > 0) {
+    for (const event of baselineEvents) await db.put('learning-activity-outbox', event);
+    const result = await synchronizeLearningActivity(baselineEvents);
+    const acknowledged = new Set(result.acknowledgedIds);
+    for (const event of baselineEvents) if (acknowledged.has(event.id)) await db.delete('learning-activity-outbox', event.id);
+    remoteTotals = result.totals;
+  }
+
+  const synchronizedTotals = studentId ? remoteTotals : preferLocalTotals(localTotals, remoteTotals);
+  await db.put('learning-activity-summary', { id: summaryId, ...synchronizedTotals });
   window.dispatchEvent(new Event('mentor-learning-activity-updated'));
   return loadLearningActivityTotals();
 }
