@@ -48,8 +48,9 @@ module.exports = async (request, response) => {
         sendJson(response, 401, { message: 'Google sign-in is required to save reading transcripts.' });
         return;
       }
+      const chunks = Array.isArray(body?.chunks) ? body.chunks : [];
       const service = await import('../apps/api/src/services/reading-transcripts.service.js');
-      sendJson(response, 200, await service.storeReadingTranscript(body, user));
+      sendJson(response, 200, await service.storeReadingTranscripts(chunks, user));
       return;
     }
 
