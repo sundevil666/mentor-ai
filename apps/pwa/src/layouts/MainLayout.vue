@@ -717,10 +717,17 @@ async function syncLearningDataNow() {
       syncMovieLearningReports(),
     ]);
     await Promise.all([refreshLevelActivity(), refreshPendingActivityCount(), refreshPendingReadingTranscriptCount(), refreshPendingMovieReportCount()]);
-    if (results.some((result) => result.status === 'rejected') || pendingUploadCount.value > 0) {
+    if (pendingUploadCount.value > 0) {
       Notify.create({ type: 'warning', icon: 'cloud_off', message: 'Some updates are still saved on this device. Try again later.' });
     } else {
-      Notify.create({ type: 'positive', icon: 'cloud_done', message: 'Learning data uploaded and refreshed.' });
+      const backgroundRefreshFailed = results.some((result) => result.status === 'rejected');
+      Notify.create({
+        type: 'positive',
+        icon: 'cloud_done',
+        message: backgroundRefreshFailed
+          ? 'Saved learning data uploaded. Background refresh will retry automatically.'
+          : 'Learning data uploaded and refreshed.',
+      });
     }
   } catch {
     Notify.create({ type: 'negative', icon: 'cloud_off', message: 'Sync failed. Your local data is still saved.' });
