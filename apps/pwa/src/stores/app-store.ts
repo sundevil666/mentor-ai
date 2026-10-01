@@ -852,7 +852,9 @@ export const useAppStore = defineStore('app', {
       const retainedIds = new Set(this.updateNotifications.map((notification) => notification.id));
       const db = await mentorDb;
 
-      for (const notification of next) await db.put('update-notifications', notification);
+      for (const notification of next) {
+        await db.put('update-notifications', { ...notification });
+      }
       for (const notification of next) {
         if (!retainedIds.has(notification.id)) await db.delete('update-notifications', notification.id);
       }
