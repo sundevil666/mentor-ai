@@ -7,6 +7,7 @@ import {
   generatedLessonCategory,
   generatedLessonMode,
   mergeAvailableLessonCatalog,
+  selectProgressLessonCatalog,
   sortGeneratedLessonsNewestFirst,
   type LessonProgressState,
 } from '../src/services/lesson-category-progress.js';
@@ -37,6 +38,13 @@ describe('lesson category progress', () => {
     assert.deepEqual(mergeAvailableLessonCatalog([], [cached], active, []).map((lesson) => lesson.id), [
       'older-grammar', 'active-grammar',
     ]);
+  });
+
+  it('uses the shared server catalog for the online progress denominator', () => {
+    const fetched = [{ id: 'shared-listening' }] as GeneratedLesson[];
+    const available = [...fetched, { id: 'phone-only-cache' }] as GeneratedLesson[];
+    assert.deepEqual(selectProgressLessonCatalog(fetched, available).map((lesson) => lesson.id), ['shared-listening']);
+    assert.deepEqual(selectProgressLessonCatalog([], available).map((lesson) => lesson.id), ['shared-listening', 'phone-only-cache']);
   });
 
   it('puts generated lessons into the category represented by their exercises', () => {

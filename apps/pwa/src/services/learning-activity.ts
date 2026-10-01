@@ -1,7 +1,8 @@
 import type { LearningActivityEvent, LearningActivityKind, LearningActivityTotals } from '@mentor-ai/shared';
 import { fetchLearningActivityTotals, synchronizeLearningActivity } from './api-client';
+import { readAuthSession } from './auth';
 import { mentorDb } from './indexed-db';
-import { preferLocalTotals } from './learning-activity-totals';
+import { buildActivityBaselineEvents, preferLocalTotals } from './learning-activity-totals';
 
 const deviceKey = 'mentor-ai-device-id';
 const summaryId = 'current';
@@ -61,7 +62,20 @@ async function performLearningActivitySync(): Promise<LearningActivityTotals> {
   const pending = await db.getAll('learning-activity-outbox') as LearningActivityEvent[];
   if (pending.length === 0) {
     const totals = await fetchLearningActivityTotals();
-    await db.put('learning-activity-summary', { id: summaryId, ...preferLocalTotals(await loadLearningActivityTotals(), totals) });
+    const localTotals = await loadLearningActivityTotals();
+    const studentId = readAuthSession()?.user.id;
+    const baselineEvents = studentId
+      ? buildActivityBaselineEvents(localTotals, totals, studentId, getDeviceId())
+      : [];
+    if (baselineEvents.length > 0) {
+      for (const event of baselineEvents) await db.put('learning-activity-outbox', event);
+      const result = await synchronizeLearningActivity(baselineEvents);
+      const acknowledged = new Set(result.acknowledgedIds);
+      for (const event of baselineEvents) if (acknowledged.has(event.id)) await db.delete('learning-activity-outbox', event.id);
+      await db.put('learning-activity-summary', { id: summaryId, ...result.totals });
+    } else {
+      await db.put('learning-activity-summary', { id: summaryId, ...preferLocalTotals(localTotals, totals) });
+    }
     window.dispatchEvent(new Event('mentor-learning-activity-updated'));
     return loadLearningActivityTotals();
   }

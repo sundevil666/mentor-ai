@@ -1,4 +1,4 @@
-import type { LearningActivityTotals } from '@mentor-ai/shared';
+import { learningActivityKinds, type LearningActivityEvent, type LearningActivityTotals } from '@mentor-ai/shared';
 
 export function preferLocalTotals(local: LearningActivityTotals, remote: LearningActivityTotals): LearningActivityTotals {
   const grammarSeconds = Math.max(local.grammarSeconds ?? 0, remote.grammarSeconds ?? 0);
@@ -13,4 +13,27 @@ export function preferLocalTotals(local: LearningActivityTotals, remote: Learnin
     totalSeconds: grammarSeconds + listeningSeconds + speakingSeconds + phrasesSeconds + audioSeconds + readingSeconds + vocabularySeconds,
     updatedAt: !local.updatedAt || (remote.updatedAt && remote.updatedAt > local.updatedAt) ? remote.updatedAt : local.updatedAt,
   };
+}
+
+export function buildActivityBaselineEvents(
+  local: LearningActivityTotals,
+  remote: LearningActivityTotals,
+  studentId: string,
+  deviceId: string,
+): LearningActivityEvent[] {
+  const endedAt = local.updatedAt ?? new Date().toISOString();
+  return learningActivityKinds.flatMap((kind) => {
+    const activeSeconds = Math.max(0, Math.round(local[`${kind}Seconds`] - remote[`${kind}Seconds`]));
+    if (activeSeconds === 0) return [];
+    return [{
+      id: `activity-baseline:${deviceId}:${kind}:${endedAt}`,
+      studentId,
+      kind,
+      contentId: 'historic-device-baseline',
+      activeSeconds,
+      sourceDeviceId: deviceId,
+      startedAt: new Date(Date.parse(endedAt) - activeSeconds * 1_000).toISOString(),
+      endedAt,
+    }];
+  });
 }

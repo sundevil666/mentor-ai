@@ -729,6 +729,7 @@ import {
   generatedLessonCategory,
   generatedLessonMode,
   mergeAvailableLessonCatalog,
+  selectProgressLessonCatalog,
   type LessonProgressState,
 } from 'src/services/lesson-category-progress';
 import { isLessonAnswerReady, requiresExactLessonAnswer } from 'src/services/lesson-answer-readiness';
@@ -1248,6 +1249,7 @@ const isRecommendedLessonPinned = computed(() =>
   pinnedHomeLessonKey.value === recommendedHomeLesson.value.templateKey,
 );
 const levelActivity = ref<LearningActivityTotals>({ grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null });
+const fetchedLessonCatalog = ref<GeneratedLesson[]>([]);
 const homeReadingProgress = ref<DailyReadingProgress>(createDailyReadingProgress());
 function refreshHomeReadingProgress() {
   try {
@@ -1263,7 +1265,7 @@ const homeProgressItems = computed(() => {
   }), { listeningSeconds: 0 });
   const listenedSeconds = Math.max(totals.listeningSeconds, levelActivity.value.listeningSeconds);
   const listeningLessonSeconds = trainingLibraries.listening.lessons.reduce((sum, lesson) => sum + lesson.minutes * 60, 0);
-  const generatedListeningSeconds = newLessonCatalog.value
+  const generatedListeningSeconds = selectProgressLessonCatalog(fetchedLessonCatalog.value, newLessonCatalog.value)
     .filter((lesson) => generatedLessonMode(lesson) === 'listening')
     .reduce((sum, lesson) => sum + lesson.estimatedMinutes * 60, 0);
   const listeningTotalSeconds = audioLibrary.reduce((sum, item) => sum + item.durationSeconds, 0)
@@ -1493,6 +1495,7 @@ async function refreshNewLessonCatalog() {
   } catch {
     // Previously downloaded lessons still belong in their categories while offline.
   }
+  fetchedLessonCatalog.value = fetched;
   const cached = await readOfflineGeneratedLessons().catch(() => []);
   newLessonCatalog.value = mergeAvailableLessonCatalog(
     fetched,

@@ -90,6 +90,13 @@ export function mergeAvailableLessonCatalog(
   return [...known.values()];
 }
 
+export function selectProgressLessonCatalog(
+  fetched: GeneratedLesson[],
+  available: GeneratedLesson[],
+): GeneratedLesson[] {
+  return fetched.length > 0 ? fetched : available;
+}
+
 export function buildLessonCategoryProgress(
   lessons: GeneratedLesson[],
   getProgress: (lesson: GeneratedLesson) => LessonProgressState,
