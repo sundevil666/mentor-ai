@@ -128,6 +128,7 @@ import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayP
 import AppAudioDock from 'src/components/AppAudioDock.vue';
 import AudioLibraryTabs from 'src/components/AudioLibraryTabs.vue';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
+import { loadContentProgress, saveContentProgress } from 'src/services/content-progress';
 
 const appStore = useAppStore();
 const listeningTimer = new ActiveLearningTimer({ studentId: () => appStore.studentId, kind: 'audio', contentId: () => selectedAudio.value?.id ?? 'audio' });
@@ -149,6 +150,7 @@ let playbackCycleStart = 0;
 let playbackCycleHadForwardSeek = false;
 let playbackCycleFinished = false;
 let lastObservedPlaybackPosition = 0;
+let lastProgressSave = 0;
 
 onMounted(async () => {
   configurePlaybackAudioSession();
@@ -163,6 +165,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  persistSyncedProgress(false, true);
   void listeningTimer.stop();
   window.removeEventListener('online', updateOnlineState);
   window.removeEventListener('offline', updateOnlineState);
@@ -182,7 +185,8 @@ async function selectAudio(item: LibraryAudio) {
   await nextTick();
   const player = audioElement.value;
   if (!player) return;
-  player.currentTime = readProgress(item.id);
+  const syncedProgress = await loadContentProgress('audio', item.id);
+  player.currentTime = Math.max(readProgress(item.id), syncedProgress?.completed ? 0 : (syncedProgress?.position ?? 0));
   currentTime.value = player.currentTime;
   duration.value = item.durationSeconds;
   player.playbackRate = playbackRate.value;
@@ -190,6 +194,7 @@ async function selectAudio(item: LibraryAudio) {
 }
 
 function closeAudio() {
+  persistSyncedProgress(false, true);
   void listeningTimer.stop();
   audioElement.value?.pause();
   selectedAudio.value = null;
@@ -244,9 +249,29 @@ function saveProgress() {
   currentTime.value = player.currentTime;
   duration.value = Number.isFinite(player.duration) ? player.duration : item.durationSeconds;
   localStorage.setItem(`mentor-ai:audio-progress:${item.id}`, String(Math.floor(player.currentTime)));
+  persistSyncedProgress();
   observePlaybackCycle(player);
   void listeningTimer.checkpoint();
   if ('mediaSession' in navigator && Number.isFinite(player.duration) && player.duration > 0) navigator.mediaSession.setPositionState({ duration: player.duration, playbackRate: player.playbackRate, position: Math.min(player.currentTime, player.duration) });
+}
+function persistSyncedProgress(completed = false, force = false) {
+  const player = audioElement.value;
+  const item = selectedAudio.value;
+  if (!player || !item || !Number.isFinite(player.currentTime)) return;
+  const now = Date.now();
+  if (!completed && !force && now - lastProgressSave < 5_000) return;
+  lastProgressSave = now;
+  const resolvedDuration = Number.isFinite(player.duration) && player.duration > 0 ? player.duration : item.durationSeconds;
+  void saveContentProgress({
+    studentId: appStore.studentId,
+    category: 'audio',
+    contentId: item.id,
+    position: completed ? resolvedDuration : player.currentTime,
+    furthestPosition: completed ? resolvedDuration : player.currentTime,
+    duration: resolvedDuration,
+    completed,
+    updatedAt: new Date(now).toISOString(),
+  });
 }
 function readProgress(id: string) { const saved = Number(localStorage.getItem(`mentor-ai:audio-progress:${id}`)); return Number.isFinite(saved) && saved > 0 ? saved : 0; }
 function handlePlay() {
@@ -263,6 +288,7 @@ function handlePlay() {
   void recordAudioEngagement('started');
 }
 function handlePause() {
+  persistSyncedProgress(false, true);
   void listeningTimer.stop();
   isPlaying.value = false;
   setMediaSessionPlaybackState('paused');
@@ -282,6 +308,7 @@ function observePlaybackCycle(player: HTMLAudioElement) {
 function completePlaybackCycle() {
   if (!playbackCycleActive || playbackCycleFinished) return;
   playbackCycleFinished = true;
+  persistSyncedProgress(true, true);
   void recordAudioEngagement('finished');
   if (playbackCycleStart <= 2 && !playbackCycleHadForwardSeek) void recordAudioEngagement('full-play');
 }
@@ -291,6 +318,7 @@ function handleEnded() {
   const item = selectedAudio.value;
   completePlaybackCycle();
   if (item) localStorage.removeItem(`mentor-ai:audio-progress:${item.id}`);
+  persistSyncedProgress(true, true);
   isPlaying.value = false;
 }
 function recordAudioEngagement(type: 'started' | 'finished' | 'full-play') {

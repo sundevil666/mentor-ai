@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { ContentEngagementEvent, ContentProgress } from '@mentor-ai/shared';
+import type { ContentProgress } from '@mentor-ai/shared';
 import { selectUnfinishedStartedContent } from '../src/services/home-started-content.js';
 
 const progress = (overrides: Partial<ContentProgress>): ContentProgress => ({
@@ -8,28 +8,18 @@ const progress = (overrides: Partial<ContentProgress>): ContentProgress => ({
   furthestPosition: 20, duration: 100, completed: false, sourceDeviceId: 'device',
   updatedAt: '2026-10-02T08:00:00.000Z', ...overrides,
 });
-const event = (type: ContentEngagementEvent['type'], createdAt: string): ContentEngagementEvent => ({
-  id: `${type}:${createdAt}`, studentId: 'student', category: 'audio', contentId: 'two', type,
-  sourceDeviceId: 'device', createdAt,
-});
-
 describe('Home started content', () => {
-  it('keeps partial synchronized progress and removes completed content', () => {
+  it('keeps only synchronized progress strictly between zero and completion', () => {
     const selected = selectUnfinishedStartedContent([
       progress({}),
+      progress({ id: 'audio:zero', contentId: 'zero', position: 0, furthestPosition: 0 }),
+      progress({ id: 'audio:full', contentId: 'full', position: 100, furthestPosition: 100 }),
       progress({ id: 'reading:book', category: 'reading', contentId: 'book', completed: true }),
-    ], []);
+    ]);
     assert.deepEqual(selected.map((item) => item.contentId), ['one']);
   });
 
-  it('removes a start after its later finish and keeps a later new start', () => {
-    assert.equal(selectUnfinishedStartedContent([], [
-      event('started', '2026-10-02T08:00:00.000Z'),
-      event('finished', '2026-10-02T08:10:00.000Z'),
-    ]).length, 0);
-    assert.equal(selectUnfinishedStartedContent([], [
-      event('finished', '2026-10-02T08:10:00.000Z'),
-      event('started', '2026-10-02T08:20:00.000Z'),
-    ])[0]?.contentId, 'two');
+  it('does not treat an item without measurable progress as started', () => {
+    assert.equal(selectUnfinishedStartedContent([]).length, 0);
   });
 });

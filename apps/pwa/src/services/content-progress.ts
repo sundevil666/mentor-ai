@@ -26,6 +26,7 @@ export async function saveContentProgress(input: Omit<ContentProgress, 'id' | 's
     id,
     sourceDeviceId: getContentProgressDeviceId(),
     furthestPosition: Math.max(previous?.furthestPosition ?? 0, input.furthestPosition, input.position),
+    completed: Boolean(previous?.completed || input.completed),
   };
   await db.put('content-progress', progress);
   return progress;

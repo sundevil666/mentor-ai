@@ -744,7 +744,6 @@ import { listPersonalBooks, type PersonalBook } from 'src/services/personal-book
 import { selectUnfinishedStartedContent } from 'src/services/home-started-content';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import {
-  loadAllContentEngagement,
   loadContentEngagementSummaries,
   recordContentEngagement,
   syncContentEngagement,
@@ -1242,12 +1241,11 @@ async function refreshLessonProgressStates() {
 }
 
 async function refreshStartedContent() {
-  const [progress, engagement, books] = await Promise.all([
+  const [progress, books] = await Promise.all([
     loadAllContentProgress(),
-    loadAllContentEngagement(),
     listPersonalBooks(),
   ]);
-  rawStartedContent.value = selectUnfinishedStartedContent(progress, engagement);
+  rawStartedContent.value = selectUnfinishedStartedContent(progress);
   personalBooks.value = books;
 }
 
