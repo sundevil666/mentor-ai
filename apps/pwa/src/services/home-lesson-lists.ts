@@ -1,7 +1,7 @@
-export function belongsToRequiredLessons(hasCompletedOnce: boolean) {
-  return !hasCompletedOnce;
+export function belongsToRequiredLessons(isRequired: boolean, hasCompletedOnce: boolean) {
+  return isRequired && !hasCompletedOnce;
 }
 
-export function belongsToStartedLessons(hasCompletedOnce: boolean, currentAttemptProgress: number) {
-  return hasCompletedOnce && currentAttemptProgress > 1 && currentAttemptProgress < 100;
+export function belongsToStartedLessons(isRequired: boolean, currentAttemptProgress: number) {
+  return !isRequired && currentAttemptProgress > 1 && currentAttemptProgress < 100;
 }
