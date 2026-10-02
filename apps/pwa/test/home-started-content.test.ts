@@ -14,6 +14,9 @@ describe('Home started content', () => {
       progress({}),
       progress({ id: 'audio:zero', contentId: 'zero', position: 0, furthestPosition: 0 }),
       progress({ id: 'audio:full', contentId: 'full', position: 100, furthestPosition: 100 }),
+      progress({ id: 'audio:rounded-zero', contentId: 'rounded-zero', position: 0.4, furthestPosition: 0.4 }),
+      progress({ id: 'audio:rounded-full', contentId: 'rounded-full', position: 99.6, furthestPosition: 99.6 }),
+      progress({ id: 'audio:unknown-total', contentId: 'unknown-total', duration: undefined }),
       progress({ id: 'reading:book', category: 'reading', contentId: 'book', completed: true }),
     ]);
     assert.deepEqual(selected.map((item) => item.contentId), ['one']);

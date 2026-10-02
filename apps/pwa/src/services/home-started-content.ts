@@ -16,7 +16,9 @@ export function selectUnfinishedStartedContent(
 
   for (const item of progress) {
     const position = Math.max(item.position, item.furthestPosition);
-    if (item.completed || position <= 0 || (item.duration !== undefined && position >= item.duration)) continue;
+    if (item.completed || position <= 0 || !item.duration || item.duration <= 0) continue;
+    const displayedPercent = Math.round((position / item.duration) * 100);
+    if (displayedPercent <= 0 || displayedPercent >= 100) continue;
     items.set(`${item.category}:${item.contentId}`, {
       category: item.category,
       contentId: item.contentId,

@@ -70,9 +70,6 @@
                       </span>
                       <q-icon name="arrow_forward" size="24px" />
                     </button>
-                    <div v-if="item.kind === 'paused' && item.canFinish" class="priority-link__actions">
-                      <q-btn color="primary" dense flat icon="done_all" label="Finish repeat" no-caps @click="finishRepeatedLesson(item.sessionId)" />
-                    </div>
                   </article>
                 </div>
                 <p v-else class="home-work-empty">Block is empty</p>
@@ -791,7 +788,6 @@ type RequiredLessonItem = {
   skillLabel: string;
   status: string;
   progress: number | null;
-  canFinish: boolean;
 };
 type StartedContentItem = {
   id: string;
@@ -827,6 +823,7 @@ const savedHomeListTab = readHomePreference('mentor-ai:home-list-tab');
 const selectedHomeListTab = ref<HomeListTab>(savedHomeListTab === 'started' ? 'started' : 'required');
 const isPhoneViewport = ref(false);
 const rawStartedContent = ref<ReturnType<typeof selectUnfinishedStartedContent>>([]);
+const allContentProgress = ref<Awaited<ReturnType<typeof loadAllContentProgress>>>([]);
 const personalBooks = ref<PersonalBook[]>([]);
 const selectedLessonLibrary = ref<TrainingLibraryKey>('home');
 const lessonReturnDestination = ref<LessonReturnDestination>('home');
@@ -838,6 +835,7 @@ const currentLessonFeedbackContentId = computed(() => (
   ?? null
 ));
 const lessonEngagementSummaries = ref(new Map<string, ContentEngagementSummary>());
+const audioEngagementSummaries = ref(new Map<string, ContentEngagementSummary>());
 const libraryDownloadStatus = ref<Record<string, 'idle' | 'checking' | 'downloading' | 'ready' | 'error'>>({});
 const newLessonCatalog = ref<GeneratedLesson[]>([]);
 watch(() => appStore.session?.lesson, (lesson) => {
@@ -1208,17 +1206,32 @@ const allHomeLessons = computed<HomeLesson[]>(() => [
 const lessonCompletionCounts = computed(() => {
   const counts = new Map<string, number>();
   for (const snapshot of appStore.statisticsSnapshots) {
-    const key = snapshot.lessonTemplateKey;
-    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+    const keys = new Set([snapshot.lessonTemplateKey, snapshot.lessonId].filter((key): key is string => Boolean(key)));
+    for (const key of keys) counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   return counts;
 });
 function lessonProgressState(templateKey: string): LessonProgressState {
-  const summary = lessonEngagementSummaries.value.get(templateKey);
-  if ((lessonCompletionCounts.value.get(templateKey) ?? 0) > 0 || (summary?.fullPlays ?? 0) > 0 || (summary?.finishes ?? 0) > 0) {
+  const generatedLessonId = newLessonCatalog.value.find(
+    (lesson) => (lesson.lessonTemplateKey ?? lesson.id) === templateKey,
+  )?.id;
+  const summaries = [templateKey, generatedLessonId]
+    .filter((key): key is string => Boolean(key))
+    .map((key) => lessonEngagementSummaries.value.get(key));
+  const completedByEngagement = summaries.some((summary) => (summary?.fullPlays ?? 0) > 0 || (summary?.finishes ?? 0) > 0);
+  const startedByEngagement = summaries.some((summary) => (summary?.starts ?? 0) > 0);
+  const completedInProgress = allContentProgress.value.some((progress) => (
+    progress.category === 'lesson'
+    && progress.completed
+    && (progress.contentId === templateKey || progress.contentId === generatedLessonId)
+  ));
+  if (completedInProgress
+    || (lessonCompletionCounts.value.get(templateKey) ?? 0) > 0
+    || (generatedLessonId && (lessonCompletionCounts.value.get(generatedLessonId) ?? 0) > 0)
+    || completedByEngagement) {
     return 'completed';
   }
-  if ((summary?.starts ?? 0) > 0 || appStore.pausedSessions.some((session) => session.lesson.lessonTemplateKey === templateKey)) {
+  if (startedByEngagement || appStore.pausedSessions.some((session) => session.lesson.lessonTemplateKey === templateKey)) {
     return 'started';
   }
   return 'new';
@@ -1237,7 +1250,12 @@ function lessonProgressIcon(templateKey: string) {
 }
 
 async function refreshLessonProgressStates() {
-  lessonEngagementSummaries.value = await loadContentEngagementSummaries('lesson');
+  const [lessons, audio] = await Promise.all([
+    loadContentEngagementSummaries('lesson'),
+    loadContentEngagementSummaries('audio'),
+  ]);
+  lessonEngagementSummaries.value = lessons;
+  audioEngagementSummaries.value = audio;
 }
 
 async function refreshStartedContent() {
@@ -1245,6 +1263,7 @@ async function refreshStartedContent() {
     loadAllContentProgress(),
     listPersonalBooks(),
   ]);
+  allContentProgress.value = progress;
   rawStartedContent.value = selectUnfinishedStartedContent(progress);
   personalBooks.value = books;
 }
@@ -1268,15 +1287,16 @@ const homeLessonQueue = computed(() => {
 function lessonSessionProgress(session: typeof appStore.pausedSessions[number]) {
   return calculateLessonSessionProgress(session.currentExerciseIndex, session.lesson.exercises.length);
 }
-function wasLessonCompleted(session: typeof appStore.pausedSessions[number]) {
-  return canFinishRepeatedLesson(session.lesson.lessonTemplateKey, lessonCompletionCounts.value);
-}
 const requiredLessonItems = computed<RequiredLessonItem[]>(() => {
+  const assignedKeys = new Set(generatedHomeLessons.value.map((lesson) => lesson.templateKey));
   const paused = [...appStore.pausedSessions]
+    .filter((session) => {
+      const key = session.lesson.lessonTemplateKey ?? session.lesson.id;
+      return assignedKeys.has(key) && lessonProgressState(key) !== 'completed';
+    })
     .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
     .map((session): RequiredLessonItem => {
       const category = generatedLessonCategory(session.lesson);
-      const repeated = wasLessonCompleted(session);
       return {
         id: `paused:${session.id}`,
         kind: 'paused',
@@ -1284,13 +1304,11 @@ const requiredLessonItems = computed<RequiredLessonItem[]>(() => {
         title: session.lesson.title,
         category,
         skillLabel: lessonCategoryLabel(category),
-        status: repeated ? 'Repeat in progress' : 'Must finish',
+        status: 'Must finish',
         progress: lessonSessionProgress(session),
-        canFinish: repeated,
       };
     });
   const pausedKeys = new Set(appStore.pausedSessions.map((session) => session.lesson.lessonTemplateKey ?? session.lesson.id));
-  const assignedKeys = new Set(generatedHomeLessons.value.map((lesson) => lesson.templateKey));
   const remaining = homeLessonQueue.value
     .filter((lesson) => assignedKeys.has(lesson.templateKey) && !pausedKeys.has(lesson.templateKey) && lessonProgressState(lesson.templateKey) !== 'completed')
     .map((lesson): RequiredLessonItem => ({
@@ -1303,7 +1321,6 @@ const requiredLessonItems = computed<RequiredLessonItem[]>(() => {
       skillLabel: lesson.skillLabel,
       status: 'Must complete',
       progress: null,
-      canFinish: false,
     }));
   return [...paused, ...remaining];
 });
@@ -1320,6 +1337,17 @@ const startedContentItems = computed<StartedContentItem[]>(() => {
 
   return rawStartedContent.value
     .filter((item) => !(isPhoneViewport.value && item.category === 'reading'))
+    .filter((item) => {
+      if (item.category === 'lesson') {
+        const lesson = lessons.get(item.contentId);
+        return !lesson || lessonProgressState(lesson.templateKey) !== 'completed';
+      }
+      if (item.category === 'audio') {
+        const summary = audioEngagementSummaries.value.get(item.contentId);
+        return (summary?.finishes ?? 0) === 0 && (summary?.fullPlays ?? 0) === 0;
+      }
+      return true;
+    })
     .map((item): StartedContentItem => {
       const lesson = lessons.get(item.contentId);
       const audio = audios.get(item.contentId);
@@ -1594,12 +1622,11 @@ onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();
   }
-  await refreshLessonProgressStates();
   await Promise.all([
     syncAllContentProgress().catch(() => undefined),
     syncContentEngagement().catch(() => undefined),
   ]);
-  await refreshStartedContent();
+  await Promise.all([refreshLessonProgressStates(), refreshStartedContent()]);
   await refreshLevelActivity();
   refreshHomeReadingProgress();
   await refreshNewLessonCatalog();
@@ -1786,10 +1813,6 @@ async function resumePausedLesson(sessionId: string) {
   setForwardTransition();
   await appStore.resumePausedLesson(sessionId);
   await syncActiveLessonNavigation();
-}
-
-async function finishRepeatedLesson(sessionId: string) {
-  await appStore.dismissPausedLesson(sessionId);
 }
 
 function updatePhoneViewport() {
