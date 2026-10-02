@@ -2854,7 +2854,9 @@ function persistProgress(completed = false) {
   const audio = audioElement.value;
   if (!story || !audio || !Number.isFinite(audio.currentTime)) return;
   lastProgressSave = Date.now();
-  void saveContentProgress({ studentId: appStore.studentId, category: 'audio', contentId: story.id, position: audio.currentTime, furthestPosition: audio.currentTime, duration: duration.value || story.durationSeconds, completed, updatedAt: new Date().toISOString() });
+  const resolvedDuration = duration.value || story.durationSeconds;
+  const position = completed ? resolvedDuration : audio.currentTime;
+  void saveContentProgress({ studentId: appStore.studentId, category: 'audio', contentId: story.id, position, furthestPosition: position, duration: resolvedDuration, completed, updatedAt: new Date().toISOString() });
 }
 async function toggleOffline(story: LibraryStory) {
   const saved = isSaved(story);
