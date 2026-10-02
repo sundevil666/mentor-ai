@@ -53,45 +53,47 @@
             </div>
           </section>
 
-          <article
-            v-if="currentInProgressLesson"
-            class="priority-link priority-link--resume"
-          >
-            <button type="button" class="priority-link__main" @click="resumePausedLesson(currentInProgressLesson.id)">
-              <q-icon :name="lessonCategoryIcon(generatedLessonCategory(currentInProgressLesson.lesson))" size="26px" />
-              <span>
-                <small>In progress · {{ lessonCategoryLabel(generatedLessonCategory(currentInProgressLesson.lesson)) }} · {{ lessonSessionProgress(currentInProgressLesson) }}%</small>
-                <strong>{{ currentInProgressLesson.lesson.title }}</strong>
-              </span>
-              <q-icon name="arrow_forward" size="24px" />
-            </button>
-            <div v-if="wasLessonCompleted(currentInProgressLesson)" class="priority-link__actions">
-              <q-btn
-                color="primary"
-                dense
-                flat
-                icon="done_all"
-                label="Finish"
-                no-caps
-                @click="finishRepeatedLesson(currentInProgressLesson.id)"
-              />
-            </div>
-          </article>
-
-          <article class="priority-link">
-            <button type="button" class="priority-link__main" @click="startRecommendedHomeLesson">
-              <q-icon :name="lessonCategoryIcon(recommendedHomeLesson.category)" size="26px" />
-              <span>
-                <small>Recommended · {{ recommendedHomeLesson.skillLabel }} · {{ isRecommendedLessonPinned ? 'Pinned lesson' : 'Do this next' }} · {{ recommendedHomeLesson.minutes }} min</small>
-                <strong>{{ recommendedHomeLesson.title }}</strong>
-              </span>
-              <q-icon name="arrow_forward" size="24px" />
-            </button>
-            <div class="priority-link__actions">
-              <q-btn dense flat no-caps color="primary" :icon="isRecommendedLessonPinned ? 'bookmark_remove' : 'push_pin'" :label="isRecommendedLessonPinned ? 'Unpin' : 'Pin'" @click="toggleRecommendedLessonPin" />
-              <q-btn v-if="!isRecommendedLessonPinned" dense flat no-caps color="primary" icon="swap_horiz" label="Another" @click="suggestNextHomeLesson" />
-            </div>
-          </article>
+          <section class="home-work-lists" aria-label="Your learning lists">
+            <q-tabs v-model="selectedHomeListTab" dense no-caps align="justify" active-color="primary" indicator-color="primary" class="home-work-tabs">
+              <q-tab name="required" icon="priority_high" :label="`Required · ${requiredLessonItems.length}`" />
+              <q-tab name="started" icon="play_circle" :label="`Started · ${startedContentItems.length}`" />
+            </q-tabs>
+            <q-tab-panels v-model="selectedHomeListTab" animated swipeable class="home-work-panels" :class="`home-work-panels--${selectedHomeListTab}`">
+              <q-tab-panel name="required" class="home-work-panel home-work-panel--required">
+                <div v-if="requiredLessonItems.length" class="home-work-list">
+                  <article v-for="item in requiredLessonItems" :key="item.id" class="priority-link home-work-card home-work-card--required" :class="{ 'priority-link--resume': item.kind === 'paused' }">
+                    <button type="button" class="priority-link__main" @click="openRequiredLesson(item)">
+                      <q-icon :name="lessonCategoryIcon(item.category)" size="26px" />
+                      <span>
+                        <small>{{ item.status }} · {{ item.skillLabel }}<template v-if="item.progress !== null"> · {{ item.progress }}%</template></small>
+                        <strong>{{ item.title }}</strong>
+                      </span>
+                      <q-icon name="arrow_forward" size="24px" />
+                    </button>
+                    <div v-if="item.kind === 'paused' && item.canFinish" class="priority-link__actions">
+                      <q-btn color="primary" dense flat icon="done_all" label="Finish repeat" no-caps @click="finishRepeatedLesson(item.sessionId)" />
+                    </div>
+                  </article>
+                </div>
+                <p v-else class="home-work-empty">Block is empty</p>
+              </q-tab-panel>
+              <q-tab-panel name="started" class="home-work-panel home-work-panel--started">
+                <div v-if="startedContentItems.length" class="home-work-list">
+                  <article v-for="item in startedContentItems" :key="item.id" class="priority-link priority-link--resume home-work-card home-work-card--started">
+                    <button type="button" class="priority-link__main" @click="openStartedContent(item)">
+                      <q-icon :name="item.icon" size="26px" />
+                      <span>
+                        <small>{{ item.label }}<template v-if="item.progress !== null"> · {{ item.progress }}%</template></small>
+                        <strong>{{ item.title }}</strong>
+                      </span>
+                      <q-icon name="arrow_forward" size="24px" />
+                    </button>
+                  </article>
+                </div>
+                <p v-else class="home-work-empty">Block is empty</p>
+              </q-tab-panel>
+            </q-tab-panels>
+          </section>
 
           </template>
 
@@ -737,10 +739,15 @@ import { loadLearningActivityTotals } from 'src/services/learning-activity';
 import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { audioLibrary } from 'src/services/audio-library';
 import { storyLibrary } from 'src/services/story-library';
+import { loadAllContentProgress, syncAllContentProgress } from 'src/services/content-progress';
+import { listPersonalBooks, type PersonalBook } from 'src/services/personal-book-library';
+import { selectUnfinishedStartedContent } from 'src/services/home-started-content';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import {
+  loadAllContentEngagement,
   loadContentEngagementSummaries,
   recordContentEngagement,
+  syncContentEngagement,
   type ContentEngagementSummary,
 } from 'src/services/content-engagement';
 
@@ -774,6 +781,28 @@ type TrainingLibraryKey = 'home' | DashboardTrainingCategory;
 type LessonReturnDestination = TrainingLibraryKey | 'specific-lessons';
 type TrainingLibraryLesson = LessonChoice & { mode: 'home' | 'listening' | 'speaking'; minutes: number; concept?: GeneratedLesson['concept'] };
 type HomeLesson = TrainingLibraryLesson & { category: DashboardTrainingCategory; skillLabel: string };
+type HomeListTab = 'required' | 'started';
+type RequiredLessonItem = {
+  id: string;
+  kind: 'paused' | 'lesson';
+  sessionId: string;
+  lesson?: HomeLesson;
+  title: string;
+  category: DashboardTrainingCategory;
+  skillLabel: string;
+  status: string;
+  progress: number | null;
+  canFinish: boolean;
+};
+type StartedContentItem = {
+  id: string;
+  category: 'lesson' | 'audio' | 'reading' | 'video' | 'vocabulary';
+  contentId: string;
+  title: string;
+  label: string;
+  icon: string;
+  progress: number | null;
+};
 type PendingLessonUpdate = {
   choice: TrainingLibraryLesson;
   context: LearningContext;
@@ -795,8 +824,11 @@ const isListeningRepeatEnabled = ref(false);
 const isListeningTranslationVisible = ref(false);
 const isListeningPlaylistVisible = ref(false);
 const isLessonLibraryVisible = ref(false);
-const pinnedHomeLessonKey = ref(readHomePreference('mentor-ai:home-pinned-lesson'));
-const skippedHomeLessonKey = ref(readHomePreference('mentor-ai:home-skipped-lesson'));
+const savedHomeListTab = readHomePreference('mentor-ai:home-list-tab');
+const selectedHomeListTab = ref<HomeListTab>(savedHomeListTab === 'started' ? 'started' : 'required');
+const isPhoneViewport = ref(false);
+const rawStartedContent = ref<ReturnType<typeof selectUnfinishedStartedContent>>([]);
+const personalBooks = ref<PersonalBook[]>([]);
 const selectedLessonLibrary = ref<TrainingLibraryKey>('home');
 const lessonReturnDestination = ref<LessonReturnDestination>('home');
 const activeEngagementContentId = ref<string | null>(null);
@@ -1209,17 +1241,25 @@ async function refreshLessonProgressStates() {
   lessonEngagementSummaries.value = await loadContentEngagementSummaries('lesson');
 }
 
+async function refreshStartedContent() {
+  const [progress, engagement, books] = await Promise.all([
+    loadAllContentProgress(),
+    loadAllContentEngagement(),
+    listPersonalBooks(),
+  ]);
+  rawStartedContent.value = selectUnfinishedStartedContent(progress, engagement);
+  personalBooks.value = books;
+}
+
 function handleLessonEngagementChange() {
   void refreshLessonProgressStates();
+  void refreshStartedContent();
 }
 const homeLessonQueue = computed(() => {
   const priorityMode = chooseRecommendedTraining(currentSuggestion.value, appStore.studentModel) === 'listening'
     ? 'listening'
     : 'speaking';
   return [...allHomeLessons.value].sort((left, right) => {
-    const leftSkipped = left.templateKey === skippedHomeLessonKey.value ? 1 : 0;
-    const rightSkipped = right.templateKey === skippedHomeLessonKey.value ? 1 : 0;
-    if (leftSkipped !== rightSkipped) return leftSkipped - rightSkipped;
     const leftMode = left.mode === priorityMode ? 0 : 1;
     const rightMode = right.mode === priorityMode ? 0 : 1;
     if (leftMode !== rightMode) return leftMode - rightMode;
@@ -1227,27 +1267,74 @@ const homeLessonQueue = computed(() => {
       - (lessonCompletionCounts.value.get(right.templateKey) ?? 0);
   });
 });
-const recommendedHomeLesson = computed(() =>
-  homeLessonQueue.value.find((lesson) => (
-    lesson.templateKey === pinnedHomeLessonKey.value
-    && !appStore.pausedSessions.some((session) => session.lesson.lessonTemplateKey === lesson.templateKey)
-  ))
-    ?? homeLessonQueue.value.find((lesson) => (
-      !appStore.pausedSessions.some((session) => session.lesson.lessonTemplateKey === lesson.templateKey)
-    ))
-    ?? homeLessonQueue.value[0]!,
-);
-const currentInProgressLesson = computed(() => [...appStore.pausedSessions]
-  .sort((left, right) => right.startedAt.localeCompare(left.startedAt))[0]);
 function lessonSessionProgress(session: typeof appStore.pausedSessions[number]) {
   return calculateLessonSessionProgress(session.currentExerciseIndex, session.lesson.exercises.length);
 }
 function wasLessonCompleted(session: typeof appStore.pausedSessions[number]) {
   return canFinishRepeatedLesson(session.lesson.lessonTemplateKey, lessonCompletionCounts.value);
 }
-const isRecommendedLessonPinned = computed(() =>
-  pinnedHomeLessonKey.value === recommendedHomeLesson.value.templateKey,
-);
+const requiredLessonItems = computed<RequiredLessonItem[]>(() => {
+  const paused = [...appStore.pausedSessions]
+    .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
+    .map((session): RequiredLessonItem => {
+      const category = generatedLessonCategory(session.lesson);
+      const repeated = wasLessonCompleted(session);
+      return {
+        id: `paused:${session.id}`,
+        kind: 'paused',
+        sessionId: session.id,
+        title: session.lesson.title,
+        category,
+        skillLabel: lessonCategoryLabel(category),
+        status: repeated ? 'Repeat in progress' : 'Must finish',
+        progress: lessonSessionProgress(session),
+        canFinish: repeated,
+      };
+    });
+  const pausedKeys = new Set(appStore.pausedSessions.map((session) => session.lesson.lessonTemplateKey ?? session.lesson.id));
+  const assignedKeys = new Set(generatedHomeLessons.value.map((lesson) => lesson.templateKey));
+  const remaining = homeLessonQueue.value
+    .filter((lesson) => assignedKeys.has(lesson.templateKey) && !pausedKeys.has(lesson.templateKey) && lessonProgressState(lesson.templateKey) !== 'completed')
+    .map((lesson): RequiredLessonItem => ({
+      id: `lesson:${lesson.templateKey}`,
+      kind: 'lesson',
+      sessionId: '',
+      lesson,
+      title: lesson.title,
+      category: lesson.category,
+      skillLabel: lesson.skillLabel,
+      status: 'Must complete',
+      progress: null,
+      canFinish: false,
+    }));
+  return [...paused, ...remaining];
+});
+
+const startedContentItems = computed<StartedContentItem[]>(() => {
+  const lessons = new Map<string, HomeLesson>();
+  for (const lesson of allHomeLessons.value) lessons.set(lesson.templateKey, lesson);
+  for (const generated of newLessonCatalog.value) {
+    const lesson = allHomeLessons.value.find((candidate) => candidate.templateKey === (generated.lessonTemplateKey ?? generated.id));
+    if (lesson) lessons.set(generated.id, lesson);
+  }
+  const audios = new Map([...audioLibrary, ...storyLibrary].map((item) => [item.id, item]));
+  const books = new Map(personalBooks.value.map((book) => [book.id, book]));
+
+  return rawStartedContent.value
+    .filter((item) => !(isPhoneViewport.value && item.category === 'reading'))
+    .map((item): StartedContentItem => {
+      const lesson = lessons.get(item.contentId);
+      const audio = audios.get(item.contentId);
+      const book = books.get(item.contentId);
+      const progress = item.duration && item.duration > 0
+        ? Math.min(99, Math.round(((item.position ?? 0) / item.duration) * 100))
+        : null;
+      if (lesson) return { id: `started:${item.category}:${item.contentId}`, category: item.category, contentId: item.contentId, title: lesson.title, label: lesson.skillLabel, icon: lessonCategoryIcon(lesson.category), progress };
+      if (audio) return { id: `started:${item.category}:${item.contentId}`, category: item.category, contentId: item.contentId, title: audio.title, label: storyLibrary.some((story) => story.id === item.contentId) ? 'Audio story' : 'Listening', icon: 'headphones', progress };
+      if (book) return { id: `started:${item.category}:${item.contentId}`, category: item.category, contentId: item.contentId, title: book.title, label: 'Reading', icon: 'menu_book', progress };
+      return { id: `started:${item.category}:${item.contentId}`, category: item.category, contentId: item.contentId, title: 'Continue where you stopped', label: item.category, icon: item.category === 'reading' ? 'menu_book' : 'play_circle', progress };
+    });
+});
 const levelActivity = ref<LearningActivityTotals>({ grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null });
 const fetchedLessonCatalog = ref<GeneratedLesson[]>([]);
 const homeReadingProgress = ref<DailyReadingProgress>(createDailyReadingProgress());
@@ -1510,6 +1597,11 @@ onMounted(async () => {
     await appStore.hydrate();
   }
   await refreshLessonProgressStates();
+  await Promise.all([
+    syncAllContentProgress().catch(() => undefined),
+    syncContentEngagement().catch(() => undefined),
+  ]);
+  await refreshStartedContent();
   await refreshLevelActivity();
   refreshHomeReadingProgress();
   await refreshNewLessonCatalog();
@@ -1527,6 +1619,9 @@ onMounted(async () => {
   window.addEventListener('mentor-content-engagement', handleLessonEngagementChange);
   window.addEventListener('mentor-learning-activity-updated', refreshLevelActivity);
   window.addEventListener('focus', refreshHomeReadingProgress);
+  window.addEventListener('focus', refreshStartedContent);
+  window.addEventListener('resize', updatePhoneViewport);
+  updatePhoneViewport();
 });
 
 onUnmounted(() => {
@@ -1541,7 +1636,11 @@ onUnmounted(() => {
   window.removeEventListener('mentor-content-engagement', handleLessonEngagementChange);
   window.removeEventListener('mentor-learning-activity-updated', refreshLevelActivity);
   window.removeEventListener('focus', refreshHomeReadingProgress);
+  window.removeEventListener('focus', refreshStartedContent);
+  window.removeEventListener('resize', updatePhoneViewport);
 });
+
+watch(selectedHomeListTab, (tab) => saveHomePreference('mentor-ai:home-list-tab', tab));
 
 async function refreshLevelActivity() { levelActivity.value = await loadLearningActivityTotals(); }
 
@@ -1652,8 +1751,37 @@ async function startHomeLesson(lesson: HomeLesson) {
   await startLibraryLesson(lesson);
 }
 
-async function startRecommendedHomeLesson() {
-  await startHomeLesson(recommendedHomeLesson.value);
+async function openRequiredLesson(item: RequiredLessonItem) {
+  if (item.kind === 'paused') {
+    await resumePausedLesson(item.sessionId);
+    return;
+  }
+  if (item.lesson) await startHomeLesson(item.lesson);
+}
+
+async function openStartedContent(item: StartedContentItem) {
+  if (item.category === 'lesson') {
+    const paused = appStore.pausedSessions.find((session) => (
+      session.lesson.id === item.contentId || session.lesson.lessonTemplateKey === item.contentId
+    ));
+    if (paused) {
+      await resumePausedLesson(paused.id);
+      return;
+    }
+    const lesson = allHomeLessons.value.find((candidate) => candidate.templateKey === item.contentId);
+    if (lesson) {
+      await startHomeLesson(lesson);
+      return;
+    }
+  }
+  if (item.category === 'audio') {
+    const isStory = storyLibrary.some((story) => story.id === item.contentId);
+    await router.push({ name: isStory ? 'audio-stories' : 'audio', query: { [isStory ? 'story' : 'audio']: item.contentId } });
+    return;
+  }
+  if (item.category === 'reading') {
+    await router.push({ name: 'reading' });
+  }
 }
 
 async function resumePausedLesson(sessionId: string) {
@@ -1666,16 +1794,8 @@ async function finishRepeatedLesson(sessionId: string) {
   await appStore.dismissPausedLesson(sessionId);
 }
 
-function toggleRecommendedLessonPin() {
-  pinnedHomeLessonKey.value = isRecommendedLessonPinned.value
-    ? null
-    : recommendedHomeLesson.value.templateKey;
-  saveHomePreference('mentor-ai:home-pinned-lesson', pinnedHomeLessonKey.value);
-}
-
-function suggestNextHomeLesson() {
-  skippedHomeLessonKey.value = recommendedHomeLesson.value.templateKey;
-  saveHomePreference('mentor-ai:home-skipped-lesson', skippedHomeLessonKey.value);
+function updatePhoneViewport() {
+  isPhoneViewport.value = window.matchMedia('(max-width: 700px)').matches;
 }
 
 function recordLessonStart(contentId: string) {

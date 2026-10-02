@@ -12,6 +12,11 @@ export async function loadContentProgress(category: ContentProgressCategory, con
   return db.get('content-progress', `${category}:${contentId}`) as Promise<ContentProgress | undefined>;
 }
 
+export async function loadAllContentProgress() {
+  const db = await mentorDb;
+  return db.getAll('content-progress') as Promise<ContentProgress[]>;
+}
+
 export async function saveContentProgress(input: Omit<ContentProgress, 'id' | 'sourceDeviceId'>) {
   const db = await mentorDb;
   const id = `${input.category}:${input.contentId}`;
