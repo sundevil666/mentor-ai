@@ -9,6 +9,7 @@
       <section class="movies-learning-workspace">
         <q-tabs v-model="activeTab" vertical class="movies-learning-tabs" active-color="primary" indicator-color="primary" no-caps>
           <q-tab name="discuss" icon="chat" label="Discuss" />
+          <q-tab name="watch" icon="live_tv" label="Watch" />
           <q-tab name="memory" icon="psychology" label="Memory" />
           <q-tab name="report" icon="assignment_turned_in" label="Send report">
             <q-badge v-if="pendingCount" color="deep-orange-7" floating>{{ pendingCount }}</q-badge>
@@ -16,6 +17,20 @@
         </q-tabs>
 
         <q-tab-panels v-model="activeTab" animated class="movies-learning-panels">
+        <q-tab-panel name="watch">
+          <section class="movie-watch-layout">
+            <iframe
+              v-if="activeTab === 'watch'"
+              class="movie-watch-frame"
+              src="https://rezka.ag/"
+              title="Rezka film search and player"
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowfullscreen
+              referrerpolicy="strict-origin-when-cross-origin"
+            />
+          </section>
+        </q-tab-panel>
+
         <q-tab-panel name="discuss">
           <section class="movie-chat-layout">
             <q-card flat bordered class="movies-learning-card movie-chat-card">
@@ -122,7 +137,7 @@ import { buildMovieChatMemory, movieCoachPrompt } from 'src/services/movie-chat-
 import { loadMovieLearningReports, pendingMovieLearningReportCount, refreshMovieLearningReportsFromCloud, saveMovieLearningReport, syncMovieLearningReports } from 'src/services/movie-learning-reports';
 
 const appStore = useAppStore();
-const activeTab = ref<'discuss' | 'memory' | 'report'>('discuss');
+const activeTab = ref<'discuss' | 'watch' | 'memory' | 'report'>('discuss');
 const chatDraft = ref('');
 const chatMessages = ref<LocalMovieChatMessage[]>([]);
 const chatSending = ref(false);
@@ -215,6 +230,8 @@ async function retrySync(showResult = true) {
 .movies-learning-tabs :deep(.q-tab) { justify-content: flex-start; min-height: 58px; }
 .movies-learning-panels { background: transparent; }
 .movies-learning-panels :deep(.q-tab-panel) { padding: 0; }
+.movie-watch-layout { background: var(--app-surface); border: 1px solid var(--app-border); border-radius: 18px; overflow: hidden; }
+.movie-watch-frame { border: 0; display: block; height: max(680px, calc(100vh - 190px)); width: 100%; }
 .movie-chat-layout { margin: 0 auto; max-width: 900px; }
 .movie-memory-layout { display: grid; gap: 20px; }
 .movie-memory-fields { display: grid; gap: 16px; padding-top: 0; }
