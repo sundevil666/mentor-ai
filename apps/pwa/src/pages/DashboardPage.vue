@@ -736,9 +736,8 @@ import { loadLearningActivityTotals } from 'src/services/learning-activity';
 import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { audioLibrary } from 'src/services/audio-library';
 import { storyLibrary } from 'src/services/story-library';
-import { loadAllContentProgress, syncAllContentProgress } from 'src/services/content-progress';
-import { listPersonalBooks, type PersonalBook } from 'src/services/personal-book-library';
-import { selectUnfinishedStartedContent } from 'src/services/home-started-content';
+import { syncAllContentProgress } from 'src/services/content-progress';
+import { belongsToRequiredLessons, belongsToStartedLessons } from 'src/services/home-lesson-lists';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import {
   loadContentEngagementSummaries,
@@ -780,7 +779,7 @@ type HomeLesson = TrainingLibraryLesson & { category: DashboardTrainingCategory;
 type HomeListTab = 'required' | 'started';
 type RequiredLessonItem = {
   id: string;
-  kind: 'paused' | 'lesson';
+  kind: 'paused' | 'remote' | 'lesson';
   sessionId: string;
   lesson?: HomeLesson;
   title: string;
@@ -791,12 +790,12 @@ type RequiredLessonItem = {
 };
 type StartedContentItem = {
   id: string;
-  category: 'lesson' | 'audio' | 'reading' | 'video' | 'vocabulary';
-  contentId: string;
+  kind: 'paused' | 'remote';
+  sessionId: string;
   title: string;
   label: string;
   icon: string;
-  progress: number | null;
+  progress: number;
 };
 type PendingLessonUpdate = {
   choice: TrainingLibraryLesson;
@@ -821,10 +820,6 @@ const isListeningPlaylistVisible = ref(false);
 const isLessonLibraryVisible = ref(false);
 const savedHomeListTab = readHomePreference('mentor-ai:home-list-tab');
 const selectedHomeListTab = ref<HomeListTab>(savedHomeListTab === 'started' ? 'started' : 'required');
-const isPhoneViewport = ref(false);
-const rawStartedContent = ref<ReturnType<typeof selectUnfinishedStartedContent>>([]);
-const allContentProgress = ref<Awaited<ReturnType<typeof loadAllContentProgress>>>([]);
-const personalBooks = ref<PersonalBook[]>([]);
 const selectedLessonLibrary = ref<TrainingLibraryKey>('home');
 const lessonReturnDestination = ref<LessonReturnDestination>('home');
 const activeEngagementContentId = ref<string | null>(null);
@@ -835,7 +830,6 @@ const currentLessonFeedbackContentId = computed(() => (
   ?? null
 ));
 const lessonEngagementSummaries = ref(new Map<string, ContentEngagementSummary>());
-const audioEngagementSummaries = ref(new Map<string, ContentEngagementSummary>());
 const libraryDownloadStatus = ref<Record<string, 'idle' | 'checking' | 'downloading' | 'ready' | 'error'>>({});
 const newLessonCatalog = ref<GeneratedLesson[]>([]);
 watch(() => appStore.session?.lesson, (lesson) => {
@@ -1220,13 +1214,7 @@ function lessonProgressState(templateKey: string): LessonProgressState {
     .map((key) => lessonEngagementSummaries.value.get(key));
   const completedByEngagement = summaries.some((summary) => (summary?.fullPlays ?? 0) > 0 || (summary?.finishes ?? 0) > 0);
   const startedByEngagement = summaries.some((summary) => (summary?.starts ?? 0) > 0);
-  const completedInProgress = allContentProgress.value.some((progress) => (
-    progress.category === 'lesson'
-    && progress.completed
-    && (progress.contentId === templateKey || progress.contentId === generatedLessonId)
-  ));
-  if (completedInProgress
-    || (lessonCompletionCounts.value.get(templateKey) ?? 0) > 0
+  if ((lessonCompletionCounts.value.get(templateKey) ?? 0) > 0
     || (generatedLessonId && (lessonCompletionCounts.value.get(generatedLessonId) ?? 0) > 0)
     || completedByEngagement) {
     return 'completed';
@@ -1250,27 +1238,11 @@ function lessonProgressIcon(templateKey: string) {
 }
 
 async function refreshLessonProgressStates() {
-  const [lessons, audio] = await Promise.all([
-    loadContentEngagementSummaries('lesson'),
-    loadContentEngagementSummaries('audio'),
-  ]);
-  lessonEngagementSummaries.value = lessons;
-  audioEngagementSummaries.value = audio;
-}
-
-async function refreshStartedContent() {
-  const [progress, books] = await Promise.all([
-    loadAllContentProgress(),
-    listPersonalBooks(),
-  ]);
-  allContentProgress.value = progress;
-  rawStartedContent.value = selectUnfinishedStartedContent(progress);
-  personalBooks.value = books;
+  lessonEngagementSummaries.value = await loadContentEngagementSummaries('lesson');
 }
 
 function handleLessonEngagementChange() {
   void refreshLessonProgressStates();
-  void refreshStartedContent();
 }
 const homeLessonQueue = computed(() => {
   const priorityMode = chooseRecommendedTraining(currentSuggestion.value, appStore.studentModel) === 'listening'
@@ -1289,76 +1261,93 @@ function lessonSessionProgress(session: typeof appStore.pausedSessions[number]) 
 }
 const requiredLessonItems = computed<RequiredLessonItem[]>(() => {
   const assignedKeys = new Set(generatedHomeLessons.value.map((lesson) => lesson.templateKey));
-  const paused = [...appStore.pausedSessions]
-    .filter((session) => {
-      const key = session.lesson.lessonTemplateKey ?? session.lesson.id;
-      return assignedKeys.has(key) && lessonProgressState(key) !== 'completed';
-    })
-    .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
-    .map((session): RequiredLessonItem => {
-      const category = generatedLessonCategory(session.lesson);
-      return {
-        id: `paused:${session.id}`,
+  const localAttempts = new Map(appStore.pausedSessions.map((session) => [
+    session.lesson.lessonTemplateKey ?? session.lesson.id,
+    session,
+  ]));
+  const remoteAttempts = new Map(appStore.remoteSessionHandoffs.map((session) => [
+    session.lesson.lessonTemplateKey ?? session.lesson.id,
+    session,
+  ]));
+
+  return homeLessonQueue.value
+    .filter((lesson) => assignedKeys.has(lesson.templateKey) && belongsToRequiredLessons(lessonProgressState(lesson.templateKey) === 'completed'))
+    .map((lesson): RequiredLessonItem => {
+      const local = localAttempts.get(lesson.templateKey);
+      const remote = remoteAttempts.get(lesson.templateKey);
+      if (local) return {
+        id: `paused:${local.id}`,
         kind: 'paused',
-        sessionId: session.id,
-        title: session.lesson.title,
-        category,
-        skillLabel: lessonCategoryLabel(category),
+        sessionId: local.id,
+        lesson,
+        title: lesson.title,
+        category: lesson.category,
+        skillLabel: lesson.skillLabel,
         status: 'Must finish',
-        progress: lessonSessionProgress(session),
+        progress: lessonSessionProgress(local),
+      };
+      if (remote) return {
+        id: `remote:${remote.id}`,
+        kind: 'remote',
+        sessionId: remote.id,
+        lesson,
+        title: lesson.title,
+        category: lesson.category,
+        skillLabel: lesson.skillLabel,
+        status: 'Must finish',
+        progress: calculateLessonSessionProgress(remote.currentExerciseIndex, remote.lesson.exercises.length),
+      };
+      return {
+        id: `lesson:${lesson.templateKey}`,
+        kind: 'lesson',
+        sessionId: '',
+        lesson,
+        title: lesson.title,
+        category: lesson.category,
+        skillLabel: lesson.skillLabel,
+        status: 'Must complete',
+        progress: null,
       };
     });
-  const pausedKeys = new Set(appStore.pausedSessions.map((session) => session.lesson.lessonTemplateKey ?? session.lesson.id));
-  const remaining = homeLessonQueue.value
-    .filter((lesson) => assignedKeys.has(lesson.templateKey) && !pausedKeys.has(lesson.templateKey) && lessonProgressState(lesson.templateKey) !== 'completed')
-    .map((lesson): RequiredLessonItem => ({
-      id: `lesson:${lesson.templateKey}`,
-      kind: 'lesson',
-      sessionId: '',
-      lesson,
-      title: lesson.title,
-      category: lesson.category,
-      skillLabel: lesson.skillLabel,
-      status: 'Must complete',
-      progress: null,
-    }));
-  return [...paused, ...remaining];
 });
 
 const startedContentItems = computed<StartedContentItem[]>(() => {
-  const lessons = new Map<string, HomeLesson>();
-  for (const lesson of allHomeLessons.value) lessons.set(lesson.templateKey, lesson);
-  for (const generated of newLessonCatalog.value) {
-    const lesson = allHomeLessons.value.find((candidate) => candidate.templateKey === (generated.lessonTemplateKey ?? generated.id));
-    if (lesson) lessons.set(generated.id, lesson);
+  const local = appStore.pausedSessions.map((session) => ({
+    kind: 'paused' as const,
+    sessionId: session.id,
+    lesson: session.lesson,
+    progress: lessonSessionProgress(session),
+    startedAt: session.startedAt,
+  }));
+  const remote = appStore.remoteSessionHandoffs.map((session) => ({
+    kind: 'remote' as const,
+    sessionId: session.id,
+    lesson: session.lesson,
+    progress: calculateLessonSessionProgress(session.currentExerciseIndex, session.lesson.exercises.length),
+    startedAt: session.updatedAt,
+  }));
+  const attempts = new Map<string, (typeof local)[number] | (typeof remote)[number]>();
+  for (const attempt of [...local, ...remote].sort((left, right) => right.startedAt.localeCompare(left.startedAt))) {
+    const key = attempt.lesson.lessonTemplateKey ?? attempt.lesson.id;
+    if (!attempts.has(key)) attempts.set(key, attempt);
   }
-  const audios = new Map([...audioLibrary, ...storyLibrary].map((item) => [item.id, item]));
-  const books = new Map(personalBooks.value.map((book) => [book.id, book]));
 
-  return rawStartedContent.value
-    .filter((item) => !(isPhoneViewport.value && item.category === 'reading'))
-    .filter((item) => {
-      if (item.category === 'lesson') {
-        const lesson = lessons.get(item.contentId);
-        return !lesson || lessonProgressState(lesson.templateKey) !== 'completed';
-      }
-      if (item.category === 'audio') {
-        const summary = audioEngagementSummaries.value.get(item.contentId);
-        return (summary?.finishes ?? 0) === 0 && (summary?.fullPlays ?? 0) === 0;
-      }
-      return true;
-    })
-    .map((item): StartedContentItem => {
-      const lesson = lessons.get(item.contentId);
-      const audio = audios.get(item.contentId);
-      const book = books.get(item.contentId);
-      const progress = item.duration && item.duration > 0
-        ? Math.min(99, Math.round(((item.position ?? 0) / item.duration) * 100))
-        : null;
-      if (lesson) return { id: `started:${item.category}:${item.contentId}`, category: item.category, contentId: item.contentId, title: lesson.title, label: lesson.skillLabel, icon: lessonCategoryIcon(lesson.category), progress };
-      if (audio) return { id: `started:${item.category}:${item.contentId}`, category: item.category, contentId: item.contentId, title: audio.title, label: storyLibrary.some((story) => story.id === item.contentId) ? 'Audio story' : 'Listening', icon: 'headphones', progress };
-      if (book) return { id: `started:${item.category}:${item.contentId}`, category: item.category, contentId: item.contentId, title: book.title, label: 'Reading', icon: 'menu_book', progress };
-      return { id: `started:${item.category}:${item.contentId}`, category: item.category, contentId: item.contentId, title: 'Continue where you stopped', label: item.category, icon: item.category === 'reading' ? 'menu_book' : 'play_circle', progress };
+  return [...attempts.values()]
+    .filter((attempt) => belongsToStartedLessons(
+      lessonProgressState(attempt.lesson.lessonTemplateKey ?? attempt.lesson.id) === 'completed',
+      attempt.progress,
+    ))
+    .map((attempt): StartedContentItem => {
+      const category = generatedLessonCategory(attempt.lesson);
+      return {
+        id: `started:${attempt.kind}:${attempt.sessionId}`,
+        kind: attempt.kind,
+        sessionId: attempt.sessionId,
+        title: attempt.lesson.title,
+        label: lessonCategoryLabel(category),
+        icon: lessonCategoryIcon(category),
+        progress: attempt.progress,
+      };
     });
 });
 const levelActivity = ref<LearningActivityTotals>({ grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null });
@@ -1626,7 +1615,7 @@ onMounted(async () => {
     syncAllContentProgress().catch(() => undefined),
     syncContentEngagement().catch(() => undefined),
   ]);
-  await Promise.all([refreshLessonProgressStates(), refreshStartedContent()]);
+  await refreshLessonProgressStates();
   await refreshLevelActivity();
   refreshHomeReadingProgress();
   await refreshNewLessonCatalog();
@@ -1644,9 +1633,6 @@ onMounted(async () => {
   window.addEventListener('mentor-content-engagement', handleLessonEngagementChange);
   window.addEventListener('mentor-learning-activity-updated', refreshLevelActivity);
   window.addEventListener('focus', refreshHomeReadingProgress);
-  window.addEventListener('focus', refreshStartedContent);
-  window.addEventListener('resize', updatePhoneViewport);
-  updatePhoneViewport();
 });
 
 onUnmounted(() => {
@@ -1661,8 +1647,6 @@ onUnmounted(() => {
   window.removeEventListener('mentor-content-engagement', handleLessonEngagementChange);
   window.removeEventListener('mentor-learning-activity-updated', refreshLevelActivity);
   window.removeEventListener('focus', refreshHomeReadingProgress);
-  window.removeEventListener('focus', refreshStartedContent);
-  window.removeEventListener('resize', updatePhoneViewport);
 });
 
 watch(selectedHomeListTab, (tab) => saveHomePreference('mentor-ai:home-list-tab', tab));
@@ -1781,42 +1765,22 @@ async function openRequiredLesson(item: RequiredLessonItem) {
     await resumePausedLesson(item.sessionId);
     return;
   }
+  if (item.kind === 'remote') {
+    await continueFromDevice(item.sessionId);
+    return;
+  }
   if (item.lesson) await startHomeLesson(item.lesson);
 }
 
 async function openStartedContent(item: StartedContentItem) {
-  if (item.category === 'lesson') {
-    const paused = appStore.pausedSessions.find((session) => (
-      session.lesson.id === item.contentId || session.lesson.lessonTemplateKey === item.contentId
-    ));
-    if (paused) {
-      await resumePausedLesson(paused.id);
-      return;
-    }
-    const lesson = allHomeLessons.value.find((candidate) => candidate.templateKey === item.contentId);
-    if (lesson) {
-      await startHomeLesson(lesson);
-      return;
-    }
-  }
-  if (item.category === 'audio') {
-    const isStory = storyLibrary.some((story) => story.id === item.contentId);
-    await router.push({ name: isStory ? 'audio-stories' : 'audio', query: { [isStory ? 'story' : 'audio']: item.contentId } });
-    return;
-  }
-  if (item.category === 'reading') {
-    await router.push({ name: 'reading' });
-  }
+  if (item.kind === 'remote') await continueFromDevice(item.sessionId);
+  else await resumePausedLesson(item.sessionId);
 }
 
 async function resumePausedLesson(sessionId: string) {
   setForwardTransition();
   await appStore.resumePausedLesson(sessionId);
   await syncActiveLessonNavigation();
-}
-
-function updatePhoneViewport() {
-  isPhoneViewport.value = window.matchMedia('(max-width: 700px)').matches;
 }
 
 function recordLessonStart(contentId: string) {
