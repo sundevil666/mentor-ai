@@ -331,7 +331,7 @@ async function removeReport(report: MovieLearningReport) {
 .movie-chat-composer { align-items: flex-end; border-top: 1px solid var(--app-border); display: grid; gap: 10px; grid-template-columns: 1fr auto; }
 .movie-chat-empty { margin: auto; }
 .movies-learning-form { padding: 0 16px 20px; }
-.movies-learning-history { align-content: start; display: grid; gap: 14px; }
+.movies-learning-history { align-content: start; display: grid; gap: 14px; grid-auto-rows: max-content; }
 .movies-learning-page--report .movies-learning-history { min-height: 0; overflow-y: auto; padding: 0 8px 16px 0; scrollbar-color: var(--app-border-strong) transparent; scrollbar-gutter: stable; scrollbar-width: thin; }
 .movies-learning-history::-webkit-scrollbar { width: 8px; }
 .movies-learning-history::-webkit-scrollbar-thumb { background: var(--app-border-strong); border: 2px solid transparent; border-radius: 999px; background-clip: padding-box; }
