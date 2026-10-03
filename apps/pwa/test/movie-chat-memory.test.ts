@@ -21,7 +21,15 @@ describe('movie chat memory', () => {
       report(String(index), `Film ${index}`, `2026-09-${String((index % 28) + 1).padStart(2, '0')}`, 'x'.repeat(900)),
     );
 
-    assert.equal(buildMovieChatMemory('y'.repeat(5_000), reports).length <= 8_000, true);
+    assert.equal(buildMovieChatMemory('y'.repeat(20_000), reports).length <= 24_000, true);
+  });
+
+  it('keeps up to 15,000 characters of learner context', () => {
+    const learnerContext = 'y'.repeat(15_000);
+    const memory = buildMovieChatMemory(learnerContext, []);
+
+    assert.match(memory, new RegExp(`Learner notes:\\n${learnerContext}`));
+    assert.equal(memory.includes('y'.repeat(15_001)), false);
   });
 });
 

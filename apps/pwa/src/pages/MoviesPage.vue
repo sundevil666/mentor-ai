@@ -52,7 +52,7 @@
               </q-card-section>
               <q-card-section class="movie-memory-fields">
                 <q-input :model-value="movieCoachPrompt" outlined readonly autogrow label="Coach prompt" />
-                <q-input v-model="userMemory" class="movie-user-memory-input" outlined autogrow label="My additional context" hint="Add preferences, goals, difficult accents or anything the coach should remember." maxlength="4000" counter />
+                <q-input v-model="userMemory" class="movie-user-memory-input" outlined autogrow label="My additional context" hint="Add preferences, goals, difficult accents or anything the coach should remember." :maxlength="maximumMovieChatUserMemoryCharacters" counter />
                 <div class="movie-memory-actions">
                   <span>Saved on this device and included in every film-chat request.</span>
                   <q-btn color="primary" no-caps icon="save" label="Save my context" @click="persistUserMemory" />
@@ -118,7 +118,7 @@ import { Notify } from 'quasar';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useAppStore } from 'src/stores/app-store';
 import { appendMovieChatMessage, loadMovieChatMessages, loadMovieChatUserMemory, saveMovieChatUserMemory, sendMovieChatMessage, type LocalMovieChatMessage } from 'src/services/movie-chat';
-import { buildMovieChatMemory, movieCoachPrompt } from 'src/services/movie-chat-memory';
+import { buildMovieChatMemory, maximumMovieChatUserMemoryCharacters, movieCoachPrompt } from 'src/services/movie-chat-memory';
 import { loadMovieLearningReports, pendingMovieLearningReportCount, refreshMovieLearningReportsFromCloud, saveMovieLearningReport, syncMovieLearningReports } from 'src/services/movie-learning-reports';
 
 const appStore = useAppStore();

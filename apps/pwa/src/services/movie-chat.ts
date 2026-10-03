@@ -1,5 +1,6 @@
 import { requestMovieChatReply } from './api-client.js';
 import { mentorDb } from './indexed-db.js';
+import { maximumMovieChatUserMemoryCharacters } from './movie-chat-memory.js';
 
 export interface LocalMovieChatMessage {
   id: string;
@@ -16,7 +17,7 @@ export function loadMovieChatUserMemory() {
 }
 
 export function saveMovieChatUserMemory(memory: string) {
-  localStorage.setItem(userMemoryStorageKey, memory.trim().slice(0, 4_000));
+  localStorage.setItem(userMemoryStorageKey, memory.trim().slice(0, maximumMovieChatUserMemoryCharacters));
 }
 
 export async function loadMovieChatMessages() {
