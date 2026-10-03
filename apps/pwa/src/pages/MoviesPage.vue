@@ -149,7 +149,10 @@ const canSave = computed(() => Boolean(movieTitle.value.trim() && watchedAt.valu
 const canSendChat = computed(() => Boolean(chatDraft.value.trim() && appStore.isOnline && !chatSending.value));
 const movieMemory = computed(() => buildMovieChatMemory(userMemory.value, reports.value));
 
-watch(activeTab, (tab) => localStorage.setItem(movieLearningTabStorageKey, tab));
+watch(activeTab, async (tab) => {
+  localStorage.setItem(movieLearningTabStorageKey, tab);
+  if (tab === 'discuss') await scrollChatToEnd('auto');
+});
 
 onMounted(async () => {
   savedCoachPrompt.value = loadMovieCoachPrompt();
@@ -192,9 +195,9 @@ async function submitChatMessage() {
     Notify.create({ type: 'warning', icon: 'cloud_off', message: error instanceof Error ? error.message : 'Movie chat is unavailable. Your message remains saved locally.' });
   } finally { chatSending.value = false; }
 }
-async function scrollChatToEnd() {
+async function scrollChatToEnd(behavior: ScrollBehavior = 'smooth') {
   await nextTick();
-  chatScroll.value?.scrollTo({ top: chatScroll.value.scrollHeight, behavior: 'smooth' });
+  chatScroll.value?.scrollTo({ top: chatScroll.value.scrollHeight, behavior });
 }
 async function refreshReports() {
   [reports.value, pendingCount.value] = await Promise.all([loadMovieLearningReports(), pendingMovieLearningReportCount()]);
