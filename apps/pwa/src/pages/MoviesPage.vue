@@ -70,7 +70,7 @@
                 <p class="text-body2 text-grey-7">Built from local reports first, then merged with synchronized reports from the database.</p>
               </q-card-section>
               <q-card-section class="movie-memory-fields">
-                <q-input :model-value="movieMemory" outlined readonly autogrow label="Shared film context" />
+                <q-input :model-value="movieMemory" class="movie-learning-memory-input" outlined readonly type="textarea" label="Shared film context" />
                 <span class="movie-memory-status">{{ reports.length }} reports in context · {{ pendingCount }} waiting for database</span>
               </q-card-section>
             </q-card>
@@ -246,6 +246,11 @@ async function retrySync(showResult = true) {
 .movie-coach-prompt-input :deep(.q-field__native::-webkit-scrollbar), .movie-user-memory-input :deep(.q-field__native::-webkit-scrollbar) { width: 8px; }
 .movie-coach-prompt-input :deep(.q-field__native::-webkit-scrollbar-thumb), .movie-user-memory-input :deep(.q-field__native::-webkit-scrollbar-thumb) { background: var(--app-border-strong); border: 2px solid transparent; border-radius: 999px; background-clip: padding-box; }
 .movie-coach-prompt-input :deep(.q-field__native::-webkit-scrollbar-track), .movie-user-memory-input :deep(.q-field__native::-webkit-scrollbar-track) { background: transparent; }
+.movie-learning-memory-input :deep(.q-field__control) { height: 200px; }
+.movie-learning-memory-input :deep(.q-field__native) { height: 166px; overflow-y: auto; resize: none; scrollbar-color: var(--app-border-strong) transparent; scrollbar-width: thin; }
+.movie-learning-memory-input :deep(.q-field__native::-webkit-scrollbar) { width: 8px; }
+.movie-learning-memory-input :deep(.q-field__native::-webkit-scrollbar-thumb) { background: var(--app-border-strong); border: 2px solid transparent; border-radius: 999px; background-clip: padding-box; }
+.movie-learning-memory-input :deep(.q-field__native::-webkit-scrollbar-track) { background: transparent; }
 .movie-user-memory-input { margin-bottom: 12px; }
 .movie-memory-actions { align-items: center; display: grid; gap: 12px 16px; grid-template-columns: minmax(0, 1fr) auto; }
 .movie-memory-actions .q-btn { white-space: nowrap; }
