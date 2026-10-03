@@ -75,6 +75,8 @@ export const listMovieLearningReports: RequestHandler = sendData((req) =>
 export const replyToMovieChat: RequestHandler = sendData((req) =>
   createMovieChatReply(
     Array.isArray(req.body?.messages) ? req.body.messages as MovieChatMessage[] : [],
+    typeof req.body?.prompt === 'string' ? req.body.prompt : '',
+    typeof req.body?.memory === 'string' ? req.body.memory : '',
   ),
 );
 

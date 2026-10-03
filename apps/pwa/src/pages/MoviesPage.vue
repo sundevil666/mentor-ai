@@ -51,7 +51,11 @@
                 <p class="text-body2 text-grey-7">The stable instruction used for every film conversation.</p>
               </q-card-section>
               <q-card-section class="movie-memory-fields">
-                <q-input :model-value="movieCoachPrompt" outlined readonly autogrow label="Coach prompt" />
+                <q-input v-model="coachPrompt" class="movie-coach-prompt-input" outlined type="textarea" label="Coach prompt" hint="This is the main instruction the movie chat always follows." :maxlength="maximumMovieCoachPromptCharacters" counter />
+                <div class="movie-memory-actions">
+                  <span>Saved on this device and used as the primary instruction for every film-chat request.</span>
+                  <q-btn color="primary" no-caps icon="save" label="Save coach prompt" @click="persistCoachPrompt" />
+                </div>
                 <q-input v-model="userMemory" class="movie-user-memory-input" outlined autogrow label="My additional context" hint="Add preferences, goals, difficult accents or anything the coach should remember." :maxlength="maximumMovieChatUserMemoryCharacters" counter />
                 <div class="movie-memory-actions">
                   <span>Saved on this device and included in every film-chat request.</span>
@@ -117,8 +121,8 @@ import type { MovieLearningReport } from '@mentor-ai/shared';
 import { Notify } from 'quasar';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useAppStore } from 'src/stores/app-store';
-import { appendMovieChatMessage, loadMovieChatMessages, loadMovieChatUserMemory, saveMovieChatUserMemory, sendMovieChatMessage, type LocalMovieChatMessage } from 'src/services/movie-chat';
-import { buildMovieChatMemory, maximumMovieChatUserMemoryCharacters, movieCoachPrompt } from 'src/services/movie-chat-memory';
+import { appendMovieChatMessage, loadMovieChatMessages, loadMovieChatUserMemory, loadMovieCoachPrompt, saveMovieChatUserMemory, saveMovieCoachPrompt, sendMovieChatMessage, type LocalMovieChatMessage } from 'src/services/movie-chat';
+import { buildMovieChatMemory, maximumMovieChatUserMemoryCharacters, maximumMovieCoachPromptCharacters } from 'src/services/movie-chat-memory';
 import { loadMovieLearningReports, pendingMovieLearningReportCount, refreshMovieLearningReportsFromCloud, saveMovieLearningReport, syncMovieLearningReports } from 'src/services/movie-learning-reports';
 
 const appStore = useAppStore();
@@ -135,11 +139,15 @@ const pendingCount = ref(0);
 const saving = ref(false);
 const syncing = ref(false);
 const userMemory = ref('');
+const coachPrompt = ref('');
+const savedCoachPrompt = ref('');
 const canSave = computed(() => Boolean(movieTitle.value.trim() && watchedAt.value && reportText.value.trim()));
 const canSendChat = computed(() => Boolean(chatDraft.value.trim() && appStore.isOnline && !chatSending.value));
 const movieMemory = computed(() => buildMovieChatMemory(userMemory.value, reports.value));
 
 onMounted(async () => {
+  savedCoachPrompt.value = loadMovieCoachPrompt();
+  coachPrompt.value = savedCoachPrompt.value;
   userMemory.value = loadMovieChatUserMemory();
   chatMessages.value = await loadMovieChatMessages();
   await refreshReports();
@@ -148,6 +156,13 @@ onMounted(async () => {
     await refreshMovieLearningReportsFromCloud().then(refreshReports).catch(() => undefined);
   }
 });
+
+function persistCoachPrompt() {
+  saveMovieCoachPrompt(coachPrompt.value);
+  savedCoachPrompt.value = loadMovieCoachPrompt();
+  coachPrompt.value = savedCoachPrompt.value;
+  Notify.create({ type: 'positive', icon: 'save', message: 'The main movie coach prompt was saved on this device.' });
+}
 
 function persistUserMemory() {
   saveMovieChatUserMemory(userMemory.value);
@@ -163,7 +178,7 @@ async function submitChatMessage() {
     await appendMovieChatMessage('user', content);
     chatMessages.value = await loadMovieChatMessages();
     await scrollChatToEnd();
-    const response = await sendMovieChatMessage(chatMessages.value, movieMemory.value);
+    const response = await sendMovieChatMessage(chatMessages.value, savedCoachPrompt.value, movieMemory.value);
     await appendMovieChatMessage('assistant', response.reply);
     chatMessages.value = await loadMovieChatMessages();
     await scrollChatToEnd();
@@ -218,6 +233,11 @@ async function retrySync(showResult = true) {
 .movie-chat-layout { margin: 0 auto; max-width: 900px; }
 .movie-memory-layout { display: grid; gap: 20px; }
 .movie-memory-fields { display: grid; gap: 16px; padding-top: 0; }
+.movie-coach-prompt-input :deep(.q-field__control) { height: 300px; }
+.movie-coach-prompt-input :deep(.q-field__native) { height: 238px; overflow-y: auto; resize: none; scrollbar-color: var(--app-border-strong) transparent; scrollbar-width: thin; }
+.movie-coach-prompt-input :deep(.q-field__native::-webkit-scrollbar) { width: 8px; }
+.movie-coach-prompt-input :deep(.q-field__native::-webkit-scrollbar-thumb) { background: var(--app-border-strong); border: 2px solid transparent; border-radius: 999px; background-clip: padding-box; }
+.movie-coach-prompt-input :deep(.q-field__native::-webkit-scrollbar-track) { background: transparent; }
 .movie-user-memory-input { margin-bottom: 12px; }
 .movie-memory-actions { align-items: center; display: grid; gap: 12px 16px; grid-template-columns: minmax(0, 1fr) auto; }
 .movie-memory-actions .q-btn { white-space: nowrap; }

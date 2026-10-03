@@ -1,6 +1,6 @@
 import { requestMovieChatReply } from './api-client.js';
 import { mentorDb } from './indexed-db.js';
-import { maximumMovieChatUserMemoryCharacters } from './movie-chat-memory.js';
+import { defaultMovieCoachPrompt, maximumMovieChatUserMemoryCharacters, maximumMovieCoachPromptCharacters } from './movie-chat-memory.js';
 
 export interface LocalMovieChatMessage {
   id: string;
@@ -11,6 +11,16 @@ export interface LocalMovieChatMessage {
 
 const maximumLocalMessages = 300;
 const userMemoryStorageKey = 'mentor-ai:movie-chat-user-memory:v1';
+const coachPromptStorageKey = 'mentor-ai:movie-chat-coach-prompt:v1';
+
+export function loadMovieCoachPrompt() {
+  return localStorage.getItem(coachPromptStorageKey)?.trim() || defaultMovieCoachPrompt;
+}
+
+export function saveMovieCoachPrompt(prompt: string) {
+  const normalizedPrompt = prompt.trim().slice(0, maximumMovieCoachPromptCharacters);
+  localStorage.setItem(coachPromptStorageKey, normalizedPrompt || defaultMovieCoachPrompt);
+}
 
 export function loadMovieChatUserMemory() {
   return localStorage.getItem(userMemoryStorageKey) ?? '';
@@ -37,8 +47,8 @@ export async function appendMovieChatMessage(role: LocalMovieChatMessage['role']
   return message;
 }
 
-export async function sendMovieChatMessage(messages: LocalMovieChatMessage[], memory: string) {
-  return requestMovieChatReply(messages.map(({ role, content }) => ({ role, content })), memory);
+export async function sendMovieChatMessage(messages: LocalMovieChatMessage[], prompt: string, memory: string) {
+  return requestMovieChatReply(messages.map(({ role, content }) => ({ role, content })), prompt, memory);
 }
 
 async function pruneMovieChatMessages() {

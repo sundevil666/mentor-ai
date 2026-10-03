@@ -10,10 +10,12 @@ interface OpenAiResponseBody {
 const maximumMessages = 20;
 const maximumContextCharacters = 16_000;
 const maximumMemoryCharacters = 24_000;
+const maximumPromptCharacters = 15_000;
 export const movieCoachInstructions = `You are a personal English coach for learning through films and series. Help the learner choose content appropriate for their listening level and interests. After they watch, discuss scenes, language, accents, phrases and words they found difficult. Correct their English naturally and distinguish listening problems from vocabulary or grammar problems. Do not overwhelm them with long lists. When they ask for the final report, produce a compact report for Mentor AI with: title, what they watched, listening difficulties, useful new phrases, weak phrases or words, grammar or pronunciation observations, what is already strong, and recommended practice.`;
 
 export async function createMovieChatReply(
   messages: MovieChatMessage[],
+  prompt = '',
   memory = '',
   request: typeof fetch = fetch,
 ) {
@@ -22,10 +24,11 @@ export async function createMovieChatReply(
     throw new Error('A user message is required.');
   }
   if (!config.openAiApiKey) throw new Error('Movie chat is not configured on the server.');
+  const primaryPrompt = sanitizeText(prompt, maximumPromptCharacters) || movieCoachInstructions;
   const compactMemory = sanitizeText(memory, maximumMemoryCharacters);
   const instructions = compactMemory
-    ? `${movieCoachInstructions}\n\nLearner memory:\n${compactMemory}`
-    : movieCoachInstructions;
+    ? `${primaryPrompt}\n\nLearner memory:\n${compactMemory}`
+    : primaryPrompt;
 
   const response = await request('https://api.openai.com/v1/responses', {
     method: 'POST',

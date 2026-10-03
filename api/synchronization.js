@@ -16,7 +16,11 @@ module.exports = async (request, response) => {
       }
       const messages = Array.isArray(body?.messages) ? body.messages : [];
       const { createMovieChatReply } = await import('../apps/api/src/services/movie-chat.service.js');
-      sendJson(response, 200, await createMovieChatReply(messages, typeof body?.memory === 'string' ? body.memory : ''));
+      sendJson(response, 200, await createMovieChatReply(
+        messages,
+        typeof body?.prompt === 'string' ? body.prompt : '',
+        typeof body?.memory === 'string' ? body.memory : '',
+      ));
       return;
     }
     if (request.query?.action === 'movie-reports') {
