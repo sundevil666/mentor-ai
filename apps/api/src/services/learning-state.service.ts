@@ -255,6 +255,18 @@ export const learningStateService = {
       .sort((left, right) => right.watchedAt.localeCompare(left.watchedAt));
   },
 
+  async deleteMovieLearningReport(reportId: string, user?: AuthenticatedUser) {
+    const safeReportId = typeof reportId === 'string' ? reportId.trim().slice(0, 180) : '';
+    if (!safeReportId) return false;
+    const state = await learningStateRepository.read(user);
+    const movieLearningReports = state.movieLearningReports.filter(
+      (report) => report.studentId !== state.student.id || report.id !== safeReportId,
+    );
+    if (movieLearningReports.length === state.movieLearningReports.length) return false;
+    await learningStateRepository.write({ ...state, movieLearningReports }, user);
+    return true;
+  },
+
   async mergeReaderVocabularyItems(incoming: ReaderVocabularyItem[], user?: AuthenticatedUser) {
     const state = await learningStateRepository.read(user);
     const merged = new Map(state.readerVocabularyItems.map((item) => [item.id, item]));

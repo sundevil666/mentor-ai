@@ -34,6 +34,13 @@ module.exports = async (request, response) => {
         sendJson(response, 200, await learningStateService.mergeMovieLearningReports(reports, user));
         return;
       }
+      if (request.method === 'DELETE') {
+        sendJson(response, 200, await learningStateService.deleteMovieLearningReport(
+          typeof body?.reportId === 'string' ? body.reportId : '',
+          user,
+        ));
+        return;
+      }
       sendJson(response, 405, { message: 'Method not allowed.' });
       return;
     }

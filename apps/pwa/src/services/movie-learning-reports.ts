@@ -1,5 +1,5 @@
 import type { MovieLearningReport } from '@mentor-ai/shared';
-import { fetchMovieLearningReports, synchronizeMovieLearningReports } from './api-client.js';
+import { deleteMovieLearningReportFromCloud, fetchMovieLearningReports, synchronizeMovieLearningReports } from './api-client.js';
 import { mentorDb } from './indexed-db.js';
 import { createMovieReport, synchronizeMovieReports, type MovieReportStorage } from './movie-learning-report-outbox.js';
 
@@ -55,6 +55,15 @@ export async function refreshMovieLearningReportsFromCloud() {
   }
   if (merged) dispatchUpdated();
   return merged;
+}
+
+export async function deleteMovieLearningReport(report: MovieLearningReport) {
+  if (report.synchronizedAt) {
+    if (!navigator.onLine) throw new Error('Connect to the internet to remove this report from every device.');
+    await deleteMovieLearningReportFromCloud(report.id);
+  }
+  await (await mentorDb).delete('movie-learning-reports', report.id);
+  dispatchUpdated();
 }
 
 async function pruneReports(storage: MovieReportStorage) {

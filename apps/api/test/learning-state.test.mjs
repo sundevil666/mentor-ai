@@ -152,6 +152,10 @@ describe('learning state service', () => {
     assert.deepEqual(saved.map((report) => report.id), [valid.id]);
     assert.deepEqual(retry.map((report) => report.id), [valid.id]);
     assert.equal(listed.some((report) => report.id === valid.id), true);
+
+    assert.equal(await learningStateService.deleteMovieLearningReport(valid.id), true);
+    assert.equal((await learningStateService.listMovieLearningReports()).some((report) => report.id === valid.id), false);
+    assert.equal(await learningStateService.deleteMovieLearningReport(valid.id), false);
   });
 
   it('returns student state and generates a current lesson', async () => {

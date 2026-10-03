@@ -72,6 +72,13 @@ export const listMovieLearningReports: RequestHandler = sendData((req) =>
   learningStateService.listMovieLearningReports(req.authUser),
 );
 
+export const deleteMovieLearningReport: RequestHandler = sendData((req) =>
+  learningStateService.deleteMovieLearningReport(
+    typeof req.body?.reportId === 'string' ? req.body.reportId : '',
+    req.authUser,
+  ),
+);
+
 export const replyToMovieChat: RequestHandler = sendData((req) =>
   createMovieChatReply(
     Array.isArray(req.body?.messages) ? req.body.messages as MovieChatMessage[] : [],

@@ -100,8 +100,27 @@
               <q-card v-for="report in reports" :key="report.id" flat bordered class="movie-report-card">
                 <q-card-section>
                   <div class="movie-report-card__heading">
-                    <div><strong>{{ report.movieTitle }}</strong><span>{{ report.watchedAt }}</span></div>
-                    <q-chip dense :color="report.synchronizedAt ? 'positive' : 'deep-orange-7'" text-color="white" :icon="report.synchronizedAt ? 'cloud_done' : 'cloud_off'">{{ report.synchronizedAt ? 'Sent to database' : 'Waiting to send' }}</q-chip>
+                    <div class="movie-report-card__identity">
+                      <strong>{{ report.movieTitle }}</strong>
+                      <span class="movie-report-card__date"><q-icon name="event" />{{ formatMovieDate(report.watchedAt) }}</span>
+                    </div>
+                    <div class="movie-report-card__actions">
+                      <span class="movie-report-status" :class="report.synchronizedAt ? 'movie-report-status--saved' : 'movie-report-status--waiting'">
+                        <q-icon :name="report.synchronizedAt ? 'cloud_done' : 'cloud_off'" />
+                        {{ report.synchronizedAt ? 'Saved' : 'Waiting to send' }}
+                      </span>
+                      <q-btn
+                        :aria-label="`Delete ${report.movieTitle}`"
+                        class="movie-report-delete"
+                        color="negative"
+                        flat
+                        icon="delete_outline"
+                        round
+                        size="sm"
+                        :loading="deletingReportId === report.id"
+                        @click="confirmDeleteReport(report)"
+                      ><q-tooltip>Delete report</q-tooltip></q-btn>
+                    </div>
                   </div>
                   <p>{{ report.report }}</p>
                 </q-card-section>
@@ -118,12 +137,12 @@
 
 <script setup lang="ts">
 import type { MovieLearningReport } from '@mentor-ai/shared';
-import { Notify } from 'quasar';
+import { Dialog, Notify } from 'quasar';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useAppStore } from 'src/stores/app-store';
 import { appendMovieChatMessage, loadMovieChatMessages, loadMovieChatUserMemory, loadMovieCoachPrompt, saveMovieChatUserMemory, saveMovieCoachPrompt, sendMovieChatMessage, type LocalMovieChatMessage } from 'src/services/movie-chat';
 import { buildMovieChatMemory, maximumMovieChatUserMemoryCharacters, maximumMovieCoachPromptCharacters } from 'src/services/movie-chat-memory';
-import { loadMovieLearningReports, pendingMovieLearningReportCount, refreshMovieLearningReportsFromCloud, saveMovieLearningReport, syncMovieLearningReports } from 'src/services/movie-learning-reports';
+import { deleteMovieLearningReport, loadMovieLearningReports, pendingMovieLearningReportCount, refreshMovieLearningReportsFromCloud, saveMovieLearningReport, syncMovieLearningReports } from 'src/services/movie-learning-reports';
 
 const appStore = useAppStore();
 type MovieLearningTab = 'discuss' | 'memory' | 'report';
@@ -142,6 +161,7 @@ const reports = ref<MovieLearningReport[]>([]);
 const pendingCount = ref(0);
 const saving = ref(false);
 const syncing = ref(false);
+const deletingReportId = ref<string | null>(null);
 const userMemory = ref('');
 const coachPrompt = ref('');
 const savedCoachPrompt = ref('');
@@ -226,6 +246,38 @@ async function retrySync(showResult = true) {
     if (showResult) Notify.create({ type: 'warning', icon: 'cloud_off', message: 'Reports remain safely stored on this device.' });
   } finally { syncing.value = false; }
 }
+
+function formatMovieDate(value: string) {
+  const date = new Date(`${value}T12:00:00`);
+  if (!Number.isFinite(date.getTime())) return value;
+  return new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+}
+function confirmDeleteReport(report: MovieLearningReport) {
+  Dialog.create({
+    title: 'Delete this report?',
+    message: `${report.movieTitle} will be removed from your film history on every device. This cannot be undone.`,
+    cancel: true,
+    persistent: true,
+    ok: { label: 'Delete', color: 'negative', noCaps: true },
+  }).onOk(() => { void removeReport(report); });
+}
+async function removeReport(report: MovieLearningReport) {
+  if (deletingReportId.value) return;
+  deletingReportId.value = report.id;
+  try {
+    await deleteMovieLearningReport(report);
+    await refreshReports();
+    Notify.create({ type: 'positive', icon: 'delete_outline', message: `${report.movieTitle} was removed from your film history.` });
+  } catch (error) {
+    Notify.create({
+      type: 'warning',
+      icon: 'cloud_off',
+      message: error instanceof Error ? error.message : 'The report could not be deleted.',
+    });
+  } finally {
+    deletingReportId.value = null;
+  }
+}
 </script>
 
 <style scoped>
@@ -273,15 +325,33 @@ async function retrySync(showResult = true) {
 .movie-chat-composer { align-items: flex-end; border-top: 1px solid var(--app-border); display: grid; gap: 10px; grid-template-columns: 1fr auto; }
 .movie-chat-empty { margin: auto; }
 .movies-learning-form { padding: 0 16px 20px; }
-.movies-learning-history { display: grid; gap: 12px; }
+.movies-learning-history { display: grid; gap: 14px; }
 .movies-learning-history__heading, .movie-report-card__heading { align-items: center; display: flex; gap: 12px; justify-content: space-between; }
-.movies-learning-history__heading > div, .movie-report-card__heading > div { display: grid; gap: 3px; }
+.movies-learning-history__heading > div { display: grid; gap: 3px; }
 .movies-learning-history__heading span, .movie-report-card strong { font-size: 1.05rem; font-weight: 800; }
-.movies-learning-history__heading small, .movie-report-card span { color: var(--app-muted-strong); }
-.movie-report-card p { line-height: 1.6; margin: 14px 0 0; white-space: pre-wrap; }
+.movies-learning-history__heading small { color: var(--app-muted-strong); }
+.movie-report-card { overflow: hidden; position: relative; transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease; }
+.movie-report-card::before { background: color-mix(in srgb, var(--app-primary) 72%, transparent); bottom: 14px; content: ''; left: 0; position: absolute; top: 14px; width: 3px; }
+.movie-report-card:hover { border-color: color-mix(in srgb, var(--app-primary) 36%, var(--app-border)); box-shadow: 0 10px 28px rgb(0 0 0 / 8%); transform: translateY(-1px); }
+.movie-report-card .q-card__section { padding: 18px 20px 18px 22px; }
+.movie-report-card__heading { align-items: flex-start; }
+.movie-report-card__identity { display: grid; gap: 5px; min-width: 0; }
+.movie-report-card__identity strong { line-height: 1.3; overflow-wrap: anywhere; }
+.movie-report-card__date { align-items: center; color: var(--app-muted-strong); display: inline-flex; font-size: 0.82rem; gap: 5px; }
+.movie-report-card__date .q-icon { font-size: 1rem; }
+.movie-report-card__actions { align-items: center; display: flex; flex: 0 0 auto; gap: 4px; }
+.movie-report-status { align-items: center; display: inline-flex; font-size: 0.78rem; font-weight: 700; gap: 5px; white-space: nowrap; }
+.movie-report-status .q-icon { font-size: 1.05rem; }
+.movie-report-status--saved { color: var(--app-muted-strong); }
+.movie-report-status--waiting { background: color-mix(in srgb, #ef6c00 12%, transparent); border-radius: 999px; color: #d45f00; padding: 5px 9px; }
+.movie-report-delete { opacity: 0.64; transition: opacity 160ms ease, background-color 160ms ease; }
+.movie-report-delete:hover, .movie-report-delete:focus-visible { opacity: 1; }
+.movie-report-card p { color: var(--app-text); line-height: 1.62; margin: 15px 0 0; white-space: pre-wrap; }
 .movies-learning-empty { align-items: center; border: 1px dashed var(--app-border-strong); border-radius: 18px; color: var(--app-muted-strong); display: grid; gap: 8px; justify-items: center; padding: 48px 24px; text-align: center; }
 @media (max-width: 760px) {
   .movie-memory-actions { grid-template-columns: 1fr; }
   .movie-memory-actions .q-btn { justify-self: start; }
+  .movie-report-card__heading { align-items: stretch; flex-direction: column; }
+  .movie-report-card__actions { justify-content: space-between; }
 }
 </style>

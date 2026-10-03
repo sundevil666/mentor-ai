@@ -425,6 +425,16 @@ export async function fetchMovieLearningReports(): Promise<MovieLearningReport[]
   return ((await response.json()) as ApiResponse<MovieLearningReport[]>).data;
 }
 
+export async function deleteMovieLearningReportFromCloud(reportId: string): Promise<boolean> {
+  const response = await fetch(`${apiBaseUrl}/api/movie-learning-reports-synchronize`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ reportId }),
+  });
+  if (!response.ok) throw new Error('Movie learning report could not be deleted.');
+  return ((await response.json()) as ApiResponse<boolean>).data;
+}
+
 export async function requestMovieChatReply(
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
   prompt: string,
