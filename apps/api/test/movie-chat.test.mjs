@@ -26,9 +26,12 @@ describe('movie chat service', () => {
         return new Response(JSON.stringify({ output: [{ type: 'message', content: [{ type: 'output_text', text: 'Try Arrival.' }] }] }), { status: 200 });
       });
       assert.equal(result.reply, 'Try Arrival.');
-      assert.equal(requestBody.instructions, 'Always coach through questions.\n\nLearner memory:\nLearner watched Arrival.');
+      assert.equal(requestBody.instructions, 'Always coach through questions.');
       assert.equal(requestBody.store, false);
-      assert.equal(requestBody.input[0].content, 'Recommend a film.');
+      assert.deepEqual(requestBody.input, [
+        { role: 'user', content: 'Starting context for this conversation:\nLearner watched Arrival.' },
+        { role: 'user', content: 'Recommend a film.' },
+      ]);
     } finally {
       config.openAiApiKey = previousKey;
     }

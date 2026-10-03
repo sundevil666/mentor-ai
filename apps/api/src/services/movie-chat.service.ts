@@ -26,9 +26,9 @@ export async function createMovieChatReply(
   if (!config.openAiApiKey) throw new Error('Movie chat is not configured on the server.');
   const primaryPrompt = sanitizeText(prompt, maximumPromptCharacters) || movieCoachInstructions;
   const compactMemory = sanitizeText(memory, maximumMemoryCharacters);
-  const instructions = compactMemory
-    ? `${primaryPrompt}\n\nLearner memory:\n${compactMemory}`
-    : primaryPrompt;
+  const input: MovieChatMessage[] = compactMemory
+    ? [{ role: 'user', content: `Starting context for this conversation:\n${compactMemory}` }, ...history]
+    : history;
 
   const response = await request('https://api.openai.com/v1/responses', {
     method: 'POST',
@@ -38,8 +38,8 @@ export async function createMovieChatReply(
     },
     body: JSON.stringify({
       model: config.openAiMovieChatModel,
-      instructions,
-      input: history,
+      instructions: primaryPrompt,
+      input,
       max_output_tokens: 1_200,
       store: false,
     }),

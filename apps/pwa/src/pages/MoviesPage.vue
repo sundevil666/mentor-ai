@@ -56,9 +56,9 @@
                   <span>Saved on this device and used as the primary instruction for every film-chat request.</span>
                   <q-btn color="primary" no-caps icon="save" label="Save coach prompt" @click="persistCoachPrompt" />
                 </div>
-                <q-input v-model="userMemory" class="movie-user-memory-input" outlined autogrow label="My additional context" hint="Add preferences, goals, difficult accents or anything the coach should remember." :maxlength="maximumMovieChatUserMemoryCharacters" counter />
+                <q-input v-model="userMemory" class="movie-user-memory-input" outlined type="textarea" label="My additional context" hint="This context is placed at the beginning of every film conversation." :maxlength="maximumMovieChatUserMemoryCharacters" counter />
                 <div class="movie-memory-actions">
-                  <span>Saved on this device and included in every film-chat request.</span>
+                  <span>Saved on this device and used as the conversation’s starting context.</span>
                   <q-btn color="primary" no-caps icon="save" label="Save my context" @click="persistUserMemory" />
                 </div>
               </q-card-section>
@@ -241,11 +241,11 @@ async function retrySync(showResult = true) {
 .movie-chat-layout { margin: 0 auto; max-width: 900px; }
 .movie-memory-layout { display: grid; gap: 20px; }
 .movie-memory-fields { display: grid; gap: 16px; padding-top: 0; }
-.movie-coach-prompt-input :deep(.q-field__control) { height: 300px; }
-.movie-coach-prompt-input :deep(.q-field__native) { height: 238px; overflow-y: auto; resize: none; scrollbar-color: var(--app-border-strong) transparent; scrollbar-width: thin; }
-.movie-coach-prompt-input :deep(.q-field__native::-webkit-scrollbar) { width: 8px; }
-.movie-coach-prompt-input :deep(.q-field__native::-webkit-scrollbar-thumb) { background: var(--app-border-strong); border: 2px solid transparent; border-radius: 999px; background-clip: padding-box; }
-.movie-coach-prompt-input :deep(.q-field__native::-webkit-scrollbar-track) { background: transparent; }
+.movie-coach-prompt-input :deep(.q-field__control), .movie-user-memory-input :deep(.q-field__control) { height: 300px; }
+.movie-coach-prompt-input :deep(.q-field__native), .movie-user-memory-input :deep(.q-field__native) { height: 238px; overflow-y: auto; resize: none; scrollbar-color: var(--app-border-strong) transparent; scrollbar-width: thin; }
+.movie-coach-prompt-input :deep(.q-field__native::-webkit-scrollbar), .movie-user-memory-input :deep(.q-field__native::-webkit-scrollbar) { width: 8px; }
+.movie-coach-prompt-input :deep(.q-field__native::-webkit-scrollbar-thumb), .movie-user-memory-input :deep(.q-field__native::-webkit-scrollbar-thumb) { background: var(--app-border-strong); border: 2px solid transparent; border-radius: 999px; background-clip: padding-box; }
+.movie-coach-prompt-input :deep(.q-field__native::-webkit-scrollbar-track), .movie-user-memory-input :deep(.q-field__native::-webkit-scrollbar-track) { background: transparent; }
 .movie-user-memory-input { margin-bottom: 12px; }
 .movie-memory-actions { align-items: center; display: grid; gap: 12px 16px; grid-template-columns: minmax(0, 1fr) auto; }
 .movie-memory-actions .q-btn { white-space: nowrap; }
