@@ -119,14 +119,18 @@
 <script setup lang="ts">
 import type { MovieLearningReport } from '@mentor-ai/shared';
 import { Notify } from 'quasar';
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useAppStore } from 'src/stores/app-store';
 import { appendMovieChatMessage, loadMovieChatMessages, loadMovieChatUserMemory, loadMovieCoachPrompt, saveMovieChatUserMemory, saveMovieCoachPrompt, sendMovieChatMessage, type LocalMovieChatMessage } from 'src/services/movie-chat';
 import { buildMovieChatMemory, maximumMovieChatUserMemoryCharacters, maximumMovieCoachPromptCharacters } from 'src/services/movie-chat-memory';
 import { loadMovieLearningReports, pendingMovieLearningReportCount, refreshMovieLearningReportsFromCloud, saveMovieLearningReport, syncMovieLearningReports } from 'src/services/movie-learning-reports';
 
 const appStore = useAppStore();
-const activeTab = ref<'discuss' | 'memory' | 'report'>('discuss');
+type MovieLearningTab = 'discuss' | 'memory' | 'report';
+const movieLearningTabStorageKey = 'mentor-ai:movie-learning-tab:v1';
+const movieLearningTabs: MovieLearningTab[] = ['discuss', 'memory', 'report'];
+const storedMovieLearningTab = typeof localStorage === 'undefined' ? null : localStorage.getItem(movieLearningTabStorageKey);
+const activeTab = ref<MovieLearningTab>(movieLearningTabs.includes(storedMovieLearningTab as MovieLearningTab) ? storedMovieLearningTab as MovieLearningTab : 'discuss');
 const chatDraft = ref('');
 const chatMessages = ref<LocalMovieChatMessage[]>([]);
 const chatSending = ref(false);
@@ -144,6 +148,8 @@ const savedCoachPrompt = ref('');
 const canSave = computed(() => Boolean(movieTitle.value.trim() && watchedAt.value && reportText.value.trim()));
 const canSendChat = computed(() => Boolean(chatDraft.value.trim() && appStore.isOnline && !chatSending.value));
 const movieMemory = computed(() => buildMovieChatMemory(userMemory.value, reports.value));
+
+watch(activeTab, (tab) => localStorage.setItem(movieLearningTabStorageKey, tab));
 
 onMounted(async () => {
   savedCoachPrompt.value = loadMovieCoachPrompt();
@@ -227,7 +233,9 @@ async function retrySync(showResult = true) {
 .movies-learning-header h1 { font-size: clamp(2rem, 4vw, 3rem); margin: 0; }
 .movies-learning-workspace { display: grid; gap: 20px; grid-template-columns: 150px minmax(0, 1fr); }
 .movies-learning-tabs { align-self: start; border-right: 1px solid var(--app-border); }
-.movies-learning-tabs :deep(.q-tab) { justify-content: flex-start; min-height: 58px; }
+.movies-learning-tabs :deep(.q-tab) { justify-content: center; min-height: 58px; }
+.movies-learning-tabs :deep(.q-tab__content) { justify-content: center; }
+.movies-learning-tabs :deep(.q-tab__icon) { flex: 0 0 24px; width: 24px; }
 .movies-learning-panels { background: transparent; }
 .movies-learning-panels :deep(.q-tab-panel) { padding: 0; }
 .movie-chat-layout { margin: 0 auto; max-width: 900px; }
