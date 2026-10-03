@@ -1,5 +1,5 @@
 <template>
-  <q-page class="movies-learning-page">
+  <q-page class="movies-learning-page" :class="{ 'movies-learning-page--report': activeTab === 'report' }">
     <section class="movies-learning-shell">
       <header class="movies-learning-header">
         <p>Learning from films</p>
@@ -282,16 +282,21 @@ async function removeReport(report: MovieLearningReport) {
 
 <style scoped>
 .movies-learning-page { padding: 18px 24px 120px; }
+.movies-learning-page--report { box-sizing: border-box; height: calc(100dvh - 50px); overflow: hidden; padding-bottom: 104px; }
 .movies-learning-shell { margin: 0 auto; max-width: 1180px; }
+.movies-learning-page--report .movies-learning-shell { display: flex; flex-direction: column; height: 100%; }
 .movies-learning-header { margin-bottom: 12px; }
 .movies-learning-header p { color: var(--app-primary); font-weight: 800; margin: 0 0 4px; text-transform: uppercase; }
 .movies-learning-header h1 { font-size: clamp(2rem, 4vw, 3rem); margin: 0; }
 .movies-learning-workspace { display: grid; gap: 20px; grid-template-columns: 150px minmax(0, 1fr); }
+.movies-learning-page--report .movies-learning-workspace { flex: 1; min-height: 0; }
 .movies-learning-tabs { align-self: start; border-right: 1px solid var(--app-border); }
 .movies-learning-tabs :deep(.q-tab) { justify-content: center; min-height: 58px; }
 .movies-learning-tabs :deep(.q-tab__content) { justify-content: center; }
 .movies-learning-tabs :deep(.q-tab__icon) { flex: 0 0 24px; width: 24px; }
 .movies-learning-panels { background: transparent; }
+.movies-learning-page--report .movies-learning-panels { min-height: 0; overflow: hidden; }
+.movies-learning-page--report .movies-learning-panels :deep(.q-panel), .movies-learning-page--report .movies-learning-panels :deep(.q-tab-panel) { height: 100%; }
 .movies-learning-panels :deep(.q-tab-panel) { padding: 0; }
 .movie-chat-layout { margin: 0 auto; max-width: 900px; }
 .movie-memory-layout { display: grid; gap: 20px; }
@@ -311,6 +316,7 @@ async function removeReport(report: MovieLearningReport) {
 .movie-memory-actions .q-btn { white-space: nowrap; }
 .movie-memory-actions span, .movie-memory-status { color: var(--app-muted-strong); font-size: 0.86rem; }
 .movies-learning-grid { display: grid; gap: 24px; grid-template-columns: minmax(360px, 0.85fr) minmax(420px, 1.15fr); }
+.movies-learning-page--report .movies-learning-grid { height: 100%; min-height: 0; }
 .movies-learning-card, .movie-report-card { background: var(--app-surface); border-color: var(--app-border); border-radius: 18px; }
 .movies-learning-form { display: grid; gap: 16px; }
 .movie-chat-card { display: grid; grid-template-rows: auto minmax(320px, 1fr) auto; min-height: 620px; }
@@ -325,7 +331,11 @@ async function removeReport(report: MovieLearningReport) {
 .movie-chat-composer { align-items: flex-end; border-top: 1px solid var(--app-border); display: grid; gap: 10px; grid-template-columns: 1fr auto; }
 .movie-chat-empty { margin: auto; }
 .movies-learning-form { padding: 0 16px 20px; }
-.movies-learning-history { display: grid; gap: 14px; }
+.movies-learning-history { align-content: start; display: grid; gap: 14px; }
+.movies-learning-page--report .movies-learning-history { min-height: 0; overflow-y: auto; padding: 0 8px 16px 0; scrollbar-color: var(--app-border-strong) transparent; scrollbar-gutter: stable; scrollbar-width: thin; }
+.movies-learning-history::-webkit-scrollbar { width: 8px; }
+.movies-learning-history::-webkit-scrollbar-thumb { background: var(--app-border-strong); border: 2px solid transparent; border-radius: 999px; background-clip: padding-box; }
+.movies-learning-history::-webkit-scrollbar-track { background: transparent; }
 .movies-learning-history__heading, .movie-report-card__heading { align-items: center; display: flex; gap: 12px; justify-content: space-between; }
 .movies-learning-history__heading > div { display: grid; gap: 3px; }
 .movies-learning-history__heading span, .movie-report-card strong { font-size: 1.05rem; font-weight: 800; }
