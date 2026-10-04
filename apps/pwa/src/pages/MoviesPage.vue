@@ -36,7 +36,18 @@
               <div ref="chatScroll" class="movie-chat-messages" aria-live="polite">
                 <article v-for="message in chatMessages" :key="message.id" class="movie-chat-message" :class="`movie-chat-message--${message.role}`">
                   <strong>{{ message.role === 'user' ? 'You' : 'Movie coach' }}</strong>
-                  <p>{{ message.content }}</p>
+                  <div class="movie-chat-message__content">
+                    <template v-for="(segment, segmentIndex) in parseMovieChatContent(message.content)" :key="segmentIndex">
+                      <p v-if="segment.type === 'text'">{{ segment.content }}</p>
+                      <section v-else class="movie-chat-code-block">
+                        <header>
+                          <span>{{ segment.language || 'Text' }}</span>
+                          <q-btn flat dense no-caps icon="content_copy" label="Copy" aria-label="Copy block contents" @click="copyChatBlock(segment.content)" />
+                        </header>
+                        <pre><code>{{ segment.content }}</code></pre>
+                      </section>
+                    </template>
+                  </div>
                 </article>
                 <div v-if="!chatMessages.length" class="movies-learning-empty movie-chat-empty">
                   <q-icon name="forum" size="42px" />
@@ -147,11 +158,12 @@
 
 <script setup lang="ts">
 import type { MovieLearningReport } from '@mentor-ai/shared';
-import { Dialog, Notify } from 'quasar';
+import { copyToClipboard, Dialog, Notify } from 'quasar';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useAppStore } from 'src/stores/app-store';
 import { appendMovieChatMessage, loadMovieChatMessages, loadMovieChatUserMemory, loadMovieCoachPrompt, saveMovieChatUserMemory, saveMovieCoachPrompt, sendMovieChatMessage, type LocalMovieChatMessage } from 'src/services/movie-chat';
 import { buildMovieChatMemory, maximumMovieChatUserMemoryCharacters, maximumMovieCoachPromptCharacters } from 'src/services/movie-chat-memory';
+import { parseMovieChatContent } from 'src/services/movie-chat-content';
 import { deleteMovieLearningReport, loadMovieLearningReports, pendingMovieLearningReportCount, refreshMovieLearningReportsFromCloud, saveMovieLearningReport, syncMovieLearningReports } from 'src/services/movie-learning-reports';
 
 const appStore = useAppStore();
@@ -220,6 +232,15 @@ function persistUserMemory() {
 function changeChatFontSize(change: number) {
   chatFontSize.value = Math.min(maximumChatFontSize, Math.max(minimumChatFontSize, chatFontSize.value + change));
   localStorage.setItem(movieChatFontSizeStorageKey, String(chatFontSize.value));
+}
+
+async function copyChatBlock(content: string) {
+  try {
+    await copyToClipboard(content);
+    Notify.create({ type: 'positive', icon: 'content_copy', message: 'Block copied.' });
+  } catch {
+    Notify.create({ type: 'warning', icon: 'error_outline', message: 'Could not copy this block.' });
+  }
 }
 
 async function submitChatMessage() {
@@ -353,7 +374,14 @@ async function removeReport(report: MovieLearningReport) {
 .movie-chat-message { border-radius: 16px; max-width: 86%; padding: 12px 15px; }
 .movie-chat-message--user { align-self: flex-end; background: var(--app-primary); color: white; }
 .movie-chat-message--assistant { align-self: flex-start; background: var(--app-surface-active); border: 1px solid var(--app-border); }
-.movie-chat-message p { font-size: var(--movie-chat-font-size); line-height: 1.55; margin: 5px 0 0; white-space: pre-wrap; }
+.movie-chat-message__content { display: grid; gap: 10px; margin-top: 5px; }
+.movie-chat-message p { font-size: var(--movie-chat-font-size); line-height: 1.55; margin: 0; white-space: pre-wrap; }
+.movie-chat-code-block { background: #17202b; border: 1px solid rgb(255 255 255 / 14%); border-radius: 10px; color: #f5f7fa; min-width: min(560px, 70vw); overflow: hidden; }
+.movie-chat-code-block header { align-items: center; background: rgb(255 255 255 / 7%); border-bottom: 1px solid rgb(255 255 255 / 12%); display: flex; justify-content: space-between; padding: 4px 6px 4px 12px; }
+.movie-chat-code-block header span { color: #c7d0da; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; }
+.movie-chat-code-block header :deep(.q-btn) { color: #f5f7fa; }
+.movie-chat-code-block pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: var(--movie-chat-font-size); line-height: 1.55; margin: 0; max-width: 100%; overflow-x: auto; padding: 14px; white-space: pre-wrap; word-break: break-word; }
+.movie-chat-message--user .movie-chat-code-block { background: rgb(0 0 0 / 28%); }
 .movie-chat-thinking { align-items: center; color: var(--app-muted-strong); display: flex; gap: 8px; }
 .movie-chat-composer { align-items: flex-end; border-top: 1px solid var(--app-border); display: grid; gap: 10px; grid-template-columns: 1fr auto; }
 .movie-chat-composer :deep(.q-field__native) { font-size: var(--movie-chat-font-size); line-height: 1.55; }
