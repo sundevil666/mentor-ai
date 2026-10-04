@@ -55,6 +55,10 @@
                   <span>The coach can recommend films, discuss difficult scenes and prepare the final report.</span>
                 </div>
                 <div v-if="chatSending" class="movie-chat-thinking"><q-spinner-dots color="primary" size="32px" /> Movie coach is thinking…</div>
+                <div v-else-if="hasUnansweredMessage" class="movie-chat-retry">
+                  <span>The coach did not answer this message.</span>
+                  <q-btn color="primary" flat no-caps icon="refresh" label="Retry unanswered message" :disable="!appStore.isOnline" @click="retryUnansweredMessage" />
+                </div>
               </div>
               <q-card-section class="movie-chat-composer">
                 <q-input v-model="chatDraft" outlined autogrow label="Message" maxlength="4000" :disable="chatSending" @keydown.enter.exact.prevent="submitChatMessage" />
@@ -168,6 +172,7 @@ import { deleteMovieLearningReport, loadMovieLearningReports, pendingMovieLearni
 
 const appStore = useAppStore();
 type MovieLearningTab = 'discuss' | 'memory' | 'report';
+type ChatScrollBehavior = 'auto' | 'smooth';
 const movieLearningTabStorageKey = 'mentor-ai:movie-learning-tab:v1';
 const movieChatFontSizeStorageKey = 'mentor-ai:movie-chat-font-size:v1';
 const minimumChatFontSize = 14;
@@ -198,6 +203,7 @@ const coachPrompt = ref('');
 const savedCoachPrompt = ref('');
 const canSave = computed(() => Boolean(movieTitle.value.trim() && watchedAt.value && reportText.value.trim()));
 const canSendChat = computed(() => Boolean(chatDraft.value.trim() && appStore.isOnline && !chatSending.value));
+const hasUnansweredMessage = computed(() => chatMessages.value.at(-1)?.role === 'user');
 const movieMemory = computed(() => buildMovieChatMemory(userMemory.value, reports.value));
 
 watch(activeTab, async (tab) => {
@@ -247,20 +253,39 @@ async function submitChatMessage() {
   if (!canSendChat.value) return;
   const content = chatDraft.value.trim();
   chatDraft.value = '';
-  chatSending.value = true;
   try {
     await appendMovieChatMessage('user', content);
     chatMessages.value = await loadMovieChatMessages();
     await scrollChatToEnd();
+  } catch (error) {
+    Notify.create({ type: 'warning', icon: 'error_outline', message: error instanceof Error ? error.message : 'The message could not be saved.' });
+    return;
+  }
+  await requestChatReply();
+}
+async function retryUnansweredMessage() {
+  if (!hasUnansweredMessage.value || chatSending.value || !appStore.isOnline) return;
+  await requestChatReply();
+}
+async function requestChatReply() {
+  chatSending.value = true;
+  try {
     const response = await sendMovieChatMessage(chatMessages.value, savedCoachPrompt.value, movieMemory.value);
     await appendMovieChatMessage('assistant', response.reply);
     chatMessages.value = await loadMovieChatMessages();
     await scrollChatToEnd();
   } catch (error) {
-    Notify.create({ type: 'warning', icon: 'cloud_off', message: error instanceof Error ? error.message : 'Movie chat is unavailable. Your message remains saved locally.' });
-  } finally { chatSending.value = false; }
+    Notify.create({
+      type: 'warning',
+      icon: 'cloud_off',
+      message: `${error instanceof Error ? error.message : 'Movie chat is unavailable.'} Your message is saved; use Retry to send it again.`,
+    });
+  } finally {
+    chatSending.value = false;
+    await scrollChatToEnd();
+  }
 }
-async function scrollChatToEnd(behavior: ScrollBehavior = 'smooth') {
+async function scrollChatToEnd(behavior: ChatScrollBehavior = 'smooth') {
   await nextTick();
   chatScroll.value?.scrollTo({ top: chatScroll.value.scrollHeight, behavior });
 }
@@ -390,6 +415,8 @@ async function removeReport(report: MovieLearningReport) {
 .movie-chat-code-block pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: var(--movie-chat-font-size); line-height: 1.55; margin: 0; max-width: 100%; overflow-x: auto; padding: 14px; white-space: pre-wrap; word-break: break-word; }
 .movie-chat-message--user .movie-chat-code-block { background: rgb(0 0 0 / 28%); }
 .movie-chat-thinking { align-items: center; color: var(--app-muted-strong); display: flex; gap: 8px; }
+.movie-chat-retry { align-items: center; align-self: flex-end; background: var(--app-surface-active); border: 1px solid var(--app-border); border-radius: 12px; display: flex; gap: 8px; padding: 6px 8px 6px 12px; }
+.movie-chat-retry span { color: var(--app-muted-strong); font-size: 0.86rem; }
 .movie-chat-composer { align-items: flex-end; border-top: 1px solid var(--app-border); display: grid; gap: 10px; grid-template-columns: 1fr auto; }
 .movie-chat-composer :deep(.q-field__native) { font-size: var(--movie-chat-font-size); line-height: 1.55; }
 .movie-chat-empty { margin: auto; }

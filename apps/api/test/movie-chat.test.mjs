@@ -28,10 +28,40 @@ describe('movie chat service', () => {
       assert.equal(result.reply, 'Try Arrival.');
       assert.equal(requestBody.instructions, 'Always coach through questions.');
       assert.equal(requestBody.store, false);
+      assert.deepEqual(requestBody.reasoning, { effort: 'low' });
       assert.deepEqual(requestBody.input, [
         { role: 'user', content: 'Starting context for this conversation:\nLearner watched Arrival.' },
         { role: 'user', content: 'Recommend a film.' },
       ]);
+    } finally {
+      config.openAiApiKey = previousKey;
+    }
+  });
+
+  it('retries once when the model returns no visible answer', async () => {
+    const previousKey = config.openAiApiKey;
+    config.openAiApiKey = 'test-key';
+    const requestBodies = [];
+    try {
+      const result = await createMovieChatReply([{ role: 'user', content: 'Explain this scene.' }], '', '', async (_url, init) => {
+        requestBodies.push(JSON.parse(String(init?.body)));
+        if (requestBodies.length === 1) {
+          return new Response(JSON.stringify({
+            status: 'incomplete',
+            incomplete_details: { reason: 'max_output_tokens' },
+            output: [{ type: 'reasoning' }],
+          }), { status: 200 });
+        }
+        return new Response(JSON.stringify({
+          status: 'completed',
+          output: [{ type: 'message', content: [{ type: 'output_text', text: 'Here is the answer.' }] }],
+        }), { status: 200 });
+      });
+
+      assert.equal(result.reply, 'Here is the answer.');
+      assert.equal(requestBodies.length, 2);
+      assert.equal(requestBodies[0].max_output_tokens, 1_200);
+      assert.equal(requestBodies[1].max_output_tokens, 2_400);
     } finally {
       config.openAiApiKey = previousKey;
     }

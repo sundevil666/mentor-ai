@@ -5,6 +5,8 @@ export type MovieChatMessage = { role: 'user' | 'assistant'; content: string };
 interface OpenAiResponseBody {
   output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
   error?: { message?: string };
+  status?: string;
+  incomplete_details?: { reason?: string } | null;
 }
 
 const maximumMessages = 20;
@@ -30,30 +32,37 @@ export async function createMovieChatReply(
     ? [{ role: 'user', content: `Starting context for this conversation:\n${compactMemory}` }, ...history]
     : history;
 
-  const response = await request('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.openAiApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: config.openAiMovieChatModel,
-      instructions: primaryPrompt,
-      input,
-      max_output_tokens: 1_200,
-      store: false,
-    }),
-  });
-  const body = await response.json().catch(() => ({})) as OpenAiResponseBody;
-  if (!response.ok) throw new Error(body.error?.message || 'Movie chat request failed.');
-  const reply = body.output
+  for (const maxOutputTokens of [1_200, 2_400]) {
+    const response = await request('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.openAiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: config.openAiMovieChatModel,
+        instructions: primaryPrompt,
+        input,
+        max_output_tokens: maxOutputTokens,
+        reasoning: { effort: 'low' },
+        store: false,
+      }),
+    });
+    const body = await response.json().catch(() => ({})) as OpenAiResponseBody;
+    if (!response.ok) throw new Error(body.error?.message || 'Movie chat request failed.');
+    const reply = extractReply(body);
+    if (reply) return { reply, model: config.openAiMovieChatModel };
+  }
+  throw new Error('Movie chat did not return an answer after retrying.');
+}
+
+function extractReply(body: OpenAiResponseBody) {
+  return body.output
     ?.flatMap((item) => item.type === 'message' ? item.content ?? [] : [])
     .filter((item) => item.type === 'output_text' && typeof item.text === 'string')
     .map((item) => item.text!.trim())
     .filter(Boolean)
     .join('\n\n');
-  if (!reply) throw new Error('Movie chat returned an empty response.');
-  return { reply, model: config.openAiMovieChatModel };
 }
 
 export function boundedHistory(messages: MovieChatMessage[]) {
