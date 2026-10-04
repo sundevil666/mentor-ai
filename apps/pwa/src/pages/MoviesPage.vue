@@ -1,5 +1,5 @@
 <template>
-  <q-page class="movies-learning-page" :class="{ 'movies-learning-page--report': activeTab === 'report' }">
+  <q-page class="movies-learning-page" :class="{ 'movies-learning-page--discuss': activeTab === 'discuss', 'movies-learning-page--report': activeTab === 'report' }">
     <section class="movies-learning-shell">
       <header class="movies-learning-header">
         <p>Learning from films</p>
@@ -329,6 +329,7 @@ async function removeReport(report: MovieLearningReport) {
 .movies-learning-page { padding: 18px 24px 120px; }
 .movies-learning-page--report { box-sizing: border-box; height: calc(100dvh - 50px); overflow: hidden; padding-bottom: 104px; }
 .movies-learning-shell { margin: 0 auto; max-width: 1180px; }
+.movies-learning-page--discuss .movies-learning-shell { max-width: 1440px; }
 .movies-learning-page--report .movies-learning-shell { display: flex; flex-direction: column; height: 100%; }
 .movies-learning-header { margin-bottom: 12px; }
 .movies-learning-header p { color: var(--app-primary); font-weight: 800; margin: 0 0 4px; text-transform: uppercase; }
@@ -343,7 +344,7 @@ async function removeReport(report: MovieLearningReport) {
 .movies-learning-page--report .movies-learning-panels { min-height: 0; overflow: hidden; }
 .movies-learning-page--report .movies-learning-panels :deep(.q-panel), .movies-learning-page--report .movies-learning-panels :deep(.q-tab-panel) { height: 100%; }
 .movies-learning-panels :deep(.q-tab-panel) { padding: 0; }
-.movie-chat-layout { margin: 0 auto; max-width: 900px; }
+.movie-chat-layout { margin: 0 auto; max-width: 1200px; }
 .movie-memory-layout { display: grid; gap: 20px; }
 .movie-memory-fields { display: grid; gap: 16px; padding-top: 0; }
 .movie-coach-prompt-input :deep(.q-field__control), .movie-user-memory-input :deep(.q-field__control) { height: 300px; }
@@ -364,13 +365,13 @@ async function removeReport(report: MovieLearningReport) {
 .movies-learning-page--report .movies-learning-grid { height: 100%; min-height: 0; }
 .movies-learning-card, .movie-report-card { background: var(--app-surface); border-color: var(--app-border); border-radius: 18px; }
 .movies-learning-form { display: grid; gap: 16px; }
-.movie-chat-card { display: grid; grid-template-rows: auto minmax(320px, 1fr) auto; min-height: 620px; }
+.movie-chat-card { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: clamp(680px, calc(100dvh - 210px), 920px); }
 .movie-chat-heading { align-items: center; border-bottom: 1px solid var(--app-border); display: flex; gap: 16px; justify-content: space-between; }
 .movie-chat-heading span { color: var(--app-muted-strong); font-size: 0.86rem; }
 .movie-chat-heading__actions, .movie-chat-font-controls { align-items: center; display: flex; flex: 0 0 auto; }
 .movie-chat-heading__actions { gap: 10px; }
 .movie-chat-font-controls { background: var(--app-surface-active); border: 1px solid var(--app-border); border-radius: 999px; padding: 2px; }
-.movie-chat-messages { display: flex; flex-direction: column; gap: 12px; max-height: 520px; overflow-y: auto; padding: 18px; }
+.movie-chat-messages { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; padding: 22px 24px; }
 .movie-chat-message { border-radius: 16px; max-width: 86%; padding: 12px 15px; }
 .movie-chat-message--user { align-self: flex-end; background: var(--app-primary); color: white; }
 .movie-chat-message--assistant { align-self: flex-start; background: var(--app-surface-active); border: 1px solid var(--app-border); }
