@@ -18,10 +18,20 @@
         <q-tab-panels v-model="activeTab" animated class="movies-learning-panels">
         <q-tab-panel name="discuss">
           <section class="movie-chat-layout">
-            <q-card flat bordered class="movies-learning-card movie-chat-card">
+            <q-card flat bordered class="movies-learning-card movie-chat-card" :style="{ '--movie-chat-font-size': `${chatFontSize}px` }">
               <q-card-section class="movie-chat-heading">
                 <div><div class="text-h6">Film chat</div><span>Messages stay locally. Only recent context is sent for each answer.</span></div>
-                <q-icon :name="appStore.isOnline ? 'wifi' : 'wifi_off'" :color="appStore.isOnline ? 'positive' : 'negative'" size="22px" />
+                <div class="movie-chat-heading__actions">
+                  <div class="movie-chat-font-controls" role="group" aria-label="Chat text size">
+                    <q-btn flat round dense icon="text_decrease" aria-label="Decrease chat text size" :disable="chatFontSize <= minimumChatFontSize" @click="changeChatFontSize(-chatFontSizeStep)">
+                      <q-tooltip>Smaller text</q-tooltip>
+                    </q-btn>
+                    <q-btn flat round dense icon="text_increase" aria-label="Increase chat text size" :disable="chatFontSize >= maximumChatFontSize" @click="changeChatFontSize(chatFontSizeStep)">
+                      <q-tooltip>Larger text</q-tooltip>
+                    </q-btn>
+                  </div>
+                  <q-icon :name="appStore.isOnline ? 'wifi' : 'wifi_off'" :color="appStore.isOnline ? 'positive' : 'negative'" size="22px" />
+                </div>
               </q-card-section>
               <div ref="chatScroll" class="movie-chat-messages" aria-live="polite">
                 <article v-for="message in chatMessages" :key="message.id" class="movie-chat-message" :class="`movie-chat-message--${message.role}`">
@@ -147,9 +157,18 @@ import { deleteMovieLearningReport, loadMovieLearningReports, pendingMovieLearni
 const appStore = useAppStore();
 type MovieLearningTab = 'discuss' | 'memory' | 'report';
 const movieLearningTabStorageKey = 'mentor-ai:movie-learning-tab:v1';
+const movieChatFontSizeStorageKey = 'mentor-ai:movie-chat-font-size:v1';
+const minimumChatFontSize = 14;
+const maximumChatFontSize = 22;
+const chatFontSizeStep = 2;
 const movieLearningTabs: MovieLearningTab[] = ['discuss', 'memory', 'report'];
 const storedMovieLearningTab = typeof localStorage === 'undefined' ? null : localStorage.getItem(movieLearningTabStorageKey);
+const storedMovieChatFontSizeValue = typeof localStorage === 'undefined' ? null : localStorage.getItem(movieChatFontSizeStorageKey);
+const storedMovieChatFontSize = storedMovieChatFontSizeValue === null ? Number.NaN : Number(storedMovieChatFontSizeValue);
 const activeTab = ref<MovieLearningTab>(movieLearningTabs.includes(storedMovieLearningTab as MovieLearningTab) ? storedMovieLearningTab as MovieLearningTab : 'discuss');
+const chatFontSize = ref(Number.isFinite(storedMovieChatFontSize)
+  ? Math.min(maximumChatFontSize, Math.max(minimumChatFontSize, storedMovieChatFontSize))
+  : 16);
 const chatDraft = ref('');
 const chatMessages = ref<LocalMovieChatMessage[]>([]);
 const chatSending = ref(false);
@@ -196,6 +215,11 @@ function persistCoachPrompt() {
 function persistUserMemory() {
   saveMovieChatUserMemory(userMemory.value);
   Notify.create({ type: 'positive', icon: 'save', message: 'Your film-learning context was saved on this device.' });
+}
+
+function changeChatFontSize(change: number) {
+  chatFontSize.value = Math.min(maximumChatFontSize, Math.max(minimumChatFontSize, chatFontSize.value + change));
+  localStorage.setItem(movieChatFontSizeStorageKey, String(chatFontSize.value));
 }
 
 async function submitChatMessage() {
@@ -320,15 +344,19 @@ async function removeReport(report: MovieLearningReport) {
 .movies-learning-card, .movie-report-card { background: var(--app-surface); border-color: var(--app-border); border-radius: 18px; }
 .movies-learning-form { display: grid; gap: 16px; }
 .movie-chat-card { display: grid; grid-template-rows: auto minmax(320px, 1fr) auto; min-height: 620px; }
-.movie-chat-heading { align-items: center; border-bottom: 1px solid var(--app-border); display: flex; justify-content: space-between; }
+.movie-chat-heading { align-items: center; border-bottom: 1px solid var(--app-border); display: flex; gap: 16px; justify-content: space-between; }
 .movie-chat-heading span { color: var(--app-muted-strong); font-size: 0.86rem; }
+.movie-chat-heading__actions, .movie-chat-font-controls { align-items: center; display: flex; flex: 0 0 auto; }
+.movie-chat-heading__actions { gap: 10px; }
+.movie-chat-font-controls { background: var(--app-surface-active); border: 1px solid var(--app-border); border-radius: 999px; padding: 2px; }
 .movie-chat-messages { display: flex; flex-direction: column; gap: 12px; max-height: 520px; overflow-y: auto; padding: 18px; }
 .movie-chat-message { border-radius: 16px; max-width: 86%; padding: 12px 15px; }
 .movie-chat-message--user { align-self: flex-end; background: var(--app-primary); color: white; }
 .movie-chat-message--assistant { align-self: flex-start; background: var(--app-surface-active); border: 1px solid var(--app-border); }
-.movie-chat-message p { line-height: 1.55; margin: 5px 0 0; white-space: pre-wrap; }
+.movie-chat-message p { font-size: var(--movie-chat-font-size); line-height: 1.55; margin: 5px 0 0; white-space: pre-wrap; }
 .movie-chat-thinking { align-items: center; color: var(--app-muted-strong); display: flex; gap: 8px; }
 .movie-chat-composer { align-items: flex-end; border-top: 1px solid var(--app-border); display: grid; gap: 10px; grid-template-columns: 1fr auto; }
+.movie-chat-composer :deep(.q-field__native) { font-size: var(--movie-chat-font-size); line-height: 1.55; }
 .movie-chat-empty { margin: auto; }
 .movies-learning-form { padding: 0 16px 20px; }
 .movies-learning-history { align-content: start; display: grid; gap: 14px; grid-auto-rows: max-content; }
