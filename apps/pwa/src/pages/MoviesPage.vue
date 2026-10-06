@@ -410,7 +410,7 @@ async function removeReport(report: MovieLearningReport) {
 .movie-chat-messages { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; padding: 22px 24px; }
 .movie-chat-message { border-radius: 16px; max-width: 86%; padding: 12px 15px; }
 .movie-chat-message--user { align-self: flex-end; background: var(--app-primary); color: white; }
-.movie-chat-message--assistant { align-self: flex-start; background: var(--app-surface-active); border: 1px solid var(--app-border); }
+.movie-chat-message--assistant { align-self: stretch; background: var(--app-surface-active); border: 1px solid var(--app-border); max-width: 100%; }
 .movie-chat-message__content { display: grid; gap: 10px; margin-top: 5px; }
 .movie-chat-message p { font-size: var(--movie-chat-font-size); line-height: 1.55; margin: 0; white-space: pre-wrap; }
 .movie-chat-code-block { background: #17202b; border: 1px solid rgb(255 255 255 / 14%); border-radius: 10px; color: #f5f7fa; min-width: min(560px, 70vw); overflow: hidden; }
