@@ -110,9 +110,9 @@
                 <p class="text-body2 text-grey-7">Paste the report from the chat. It is saved on this device first, even when the database is unavailable.</p>
               </q-card-section>
               <q-form class="movies-learning-form" @submit.prevent="saveReport">
-                <q-input v-model="movieTitle" outlined label="Film or episode" maxlength="160" counter />
-                <q-input v-model="watchedAt" outlined label="Date watched" type="date" />
-                <q-input v-model="reportText" outlined autogrow label="ChatGPT learning report" hint="Include difficult listening, useful phrases, weak vocabulary and suggested practice." maxlength="20000" counter />
+                <q-input v-model="movieTitle" dense outlined label="Film or episode" maxlength="160" counter />
+                <q-input v-model="watchedAt" dense outlined label="Date watched" type="date" />
+                <q-input v-model="reportText" class="movie-report-input" outlined type="textarea" label="ChatGPT learning report" hint="Include difficult listening, useful phrases, weak vocabulary and suggested practice." maxlength="20000" counter />
                 <q-btn color="primary" icon="save" label="Save report" no-caps type="submit" :disable="!canSave" :loading="saving" />
               </q-form>
             </q-card>
@@ -396,6 +396,11 @@ async function removeReport(report: MovieLearningReport) {
 .movies-learning-page--report .movies-learning-grid { height: 100%; min-height: 0; }
 .movies-learning-card, .movie-report-card { background: var(--app-surface); border-color: var(--app-border); border-radius: 18px; }
 .movies-learning-form { display: grid; gap: 16px; }
+.movie-report-input :deep(.q-field__control) { height: 300px; }
+.movie-report-input :deep(.q-field__native) { height: 238px; overflow-y: auto; resize: none; scrollbar-color: var(--app-border-strong) transparent; scrollbar-width: thin; }
+.movie-report-input :deep(.q-field__native::-webkit-scrollbar) { width: 8px; }
+.movie-report-input :deep(.q-field__native::-webkit-scrollbar-thumb) { background: var(--app-border-strong); border: 2px solid transparent; border-radius: 999px; background-clip: padding-box; }
+.movie-report-input :deep(.q-field__native::-webkit-scrollbar-track) { background: transparent; }
 .movie-chat-card { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; min-height: 0; }
 .movie-chat-heading { align-items: center; border-bottom: 1px solid var(--app-border); display: flex; gap: 16px; justify-content: space-between; }
 .movie-chat-heading span { color: var(--app-muted-strong); font-size: 0.86rem; }
