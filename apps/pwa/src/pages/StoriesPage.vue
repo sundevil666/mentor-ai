@@ -184,12 +184,12 @@
                   <small v-if="book.difficultyAssessment" :class="`personal-book-row__recommendation--${personalBookAction(book)}`">
                     {{ personalBookAction(book) === 'read' ? 'Read' : 'Rewrite' }}
                   </small>
-                  <small class="personal-book-row__progress" :aria-label="bookListProgress(book).ariaLabel">
-                    <span>{{ bookListProgress(book).wordsRead }} read</span>
-                    <span>{{ bookListProgress(book).wordsRemaining }} left</span>
-                    <span v-if="bookListProgress(book).pageLabel">{{ bookListProgress(book).pageLabel }}</span>
-                    <span>{{ bookListProgress(book).finishLabel }}</span>
-                  </small>
+                </span>
+                <span class="personal-book-row__progress" :aria-label="bookListProgress(book).ariaLabel">
+                  <span><small>Read</small><strong>{{ bookListProgress(book).wordsRead }}</strong></span>
+                  <span><small>Left</small><strong>{{ bookListProgress(book).wordsRemaining }}</strong></span>
+                  <span><small>Page</small><strong>{{ bookListProgress(book).pageLabel || '—' }}</strong></span>
+                  <span><small>Finish</small><strong>{{ bookListProgress(book).finishLabel }}</strong></span>
                 </span>
                 <span
                   v-if="book.difficultyAssessment"
@@ -197,13 +197,12 @@
                   :class="`personal-book-row__difficulty--${bookFitPrediction(book)?.band}`"
                 >
                   <span class="personal-book-row__difficulty-heading">
-                    <span>Text difficulty</span>
-                    <strong>{{ bookFitPrediction(book)?.calibratedDifficulty }}<small>/100</small></strong>
+                    <span>Text difficulty <strong>{{ bookFitPrediction(book)?.calibratedDifficulty }}<small>/100</small></strong></span>
+                    <span class="personal-book-row__fit-label">Your fit: {{ bookFitPrediction(book)?.label }}</span>
                   </span>
                   <span class="personal-book-row__difficulty-track" aria-hidden="true">
                     <span :style="{ width: `${bookFitPrediction(book)?.calibratedDifficulty ?? 0}%` }" />
                   </span>
-                  <span class="personal-book-row__fit-label">Your fit: {{ bookFitPrediction(book)?.label }}</span>
                 </span>
               </span>
             </button>
@@ -213,10 +212,12 @@
                 :class="{ 'personal-book-row__rating--selected': book.difficultyAssessment?.readerRating }"
                 flat
                 :icon="book.difficultyAssessment?.readerRating ? 'check_circle' : 'rate_review'"
-                :label="bookReaderDifficultyRatingLabel(book.difficultyAssessment?.readerRating)"
-                no-caps
+                round
+                size="sm"
                 @click="openBookDifficultyReview(book)"
-              />
+              >
+                <q-tooltip>{{ bookReaderDifficultyRatingLabel(book.difficultyAssessment?.readerRating) }}</q-tooltip>
+              </q-btn>
               <q-btn
                 :aria-label="`Check difficulty of ${book.title}`"
                 :class="{
@@ -226,6 +227,7 @@
                 color="primary"
                 icon="psychology"
                 round
+                size="sm"
                 :flat="Boolean(book.difficultyAssessment)"
                 :unelevated="!book.difficultyAssessment"
                 :loading="assessingBookIds.has(book.id)"
@@ -233,7 +235,9 @@
               >
                 <q-tooltip>{{ book.difficultyAssessment ? 'Check difficulty again' : 'Check difficulty' }}</q-tooltip>
               </q-btn>
-              <q-btn :aria-label="`Delete ${book.title}`" color="negative" flat icon="delete_outline" round @click="confirmDeleteBook(book)" />
+              <q-btn :aria-label="`Delete ${book.title}`" color="negative" flat icon="delete_outline" round size="sm" @click="confirmDeleteBook(book)">
+                <q-tooltip>Delete book</q-tooltip>
+              </q-btn>
             </div>
           </div>
         </div>
@@ -957,12 +961,12 @@ const personalBookListProgress = computed(() => Object.fromEntries(personalBooks
     ? Math.min(localProgress.pageCountAtSave, localProgress.currentPageIndex + 1)
     : undefined;
   const pageLabel = currentPage && localProgress.pageCountAtSave
-    ? `${currentPage}/${localProgress.pageCountAtSave} p.`
+    ? `${currentPage}/${localProgress.pageCountAtSave}`
     : '';
   const wordsReadLabel = formatCompactBookCount(wordsRead);
   const wordsRemainingLabel = formatCompactBookCount(forecast.wordsRemaining);
   const finishDate = formatCompactBookDate(forecast.finishDate, readingForecastToday.value);
-  const finishLabel = forecast.wordsRemaining === 0 ? 'Complete' : `→ ${finishDate}`;
+  const finishLabel = forecast.wordsRemaining === 0 ? 'Complete' : finishDate;
   return [book.id, {
     wordsRead: wordsReadLabel,
     wordsRemaining: wordsRemainingLabel,

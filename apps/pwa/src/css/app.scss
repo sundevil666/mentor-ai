@@ -2182,7 +2182,7 @@ body.body--dark .mobile-start-dock__button--movies { --dock-accent: #f1a08f; --d
 }
 
 .personal-book-row__open {
-  align-items: center;
+  align-items: flex-start;
   appearance: none;
   background: transparent;
   border: 0;
@@ -2191,10 +2191,10 @@ body.body--dark .mobile-start-dock__button--movies { --dock-accent: #f1a08f; --d
   display: flex;
   font: inherit;
   font-weight: 800;
-  gap: 12px;
+  gap: 9px;
   min-height: 64px;
   min-width: 0;
-  padding: 16px;
+  padding: 10px 12px;
   text-align: left;
   width: 100%;
 }
@@ -2202,12 +2202,13 @@ body.body--dark .mobile-start-dock__button--movies { --dock-accent: #f1a08f; --d
 .personal-book-row__open .q-icon {
   color: var(--category-accent);
   flex: 0 0 auto;
-  font-size: 26px;
+  font-size: 22px;
+  margin-top: 1px;
 }
 
 .personal-book-row__content {
   display: grid;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
 }
 
@@ -2222,19 +2223,26 @@ body.body--dark .mobile-start-dock__button--movies { --dock-accent: #f1a08f; --d
   display: grid;
   font-size: 11px;
   font-weight: 700;
-  gap: 3px;
-  max-width: 280px;
+  gap: 4px;
+  width: 100%;
 }
 
 .personal-book-row__difficulty-heading {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.personal-book-row__difficulty-heading > span:first-child {
   align-items: baseline;
   display: flex;
-  justify-content: space-between;
+  gap: 4px;
 }
 
 .personal-book-row__difficulty-heading strong {
   color: var(--app-text-strong);
-  font-size: 17px;
+  font-size: 14px;
   line-height: 1;
 }
 
@@ -2268,6 +2276,9 @@ body.body--dark .mobile-start-dock__button--movies { --dock-accent: #f1a08f; --d
   font-size: 11px;
   font-weight: 900;
   letter-spacing: .02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .personal-books__recommendation-fit {
@@ -2284,21 +2295,35 @@ body.body--dark .mobile-start-dock__button--movies { --dock-accent: #f1a08f; --d
 .personal-book-row__fit-label--stretch { background: rgba(242, 192, 55, .16); color: var(--q-warning); }
 .personal-book-row__fit-label--too-hard { background: rgba(193, 52, 52, .14); color: var(--q-negative); }
 
-.personal-book-row__statuses { align-items: center; display: flex; gap: 6px; min-width: 0; }
+.personal-book-row__statuses { align-items: center; display: flex; gap: 5px; min-width: 0; }
 .personal-book-row__statuses small { border-radius: 999px; font-size: 11px; font-weight: 800; padding: 3px 8px; }
 .personal-book-row__progress {
-  color: var(--app-text-muted);
-  display: flex;
-  font-weight: 700 !important;
-  gap: 0;
-  margin-left: auto;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   min-width: 0;
+}
+.personal-book-row__progress > span {
+  background: color-mix(in srgb, var(--category-accent) 7%, transparent);
+  border-radius: 6px;
+  display: grid;
+  min-width: 0;
+  padding: 3px 5px;
+}
+.personal-book-row__progress small {
+  color: var(--app-text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
+.personal-book-row__progress strong {
+  color: var(--app-text-strong);
+  font-size: 11px;
+  line-height: 1.25;
   overflow: hidden;
-  padding: 0 !important;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.personal-book-row__progress span { flex: 0 0 auto; }
-.personal-book-row__progress span + span::before { content: '\00b7'; padding: 0 5px; }
 .personal-book-row__reading-status--new { background: var(--category-soft); color: var(--app-text-muted); }
 .personal-book-row__reading-status--started { background: rgba(33, 150, 243, .14); color: var(--q-primary); }
 .personal-book-row__reading-status--finished { background: rgba(33, 186, 69, .14); color: var(--q-positive); }
@@ -2309,8 +2334,8 @@ body.body--dark .mobile-start-dock__button--movies { --dock-accent: #f1a08f; --d
 .personal-book-row__actions {
   align-items: center;
   display: flex;
-  gap: 4px;
-  padding-right: 8px;
+  gap: 2px;
+  padding-right: 6px;
 }
 
 .personal-book-row__difficulty-check--complete { opacity: .58; }
@@ -2358,17 +2383,19 @@ body.body--dark .mobile-start-dock__button--movies { --dock-accent: #f1a08f; --d
 }
 
 @media (max-width: 520px) {
-  .personal-book-row { grid-template-columns: minmax(0, 1fr); }
+  .personal-book-row { grid-template-columns: minmax(0, 1fr) auto; }
   .personal-book-row__actions {
-    border-top: 1px solid var(--category-border);
-    justify-content: space-between;
-    padding: 8px 10px;
+    align-self: stretch;
+    border-left: 1px solid var(--category-border);
+    flex-direction: column;
+    justify-content: center;
+    padding: 4px;
   }
   .book-difficulty-review-dialog__choices { grid-template-columns: 1fr; }
   .personal-books__ability { align-items: flex-start; flex-wrap: wrap; }
   .personal-books__ability > small:last-child { margin-left: 34px; text-align: left; width: 100%; }
-  .personal-book-row__progress { font-size: 9.5px !important; }
-  .personal-book-row__progress span + span::before { padding: 0 2px; }
+  .personal-book-row__open { padding: 9px 10px; }
+  .personal-book-row__open .q-icon { font-size: 20px; }
 }
 
 .personal-books__add-button {
