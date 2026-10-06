@@ -117,46 +117,83 @@
               </q-form>
             </q-card>
 
-            <section class="movies-learning-history">
+            <section class="movies-learning-history-column">
               <div class="movies-learning-history__heading">
                 <div><span>Report status</span><small>{{ reports.length }} reports · {{ pendingCount }} waiting</small></div>
                 <q-btn flat round icon="sync" :disable="!pendingCount || !appStore.isOnline" :loading="syncing" @click="retrySync()"><q-tooltip>Upload waiting reports</q-tooltip></q-btn>
               </div>
-              <q-card v-for="report in reports" :key="report.id" flat bordered class="movie-report-card">
-                <q-card-section>
-                  <div class="movie-report-card__heading">
-                    <div class="movie-report-card__identity">
-                      <strong>{{ report.movieTitle }}</strong>
-                      <span class="movie-report-card__date"><q-icon name="event" />{{ formatMovieDate(report.watchedAt) }}</span>
-                    </div>
-                    <div class="movie-report-card__actions">
-                      <span class="movie-report-status" :class="report.synchronizedAt ? 'movie-report-status--saved' : 'movie-report-status--waiting'">
-                        <q-icon :name="report.synchronizedAt ? 'cloud_done' : 'cloud_off'" />
-                        {{ report.synchronizedAt ? 'Saved' : 'Waiting to send' }}
-                      </span>
-                      <q-btn
-                        :aria-label="`Delete ${report.movieTitle}`"
-                        class="movie-report-delete"
-                        color="negative"
-                        flat
-                        icon="delete_outline"
-                        round
-                        size="sm"
-                        :loading="deletingReportId === report.id"
-                        @click="confirmDeleteReport(report)"
-                      ><q-tooltip>Delete report</q-tooltip></q-btn>
-                    </div>
-                  </div>
-                  <p>{{ report.report }}</p>
-                </q-card-section>
-              </q-card>
-              <div v-if="!reports.length" class="movies-learning-empty"><q-icon name="movie" size="42px" /><strong>No film reports yet</strong><span>Your first saved report will appear here.</span></div>
+              <div ref="reportListScroll" class="movies-learning-history">
+                <q-card
+                  v-for="report in paginatedReports"
+                  :key="report.id"
+                  flat
+                  bordered
+                  class="movie-report-card movie-report-card--summary"
+                  role="button"
+                  tabindex="0"
+                  @click="selectedReport = report"
+                  @keyup.enter="selectedReport = report"
+                  @keyup.space.prevent="selectedReport = report"
+                >
+                  <q-card-section>
+                    <strong>{{ report.movieTitle }}</strong>
+                    <p>{{ report.report }}</p>
+                  </q-card-section>
+                </q-card>
+                <div v-if="!reports.length" class="movies-learning-empty"><q-icon name="movie" size="42px" /><strong>No film reports yet</strong><span>Your first saved report will appear here.</span></div>
+              </div>
+              <nav v-if="totalReportPages > 1" class="movie-report-pagination" aria-label="Film report pages">
+                <q-btn
+                  v-for="page in visibleReportPages"
+                  :key="page"
+                  :aria-label="`Open report page ${page}`"
+                  :color="page === reportPage ? 'primary' : undefined"
+                  :flat="page !== reportPage"
+                  :outline="page === reportPage"
+                  dense
+                  round
+                  :label="String(page)"
+                  @click="openReportPage(page)"
+                />
+              </nav>
             </section>
           </section>
         </q-tab-panel>
         </q-tab-panels>
       </section>
     </section>
+
+    <q-dialog v-model="reportDialogOpen">
+      <q-card v-if="selectedReport" class="movie-report-dialog">
+        <q-card-section class="movie-report-dialog__heading">
+          <div class="movie-report-card__identity">
+            <strong>{{ selectedReport.movieTitle }}</strong>
+            <span class="movie-report-card__date"><q-icon name="event" />{{ formatMovieDate(selectedReport.watchedAt) }}</span>
+          </div>
+          <q-btn v-close-popup flat round icon="close" aria-label="Close film report" />
+        </q-card-section>
+        <q-separator />
+        <q-card-section class="movie-report-dialog__content">
+          <span class="movie-report-status" :class="selectedReport.synchronizedAt ? 'movie-report-status--saved' : 'movie-report-status--waiting'">
+            <q-icon :name="selectedReport.synchronizedAt ? 'cloud_done' : 'cloud_off'" />
+            {{ selectedReport.synchronizedAt ? 'Saved' : 'Waiting to send' }}
+          </span>
+          <p>{{ selectedReport.report }}</p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn
+            :aria-label="`Delete ${selectedReport.movieTitle}`"
+            color="negative"
+            flat
+            icon="delete_outline"
+            label="Delete report"
+            no-caps
+            :loading="deletingReportId === selectedReport.id"
+            @click="confirmDeleteReport(selectedReport)"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -169,6 +206,7 @@ import { appendMovieChatMessage, loadMovieChatMessages, loadMovieChatUserMemory,
 import { buildMovieChatMemory, maximumMovieChatUserMemoryCharacters, maximumMovieCoachPromptCharacters } from 'src/services/movie-chat-memory';
 import { parseMovieChatContent } from 'src/services/movie-chat-content';
 import { deleteMovieLearningReport, loadMovieLearningReports, pendingMovieLearningReportCount, refreshMovieLearningReportsFromCloud, saveMovieLearningReport, syncMovieLearningReports } from 'src/services/movie-learning-reports';
+import { visibleMovieReportPages } from 'src/services/movie-report-pagination';
 
 const appStore = useAppStore();
 type MovieLearningTab = 'discuss' | 'memory' | 'report';
@@ -190,6 +228,7 @@ const chatDraft = ref('');
 const chatMessages = ref<LocalMovieChatMessage[]>([]);
 const chatSending = ref(false);
 const chatScroll = ref<HTMLElement | null>(null);
+const reportListScroll = ref<HTMLElement | null>(null);
 const movieTitle = ref('');
 const watchedAt = ref(new Date().toISOString().slice(0, 10));
 const reportText = ref('');
@@ -198,17 +237,38 @@ const pendingCount = ref(0);
 const saving = ref(false);
 const syncing = ref(false);
 const deletingReportId = ref<string | null>(null);
+const selectedReport = ref<MovieLearningReport | null>(null);
+const reportPage = ref(1);
 const userMemory = ref('');
 const coachPrompt = ref('');
 const savedCoachPrompt = ref('');
+const reportsPerPage = 10;
 const canSave = computed(() => Boolean(movieTitle.value.trim() && watchedAt.value && reportText.value.trim()));
 const canSendChat = computed(() => Boolean(chatDraft.value.trim() && appStore.isOnline && !chatSending.value));
 const hasUnansweredMessage = computed(() => chatMessages.value.at(-1)?.role === 'user');
 const movieMemory = computed(() => buildMovieChatMemory(userMemory.value, reports.value));
+const reportDialogOpen = computed({
+  get: () => Boolean(selectedReport.value),
+  set: (open: boolean) => {
+    if (!open) selectedReport.value = null;
+  },
+});
+const totalReportPages = computed(() => Math.max(1, Math.ceil(reports.value.length / reportsPerPage)));
+const paginatedReports = computed(() => {
+  const start = (reportPage.value - 1) * reportsPerPage;
+  return reports.value.slice(start, start + reportsPerPage);
+});
+const visibleReportPages = computed(() => {
+  return visibleMovieReportPages(reportPage.value, totalReportPages.value);
+});
 
 watch(activeTab, async (tab) => {
   localStorage.setItem(movieLearningTabStorageKey, tab);
   if (tab === 'discuss') await scrollChatToEnd('auto');
+});
+
+watch(totalReportPages, (total) => {
+  if (reportPage.value > total) reportPage.value = total;
 });
 
 onMounted(async () => {
@@ -289,6 +349,11 @@ async function scrollChatToEnd(behavior: ChatScrollBehavior = 'smooth') {
   await nextTick();
   chatScroll.value?.scrollTo({ top: chatScroll.value.scrollHeight, behavior });
 }
+async function openReportPage(page: number) {
+  reportPage.value = page;
+  await nextTick();
+  reportListScroll.value?.scrollTo({ top: 0, behavior: 'smooth' });
+}
 async function refreshReports() {
   [reports.value, pendingCount.value] = await Promise.all([loadMovieLearningReports(), pendingMovieLearningReportCount()]);
 }
@@ -299,6 +364,7 @@ async function saveReport() {
     await saveMovieLearningReport({ studentId: appStore.studentId, movieTitle: movieTitle.value, watchedAt: watchedAt.value, report: reportText.value });
     movieTitle.value = '';
     reportText.value = '';
+    reportPage.value = 1;
     await refreshReports();
     if (appStore.isOnline) await retrySync(false);
     Notify.create({ type: pendingCount.value ? 'warning' : 'positive', icon: pendingCount.value ? 'cloud_off' : 'cloud_done', message: pendingCount.value ? 'Report saved locally and will be sent later.' : 'Film report sent to the database.' });
@@ -336,6 +402,7 @@ async function removeReport(report: MovieLearningReport) {
   deletingReportId.value = report.id;
   try {
     await deleteMovieLearningReport(report);
+    selectedReport.value = null;
     await refreshReports();
     Notify.create({ type: 'positive', icon: 'delete_outline', message: `${report.movieTitle} was removed from your film history.` });
   } catch (error) {
@@ -410,7 +477,7 @@ async function removeReport(report: MovieLearningReport) {
 .movie-chat-messages { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; padding: 22px 24px; }
 .movie-chat-message { border-radius: 16px; max-width: 86%; padding: 12px 15px; }
 .movie-chat-message--user { align-self: flex-end; background: var(--app-primary); color: white; }
-.movie-chat-message--assistant { align-self: stretch; background: var(--app-surface-active); border: 1px solid var(--app-border); max-width: 100%; }
+.movie-chat-message--assistant { align-self: flex-start; background: var(--app-surface-active); border: 1px solid var(--app-border); }
 .movie-chat-message__content { display: grid; gap: 10px; margin-top: 5px; }
 .movie-chat-message p { font-size: var(--movie-chat-font-size); line-height: 1.55; margin: 0; white-space: pre-wrap; }
 .movie-chat-code-block { background: #17202b; border: 1px solid rgb(255 255 255 / 14%); border-radius: 10px; color: #f5f7fa; min-width: min(560px, 70vw); overflow: hidden; }
@@ -426,8 +493,9 @@ async function removeReport(report: MovieLearningReport) {
 .movie-chat-composer :deep(.q-field__native) { font-size: var(--movie-chat-font-size); line-height: 1.55; }
 .movie-chat-empty { margin: auto; }
 .movies-learning-form { padding: 0 16px 20px; }
-.movies-learning-history { align-content: start; display: grid; gap: 14px; grid-auto-rows: max-content; }
-.movies-learning-page--report .movies-learning-history { min-height: 0; overflow-y: auto; padding: 0 8px 16px 0; scrollbar-color: var(--app-border-strong) transparent; scrollbar-gutter: stable; scrollbar-width: thin; }
+.movies-learning-history-column { display: grid; gap: 14px; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; }
+.movies-learning-history { align-content: start; display: grid; gap: 10px; grid-auto-rows: max-content; }
+.movies-learning-page--report .movies-learning-history { min-height: 0; overflow-y: auto; padding: 0 8px 4px 0; scrollbar-color: var(--app-border-strong) transparent; scrollbar-gutter: stable; scrollbar-width: thin; }
 .movies-learning-history::-webkit-scrollbar { width: 8px; }
 .movies-learning-history::-webkit-scrollbar-thumb { background: var(--app-border-strong); border: 2px solid transparent; border-radius: 999px; background-clip: padding-box; }
 .movies-learning-history::-webkit-scrollbar-track { background: transparent; }
@@ -439,6 +507,10 @@ async function removeReport(report: MovieLearningReport) {
 .movie-report-card::before { background: color-mix(in srgb, var(--app-primary) 72%, transparent); bottom: 14px; content: ''; left: 0; position: absolute; top: 14px; width: 3px; }
 .movie-report-card:hover { border-color: color-mix(in srgb, var(--app-primary) 36%, var(--app-border)); box-shadow: 0 10px 28px rgb(0 0 0 / 8%); transform: translateY(-1px); }
 .movie-report-card .q-card__section { padding: 18px 20px 18px 22px; }
+.movie-report-card--summary { cursor: pointer; }
+.movie-report-card--summary:focus-visible { border-color: var(--app-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-primary) 24%, transparent); outline: none; }
+.movie-report-card--summary strong { display: block; font-size: 1.05rem; overflow-wrap: anywhere; }
+.movie-report-card--summary p { display: -webkit-box; margin-top: 8px; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .movie-report-card__heading { align-items: flex-start; }
 .movie-report-card__identity { display: grid; gap: 5px; min-width: 0; }
 .movie-report-card__identity strong { line-height: 1.3; overflow-wrap: anywhere; }
@@ -452,6 +524,13 @@ async function removeReport(report: MovieLearningReport) {
 .movie-report-delete { opacity: 0.64; transition: opacity 160ms ease, background-color 160ms ease; }
 .movie-report-delete:hover, .movie-report-delete:focus-visible { opacity: 1; }
 .movie-report-card p { color: var(--app-text); line-height: 1.62; margin: 15px 0 0; white-space: pre-wrap; }
+.movie-report-pagination { align-items: center; display: flex; gap: 6px; justify-content: center; min-height: 40px; }
+.movie-report-pagination :deep(.q-btn) { font-weight: 800; }
+.movie-report-dialog { background: var(--app-surface); border-radius: 18px; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; max-height: min(760px, 86vh); max-width: 760px; width: min(760px, 92vw); }
+.movie-report-dialog__heading { align-items: flex-start; display: flex; gap: 20px; justify-content: space-between; }
+.movie-report-dialog__heading strong { font-size: 1.25rem; line-height: 1.35; }
+.movie-report-dialog__content { overflow-y: auto; }
+.movie-report-dialog__content p { line-height: 1.65; margin: 16px 0 0; white-space: pre-wrap; }
 .movies-learning-empty { align-items: center; border: 1px dashed var(--app-border-strong); border-radius: 18px; color: var(--app-muted-strong); display: grid; gap: 8px; justify-items: center; padding: 48px 24px; text-align: center; }
 @media (max-width: 760px) {
   .movie-memory-actions { grid-template-columns: 1fr; }
