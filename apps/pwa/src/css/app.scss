@@ -2208,11 +2208,14 @@ body.body--dark .mobile-start-dock__button--movies { --dock-accent: #f1a08f; --d
 
 .personal-book-row__content {
   display: grid;
+  flex: 1 1 auto;
   gap: 5px;
   min-width: 0;
 }
 
 .personal-book-row__content > strong {
+  font-size: 18px;
+  line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2221,7 +2224,7 @@ body.body--dark .mobile-start-dock__button--movies { --dock-accent: #f1a08f; --d
 .personal-book-row__difficulty {
   color: var(--app-text-muted);
   display: grid;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   gap: 4px;
   width: 100%;
@@ -2238,11 +2241,12 @@ body.body--dark .mobile-start-dock__button--movies { --dock-accent: #f1a08f; --d
   align-items: baseline;
   display: flex;
   gap: 4px;
+  white-space: nowrap;
 }
 
 .personal-book-row__difficulty-heading strong {
   color: var(--app-text-strong);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1;
 }
 
@@ -2273,7 +2277,7 @@ body.body--dark .mobile-start-dock__button--movies { --dock-accent: #f1a08f; --d
 .personal-book-row__difficulty--too-hard { color: var(--q-negative); }
 
 .personal-book-row__fit-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 900;
   letter-spacing: .02em;
   overflow: hidden;
@@ -2312,14 +2316,14 @@ body.body--dark .mobile-start-dock__button--movies { --dock-accent: #f1a08f; --d
 }
 .personal-book-row__progress small {
   color: var(--app-text-muted);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   line-height: 1;
 }
 .personal-book-row__progress strong {
   color: var(--app-text-strong);
-  font-size: 11px;
-  line-height: 1.25;
+  font-size: 14px;
+  line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2336,6 +2340,26 @@ body.body--dark .mobile-start-dock__button--movies { --dock-accent: #f1a08f; --d
   display: flex;
   gap: 2px;
   padding-right: 6px;
+}
+
+@media (min-width: 760px) {
+  .personal-book-row__content {
+    align-items: center;
+    column-gap: clamp(18px, 2.4vw, 36px);
+    grid-template-columns: minmax(220px, .72fr) minmax(440px, 1.6fr);
+    grid-template-rows: auto auto;
+  }
+
+  .personal-book-row__content > strong { grid-column: 1; grid-row: 1; }
+  .personal-book-row__statuses { grid-column: 1; grid-row: 2; }
+  .personal-book-row__progress { grid-column: 2; grid-row: 1; }
+  .personal-book-row__difficulty { grid-column: 2; grid-row: 2; }
+
+  .personal-book-row__progress > span {
+    padding: 5px 9px;
+  }
+
+  .personal-book-row__difficulty-track { height: 6px; }
 }
 
 .personal-book-row__difficulty-check--complete { opacity: .58; }
