@@ -184,6 +184,12 @@
                   <small v-if="book.difficultyAssessment" :class="`personal-book-row__recommendation--${personalBookAction(book)}`">
                     {{ personalBookAction(book) === 'read' ? 'Read' : 'Rewrite' }}
                   </small>
+                  <small class="personal-book-row__progress" :aria-label="bookListProgress(book).ariaLabel">
+                    <span>{{ bookListProgress(book).wordsRead }} read</span>
+                    <span>{{ bookListProgress(book).wordsRemaining }} left</span>
+                    <span v-if="bookListProgress(book).pageLabel">{{ bookListProgress(book).pageLabel }}</span>
+                    <span>{{ bookListProgress(book).finishLabel }}</span>
+                  </small>
                 </span>
                 <span
                   v-if="book.difficultyAssessment"
@@ -663,7 +669,7 @@
 <script setup lang="ts">
 import { Dialog, Notify } from 'quasar';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import type { ReaderTextLookup, ReadingChapter, ReadingDeviceSession, ReadingPage } from '@mentor-ai/shared';
+import type { ContentProgress, ReaderTextLookup, ReadingChapter, ReadingDeviceSession, ReadingPage } from '@mentor-ai/shared';
 import type { BookReaderDifficultyRating } from '@mentor-ai/shared';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import AppDetailLayout from 'src/components/AppDetailLayout.vue';
@@ -796,6 +802,7 @@ let readingSpeechSuppressedForLookup = false;
 const dailyReadingProgress = ref<DailyReadingProgress>(readDailyReadingProgress());
 const personalBooks = ref<PersonalBook[]>([]);
 const personalBookStatuses = ref<Record<string, PersonalBookReadingStatus>>({});
+const personalBookContentProgress = ref<Record<string, ContentProgress | undefined>>({});
 type PersonalBookSection = PersonalBookKanbanColumn | 'recommendations';
 const activeBookSection = ref<PersonalBookSection>('read');
 const bookSyncing = ref(false);
@@ -937,6 +944,46 @@ const bookReadingDaysLabel = computed(() => {
 });
 const bookReadingFinishDate = computed(() => formatDisplayDate(currentBookReadingForecast.value.finishDate));
 const bookReadingForecastAriaLabel = computed(() => `${bookReadingDaysLabel.value}. Estimated finish ${bookReadingFinishDate.value}, at ${dailyReadingTarget.value.toLocaleString('en')} words per reading day.`);
+const personalBookListProgress = computed(() => Object.fromEntries(personalBooks.value.map((book) => {
+  const localProgress = readBookProgress(book.id, book.chapterCount);
+  const synchronizedProgress = personalBookContentProgress.value[book.id];
+  const wordsRead = Math.max(
+    localProgress.wordPosition ?? 0,
+    Math.round((localProgress.furthestProgressRatio ?? 0) * book.wordCount),
+    synchronizedProgress?.furthestPosition ?? 0,
+  );
+  const forecast = bookReadingForecast(book.wordCount, wordsRead, dailyReadingTarget.value, readingForecastToday.value);
+  const currentPage = localProgress.currentPageIndex !== undefined && localProgress.pageCountAtSave
+    ? Math.min(localProgress.pageCountAtSave, localProgress.currentPageIndex + 1)
+    : undefined;
+  const pageLabel = currentPage && localProgress.pageCountAtSave
+    ? `${currentPage}/${localProgress.pageCountAtSave} p.`
+    : '';
+  const wordsReadLabel = formatCompactBookCount(wordsRead);
+  const wordsRemainingLabel = formatCompactBookCount(forecast.wordsRemaining);
+  const finishDate = formatCompactBookDate(forecast.finishDate, readingForecastToday.value);
+  const finishLabel = forecast.wordsRemaining === 0 ? 'Complete' : `→ ${finishDate}`;
+  return [book.id, {
+    wordsRead: wordsReadLabel,
+    wordsRemaining: wordsRemainingLabel,
+    pageLabel,
+    finishLabel,
+    ariaLabel: `${wordsRead.toLocaleString('en')} words read. ${forecast.wordsRemaining.toLocaleString('en')} words left.${currentPage && localProgress.pageCountAtSave ? ` Page ${currentPage} of ${localProgress.pageCountAtSave}.` : ''} ${forecast.wordsRemaining === 0 ? 'Book complete.' : `Estimated finish ${formatDisplayDate(forecast.finishDate)}.`}`,
+  }];
+})));
+function bookListProgress(book: PersonalBook) {
+  return personalBookListProgress.value[book.id]!;
+}
+function formatCompactBookCount(value: number) {
+  return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+}
+function formatCompactBookDate(value: Date, today: Date) {
+  return new Intl.DateTimeFormat('en', {
+    day: 'numeric',
+    month: 'short',
+    ...(value.getFullYear() === today.getFullYear() ? {} : { year: 'numeric' as const }),
+  }).format(value);
+}
 const readerSidebarScalePercent = computed(() => 100 + readerSidebarScale.value * 10);
 const readerSidebarStyle = computed(() => ({
   '--reader-sidebar-width': `${280 + readerSidebarScale.value * 30}px`,
@@ -1206,9 +1253,10 @@ async function refreshPersonalBookStatuses() {
   const entries = await Promise.all(personalBooks.value.map(async (book) => {
     const progress = await loadContentProgress('reading', book.id);
     const localProgress = readBookProgress(book.id, book.chapterCount);
-    return [book.id, personalBookReadingStatus(book, progress, localProgress.furthestProgressRatio)] as const;
+    return { bookId: book.id, progress, status: personalBookReadingStatus(book, progress, localProgress.furthestProgressRatio) };
   }));
-  personalBookStatuses.value = Object.fromEntries(entries);
+  personalBookStatuses.value = Object.fromEntries(entries.map((entry) => [entry.bookId, entry.status]));
+  personalBookContentProgress.value = Object.fromEntries(entries.map((entry) => [entry.bookId, entry.progress]));
 }
 
 function handleBookSyncWakeup() {
@@ -2469,11 +2517,13 @@ interface BookReaderProgress {
   legacyChapterIndex?: number;
   updatedAt?: string;
   wordPosition?: number;
+  currentPageIndex?: number;
+  pageCountAtSave?: number;
 }
 function readBookProgress(bookId: string, chapterCount: number): BookReaderProgress {
   if (typeof localStorage === 'undefined') return { progressRatio: 0, furthestProgressRatio: 0 };
   try {
-    const parsed = JSON.parse(localStorage.getItem(bookProgressKey(bookId)) ?? 'null') as { version?: number; currentPageIndex?: number; progressRatio?: number; furthestProgressRatio?: number; updatedAt?: string; wordPosition?: number } | null;
+    const parsed = JSON.parse(localStorage.getItem(bookProgressKey(bookId)) ?? 'null') as { version?: number; currentPageIndex?: number; pageCountAtSave?: number; progressRatio?: number; furthestProgressRatio?: number; updatedAt?: string; wordPosition?: number } | null;
     if (parsed?.version === 2 || parsed?.version === 3) {
       return {
         progressRatio: clampProgressRatio(parsed.progressRatio),
@@ -2481,6 +2531,12 @@ function readBookProgress(bookId: string, chapterCount: number): BookReaderProgr
         updatedAt: Number.isFinite(Date.parse(parsed.updatedAt ?? '')) ? parsed.updatedAt : undefined,
         wordPosition: parsed.version === 3 && Number.isInteger(parsed.wordPosition) && Number(parsed.wordPosition) >= 0
           ? Number(parsed.wordPosition)
+          : undefined,
+        currentPageIndex: Number.isInteger(parsed.currentPageIndex) && Number(parsed.currentPageIndex) >= 0
+          ? Number(parsed.currentPageIndex)
+          : undefined,
+        pageCountAtSave: Number.isInteger(parsed.pageCountAtSave) && Number(parsed.pageCountAtSave) > 0
+          ? Number(parsed.pageCountAtSave)
           : undefined,
       };
     }
