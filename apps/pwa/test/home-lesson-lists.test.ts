@@ -9,8 +9,9 @@ describe('Home lesson lists', () => {
     assert.equal(belongsToRequiredLessons(true, true), false);
   });
 
-  it('shows non-required attempts only after more than one percent and before completion', () => {
-    assert.equal(belongsToStartedLessons(false, 1), false);
+  it('shows non-required attempts only above zero percent and before completion', () => {
+    assert.equal(belongsToStartedLessons(false, 0), false);
+    assert.equal(belongsToStartedLessons(false, 1), true);
     assert.equal(belongsToStartedLessons(false, 2), true);
     assert.equal(belongsToStartedLessons(false, 99), true);
     assert.equal(belongsToStartedLessons(false, 100), false);

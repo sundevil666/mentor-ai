@@ -3,5 +3,5 @@ export function belongsToRequiredLessons(isRequired: boolean, hasCompletedOnce: 
 }
 
 export function belongsToStartedLessons(isRequired: boolean, currentAttemptProgress: number) {
-  return !isRequired && currentAttemptProgress > 1 && currentAttemptProgress < 100;
+  return !isRequired && currentAttemptProgress > 0 && currentAttemptProgress < 100;
 }
