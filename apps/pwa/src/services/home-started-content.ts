@@ -9,6 +9,10 @@ export interface StartedContentState {
   progress: number;
 }
 
+export interface RecentContentState extends StartedContentState {
+  completed: boolean;
+}
+
 /** Keeps synchronized content with real, unfinished progress above one percent. */
 export function selectUnfinishedStartedContent(progress: ContentProgress[]): StartedContentState[] {
   const items = new Map<string, StartedContentState>();
@@ -35,4 +39,27 @@ export function selectUnfinishedStartedContent(progress: ContentProgress[]): Sta
   }
 
   return [...items.values()].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+/** Keeps the most recently updated progress records for the Home history tab. */
+export function selectRecentContent(progress: ContentProgress[], limit = 12): RecentContentState[] {
+  const items = new Map<string, RecentContentState>();
+
+  for (const item of progress) {
+    if (item.position <= 0 || !item.duration || item.duration <= 0) continue;
+    const percent = Math.min(100, Math.max(0, Math.round((item.position / item.duration) * 100)));
+    items.set(`${item.category}:${item.contentId}`, {
+      category: item.category,
+      contentId: item.contentId,
+      updatedAt: item.updatedAt,
+      position: item.position,
+      duration: item.duration,
+      progress: percent,
+      completed: Boolean(item.completed || percent >= 100),
+    });
+  }
+
+  return [...items.values()]
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    .slice(0, Math.max(0, limit));
 }

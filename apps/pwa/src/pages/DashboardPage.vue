@@ -55,8 +55,9 @@
 
           <section class="home-work-lists" aria-label="Your learning lists">
             <q-tabs v-model="selectedHomeListTab" dense no-caps align="justify" active-color="primary" indicator-color="primary" class="home-work-tabs">
-              <q-tab name="required" icon="priority_high" :label="`Required · ${requiredLessonItems.length}`" />
+              <q-tab name="required" icon="priority_high" :label="`Priority · ${requiredLessonItems.length}`" />
               <q-tab name="started" icon="play_circle" :label="`Started · ${startedContentItems.length}`" />
+              <q-tab name="recent" icon="history" :label="`Recent · ${recentContentItems.length}`" />
             </q-tabs>
             <q-tab-panels v-model="selectedHomeListTab" animated swipeable class="home-work-panels" :class="`home-work-panels--${selectedHomeListTab}`">
               <q-tab-panel name="required" class="home-work-panel home-work-panel--required">
@@ -81,6 +82,21 @@
                       <q-icon :name="item.icon" size="26px" />
                       <span>
                         <small>{{ item.label }}<template v-if="item.progress !== null"> · {{ item.progress }}%</template></small>
+                        <strong>{{ item.title }}</strong>
+                      </span>
+                      <q-icon name="arrow_forward" size="24px" />
+                    </button>
+                  </article>
+                </div>
+                <p v-else class="home-work-empty">Block is empty</p>
+              </q-tab-panel>
+              <q-tab-panel name="recent" class="home-work-panel home-work-panel--recent">
+                <div v-if="recentContentItems.length" class="home-work-list">
+                  <article v-for="item in recentContentItems" :key="item.id" class="priority-link home-work-card home-work-card--recent">
+                    <button type="button" class="priority-link__main" @click="openStartedContent(item)">
+                      <q-icon :name="item.icon" size="26px" />
+                      <span>
+                        <small>{{ item.label }} · {{ item.progress }}%</small>
                         <strong>{{ item.title }}</strong>
                       </span>
                       <q-icon name="arrow_forward" size="24px" />
@@ -736,15 +752,14 @@ import { loadLearningActivityTotals } from 'src/services/learning-activity';
 import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { audioLibrary } from 'src/services/audio-library';
 import { storyLibrary } from 'src/services/story-library';
-import { loadAllContentProgress, syncAllContentProgress } from 'src/services/content-progress';
+import { loadAllContentProgress } from 'src/services/content-progress';
 import { belongsToRequiredLessons, belongsToStartedLessons } from 'src/services/home-lesson-lists';
-import { selectUnfinishedStartedContent } from 'src/services/home-started-content';
+import { selectRecentContent, selectUnfinishedStartedContent, type StartedContentState } from 'src/services/home-started-content';
 import { listPersonalBooks, type PersonalBook } from 'src/services/personal-book-library';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import {
   loadContentEngagementSummaries,
   recordContentEngagement,
-  syncContentEngagement,
   type ContentEngagementSummary,
 } from 'src/services/content-engagement';
 
@@ -778,7 +793,7 @@ type TrainingLibraryKey = 'home' | DashboardTrainingCategory;
 type LessonReturnDestination = TrainingLibraryKey | 'specific-lessons';
 type TrainingLibraryLesson = LessonChoice & { mode: 'home' | 'listening' | 'speaking'; minutes: number; concept?: GeneratedLesson['concept'] };
 type HomeLesson = TrainingLibraryLesson & { category: DashboardTrainingCategory; skillLabel: string };
-type HomeListTab = 'required' | 'started';
+type HomeListTab = 'required' | 'started' | 'recent';
 type RequiredLessonItem = {
   id: string;
   kind: 'paused' | 'remote' | 'lesson';
@@ -792,7 +807,7 @@ type RequiredLessonItem = {
 };
 type StartedContentItem = {
   id: string;
-  category: 'lesson' | 'audio' | 'reading' | 'video' | 'vocabulary';
+  category: 'lesson' | 'audio' | 'reading';
   contentId: string;
   title: string;
   label: string;
@@ -821,9 +836,9 @@ const isListeningTranslationVisible = ref(false);
 const isListeningPlaylistVisible = ref(false);
 const isLessonLibraryVisible = ref(false);
 const savedHomeListTab = readHomePreference('mentor-ai:home-list-tab');
-const selectedHomeListTab = ref<HomeListTab>(savedHomeListTab === 'started' ? 'started' : 'required');
-const isPhoneViewport = ref(false);
+const selectedHomeListTab = ref<HomeListTab>(savedHomeListTab === 'started' || savedHomeListTab === 'recent' ? savedHomeListTab : 'required');
 const rawStartedContent = ref<ReturnType<typeof selectUnfinishedStartedContent>>([]);
+const rawRecentContent = ref<ReturnType<typeof selectRecentContent>>([]);
 const personalBooks = ref<PersonalBook[]>([]);
 const selectedLessonLibrary = ref<TrainingLibraryKey>('home');
 const lessonReturnDestination = ref<LessonReturnDestination>('home');
@@ -1257,6 +1272,7 @@ async function refreshStartedContent() {
     listPersonalBooks(),
   ]);
   rawStartedContent.value = selectUnfinishedStartedContent(progress);
+  rawRecentContent.value = selectRecentContent(progress, progress.length);
   personalBooks.value = books;
 }
 const homeLessonQueue = computed(() => {
@@ -1346,50 +1362,88 @@ const startedContentItems = computed<StartedContentItem[]>(() => {
   const audios = new Map([...audioLibrary, ...storyLibrary].map((item) => [item.id, item]));
   const books = new Map(personalBooks.value.map((book) => [book.id, book]));
 
+  const resolveItem = (item: StartedContentState): StartedContentItem | null => {
+    const lesson = lessons.get(item.contentId);
+    const audio = audios.get(item.contentId);
+    const book = books.get(item.contentId);
+    if (lesson) return {
+      id: `started:${item.category}:${item.contentId}`,
+      category: 'lesson',
+      contentId: item.contentId,
+      title: lesson.title,
+      label: lesson.skillLabel,
+      icon: lessonCategoryIcon(lesson.category),
+      progress: item.progress,
+    };
+    if (audio) return {
+      id: `started:${item.category}:${item.contentId}`,
+      category: 'audio',
+      contentId: item.contentId,
+      title: audio.title,
+      label: storyLibrary.some((story) => story.id === item.contentId) ? 'Audio story' : 'Listening',
+      icon: 'headphones',
+      progress: item.progress,
+    };
+    if (book) return {
+      id: `started:${item.category}:${item.contentId}`,
+      category: 'reading',
+      contentId: item.contentId,
+      title: book.title,
+      label: 'Reading',
+      icon: 'menu_book',
+      progress: item.progress,
+    };
+    return null;
+  };
+
   return rawStartedContent.value
-    .filter((item) => !(isPhoneViewport.value && item.category === 'reading'))
     .filter((item) => item.category !== 'lesson' || belongsToStartedLessons(requiredKeys.has(item.contentId), item.progress))
-    .map((item): StartedContentItem => {
-      const lesson = lessons.get(item.contentId);
-      const audio = audios.get(item.contentId);
-      const book = books.get(item.contentId);
-      if (lesson) return {
-        id: `started:${item.category}:${item.contentId}`,
-        category: item.category,
-        contentId: item.contentId,
+    .map(resolveItem)
+    .filter((item): item is StartedContentItem => item !== null);
+});
+
+const recentContentItems = computed<StartedContentItem[]>(() => {
+  const startedByKey = new Map(startedContentItems.value.map((item) => [`${item.category}:${item.contentId}`, item]));
+  return rawRecentContent.value.flatMap((recent) => {
+    const exact = startedByKey.get(`${recent.category}:${recent.contentId}`);
+    if (exact) return [{ ...exact, id: `recent:${recent.category}:${recent.contentId}`, progress: recent.progress }];
+    if (recent.category === 'lesson') {
+      const generated = newLessonCatalog.value.find((candidate) => candidate.id === recent.contentId);
+      const templateKey = generated?.lessonTemplateKey ?? recent.contentId;
+      const lesson = allHomeLessons.value.find((candidate) => candidate.templateKey === templateKey);
+      if (!lesson) return [];
+      return [{
+        id: `recent:lesson:${recent.contentId}`,
+        category: 'lesson' as const,
+        contentId: recent.contentId,
         title: lesson.title,
         label: lesson.skillLabel,
         icon: lessonCategoryIcon(lesson.category),
-        progress: item.progress,
-      };
-      if (audio) return {
-        id: `started:${item.category}:${item.contentId}`,
-        category: item.category,
-        contentId: item.contentId,
-        title: audio.title,
-        label: storyLibrary.some((story) => story.id === item.contentId) ? 'Audio story' : 'Listening',
-        icon: 'headphones',
-        progress: item.progress,
-      };
-      if (book) return {
-        id: `started:${item.category}:${item.contentId}`,
-        category: item.category,
-        contentId: item.contentId,
-        title: book.title,
-        label: 'Reading',
-        icon: 'menu_book',
-        progress: item.progress,
-      };
-      return {
-        id: `started:${item.category}:${item.contentId}`,
-        category: item.category,
-        contentId: item.contentId,
-        title: 'Continue where you stopped',
-        label: item.category,
-        icon: item.category === 'reading' ? 'menu_book' : 'play_circle',
-        progress: item.progress,
-      };
-    });
+        progress: recent.progress,
+      }];
+    }
+    const audio = [...audioLibrary, ...storyLibrary].find((candidate) => candidate.id === recent.contentId);
+    if (recent.category === 'audio' && audio) return [{
+      id: `recent:audio:${recent.contentId}`,
+      category: 'audio' as const,
+      contentId: recent.contentId,
+      title: audio.title,
+      label: storyLibrary.some((story) => story.id === recent.contentId) ? 'Audio story' : 'Listening',
+      icon: 'headphones',
+      progress: recent.progress,
+    }];
+    const book = personalBooks.value.find((candidate) => candidate.id === recent.contentId);
+    if (recent.category === 'reading' && book) return [{
+      id: `recent:reading:${recent.contentId}`,
+      category: 'reading' as const,
+      contentId: recent.contentId,
+      title: book.title,
+      label: 'Reading',
+      icon: 'menu_book',
+      progress: recent.progress,
+    }];
+    return [];
+  }).slice(0, 12);
 });
 const levelActivity = ref<LearningActivityTotals>({ grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null });
 const fetchedLessonCatalog = ref<GeneratedLesson[]>([]);
@@ -1652,10 +1706,6 @@ onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();
   }
-  await Promise.all([
-    syncAllContentProgress().catch(() => undefined),
-    syncContentEngagement().catch(() => undefined),
-  ]);
   await refreshStartedContent();
   await refreshLessonProgressStates();
   await refreshLevelActivity();
@@ -1674,9 +1724,8 @@ onMounted(async () => {
   window.addEventListener('mentor-ai:prepare-app-update', handlePrepareAppUpdate);
   window.addEventListener('mentor-content-engagement', handleLessonEngagementChange);
   window.addEventListener('mentor-learning-activity-updated', refreshLevelActivity);
+  window.addEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyMaintenanceFinished);
   window.addEventListener('focus', refreshHomeReadingProgress);
-  window.addEventListener('resize', updatePhoneViewport);
-  updatePhoneViewport();
 });
 
 onUnmounted(() => {
@@ -1690,8 +1739,8 @@ onUnmounted(() => {
   window.removeEventListener('mentor-ai:prepare-app-update', handlePrepareAppUpdate);
   window.removeEventListener('mentor-content-engagement', handleLessonEngagementChange);
   window.removeEventListener('mentor-learning-activity-updated', refreshLevelActivity);
+  window.removeEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyMaintenanceFinished);
   window.removeEventListener('focus', refreshHomeReadingProgress);
-  window.removeEventListener('resize', updatePhoneViewport);
 });
 
 watch(selectedHomeListTab, (tab) => saveHomePreference('mentor-ai:home-list-tab', tab));
@@ -1847,8 +1896,9 @@ async function openStartedContent(item: StartedContentItem) {
   if (item.category === 'reading') await router.push({ name: 'reading' });
 }
 
-function updatePhoneViewport() {
-  isPhoneViewport.value = window.matchMedia('(max-width: 700px)').matches;
+function handleDailyMaintenanceFinished() {
+  void refreshStartedContent();
+  void refreshLessonProgressStates();
 }
 
 async function resumePausedLesson(sessionId: string) {

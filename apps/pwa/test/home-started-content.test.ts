@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { ContentProgress } from '@mentor-ai/shared';
-import { selectUnfinishedStartedContent } from '../src/services/home-started-content.js';
+import { selectRecentContent, selectUnfinishedStartedContent } from '../src/services/home-started-content.js';
 
 const progress = (overrides: Partial<ContentProgress>): ContentProgress => ({
   id: 'lesson:one', studentId: 'student', category: 'lesson', contentId: 'one', position: 20,
@@ -22,5 +22,19 @@ describe('Home started content', () => {
       progress({ id: 'audio:unfinished-99', category: 'audio', contentId: 'unfinished-99', position: 99, furthestPosition: 99, completed: false }),
     ]);
     assert.deepEqual(selected.map((item) => item.contentId), ['one', 'partial', 'historic-completion', 'unfinished-99']);
+  });
+
+  it('keeps recent progress in update order, including completed content', () => {
+    const selected = selectRecentContent([
+      progress({ id: 'lesson:older', contentId: 'older', updatedAt: '2026-10-01T08:00:00.000Z' }),
+      progress({ id: 'audio:finished', category: 'audio', contentId: 'finished', position: 100, completed: true, updatedAt: '2026-10-03T08:00:00.000Z' }),
+      progress({ id: 'lesson:newer', contentId: 'newer', updatedAt: '2026-10-02T08:00:00.000Z' }),
+      progress({ id: 'lesson:empty', contentId: 'empty', position: 0, updatedAt: '2026-10-04T08:00:00.000Z' }),
+    ], 2);
+
+    assert.deepEqual(selected.map((item) => [item.contentId, item.progress, item.completed]), [
+      ['finished', 100, true],
+      ['newer', 20, false],
+    ]);
   });
 });
