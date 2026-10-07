@@ -5,13 +5,20 @@ import { createPatternAudioScript, patternLibrary } from '../src/services/patter
 import { createPatternPlaylistWav, getPatternPlaylistContentVersion } from '../src/services/pattern-playlist.js';
 
 describe('phrase pattern library', () => {
-  it('starts with one complete reusable pattern rather than placeholder lessons', () => {
-    assert.equal(patternLibrary.length, 1);
+  it('keeps the original complete reusable pattern', () => {
     const pattern = patternLibrary[0]!;
     assert.equal(pattern.id, 'could-you-please');
     assert.equal(pattern.examples.length, 20);
     assert.ok(pattern.examples.every((example) => example.phrase.startsWith('Could you ')));
     assert.ok(pattern.examples.every((example) => example.phrase.endsWith(', please?')));
+  });
+
+  it('adds an I want you to pattern with 20 practical examples', () => {
+    const pattern = patternLibrary.find((item) => item.id === 'i-want-you-to');
+    assert.ok(pattern);
+    assert.equal(pattern.examples.length, 20);
+    assert.ok(pattern.examples.every((example) => example.phrase.startsWith('I want you to ')));
+    assert.ok(pattern.examples.every((example) => example.phrase.endsWith('.')));
   });
 
   it('requires every current and future pattern to contain 20 useful substitutions', () => {
