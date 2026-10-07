@@ -31,6 +31,7 @@ export const expressionLibrary: EnglishExpression[] = [
 
 export const expressionPractice: PhrasePattern = {
   id: 'everyday-expressions',
+  addedAt: '2026-09-12T10:00:00.000Z',
   title: 'Everyday expressions',
   frame: 'Learn each expression as one complete meaning.',
   prefix: '',

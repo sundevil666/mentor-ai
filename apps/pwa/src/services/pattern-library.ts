@@ -1,3 +1,5 @@
+import { sortMaterialsNewestFirst } from './material-order.js';
+
 export interface PhrasePatternExample {
   id: string;
   situation: string;
@@ -8,6 +10,7 @@ export interface PhrasePatternExample {
 
 export interface PhrasePattern {
   id: string;
+  addedAt: string;
   title: string;
   frame: string;
   prefix: string;
@@ -18,9 +21,10 @@ export interface PhrasePattern {
   examples: PhrasePatternExample[];
 }
 
-export const patternLibrary: PhrasePattern[] = [
+const patternCatalog: PhrasePattern[] = [
   {
     id: 'could-you-please',
+    addedAt: '2026-08-27T10:00:00.000Z',
     title: 'Could you …, please?',
     frame: 'Could you [action], please?',
     prefix: 'Could you',
@@ -53,6 +57,7 @@ export const patternLibrary: PhrasePattern[] = [
   },
   {
     id: 'i-want-you-to',
+    addedAt: '2026-10-07T08:00:00.000Z',
     title: 'I want you to …',
     frame: 'I want you to [action].',
     prefix: 'I want you to',
@@ -84,6 +89,8 @@ export const patternLibrary: PhrasePattern[] = [
     ],
   },
 ];
+
+export const patternLibrary = sortMaterialsNewestFirst(patternCatalog);
 
 export function createPatternAudioScript(pattern: PhrasePattern) {
   return [

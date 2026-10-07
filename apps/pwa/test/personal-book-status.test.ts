@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { ContentProgress, PersonalReadingBook } from '@mentor-ai/shared';
-import { bookReaderDifficultyRatingLabel, personalBookAction, personalBookKanbanColumn, personalBookReadingStatus, sortPersonalBooksByActivity } from '../src/services/personal-book-status.js';
+import { bookReaderDifficultyRatingLabel, personalBookAction, personalBookKanbanColumn, personalBookReadingStatus, sortPersonalBooksNewestFirst } from '../src/services/personal-book-status.js';
 
 const book: PersonalReadingBook = {
   id: 'book', title: 'Book', level: 'unknown', language: 'en', sourceId: 'source', pageCount: 1,
@@ -70,16 +70,14 @@ describe('personal book reading status', () => {
     assert.equal(personalBookKanbanColumn(rewriteBook, 'finished'), 'done');
   });
 
-  it('puts the most recently started books first and finished books last', () => {
-    const olderStarted = { ...book, id: 'older', lastOpenedAt: '2026-09-20T00:00:00.000Z' };
-    const newerStarted = { ...book, id: 'newer', lastOpenedAt: '2026-09-24T00:00:00.000Z' };
+  it('puts the most recently imported books first regardless of reading activity', () => {
+    const olderStarted = { ...book, id: 'older', importedAt: '2026-09-20T00:00:00.000Z', lastOpenedAt: '2026-09-27T00:00:00.000Z' };
+    const newerStarted = { ...book, id: 'newer', importedAt: '2026-09-24T00:00:00.000Z', lastOpenedAt: '2026-09-24T00:00:00.000Z' };
     const untouched = { ...book, id: 'untouched', importedAt: '2026-09-25T00:00:00.000Z' };
-    const finished = { ...book, id: 'finished', lastOpenedAt: '2026-09-26T00:00:00.000Z' };
+    const finished = { ...book, id: 'finished', importedAt: '2026-09-26T00:00:00.000Z', lastOpenedAt: '2026-09-26T00:00:00.000Z' };
     assert.deepEqual(
-      sortPersonalBooksByActivity([finished, untouched, olderStarted, newerStarted], {
-        older: 'started', newer: 'started', untouched: 'new', finished: 'finished',
-      }).map((item) => item.id),
-      ['newer', 'older', 'untouched', 'finished'],
+      sortPersonalBooksNewestFirst([olderStarted, newerStarted, untouched, finished]).map((item) => item.id),
+      ['finished', 'untouched', 'newer', 'older'],
     );
   });
 });

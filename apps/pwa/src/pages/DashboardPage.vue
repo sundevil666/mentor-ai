@@ -640,8 +640,8 @@ import type { GeneratedLesson, LearningActivityTotals, LearningContext, Preferre
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { synchronizeDashboardLessonRoute, type DashboardTrainingCategory } from 'src/services/navigation-category';
+import { sortMaterialsNewestFirst } from 'src/services/material-order';
 import {
-  chooseRecommendedTraining,
   createCurrentActivitySuggestion,
   createLearningContext,
 } from 'src/services/learning-context';
@@ -760,7 +760,7 @@ type ListeningSentenceItem = {
 };
 type TrainingLibraryKey = 'home' | DashboardTrainingCategory;
 type LessonReturnDestination = TrainingLibraryKey | 'specific-lessons';
-type TrainingLibraryLesson = LessonChoice & { mode: 'home' | 'listening' | 'speaking'; minutes: number; concept?: GeneratedLesson['concept'] };
+type TrainingLibraryLesson = LessonChoice & { addedAt: string; mode: 'home' | 'listening' | 'speaking'; minutes: number; concept?: GeneratedLesson['concept'] };
 type HomeLesson = TrainingLibraryLesson & { category: DashboardTrainingCategory; skillLabel: string };
 type HomeListTab = 'required' | 'started';
 type RequiredLessonItem = {
@@ -1149,8 +1149,8 @@ const trainingLibraries: Record<DashboardTrainingCategory, {
     title: 'Listening lessons',
     icon: 'headphones',
     lessons: [
-      { templateKey: 'commute-listening', title: 'Commute listening', focus: 'A complete listening session for the journey', mode: 'listening', minutes: 10 },
-      { templateKey: 'shop-listening', title: 'At a small shop', focus: 'Follow a short dialogue and understand a real request', mode: 'listening', minutes: 7 },
+      { templateKey: 'commute-listening', addedAt: '2026-08-24T10:00:00.000Z', title: 'Commute listening', focus: 'A complete listening session for the journey', mode: 'listening', minutes: 10 },
+      { templateKey: 'shop-listening', addedAt: '2026-08-24T10:00:01.000Z', title: 'At a small shop', focus: 'Follow a short dialogue and understand a real request', mode: 'listening', minutes: 7 },
     ],
   },
   speaking: {
@@ -1158,16 +1158,16 @@ const trainingLibraries: Record<DashboardTrainingCategory, {
     title: 'Speaking lessons',
     icon: 'record_voice_over',
     lessons: [
-      { templateKey: 'weekly-weak-spots-dialogue', title: 'Work conversation', focus: 'Say five complete phrases for a real workday', mode: 'speaking', minutes: 9 },
-      { templateKey: 'polite-speaking', title: 'Polite requests', focus: 'Keep a conversation going when you need help', mode: 'speaking', minutes: 7 },
+      { templateKey: 'weekly-weak-spots-dialogue', addedAt: '2026-08-24T10:00:00.000Z', title: 'Work conversation', focus: 'Say five complete phrases for a real workday', mode: 'speaking', minutes: 9 },
+      { templateKey: 'polite-speaking', addedAt: '2026-08-24T10:00:01.000Z', title: 'Polite requests', focus: 'Keep a conversation going when you need help', mode: 'speaking', minutes: 7 },
     ],
   },
 };
 const generatedHomeLessons = computed<HomeLesson[]>(() => buildGeneratedLessonLinks(newLessonCatalog.value));
 const lessonsByTrainingCategory = computed(() => ({
   grammar: generatedHomeLessons.value.filter((lesson) => lesson.category === 'grammar'),
-  listening: [...generatedHomeLessons.value.filter((lesson) => lesson.category === 'listening'), ...trainingLibraries.listening.lessons],
-  speaking: [...generatedHomeLessons.value.filter((lesson) => lesson.category === 'speaking'), ...trainingLibraries.speaking.lessons],
+  listening: sortMaterialsNewestFirst([...generatedHomeLessons.value.filter((lesson) => lesson.category === 'listening'), ...trainingLibraries.listening.lessons]),
+  speaking: sortMaterialsNewestFirst([...generatedHomeLessons.value.filter((lesson) => lesson.category === 'speaking'), ...trainingLibraries.speaking.lessons]),
 }));
 const activeTrainingLibrary = computed(() => {
   const category = selectedLessonLibrary.value === 'home' ? 'grammar' : selectedLessonLibrary.value;
@@ -1236,16 +1236,9 @@ async function refreshStartedContent() {
   personalBooks.value = books;
 }
 const homeLessonQueue = computed(() => {
-  const priorityMode = chooseRecommendedTraining(currentSuggestion.value, appStore.studentModel) === 'listening'
-    ? 'listening'
-    : 'speaking';
-  return [...allHomeLessons.value].sort((left, right) => {
-    const leftMode = left.mode === priorityMode ? 0 : 1;
-    const rightMode = right.mode === priorityMode ? 0 : 1;
-    if (leftMode !== rightMode) return leftMode - rightMode;
-    return (lessonCompletionCounts.value.get(left.templateKey) ?? 0)
-      - (lessonCompletionCounts.value.get(right.templateKey) ?? 0);
-  });
+  return [...allHomeLessons.value].sort((left, right) => (
+    right.addedAt.localeCompare(left.addedAt) || left.templateKey.localeCompare(right.templateKey)
+  ));
 });
 function lessonSessionProgress(session: typeof appStore.pausedSessions[number]) {
   return calculateLessonSessionProgress(session.currentExerciseIndex, session.lesson.exercises.length);
@@ -2113,6 +2106,7 @@ async function requireCurrentLessonUpdateBeforePlayback() {
 
     const choice = trainingLibraries[mode].lessons.find((lesson) => lesson.templateKey === templateKey) ?? {
       templateKey,
+      addedAt: freshLesson.createdAt,
       title: freshLesson.title,
       focus: freshLesson.title,
       mode,

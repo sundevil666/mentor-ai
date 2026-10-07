@@ -5,6 +5,7 @@ export type LessonCategoryState = 'new' | 'started' | 'progress' | 'complete';
 export type GeneratedLessonCategory = 'grammar' | 'listening' | 'speaking';
 export interface GeneratedLessonLink {
   templateKey: string;
+  addedAt: string;
   title: string;
   focus: string;
   concept: GeneratedLesson['concept'];
@@ -65,6 +66,7 @@ export function buildGeneratedLessonLinks(lessons: GeneratedLesson[]): Generated
     const mode = category === 'grammar' ? 'home' : category;
     return {
       templateKey: lesson.lessonTemplateKey ?? lesson.id,
+      addedAt: lesson.createdAt,
       title: lesson.title,
       focus: lesson.purpose,
       concept: lesson.concept,

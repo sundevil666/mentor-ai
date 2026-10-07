@@ -1,5 +1,8 @@
+import { sortMaterialsNewestFirst } from './material-order.js';
+
 export type LibraryAudio = {
   id: string;
+  addedAt: string;
   title: string;
   description: string;
   sourceUrl: string;
@@ -16,9 +19,10 @@ export function getAudioContentVersion(audio: LibraryAudio) {
   return hashCatalogItem([audio.sourceUrl, audio.durationSeconds, audio.sizeBytes, audio.publishedAt]);
 }
 
-export const audioLibrary: LibraryAudio[] = [
+const audioCatalog: LibraryAudio[] = [
   {
     id: 'voa-yellowstone-open-boat',
+    addedAt: '2026-08-25T10:00:00.000Z',
     title: 'Yellowstone and The Open Boat',
     description: 'Adverbs, Yellowstone National Park and the conclusion of a classic American story.',
     sourceUrl: 'https://voa-audio.voanews.eu/vle/2025/03/15/20250315-003003-vle122-program.mp3',
@@ -30,6 +34,7 @@ export const audioLibrary: LibraryAudio[] = [
   },
   {
     id: 'voa-lincoln-national-parks',
+    addedAt: '2026-08-25T10:00:01.000Z',
     title: 'Lincoln and America’s National Parks',
     description: 'A historic home, the expression “watching grass grow,” Theodore Roosevelt and a grammar lesson.',
     sourceUrl: 'https://voa-audio.voanews.eu/vle/2025/03/17/20250317-003003-vle122-program.mp3',
@@ -41,6 +46,7 @@ export const audioLibrary: LibraryAudio[] = [
   },
   {
     id: 'voa-flight-grand-canyon',
+    addedAt: '2026-08-25T10:00:02.000Z',
     title: 'First Flight and the Grand Canyon',
     description: 'The Wright brothers, useful aircraft words, the Grand Canyon and everyday vocabulary.',
     sourceUrl: 'https://voa-audio.voanews.eu/vle/2025/03/18/20250318-003003-vle122-program.mp3',
@@ -52,6 +58,7 @@ export const audioLibrary: LibraryAudio[] = [
   },
   {
     id: 'voa-learning-english-2025-03-20',
+    addedAt: '2026-10-07T08:00:00.000Z',
     title: 'Learning English Podcast — March 20',
     description: 'A complete VOA Learning English program with news, stories, useful vocabulary and clearly paced English.',
     sourceUrl: 'https://voa-audio.voanews.eu/vle/2025/03/20/20250320-003003-vle122-program.mp3',
@@ -63,6 +70,7 @@ export const audioLibrary: LibraryAudio[] = [
   },
   {
     id: 'voa-learning-english-2025-03-21',
+    addedAt: '2026-10-07T08:00:01.000Z',
     title: 'Learning English Podcast — March 21',
     description: 'A complete VOA Learning English program with news, stories, useful vocabulary and clearly paced English.',
     sourceUrl: 'https://voa-audio.voanews.eu/vle/2025/03/21/20250321-003003-vle122-program.mp3',
@@ -73,6 +81,8 @@ export const audioLibrary: LibraryAudio[] = [
     publishedAt: '2025-03-21',
   },
 ];
+
+export const audioLibrary = sortMaterialsNewestFirst(audioCatalog);
 
 export async function getCachedAudioUrls(): Promise<Set<string>> {
   if (!('caches' in window)) return new Set();

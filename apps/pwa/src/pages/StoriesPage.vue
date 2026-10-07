@@ -695,7 +695,7 @@ import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, listReaderVoc
 import { assessBookDifficulty } from 'src/services/book-difficulty-assessment';
 import { applyReadingReview, isBookDifficultyReviewDue, preserveBookLaneOnDifficultyCheck, recommendNextFreeBook } from 'src/services/book-reading-guidance';
 import { calibrateReaderFromBooks, predictBookFit, predictUnseenBookFit } from 'src/services/reader-book-calibration';
-import { bookReaderDifficultyRatingLabel, personalBookAction, personalBookKanbanColumn, personalBookReadingStatus, personalBookReadingStatusLabel, sortPersonalBooksByActivity, type PersonalBookKanbanColumn, type PersonalBookReadingStatus } from 'src/services/personal-book-status';
+import { bookReaderDifficultyRatingLabel, personalBookAction, personalBookKanbanColumn, personalBookReadingStatus, personalBookReadingStatusLabel, sortPersonalBooksNewestFirst, type PersonalBookKanbanColumn, type PersonalBookReadingStatus } from 'src/services/personal-book-status';
 import { readerWordContext } from 'src/services/reader-word-context';
 import { speakWithPreferredVoice, speakWithSystemVoice } from 'src/services/speech-synthesis';
 import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, millisecondsUntilNextReadingDay, prepareDailyReadingProgress, recordDailyReadWords, type DailyReadingProgress } from 'src/services/daily-reading-progress';
@@ -869,9 +869,8 @@ function bookFitPrediction(book: PersonalBook) {
     ? predictBookFit(book.difficultyAssessment, readerBookCalibration.value, personalBookStatuses.value[book.id] ?? 'new')
     : null;
 }
-const displayedPersonalBooks = computed(() => sortPersonalBooksByActivity(
+const displayedPersonalBooks = computed(() => sortPersonalBooksNewestFirst(
   personalBooks.value.filter((book) => activeBookSection.value !== 'recommendations' && personalBookColumn(book) === activeBookSection.value),
-  personalBookStatuses.value,
 ));
 const nextFreeBookRecommendation = computed(() => {
   const flowingBooks = personalBooks.value.filter((book) => book.difficultyAssessment?.recommendation === 'read' && (

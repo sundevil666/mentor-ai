@@ -1,5 +1,8 @@
+import { sortMaterialsNewestFirst } from './material-order.js';
+
 export type LibraryStory = {
   id: string;
+  addedAt: string;
   title: string;
   description: string;
   level: 'A2' | 'A2–B1' | 'B1';
@@ -24,9 +27,10 @@ export function getStoryContentVersion(story: LibraryStory) {
   return (hash >>> 0).toString(36);
 }
 
-export const storyLibrary: LibraryStory[] = [
+const storyCatalog: LibraryStory[] = [
   {
     id: 'aladdin-and-the-magic-lamp',
+    addedAt: '2026-08-26T10:00:00.000Z',
     title: 'Aladdin and the Magic Lamp',
     description: 'A complete classic fairy tale about Aladdin, the lamp and the genie, told as one focused listening session.',
     level: 'A2–B1',
@@ -40,6 +44,7 @@ export const storyLibrary: LibraryStory[] = [
   },
   {
     id: 'beauty-and-the-beast',
+    addedAt: '2026-08-26T10:00:00.000Z',
     title: 'Beauty and the Beast',
     description: 'The complete fairy tale in clear English, with recurring vocabulary about family, promises and character.',
     level: 'A2–B1',
@@ -53,6 +58,7 @@ export const storyLibrary: LibraryStory[] = [
   },
   {
     id: 'the-30000-bequest-part-1',
+    addedAt: '2026-08-26T10:00:00.000Z',
     title: 'The $30,000 Bequest · Part 1 of 2',
     description: 'The first half of Mark Twain’s humorous story about a couple whose imagined fortune changes their lives.',
     level: 'B1',
@@ -66,6 +72,7 @@ export const storyLibrary: LibraryStory[] = [
   },
   {
     id: 'the-30000-bequest-part-2',
+    addedAt: '2026-08-26T10:00:00.000Z',
     title: 'The $30,000 Bequest · Part 2 of 2',
     description: 'The concluding half of the same story, kept as a separate 37-minute listening session.',
     level: 'B1',
@@ -78,6 +85,8 @@ export const storyLibrary: LibraryStory[] = [
     sizeBytes: 17_900_842,
   },
 ];
+
+export const storyLibrary = sortMaterialsNewestFirst(storyCatalog);
 
 export async function getCachedStoryUrls(): Promise<Set<string>> {
   if (!('caches' in globalThis)) return new Set();

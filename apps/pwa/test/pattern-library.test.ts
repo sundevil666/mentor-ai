@@ -6,7 +6,7 @@ import { createPatternPlaylistWav, getPatternPlaylistContentVersion } from '../s
 
 describe('phrase pattern library', () => {
   it('keeps the original complete reusable pattern', () => {
-    const pattern = patternLibrary[0]!;
+    const pattern = patternLibrary.find((item) => item.id === 'could-you-please')!;
     assert.equal(pattern.id, 'could-you-please');
     assert.equal(pattern.examples.length, 20);
     assert.ok(pattern.examples.every((example) => example.phrase.startsWith('Could you ')));
@@ -30,13 +30,13 @@ describe('phrase pattern library', () => {
   });
 
   it('includes every practice phrase twice in the audio drill', () => {
-    const pattern = patternLibrary[0]!;
+    const pattern = patternLibrary.find((item) => item.id === 'could-you-please')!;
     const script = createPatternAudioScript(pattern);
     for (const example of pattern.examples) assert.equal(script.split(example.phrase).length - 1, 2);
   });
 
   it('changes the offline playlist version when its phrases change', () => {
-    const pattern = patternLibrary[0]!;
+    const pattern = patternLibrary.find((item) => item.id === 'could-you-please')!;
     const changed = { ...pattern, examples: pattern.examples.map((example, index) => index === 0 ? { ...example, phrase: `${example.phrase} Updated.` } : example) };
     assert.notEqual(getPatternPlaylistContentVersion(changed), getPatternPlaylistContentVersion(pattern));
   });

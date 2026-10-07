@@ -1,4 +1,4 @@
-import type { BookDifficultyAssessment, BookReaderDifficultyRating, PersonalReadingBook } from '@mentor-ai/shared';
+import type { BookDifficultyAssessment, BookReaderDifficultyRating } from '@mentor-ai/shared';
 import type { PersonalBookAction } from './personal-book-status';
 
 export const bookDifficultyReviewIntervalMs = 7 * 24 * 60 * 60 * 1000;

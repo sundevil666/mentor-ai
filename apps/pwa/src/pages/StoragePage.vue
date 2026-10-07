@@ -74,7 +74,11 @@ const donutStyle = computed(() => {
   return { background: `conic-gradient(${stops.join(', ')})` };
 });
 onMounted(async () => { if (!appStore.isHydrated) await appStore.hydrate(); await migrateLegacySpeechDownloads(appStore.loadLesson.bind(appStore)); const expired = await cleanupExpiredOfflineLessons(); lessons.value = await refreshOfflineSizes(); if (expired.length) Notify.create({ type: 'info', message: `Removed ${expired.length} unused offline lesson${expired.length === 1 ? '' : 's'}.` }); });
-function categoryLessons(category: OfflineCategory) { return lessons.value.filter((lesson) => lesson.category === category); }
+function categoryLessons(category: OfflineCategory) {
+  return lessons.value
+    .filter((lesson) => lesson.category === category)
+    .sort((left, right) => right.downloadedAt.localeCompare(left.downloadedAt) || left.id.localeCompare(right.id));
+}
 function categoryBytes(category: OfflineCategory) { return categoryLessons(category).reduce((sum, lesson) => sum + lesson.estimatedBytes, 0); }
 function categoryPercent(category: OfflineCategory) { return totalBytes.value ? Math.round(categoryBytes(category) / totalBytes.value * 100) : 0; }
 function savePeriod(category: OfflineCategory) { saveOfflineRetention(category, retention.value[category] as RetentionDays); }

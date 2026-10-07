@@ -45,18 +45,8 @@ export function personalBookKanbanColumn(
   return status === 'finished' ? 'done' : personalBookAction(book);
 }
 
-export function sortPersonalBooksByActivity(
-  books: readonly PersonalReadingBook[],
-  statuses: Readonly<Record<string, PersonalBookReadingStatus>>,
-) {
-  const rank: Record<PersonalBookReadingStatus, number> = { started: 0, new: 1, finished: 2 };
-  return [...books].sort((left, right) => {
-    const leftStatus = statuses[left.id] ?? 'new';
-    const rightStatus = statuses[right.id] ?? 'new';
-    const statusOrder = rank[leftStatus] - rank[rightStatus];
-    if (statusOrder !== 0) return statusOrder;
-    const leftDate = left.lastOpenedAt ?? left.importedAt;
-    const rightDate = right.lastOpenedAt ?? right.importedAt;
-    return rightDate.localeCompare(leftDate);
-  });
+export function sortPersonalBooksNewestFirst(books: readonly PersonalReadingBook[]) {
+  return [...books].sort((left, right) => (
+    right.importedAt.localeCompare(left.importedAt) || left.id.localeCompare(right.id)
+  ));
 }
