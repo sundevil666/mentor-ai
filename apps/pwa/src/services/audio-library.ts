@@ -50,6 +50,28 @@ export const audioLibrary: LibraryAudio[] = [
     sizeBytes: 14_376_586,
     publishedAt: '2025-03-18',
   },
+  {
+    id: 'voa-learning-english-2025-03-20',
+    title: 'Learning English Podcast — March 20',
+    description: 'A complete VOA Learning English program with news, stories, useful vocabulary and clearly paced English.',
+    sourceUrl: 'https://voa-audio.voanews.eu/vle/2025/03/20/20250320-003003-vle122-program.mp3',
+    articleUrl: 'https://learningenglish.voanews.com/a/7999374.html',
+    level: 'A2–B1',
+    durationSeconds: 1_797,
+    sizeBytes: 14_376_586,
+    publishedAt: '2025-03-20',
+  },
+  {
+    id: 'voa-learning-english-2025-03-21',
+    title: 'Learning English Podcast — March 21',
+    description: 'A complete VOA Learning English program with news, stories, useful vocabulary and clearly paced English.',
+    sourceUrl: 'https://voa-audio.voanews.eu/vle/2025/03/21/20250321-003003-vle122-program.mp3',
+    articleUrl: 'https://learningenglish.voanews.com/a/8001750.html',
+    level: 'A2–B1',
+    durationSeconds: 1_796,
+    sizeBytes: 14_375_541,
+    publishedAt: '2025-03-21',
+  },
 ];
 
 export async function getCachedAudioUrls(): Promise<Set<string>> {
