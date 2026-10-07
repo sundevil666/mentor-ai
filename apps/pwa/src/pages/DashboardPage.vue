@@ -14,21 +14,6 @@
         </section>
 
         <section v-else-if="!appStore.session" key="choice" class="learning-start">
-          <div v-if="remoteContinueOptions.length > 0" class="handoff-actions">
-            <q-btn
-              v-for="handoff in remoteContinueOptions"
-              :key="handoff.id"
-              color="primary"
-              outline
-              no-caps
-              icon="devices"
-              :label="handoff.label"
-              @click="continueFromDevice(handoff.id)"
-            >
-              <q-tooltip>{{ handoff.detail }}</q-tooltip>
-            </q-btn>
-          </div>
-
           <template v-if="selectedLessonLibrary === 'home'">
           <section class="home-overview" aria-label="Learning progress">
             <div class="home-progress-heading">
@@ -1163,13 +1148,6 @@ const inputLabel = computed(() =>
 );
 const currentSuggestion = computed(() =>
   createCurrentActivitySuggestion(appStore.preferredWorkShift, appStore.activitySnapshots, new Date(), appStore.myShiftActivity),
-);
-const remoteContinueOptions = computed(() =>
-  appStore.remoteSessionHandoffs.map((handoff) => ({
-    id: handoff.id,
-    label: `Continue from ${handoff.sourceDevice}`,
-    detail: `${handoff.lesson.title} · ${Math.min(handoff.currentExerciseIndex + 1, handoff.lesson.exercises.length)}/${handoff.lesson.exercises.length}`,
-  })),
 );
 const trainingLibraries: Record<DashboardTrainingCategory, {
   label: string;

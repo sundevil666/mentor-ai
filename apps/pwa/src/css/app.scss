@@ -1036,16 +1036,6 @@ body .q-menu {
   border-color: var(--q-positive) !important;
 }
 
-.handoff-actions {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.handoff-actions .q-btn {
-  min-height: 48px;
-}
-
 .learning-start h1,
 .lesson-stage h1,
 .lesson-complete h1 {
@@ -4361,20 +4351,17 @@ body.body--dark .personal-reader__lookup-error {
     min-width: 44px;
   }
 
-  .handoff-actions .q-btn,
   .lesson-complete .q-btn,
   .audio-row .q-btn,
   .panel-heading .q-btn {
     min-height: 48px;
   }
 
-  .handoff-actions .q-btn,
   .lesson-complete > .q-btn {
     width: 100%;
   }
 
   .lesson-library__grid,
-  .handoff-actions,
   .shift-timing-grid {
     grid-template-columns: 1fr;
   }
