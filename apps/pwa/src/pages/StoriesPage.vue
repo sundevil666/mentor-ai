@@ -200,9 +200,6 @@
                     <span>Text difficulty <strong>{{ bookFitPrediction(book)?.calibratedDifficulty }}<small>/100</small></strong></span>
                     <span class="personal-book-row__fit-label">Your fit: {{ bookFitPrediction(book)?.label }}</span>
                   </span>
-                  <span class="personal-book-row__difficulty-track" aria-hidden="true">
-                    <span :style="{ width: `${bookFitPrediction(book)?.calibratedDifficulty ?? 0}%` }" />
-                  </span>
                 </span>
               </span>
             </button>
