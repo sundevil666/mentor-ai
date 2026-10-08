@@ -90,37 +90,14 @@
             @click="personalBookSyncControl.trigger?.()"
           />
         </div>
-        <q-btn
-          class="network-status-button"
-          :aria-label="appStore.isOnline ? 'Online' : 'Offline'"
-          :color="appStore.isOnline ? 'primary' : 'negative'"
-          flat
-          :icon="appStore.isOnline ? 'wifi' : 'wifi_off'"
-          round
-        >
-          <q-tooltip>{{ appStore.isOnline ? 'Online' : 'Offline' }}</q-tooltip>
-        </q-btn>
         <span class="level-trend header-level-trend">
           {{ levelTrend.currentLevel }}→{{ levelTrend.nextLevel }} · {{ levelTrend.daysLabel }} · {{ levelTrend.reviewLabel }}
           <q-tooltip>{{ levelTrend.tooltip }}</q-tooltip>
         </span>
         <q-btn
-          class="lesson-update-button"
-          :aria-label="lessonUpdateTooltip"
-          :color="offlineLessonState.status === 'error' ? 'negative' : offlineLessonState.status === 'ready' ? 'positive' : undefined"
-          :disable="appStore.isAppUpdateRunningInBackground || !appStore.isOnline || offlineLessonState.status === 'checking' || offlineLessonState.status === 'downloading'"
-          flat
-          :icon="lessonUpdateIcon"
-          :loading="appStore.isAppUpdateRunningInBackground || offlineLessonState.status === 'checking' || offlineLessonState.status === 'downloading'"
-          round
-          @click="checkOfflineLessons(true)"
-        >
-          <q-tooltip>{{ lessonUpdateTooltip }}</q-tooltip>
-        </q-btn>
-        <q-btn
           class="sync-status-button"
           :aria-label="syncStatusTooltip"
-          :color="pendingUploadCount > 0 ? 'deep-orange-7' : 'primary'"
+          :color="!appStore.isOnline ? 'negative' : pendingUploadCount > 0 ? 'deep-orange-7' : 'primary'"
           :flat="pendingUploadCount === 0"
           :icon="syncStatusIcon"
           :label="pendingUploadCount > 0 ? 'Send' : undefined"
@@ -154,6 +131,23 @@
           <q-tooltip>More</q-tooltip>
           <q-menu anchor="bottom right" self="top right">
             <q-list class="more-nav-menu" dense>
+              <q-item
+                clickable
+                :disable="offlineContentSyncDisabled"
+                @click="checkOfflineLessons(true)"
+              >
+                <q-item-section avatar>
+                  <q-icon
+                    :color="offlineLessonState.status === 'error' ? 'negative' : undefined"
+                    :name="lessonUpdateIcon"
+                  />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>Check offline content</q-item-label>
+                  <q-item-label caption>{{ lessonUpdateTooltip }}</q-item-label>
+                </q-item-section>
+              </q-item>
+              <q-separator />
               <q-item clickable :to="{ name: 'storage' }">
                 <q-item-section avatar><q-icon name="storage" /></q-item-section>
                 <q-item-section>Storage</q-item-section>
@@ -474,16 +468,24 @@ const lessonUpdateTooltip = computed(() => {
   if (!appStore.isOnline) return 'Offline. Saved lessons remain available.';
   return 'Current lessons are available offline. Tap to check the server now.';
 });
+const offlineContentSyncDisabled = computed(() => appStore.isAppUpdateRunningInBackground
+  || !appStore.isOnline
+  || offlineLessonState.value.status === 'checking'
+  || offlineLessonState.value.status === 'downloading');
 const syncStatusIcon = computed(() => {
+  if (!appStore.isOnline) return 'cloud_off';
+
   if (pendingUploadCount.value > 0) {
-    return appStore.isOnline ? 'cloud_upload' : 'cloud_off';
+    return 'cloud_upload';
   }
 
   return appStore.isSyncRefreshing ? 'sync' : 'cloud_done';
 });
 const syncStatusTooltip = computed(() => {
-  if (pendingUploadCount.value > 0 && !appStore.isOnline) {
-    return `${pendingUploadCount.value} learning updates are saved on this device. They will upload when internet returns.`;
+  if (!appStore.isOnline) {
+    return pendingUploadCount.value > 0
+      ? `Offline. ${pendingUploadCount.value} learning updates are saved on this device and will upload automatically.`
+      : 'Offline. New learning progress will stay safely on this device until internet returns.';
   }
 
   if (pendingUploadCount.value > 0) {

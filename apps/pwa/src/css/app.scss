@@ -255,10 +255,8 @@ body .q-menu {
   display: none;
 }
 
-.app-header .lesson-update-button,
-.app-header .sync-status-button,
 .app-header .analysis-status-button {
-  order: 1;
+  order: 2;
 }
 .app-header .sync-status-button:not(.q-btn--flat) { box-shadow: 0 0 0 3px rgba(249, 115, 22, .3), 0 5px 14px rgba(194, 65, 12, .32); font-weight: 800; }
 
@@ -295,7 +293,7 @@ body .q-menu {
   gap: 12px;
 }
 
-.app-header .network-status-button {
+.app-header .sync-status-button {
   margin-left: auto;
   order: 2;
 }
@@ -671,13 +669,6 @@ body .q-menu {
   display: flex;
   gap: 12px;
   justify-content: space-between;
-}
-
-.network-status-button {
-  height: 44px;
-  min-height: 44px;
-  min-width: 44px;
-  width: 44px;
 }
 
 .header-level-trend {
