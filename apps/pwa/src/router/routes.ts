@@ -8,7 +8,6 @@ import StoriesPage from 'pages/StoriesPage.vue';
 import StoragePage from 'pages/StoragePage.vue';
 import AudioPage from 'pages/AudioPage.vue';
 import PatternsPage from 'pages/PatternsPage.vue';
-import VersionHistoryPage from 'pages/VersionHistoryPage.vue';
 import MoviesPage from 'pages/MoviesPage.vue';
 
 const routes: RouteRecordRaw[] = [
@@ -72,12 +71,6 @@ const routes: RouteRecordRaw[] = [
         path: 'settings',
         name: 'settings',
         component: SettingsPage,
-        meta: { routeOrder: 3 },
-      },
-      {
-        path: 'versions',
-        name: 'version-history',
-        component: VersionHistoryPage,
         meta: { routeOrder: 3 },
       },
     ],

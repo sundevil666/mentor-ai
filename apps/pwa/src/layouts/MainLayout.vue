@@ -5,12 +5,75 @@
         <button
           class="app-version-badge"
           type="button"
-          :aria-label="`Open Mentor AI version history. Current version ${appVersion}`"
-          @click="$router.push({ name: 'version-history' })"
+          :aria-label="`Open update notifications. Current Mentor AI version ${appVersion}`"
         >
           <span class="app-version-badge__wide">{{ appVersionWideLabel }}</span>
           <span class="app-version-badge__compact">{{ appVersionCompactLabel }}</span>
-          <q-tooltip>What changed in Mentor AI {{ appVersion }}</q-tooltip>
+          <q-icon name="notifications" size="18px" />
+          <q-badge v-if="appStore.unreadUpdateNotificationCount > 0" color="red-7" floating>
+            {{ appStore.unreadUpdateNotificationCount }}
+          </q-badge>
+          <q-tooltip>Mentor AI {{ appVersion }} · update notifications</q-tooltip>
+          <q-menu anchor="bottom left" self="top left" class="update-log-menu">
+            <div class="update-log">
+              <div class="update-log__header">
+                <div>
+                  <strong>Update log</strong>
+                  <span>{{ appStore.unreadUpdateNotificationCount }} unread</span>
+                </div>
+                <q-btn
+                  v-close-popup
+                  dense
+                  flat
+                  icon="done_all"
+                  round
+                  :disable="appStore.unreadUpdateNotificationCount === 0"
+                  @click="markAllRead"
+                >
+                  <q-tooltip>Mark all as read</q-tooltip>
+                </q-btn>
+              </div>
+
+              <q-list v-if="appStore.updateNotifications.length > 0" separator>
+                <q-item
+                  v-for="notification in appStore.updateNotifications"
+                  :key="notification.id"
+                  class="update-log__item"
+                  :class="{ 'update-log__item--unread': notification.readAt === null }"
+                >
+                  <q-item-section avatar>
+                    <q-icon
+                      :color="notification.readAt === null ? 'primary' : 'grey-6'"
+                      :name="notification.readAt === null ? 'fiber_manual_record' : 'check_circle'"
+                    />
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label>{{ notification.title }}</q-item-label>
+                    <q-item-label caption>
+                      {{ notification.kind === 'lessons' ? 'Offline lessons' : `Version ${notification.version}` }} · {{ formatDateTime(notification.createdAt) }}
+                    </q-item-label>
+                    <q-item-label caption>
+                      {{ notification.message }}
+                    </q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <q-btn
+                      v-if="notification.readAt === null"
+                      dense
+                      flat
+                      icon="done"
+                      round
+                      @click="markRead(notification.id)"
+                    >
+                      <q-tooltip>Mark as read</q-tooltip>
+                    </q-btn>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+
+              <div v-else class="update-log__empty">No updates yet.</div>
+            </div>
+          </q-menu>
         </button>
         <div class="app-header__center">
           <q-btn
@@ -86,72 +149,6 @@
             {{ appStore.unreadStatisticsCount }}
           </q-badge>
           <q-tooltip>Statistics</q-tooltip>
-        </q-btn>
-        <q-btn class="update-log-button" flat icon="notifications" round>
-          <q-badge v-if="appStore.unreadUpdateNotificationCount > 0" color="red-7" floating>
-            {{ appStore.unreadUpdateNotificationCount }}
-          </q-badge>
-          <q-tooltip>Update notifications</q-tooltip>
-          <q-menu anchor="bottom right" self="top right" class="update-log-menu">
-            <div class="update-log">
-              <div class="update-log__header">
-                <div>
-                  <strong>Update log</strong>
-                  <span>{{ appStore.unreadUpdateNotificationCount }} unread</span>
-                </div>
-                <q-btn
-                  v-close-popup
-                  dense
-                  flat
-                  icon="done_all"
-                  round
-                  :disable="appStore.unreadUpdateNotificationCount === 0"
-                  @click="markAllRead"
-                >
-                  <q-tooltip>Mark all as read</q-tooltip>
-                </q-btn>
-              </div>
-
-              <q-list v-if="appStore.updateNotifications.length > 0" separator>
-                <q-item
-                  v-for="notification in appStore.updateNotifications"
-                  :key="notification.id"
-                  class="update-log__item"
-                  :class="{ 'update-log__item--unread': notification.readAt === null }"
-                >
-                  <q-item-section avatar>
-                    <q-icon
-                      :color="notification.readAt === null ? 'primary' : 'grey-6'"
-                      :name="notification.readAt === null ? 'fiber_manual_record' : 'check_circle'"
-                    />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label>{{ notification.title }}</q-item-label>
-                    <q-item-label caption>
-                      {{ notification.kind === 'lessons' ? 'Offline lessons' : `Version ${notification.version}` }} · {{ formatDateTime(notification.createdAt) }}
-                    </q-item-label>
-                    <q-item-label caption>
-                      {{ notification.message }}
-                    </q-item-label>
-                  </q-item-section>
-                  <q-item-section side>
-                    <q-btn
-                      v-if="notification.readAt === null"
-                      dense
-                      flat
-                      icon="done"
-                      round
-                      @click="markRead(notification.id)"
-                    >
-                      <q-tooltip>Mark as read</q-tooltip>
-                    </q-btn>
-                  </q-item-section>
-                </q-item>
-              </q-list>
-
-              <div v-else class="update-log__empty">No updates yet.</div>
-            </div>
-          </q-menu>
         </q-btn>
         <q-btn class="more-nav-button" flat icon="more_vert" round>
           <q-tooltip>More</q-tooltip>
