@@ -258,6 +258,9 @@ body .q-menu {
 .app-header .analysis-status-button {
   order: 2;
 }
+.app-header .bulk-lesson-download-button {
+  order: 1;
+}
 .app-header .sync-status-button:not(.q-btn--flat) { box-shadow: 0 0 0 3px rgba(249, 115, 22, .3), 0 5px 14px rgba(194, 65, 12, .32); font-weight: 800; }
 
 .analysis-menu {

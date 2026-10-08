@@ -90,6 +90,23 @@
             @click="personalBookSyncControl.trigger?.()"
           />
         </div>
+        <q-btn
+          v-if="pendingBulkLessonDownloads.length > 0"
+          class="bulk-lesson-download-button"
+          :aria-label="bulkLessonDownloadTooltip"
+          color="secondary"
+          :disable="!appStore.isOnline"
+          flat
+          icon="download_for_offline"
+          :loading="isBulkLessonDownloadRunning"
+          round
+          @click="downloadAllPendingLessons"
+        >
+          <q-badge color="deep-orange-7" floating>
+            {{ pendingBulkLessonDownloads.length }}
+          </q-badge>
+          <q-tooltip>{{ bulkLessonDownloadTooltip }}</q-tooltip>
+        </q-btn>
         <span class="level-trend header-level-trend">
           {{ levelTrend.currentLevel }}→{{ levelTrend.nextLevel }} · {{ levelTrend.daysLabel }} · {{ levelTrend.reviewLabel }}
           <q-tooltip>{{ levelTrend.tooltip }}</q-tooltip>
@@ -314,7 +331,7 @@
 </template>
 
 <script setup lang="ts">
-import type { LearningActivityTotals, TranslationUsage } from '@mentor-ai/shared';
+import type { GeneratedLesson, LearningActivityTotals, TranslationUsage } from '@mentor-ai/shared';
 import { Dark, Notify } from 'quasar';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { personalBookSyncControl } from 'src/services/personal-book-sync-control';
@@ -332,10 +349,10 @@ import { fetchTranslationUsage } from 'src/services/api-client';
 import { recordApplicationTelemetry } from 'src/services/application-telemetry';
 import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
 import { formatDisplayDateTime } from 'src/services/date-format';
-import { cleanupExpiredOfflineLessons } from 'src/services/offline-library';
+import { cleanupExpiredOfflineLessons, readOfflineLessons } from 'src/services/offline-library';
 import { loadLearningActivityTotals, pendingLearningActivityCount, syncLearningActivity } from 'src/services/learning-activity';
 import { syncAllContentProgress } from 'src/services/content-progress';
-import { syncContentEngagement } from 'src/services/content-engagement';
+import { loadContentEngagementSummaries, syncContentEngagement } from 'src/services/content-engagement';
 import { syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
 import { syncReadingPageSpeech } from 'src/services/reading-page-speech-outbox';
 import { syncReaderVocabulary } from 'src/services/reader-vocabulary';
@@ -344,7 +361,10 @@ import { pendingMovieLearningReportCount, syncMovieLearningReports } from 'src/s
 import { mentorDb } from 'src/services/indexed-db';
 import { calculateLevelJourney } from 'src/services/level-journey';
 import {
+  downloadGeneratedLessonOffline,
+  fetchNewLessonCatalog,
   getOfflineLessonUpdateState,
+  selectPendingBulkLessonDownloads,
   subscribeOfflineLessonUpdates,
   updateOfflineLessons,
   type OfflineLessonUpdateState,
@@ -396,7 +416,17 @@ const pendingActivityCount = ref(0);
 const pendingReadingTranscriptCount = ref(0);
 const pendingMovieReportCount = ref(0);
 const isManualSyncRunning = ref(false);
+const isBulkLessonDownloadRunning = ref(false);
+const bulkLessonDownloadCompleted = ref(0);
+const pendingBulkLessonDownloads = ref<GeneratedLesson[]>([]);
 const pendingUploadCount = computed(() => appStore.pendingSyncCount + pendingActivityCount.value + pendingReadingTranscriptCount.value + pendingMovieReportCount.value);
+const bulkLessonDownloadTooltip = computed(() => {
+  if (!appStore.isOnline) return `${pendingBulkLessonDownloads.value.length} new unfinished lessons are waiting. Connect to download them.`;
+  if (isBulkLessonDownloadRunning.value) {
+    return `Downloading new lessons: ${bulkLessonDownloadCompleted.value}/${pendingBulkLessonDownloads.value.length}.`;
+  }
+  return `Download all ${pendingBulkLessonDownloads.value.length} new unfinished lessons for offline use.`;
+});
 const levelTrend = computed(() => calculateLevelJourney(appStore.studentModel, levelActivity.value, appStore.statisticsSnapshots, levelTrendNow.value));
 const deferredInstallPrompt = ref<BeforeInstallPromptEvent | null>(null);
 const isPwaInstalled = ref(false);
@@ -593,6 +623,8 @@ onMounted(async () => {
   window.addEventListener('mentor-learning-activity-updated', refreshPendingActivityCount);
   window.addEventListener('mentor-learning-upload-queue-updated', refreshPendingReadingTranscriptCount);
   window.addEventListener('mentor-movie-reports-updated', refreshPendingMovieReportCount);
+  window.addEventListener('mentor-content-engagement', handleLessonEngagementChange);
+  window.addEventListener('mentor-ai:offline-lessons-changed', handleOfflineLessonCatalogChange);
   window.addEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyServerMaintenanceFinished);
   window.addEventListener('error', handleRuntimeError);
   window.addEventListener('unhandledrejection', handleUnhandledRejection);
@@ -607,6 +639,7 @@ onMounted(async () => {
   await refreshPendingActivityCount();
   await refreshPendingReadingTranscriptCount();
   await refreshPendingMovieReportCount();
+  await refreshPendingBulkLessonDownloads();
   await recordApplicationTelemetry({ studentId: appStore.studentId, type: 'app-opened', route: String(route.name ?? 'unknown') });
   await loadTranslationUsage();
 });
@@ -623,6 +656,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('mentor-learning-activity-updated', refreshPendingActivityCount);
   window.removeEventListener('mentor-learning-upload-queue-updated', refreshPendingReadingTranscriptCount);
   window.removeEventListener('mentor-movie-reports-updated', refreshPendingMovieReportCount);
+  window.removeEventListener('mentor-content-engagement', handleLessonEngagementChange);
+  window.removeEventListener('mentor-ai:offline-lessons-changed', handleOfflineLessonCatalogChange);
   window.removeEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyServerMaintenanceFinished);
   window.removeEventListener('error', handleRuntimeError);
   window.removeEventListener('unhandledrejection', handleUnhandledRejection);
@@ -684,6 +719,7 @@ function markAllRead() {
 
 function handleApplicationOnline() {
   void recordApplicationTelemetry({ studentId: appStore.studentId, type: 'online' });
+  void refreshPendingBulkLessonDownloads();
 }
 function handleApplicationOffline() {
   void recordApplicationTelemetry({ studentId: appStore.studentId, type: 'offline', severity: 'warning' });
@@ -695,6 +731,72 @@ async function refreshPendingReadingTranscriptCount() {
 }
 async function refreshPendingMovieReportCount() {
   pendingMovieReportCount.value = await pendingMovieLearningReportCount();
+}
+function handleLessonEngagementChange() {
+  void refreshPendingBulkLessonDownloads();
+}
+function handleOfflineLessonCatalogChange() {
+  void refreshPendingBulkLessonDownloads();
+}
+async function refreshPendingBulkLessonDownloads() {
+  if (!appStore.isHydrated || !navigator.onLine || isBulkLessonDownloadRunning.value) return;
+  try {
+    const [catalog, engagement] = await Promise.all([
+      fetchNewLessonCatalog(),
+      loadContentEngagementSummaries('lesson'),
+    ]);
+    const completedKeys = new Set<string>();
+    for (const snapshot of appStore.statisticsSnapshots) {
+      if (snapshot.lessonId) completedKeys.add(snapshot.lessonId);
+      if (snapshot.lessonTemplateKey) completedKeys.add(snapshot.lessonTemplateKey);
+    }
+    for (const [key, summary] of engagement) {
+      if (summary.finishes > 0 || summary.fullPlays > 0) completedKeys.add(key);
+    }
+    const savedIds = new Set(
+      readOfflineLessons()
+        .filter((lesson) => lesson.category === 'lessons')
+        .map((lesson) => lesson.id),
+    );
+    pendingBulkLessonDownloads.value = selectPendingBulkLessonDownloads(
+      catalog,
+      savedIds,
+      completedKeys,
+    );
+  } catch {
+    // Keep the last known list; the next online or maintenance event retries it.
+  }
+}
+async function downloadAllPendingLessons() {
+  if (isBulkLessonDownloadRunning.value || !navigator.onLine) return;
+  const lessons = [...pendingBulkLessonDownloads.value];
+  if (lessons.length === 0) return;
+  isBulkLessonDownloadRunning.value = true;
+  bulkLessonDownloadCompleted.value = 0;
+  let failed = 0;
+  for (const lesson of lessons) {
+    try {
+      await downloadGeneratedLessonOffline(lesson);
+      bulkLessonDownloadCompleted.value += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+  isBulkLessonDownloadRunning.value = false;
+  await refreshPendingBulkLessonDownloads();
+  if (failed > 0) {
+    Notify.create({
+      type: 'warning',
+      icon: 'cloud_off',
+      message: `${bulkLessonDownloadCompleted.value} lessons downloaded. ${failed} will retry next time.`,
+    });
+    return;
+  }
+  Notify.create({
+    type: 'positive',
+    icon: 'offline_pin',
+    message: `${bulkLessonDownloadCompleted.value} new lessons are ready offline.`,
+  });
 }
 async function syncLearningDataNow() {
   if (isManualSyncRunning.value) return;
@@ -765,6 +867,7 @@ function formatCharacterCount(value: number) {
 }
 function handleDailyServerMaintenanceFinished() {
   void loadTranslationUsage();
+  void refreshPendingBulkLessonDownloads();
 }
 
 function handleBeforeInstallPrompt(event: Event) {

@@ -59,6 +59,17 @@ export function prioritizeNewLessons(lessons: GeneratedLesson[]) {
   });
 }
 
+export function selectPendingBulkLessonDownloads(
+  lessons: GeneratedLesson[],
+  savedLessonIds: ReadonlySet<string>,
+  completedLessonKeys: ReadonlySet<string>,
+) {
+  return prioritizeNewLessons(lessons.filter((lesson) => {
+    const keys = [lesson.id, lesson.lessonTemplateKey].filter((key): key is string => Boolean(key));
+    return !savedLessonIds.has(lesson.id) && !keys.some((key) => completedLessonKeys.has(key));
+  }));
+}
+
 export async function fetchNewLessonCatalog() {
   return prioritizeNewLessons(await fetchOfflineLessons(new Date(0).toISOString()));
 }

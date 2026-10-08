@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { GeneratedLesson } from '@mentor-ai/shared';
-import { prioritizeNewLessons } from '../src/services/offline-lesson-updates.js';
+import {
+  prioritizeNewLessons,
+  selectPendingBulkLessonDownloads,
+} from '../src/services/offline-lesson-updates.js';
 
 function lesson(id: string, priority: number, doFirst = false, createdAt = '2026-09-12T10:00:00.000Z') {
   return { id, priority, doFirst, createdAt } as GeneratedLesson;
@@ -24,5 +27,22 @@ describe('new lesson catalog priority', () => {
       lesson('newer', 80, false, '2026-09-11T10:00:00.000Z'),
     ]);
     assert.deepEqual(sorted.map(({ id }) => id), ['newer', 'older', 'lower']);
+  });
+
+  it('selects only unfinished lessons that are not already available offline', () => {
+    const lessons = [
+      { ...lesson('fresh', 90), lessonTemplateKey: 'fresh-template' },
+      { ...lesson('downloaded', 80), lessonTemplateKey: 'downloaded-template' },
+      { ...lesson('completed-id', 70), lessonTemplateKey: 'completed-id-template' },
+      { ...lesson('completed-template', 60), lessonTemplateKey: 'completed-template-key' },
+    ];
+
+    const pending = selectPendingBulkLessonDownloads(
+      lessons,
+      new Set(['downloaded']),
+      new Set(['completed-id', 'completed-template-key']),
+    );
+
+    assert.deepEqual(pending.map(({ id }) => id), ['fresh']);
   });
 });

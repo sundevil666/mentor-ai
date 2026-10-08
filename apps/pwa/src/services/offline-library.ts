@@ -78,6 +78,7 @@ export async function registerOfflineGeneratedLesson(lesson: GeneratedLesson, sp
     estimatedBytes: JSON.stringify(lesson).length * 2,
   });
   await deleteUnreferencedSpeechTexts(previous?.speechTexts ?? [], speechTexts);
+  notifyGeneratedLessonOfflineChange();
 }
 export function getOfflineLessonContentVersion(lesson: GeneratedLesson) {
   const value = JSON.stringify(lesson);
@@ -161,6 +162,7 @@ export async function removeOfflineLesson(lesson: OfflineLesson) {
   if (lesson.audio) await deleteOfflineAudio(lesson.audio);
   if (lesson.category === 'lessons') await (await getMentorDb()).delete('lessons', lesson.id);
   saveLessons(readOfflineLessons().filter((item) => !(item.id === lesson.id && item.category === lesson.category)));
+  if (lesson.category === 'lessons') notifyGeneratedLessonOfflineChange();
 }
 export async function clearOfflineCategory(category: OfflineCategory) {
   for (const lesson of readOfflineLessons().filter((item) => item.category === category)) await removeOfflineLesson(lesson);
@@ -238,6 +240,9 @@ function getStringContentVersion(value: string) {
   return (hash >>> 0).toString(36);
 }
 function saveLessons(lessons: OfflineLesson[]) { localStorage.setItem(lessonsKey, JSON.stringify(lessons)); }
+function notifyGeneratedLessonOfflineChange() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('mentor-ai:offline-lessons-changed'));
+}
 async function getMentorDb() { return (await import('./indexed-db.js')).mentorDb; }
 function readJson<T>(key: string, fallback: T): T {
   if (typeof localStorage === 'undefined') return fallback;
