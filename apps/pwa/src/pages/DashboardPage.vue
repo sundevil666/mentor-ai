@@ -29,11 +29,11 @@
                 <q-icon :name="item.icon" size="25px" />
                 <div class="home-progress-item__copy">
                   <strong>{{ item.label }}</strong>
-                  <span>{{ item.done }} of {{ item.total }}</span>
+                  <span>{{ item.done }}{{ item.ratio === null ? ' · ' : ' of ' }}{{ item.total }}</span>
                   <span v-if="item.detail">{{ item.detail }}</span>
-                  <q-linear-progress :value="item.ratio" color="primary" track-color="grey-3" rounded size="7px" />
+                  <q-linear-progress v-if="item.ratio !== null" :value="item.ratio" color="primary" track-color="grey-3" rounded size="7px" />
                 </div>
-                <b>{{ item.remaining }}</b>
+                <b v-if="item.remaining">{{ item.remaining }}</b>
               </article>
             </div>
           </section>
@@ -89,44 +89,61 @@
             </div>
 
             <div class="training-library__list">
-              <article
-                v-for="lesson in activeTrainingLibrary.lessons"
-                :key="lesson.templateKey"
-                class="training-library-card"
-                :class="`training-library-card--${lessonProgressState(lesson.templateKey)}`"
+              <section
+                v-for="section in activeTrainingLessonSections"
+                :key="section.state"
+                class="training-library__progress-section"
               >
-                <button type="button" class="training-library-card__body" @click="startLibraryLesson(lesson)">
-                  <span class="training-library-card__topline">
-                    <span class="training-library-card__title">{{ lesson.title }}</span>
-                    <span class="training-library-card__status">
-                      <q-icon :name="lessonProgressIcon(lesson.templateKey)" />
-                      {{ lessonProgressLabel(lesson.templateKey) }}
-                    </span>
-                  </span>
-                  <strong v-if="lessonProgressState(lesson.templateKey) !== 'completed'">{{ lesson.focus }}</strong>
-                  <span>{{ lesson.minutes }} min</span>
-                </button>
-                <ContentMentorFeedback category="lesson" :content-id="lesson.templateKey" hide-select-after-feedback />
-                <div class="training-library-card__offline">
-                  <q-icon
-                    :name="libraryDownloadIcon(lesson.templateKey)"
-                    :color="libraryDownloadStatus[lesson.templateKey] === 'ready' ? 'positive' : 'grey-7'"
-                    size="20px"
-                  />
-                  <span>{{ libraryDownloadLabel(lesson.templateKey) }}</span>
-                  <q-btn
-                    color="primary"
-                    :icon="libraryDownloadStatus[lesson.templateKey] === 'ready' ? 'check' : 'download'"
-                    :label="libraryDownloadStatus[lesson.templateKey] === 'ready' ? 'Downloaded' : 'Download'"
-                    :loading="libraryDownloadStatus[lesson.templateKey] === 'downloading'"
-                    :disable="libraryDownloadStatus[lesson.templateKey] === 'ready'"
-                    dense
-                    flat
-                    no-caps
-                    @click="downloadLibraryLesson(lesson)"
-                  />
-                </div>
-              </article>
+                <h2 class="training-library__progress-heading">{{ section.label }}</h2>
+                <section
+                  v-for="group in section.groups"
+                  :key="group.dateKey"
+                  class="training-library__date-group"
+                >
+                  <h3 class="training-library__date-heading">
+                    <q-icon name="calendar_today" />
+                    <time :datetime="group.dateKey">{{ group.dateLabel }}</time>
+                  </h3>
+                  <article
+                    v-for="lesson in group.lessons"
+                    :key="lesson.templateKey"
+                    class="training-library-card"
+                    :class="`training-library-card--${lessonProgressState(lesson.templateKey)}`"
+                  >
+                    <button type="button" class="training-library-card__body" @click="startLibraryLesson(lesson)">
+                      <span class="training-library-card__topline">
+                        <span class="training-library-card__title">{{ lesson.title }}</span>
+                        <span class="training-library-card__status">
+                          <q-icon :name="lessonProgressIcon(lesson.templateKey)" />
+                          {{ lessonProgressLabel(lesson.templateKey) }}
+                        </span>
+                      </span>
+                      <strong v-if="lessonProgressState(lesson.templateKey) !== 'completed'">{{ lesson.focus }}</strong>
+                      <span>{{ lesson.minutes }} min</span>
+                    </button>
+                    <ContentMentorFeedback category="lesson" :content-id="lesson.templateKey" hide-select-after-feedback />
+                    <div class="training-library-card__offline">
+                      <q-icon
+                        :name="libraryDownloadIcon(lesson.templateKey)"
+                        :color="libraryDownloadStatus[lesson.templateKey] === 'ready' ? 'positive' : 'grey-7'"
+                        size="20px"
+                      />
+                      <span>{{ libraryDownloadLabel(lesson.templateKey) }}</span>
+                      <q-btn
+                        color="primary"
+                        :icon="libraryDownloadStatus[lesson.templateKey] === 'ready' ? 'check' : 'download'"
+                        :label="libraryDownloadStatus[lesson.templateKey] === 'ready' ? 'Downloaded' : 'Download'"
+                        :loading="libraryDownloadStatus[lesson.templateKey] === 'downloading'"
+                        :disable="libraryDownloadStatus[lesson.templateKey] === 'ready'"
+                        dense
+                        flat
+                        no-caps
+                        @click="downloadLibraryLesson(lesson)"
+                      />
+                    </div>
+                  </article>
+                </section>
+              </section>
             </div>
           </section>
         </section>
@@ -636,11 +653,14 @@
 </template>
 
 <script setup lang="ts">
-import type { GeneratedLesson, LearningActivityTotals, LearningContext, PreferredLessonDevice } from '@mentor-ai/shared';
+import type { GeneratedLesson, LearningActivityTotals, LearningContext, MovieLearningReport, PreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { synchronizeDashboardLessonRoute, type DashboardTrainingCategory } from 'src/services/navigation-category';
 import { sortMaterialsNewestFirst } from 'src/services/material-order';
+import { groupLessonsByProgressAndReleaseDate } from 'src/services/lesson-library-order';
+import { loadMovieLearningReports, refreshMovieLearningReportsFromCloud } from 'src/services/movie-learning-reports';
+import { summarizeMovieViewing } from 'src/services/movie-viewing-summary';
 import {
   createCurrentActivitySuggestion,
   createLearningContext,
@@ -1205,6 +1225,10 @@ function lessonProgressState(templateKey: string): LessonProgressState {
   }
   return 'new';
 }
+const activeTrainingLessonSections = computed(() => groupLessonsByProgressAndReleaseDate(
+  activeTrainingLibrary.value.lessons,
+  (lesson) => lessonProgressState(lesson.templateKey),
+));
 function lessonProgressLabel(templateKey: string) {
   const state = lessonProgressState(templateKey);
   if (state === 'completed') return 'Completed';
@@ -1356,6 +1380,8 @@ const startedContentItems = computed<StartedContentItem[]>(() => {
 });
 
 const levelActivity = ref<LearningActivityTotals>({ grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null });
+const movieReports = ref<MovieLearningReport[]>([]);
+const movieSummary = computed(() => summarizeMovieViewing(movieReports.value));
 const fetchedLessonCatalog = ref<GeneratedLesson[]>([]);
 const homeReadingProgress = ref<DailyReadingProgress>(createDailyReadingProgress());
 function refreshHomeReadingProgress() {
@@ -1413,6 +1439,14 @@ const homeProgressItems = computed(() => {
       detail: `${completedLessons} different lessons completed`,
       remaining: `${Math.max(0, lessonTotal - completedSessions)} to goal`,
       ratio: lessonTotal > 0 ? Math.min(1, completedSessions / lessonTotal) : 0,
+    },
+    {
+      icon: 'movie',
+      label: 'Movies',
+      done: `${movieSummary.value.movieCount} watched`,
+      total: `≈ ${formatDuration(movieSummary.value.estimatedViewingSeconds)} viewing time`,
+      remaining: '',
+      ratio: null,
     },
   ];
 });
@@ -1619,6 +1653,7 @@ onMounted(async () => {
   await refreshStartedContent();
   await refreshLessonProgressStates();
   await refreshLevelActivity();
+  await refreshMovieReports();
   refreshHomeReadingProgress();
   await refreshNewLessonCatalog();
   if (appStore.session) {
@@ -1634,6 +1669,7 @@ onMounted(async () => {
   window.addEventListener('mentor-ai:prepare-app-update', handlePrepareAppUpdate);
   window.addEventListener('mentor-content-engagement', handleLessonEngagementChange);
   window.addEventListener('mentor-learning-activity-updated', refreshLevelActivity);
+  window.addEventListener('mentor-movie-reports-updated', refreshMovieReports);
   window.addEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyMaintenanceFinished);
   window.addEventListener('focus', refreshHomeReadingProgress);
 });
@@ -1649,6 +1685,7 @@ onUnmounted(() => {
   window.removeEventListener('mentor-ai:prepare-app-update', handlePrepareAppUpdate);
   window.removeEventListener('mentor-content-engagement', handleLessonEngagementChange);
   window.removeEventListener('mentor-learning-activity-updated', refreshLevelActivity);
+  window.removeEventListener('mentor-movie-reports-updated', refreshMovieReports);
   window.removeEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyMaintenanceFinished);
   window.removeEventListener('focus', refreshHomeReadingProgress);
 });
@@ -1656,6 +1693,11 @@ onUnmounted(() => {
 watch(selectedHomeListTab, (tab) => saveHomePreference('mentor-ai:home-list-tab', tab));
 
 async function refreshLevelActivity() { levelActivity.value = await loadLearningActivityTotals(); }
+
+async function refreshMovieReports() {
+  if (navigator.onLine) await refreshMovieLearningReportsFromCloud().catch(() => 0);
+  movieReports.value = await loadMovieLearningReports();
+}
 
 watch(
   () => route.query.training,

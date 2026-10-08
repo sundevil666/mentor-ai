@@ -1112,7 +1112,40 @@ body .q-menu {
 
 .training-library__list {
   display: grid;
+  gap: 24px;
+}
+
+.training-library__progress-section {
+  display: grid;
+  gap: 16px;
+}
+
+.training-library__progress-heading {
+  color: var(--app-text-strong);
+  font-size: 1rem;
+  font-weight: 800;
+  margin: 0 4px -4px;
+}
+
+.training-library__date-group {
+  display: grid;
   gap: 14px;
+}
+
+.training-library__date-heading {
+  align-items: center;
+  color: var(--app-muted-strong);
+  display: flex;
+  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 7px;
+  letter-spacing: 0.08em;
+  margin: 2px 4px -2px;
+  text-transform: uppercase;
+}
+
+.training-library__date-heading .q-icon {
+  color: var(--category-accent);
 }
 
 .training-library-card {
