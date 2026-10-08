@@ -57,6 +57,14 @@
           <span>Practice days</span>
           <strong>{{ serverSummary.practiceDays }}</strong>
         </div>
+        <div class="metric-tile">
+          <span>Movies watched</span>
+          <strong>{{ movieSummary.movieCount }}</strong>
+        </div>
+        <div class="metric-tile">
+          <span>Estimated movie viewing</span>
+          <strong>≈ {{ formatDuration(movieSummary.estimatedViewingSeconds) }}</strong>
+        </div>
       </section>
 
       <section class="learning-panels">
@@ -115,10 +123,15 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useAppStore } from 'src/stores/app-store';
 import { formatDisplayDate } from 'src/services/date-format';
 import { loadLearningActivityTotals, syncLearningActivity } from 'src/services/learning-activity';
+import { loadMovieLearningReports, refreshMovieLearningReportsFromCloud } from 'src/services/movie-learning-reports';
+import { summarizeMovieViewing } from 'src/services/movie-viewing-summary';
 import type { LearningActivityTotals } from '@mentor-ai/shared';
+import type { MovieLearningReport } from '@mentor-ai/shared';
 
 const appStore = useAppStore();
 const activityTotals = ref<LearningActivityTotals>({ grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null });
+const movieReports = ref<MovieLearningReport[]>([]);
+const movieSummary = computed(() => summarizeMovieViewing(movieReports.value));
 
 const serverSummary = computed(() => {
   const snapshots = appStore.statisticsSnapshots;
@@ -175,15 +188,18 @@ onMounted(async () => {
     await appStore.hydrate();
   }
   await refreshActivityTotals();
+  await refreshMovieReports();
   appStore.markStatisticsSeen();
   if (appStore.isOnline) void refreshFromServer();
   window.addEventListener('online', refreshFromServer);
   window.addEventListener('mentor-learning-activity-updated', refreshActivityTotals);
+  window.addEventListener('mentor-movie-reports-updated', refreshMovieReports);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('online', refreshFromServer);
   window.removeEventListener('mentor-learning-activity-updated', refreshActivityTotals);
+  window.removeEventListener('mentor-movie-reports-updated', refreshMovieReports);
 });
 
 async function sync() {
@@ -194,10 +210,16 @@ async function refreshFromServer() {
   if (!navigator.onLine) return;
   await appStore.refreshRemoteLearningState();
   activityTotals.value = await syncLearningActivity().catch(() => loadLearningActivityTotals());
+  await refreshMovieReports();
   appStore.markStatisticsSeen();
 }
 
 async function refreshActivityTotals() { activityTotals.value = await loadLearningActivityTotals(); }
+
+async function refreshMovieReports() {
+  if (navigator.onLine) await refreshMovieLearningReportsFromCloud().catch(() => 0);
+  movieReports.value = await loadMovieLearningReports();
+}
 
 function formatDuration(seconds: number) {
   const minutes = Math.floor(Math.max(0, seconds) / 60);
