@@ -76,15 +76,6 @@
           <audio ref="audioElement" :src="playbackUrl" controls :loop="repeatEnabled" preload="metadata" @ended="handleEnded" @pause="handlePause" @play="handlePlay" @seeking="handleSeeking" @timeupdate="saveProgress" />
           <div class="audio-player__actions">
             <a :href="selectedAudio.articleUrl" target="_blank" rel="noopener">Transcript and source <q-icon name="open_in_new" /></a>
-            <q-btn
-              v-if="isIosStandalone()"
-              color="primary"
-              icon="open_in_new"
-              label="Open in Safari for lock-screen audio"
-              no-caps
-              outline
-              @click="openAudioInSafari"
-            />
           </div>
         </section>
         <div v-if="!cachedUrls.has(selectedAudio.sourceUrl)" class="audio-detail__offline-action">
@@ -124,7 +115,7 @@ import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import AppDetailLayout from 'src/components/AppDetailLayout.vue';
 import { loadContentEngagementSummaries, recordContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
 import { useAppStore } from 'src/stores/app-store';
-import { configurePlaybackAudioSession, isIosStandalone, useRecoveringMediaPlayPause } from 'src/services/audio-session';
+import { configurePlaybackAudioSession, useRecoveringMediaPlayPause } from 'src/services/audio-session';
 import AppAudioDock from 'src/components/AppAudioDock.vue';
 import AudioLibraryTabs from 'src/components/AudioLibraryTabs.vue';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
@@ -204,14 +195,6 @@ function closeAudio() {
   duration.value = 0;
   playbackCycleActive = false;
   playbackCycleFinished = false;
-}
-
-function openAudioInSafari() {
-  if (!selectedAudio.value) return;
-  const url = new URL('/audio', window.location.origin);
-  url.searchParams.set('audio', selectedAudio.value.id);
-  url.searchParams.set('safari-audio', '1');
-  window.open(url, '_blank', 'noopener');
 }
 
 async function downloadAudio(item: LibraryAudio) {
