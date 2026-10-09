@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { GeneratedLesson } from '@mentor-ai/shared';
 import {
+  getRecentOfflineLessonSince,
   prioritizeNewLessons,
   selectPendingBulkLessonDownloads,
 } from '../src/services/offline-lesson-updates.js';
@@ -44,5 +45,12 @@ describe('new lesson catalog priority', () => {
     );
 
     assert.deepEqual(pending.map(({ id }) => id), ['fresh']);
+  });
+
+  it('uses the same 30-day window for recent bulk downloads and offline retention', () => {
+    assert.equal(
+      getRecentOfflineLessonSince(Date.parse('2026-10-09T12:00:00.000Z')),
+      '2026-09-09T12:00:00.000Z',
+    );
   });
 });

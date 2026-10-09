@@ -37,6 +37,7 @@ export interface OfflineLessonUpdateResult {
   eventId: string;
 }
 let activeUpdate: Promise<OfflineLessonUpdateResult> | null = null;
+export const recentOfflineLessonDays = 30;
 const builtInOfflineLessons = [
   { id: 'commute-listening', category: 'listening', title: 'Commute listening' },
   { id: 'shop-listening', category: 'listening', title: 'At a small shop' },
@@ -74,6 +75,14 @@ export async function fetchNewLessonCatalog() {
   return prioritizeNewLessons(await fetchOfflineLessons(new Date(0).toISOString()));
 }
 
+export async function fetchRecentLessonCatalog(now = Date.now()) {
+  return prioritizeNewLessons(await fetchOfflineLessons(getRecentOfflineLessonSince(now)));
+}
+
+export function getRecentOfflineLessonSince(now = Date.now()) {
+  return new Date(now - recentOfflineLessonDays * 86_400_000).toISOString();
+}
+
 export async function downloadGeneratedLessonOffline(lesson: GeneratedLesson) {
   const speechTexts = getSpeechTexts(lesson);
   const result = speechTexts.length ? await preloadSpeechBatch(speechTexts) : { failed: 0 };
@@ -96,7 +105,7 @@ async function performUpdate(
   const eventId = new Date().toISOString();
   setState({ status: 'checking', completed: 0, total: 0 });
   try {
-    const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const since = getRecentOfflineLessonSince();
     const storiesDownloaded = await updateStories();
     const audioDownloaded = await updateAudio();
     const builtInDownloaded = await updateBuiltInLessons(loadLesson);

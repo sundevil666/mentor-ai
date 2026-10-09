@@ -362,7 +362,7 @@ import { mentorDb } from 'src/services/indexed-db';
 import { calculateLevelJourney } from 'src/services/level-journey';
 import {
   downloadGeneratedLessonOffline,
-  fetchNewLessonCatalog,
+  fetchRecentLessonCatalog,
   getOfflineLessonUpdateState,
   selectPendingBulkLessonDownloads,
   subscribeOfflineLessonUpdates,
@@ -742,7 +742,7 @@ async function refreshPendingBulkLessonDownloads() {
   if (!appStore.isHydrated || !navigator.onLine || isBulkLessonDownloadRunning.value) return;
   try {
     const [catalog, engagement] = await Promise.all([
-      fetchNewLessonCatalog(),
+      fetchRecentLessonCatalog(),
       loadContentEngagementSummaries('lesson'),
     ]);
     const completedKeys = new Set<string>();
