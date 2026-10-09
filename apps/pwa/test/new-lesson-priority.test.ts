@@ -51,7 +51,7 @@ describe('new lesson catalog priority', () => {
     assert.deepEqual(pending.map(({ id }) => id), ['fresh']);
   });
 
-  it('uses the same 30-day window for recent bulk downloads and offline retention', () => {
+  it('keeps the update window at 30 days without limiting the full bulk-download catalog', () => {
     assert.equal(
       getRecentOfflineLessonSince(Date.parse('2026-10-09T12:00:00.000Z')),
       '2026-09-09T12:00:00.000Z',
@@ -76,5 +76,12 @@ describe('new lesson catalog priority', () => {
     assert.deepEqual(selectPendingAudioDownloads([audio], new Set(), version).map(({ id }) => id), ['new-audio']);
     version.set(audio.id, getAudioContentVersion(audio));
     assert.deepEqual(selectPendingAudioDownloads([audio], new Set([audio.sourceUrl]), version), []);
+  });
+
+  it('never offers completed audio for bulk download again', () => {
+    const audio = {
+      id: 'completed-audio', sourceUrl: 'https://audio.test/completed.mp3', durationSeconds: 60, sizeBytes: 1_000, publishedAt: '2026-10-09',
+    } as Parameters<typeof selectPendingAudioDownloads>[0][number];
+    assert.deepEqual(selectPendingAudioDownloads([audio], new Set(), new Map(), new Set([audio.id])), []);
   });
 });

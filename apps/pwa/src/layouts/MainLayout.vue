@@ -351,7 +351,7 @@ import { readThemePreference, saveThemePreference } from 'src/services/user-pref
 import { formatDisplayDateTime } from 'src/services/date-format';
 import { cleanupExpiredOfflineLessons, readOfflineLessons } from 'src/services/offline-library';
 import { loadLearningActivityTotals, pendingLearningActivityCount, syncLearningActivity } from 'src/services/learning-activity';
-import { syncAllContentProgress } from 'src/services/content-progress';
+import { loadAllContentProgress, syncAllContentProgress } from 'src/services/content-progress';
 import { loadContentEngagementSummaries, syncContentEngagement } from 'src/services/content-engagement';
 import { syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
 import { syncReadingPageSpeech } from 'src/services/reading-page-speech-outbox';
@@ -363,7 +363,7 @@ import { calculateLevelJourney } from 'src/services/level-journey';
 import {
   downloadGeneratedLessonOffline,
   downloadOfflineMedia,
-  fetchRecentLessonCatalog,
+  fetchNewLessonCatalog,
   findPendingOfflineMediaDownloads,
   getOfflineLessonUpdateState,
   selectPendingBulkLessonDownloads,
@@ -746,10 +746,11 @@ function handleOfflineLessonCatalogChange() {
 async function refreshPendingBulkLessonDownloads() {
   if (!appStore.isHydrated || !navigator.onLine || isBulkLessonDownloadRunning.value) return;
   try {
-    const [catalog, engagement, media] = await Promise.all([
-      fetchRecentLessonCatalog(),
+    const [catalog, engagement, audioEngagement, progress] = await Promise.all([
+      fetchNewLessonCatalog(),
       loadContentEngagementSummaries('lesson'),
-      findPendingOfflineMediaDownloads(),
+      loadContentEngagementSummaries('audio'),
+      loadAllContentProgress(),
     ]);
     const completedKeys = new Set<string>();
     for (const snapshot of appStore.statisticsSnapshots) {
@@ -758,6 +759,13 @@ async function refreshPendingBulkLessonDownloads() {
     }
     for (const [key, summary] of engagement) {
       if (summary.finishes > 0 || summary.fullPlays > 0) completedKeys.add(key);
+    }
+    const completedMediaIds = new Set<string>();
+    for (const [key, summary] of audioEngagement) {
+      if (summary.finishes > 0 || summary.fullPlays > 0) completedMediaIds.add(key);
+    }
+    for (const item of progress) {
+      if (item.category === 'audio' && item.completed) completedMediaIds.add(item.contentId);
     }
     const savedIds = new Set(
       readOfflineLessons()
@@ -769,7 +777,7 @@ async function refreshPendingBulkLessonDownloads() {
       savedIds,
       completedKeys,
     );
-    pendingBulkMediaDownloads.value = media;
+    pendingBulkMediaDownloads.value = await findPendingOfflineMediaDownloads(completedMediaIds);
   } catch {
     // Keep the last known list; the next online or maintenance event retries it.
   }

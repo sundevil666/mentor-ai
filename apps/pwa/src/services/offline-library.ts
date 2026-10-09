@@ -5,7 +5,6 @@ import type { GeneratedLesson, LearningContext } from '@mentor-ai/shared';
 
 export type OfflineCategory = 'lessons' | 'listening' | 'speaking' | 'audio' | 'stories' | 'videos';
 export type RetentionDays = 7 | 14 | 30 | 90;
-export const mandatoryOfflineDays = 7;
 export const defaultOfflineMaxBytes = 250_000_000;
 export interface OfflineLesson {
   id: string;
@@ -20,6 +19,7 @@ export interface OfflineLesson {
   story?: LibraryStory;
   audio?: LibraryAudio;
   sourceCreatedAt?: string;
+  contentKey?: string;
 }
 
 export const offlineCategories: Array<{ id: OfflineCategory; label: string; icon: string }> = [
@@ -71,6 +71,7 @@ export async function registerOfflineGeneratedLesson(lesson: GeneratedLesson, sp
     id: lesson.id,
     category: 'lessons',
     title: lesson.title,
+    contentKey: lesson.lessonTemplateKey,
     sourceCreatedAt: lesson.createdAt,
     speechTexts,
     contentBytes: JSON.stringify(lesson).length * 2,
@@ -167,18 +168,29 @@ export async function removeOfflineLesson(lesson: OfflineLesson) {
 export async function clearOfflineCategory(category: OfflineCategory) {
   for (const lesson of readOfflineLessons().filter((item) => item.category === category)) await removeOfflineLesson(lesson);
 }
-export function selectExpiredOfflineLessons(lessons: OfflineLesson[], retention: Record<OfflineCategory, RetentionDays>, now = Date.now()) {
+export function selectExpiredOfflineLessons(
+  lessons: OfflineLesson[],
+  retention: Record<OfflineCategory, RetentionDays>,
+  now = Date.now(),
+  completedKeys: ReadonlySet<string> = new Set(),
+) {
   return lessons.filter((lesson) => {
-    const added = Date.parse(lesson.sourceCreatedAt || lesson.lastOpenedAt || lesson.downloadedAt);
-    const mandatory = lesson.sourceCreatedAt && now - Date.parse(lesson.sourceCreatedAt) < mandatoryOfflineDays * 86_400_000;
-    return !mandatory && Number.isFinite(added) && now - added >= retention[lesson.category] * 86_400_000;
+    const lastUsed = Date.parse(lesson.lastOpenedAt || lesson.downloadedAt);
+    return isOfflineContentCompleted(lesson, completedKeys)
+      && Number.isFinite(lastUsed)
+      && now - lastUsed >= Math.max(30, retention[lesson.category]) * 86_400_000;
   });
 }
-export function selectOfflineLessonsOverLimit(lessons: OfflineLesson[], maxBytes: number, now = Date.now()) {
+export function selectOfflineLessonsOverLimit(
+  lessons: OfflineLesson[],
+  maxBytes: number,
+  now = Date.now(),
+  completedKeys: ReadonlySet<string> = new Set(),
+) {
   let total = lessons.reduce((sum, lesson) => sum + Math.max(0, lesson.estimatedBytes), 0);
   if (total <= maxBytes) return [];
-  const removable = lessons.filter((lesson) => !lesson.sourceCreatedAt
-    || now - Date.parse(lesson.sourceCreatedAt) >= mandatoryOfflineDays * 86_400_000)
+  const removable = lessons.filter((lesson) => isOfflineContentCompleted(lesson, completedKeys)
+    && now - Date.parse(lesson.lastOpenedAt || lesson.downloadedAt) >= 30 * 86_400_000)
     .sort((left, right) => Date.parse(left.downloadedAt) - Date.parse(right.downloadedAt));
   const selected: OfflineLesson[] = [];
   for (const lesson of removable) {
@@ -188,6 +200,9 @@ export function selectOfflineLessonsOverLimit(lessons: OfflineLesson[], maxBytes
   }
   return selected;
 }
+function isOfflineContentCompleted(lesson: OfflineLesson, completedKeys: ReadonlySet<string>) {
+  return completedKeys.has(lesson.id) || Boolean(lesson.contentKey && completedKeys.has(lesson.contentKey));
+}
 export function selectStaleOfflineStories(lessons: OfflineLesson[], activeStoryIds: ReadonlySet<string>) {
   return lessons.filter((lesson) => lesson.category === 'stories' && !activeStoryIds.has(lesson.id));
 }
@@ -196,11 +211,24 @@ export function selectStaleOfflineAudio(lessons: OfflineLesson[], activeAudioIds
 }
 export async function cleanupExpiredOfflineLessons(now = Date.now()) {
   await purgeLegacyVideoLibrary();
-  const expired = selectExpiredOfflineLessons(readOfflineLessons(), readOfflineRetention(), now);
+  const completedKeys = await loadCompletedOfflineContentKeys();
+  const expired = selectExpiredOfflineLessons(readOfflineLessons(), readOfflineRetention(), now, completedKeys);
   for (const lesson of expired) await removeOfflineLesson(lesson);
-  const oversized = selectOfflineLessonsOverLimit(readOfflineLessons(), readOfflineMaxBytes(), now);
+  const oversized = selectOfflineLessonsOverLimit(readOfflineLessons(), readOfflineMaxBytes(), now, completedKeys);
   for (const lesson of oversized) await removeOfflineLesson(lesson);
   return [...expired, ...oversized];
+}
+async function loadCompletedOfflineContentKeys() {
+  const [{ loadAllContentProgress }, { loadAllContentEngagement }] = await Promise.all([
+    import('./content-progress.js'),
+    import('./content-engagement.js'),
+  ]);
+  const [progress, engagement] = await Promise.all([loadAllContentProgress(), loadAllContentEngagement()]);
+  const completed = new Set(progress.filter((item) => item.completed).map((item) => item.contentId));
+  for (const event of engagement) {
+    if (event.type === 'finished' || event.type === 'full-play') completed.add(event.contentId);
+  }
+  return completed;
 }
 async function purgeLegacyVideoLibrary() {
   const legacyVideos = readOfflineLessons().filter((lesson) => lesson.category === 'videos');
@@ -212,7 +240,7 @@ function upsert(input: Pick<OfflineLesson, 'id' | 'category' | 'title' | 'estima
   const lessons = readOfflineLessons();
   const previous = lessons.find((item) => item.id === input.id && item.category === input.category);
   saveLessons([...lessons.filter((item) => !(item.id === input.id && item.category === input.category)), {
-    ...input, downloadedAt: previous?.downloadedAt ?? now, lastOpenedAt: now,
+    ...input, downloadedAt: previous?.downloadedAt ?? now, lastOpenedAt: previous?.lastOpenedAt ?? now,
   } as OfflineLesson]);
 }
 function splitLessonSpeechTexts(exercises: Array<{ audioText?: string }>) {

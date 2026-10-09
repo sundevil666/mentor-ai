@@ -78,10 +78,6 @@ export async function fetchNewLessonCatalog() {
   return prioritizeNewLessons(await fetchOfflineLessons(new Date(0).toISOString()));
 }
 
-export async function fetchRecentLessonCatalog(now = Date.now()) {
-  return prioritizeNewLessons(await fetchOfflineLessons(getRecentOfflineLessonSince(now)));
-}
-
 export function getRecentOfflineLessonSince(now = Date.now()) {
   return new Date(now - recentOfflineLessonDays * 86_400_000).toISOString();
 }
@@ -91,10 +87,13 @@ export function selectPendingStoryDownloads(
   cachedUrls: ReadonlySet<string>,
   savedVersions: ReadonlyMap<string, string | undefined>,
   origin: string,
+  completedIds: ReadonlySet<string> = new Set(),
 ) {
   return stories.filter((story) => (
-    !cachedUrls.has(new URL(story.sourceUrl, origin).href)
-    || savedVersions.get(story.id) !== getStoryContentVersion(story)
+    !completedIds.has(story.id) && (
+      !cachedUrls.has(new URL(story.sourceUrl, origin).href)
+      || savedVersions.get(story.id) !== getStoryContentVersion(story)
+    )
   ));
 }
 
@@ -102,14 +101,17 @@ export function selectPendingAudioDownloads(
   audioPrograms: LibraryAudio[],
   cachedUrls: ReadonlySet<string>,
   savedVersions: ReadonlyMap<string, string | undefined>,
+  completedIds: ReadonlySet<string> = new Set(),
 ) {
   return audioPrograms.filter((audio) => (
-    !cachedUrls.has(audio.sourceUrl)
-    || savedVersions.get(audio.id) !== getAudioContentVersion(audio)
+    !completedIds.has(audio.id) && (
+      !cachedUrls.has(audio.sourceUrl)
+      || savedVersions.get(audio.id) !== getAudioContentVersion(audio)
+    )
   ));
 }
 
-export async function findPendingOfflineMediaDownloads(): Promise<PendingOfflineMediaDownload[]> {
+export async function findPendingOfflineMediaDownloads(completedIds: ReadonlySet<string>): Promise<PendingOfflineMediaDownload[]> {
   const saved = readOfflineLessons();
   const [cachedStoryUrls, cachedAudioUrls] = await Promise.all([
     getCachedStoryUrls(),
@@ -118,9 +120,9 @@ export async function findPendingOfflineMediaDownloads(): Promise<PendingOffline
   const storyVersions = new Map(saved.filter((item) => item.category === 'stories').map((item) => [item.id, item.contentVersion]));
   const audioVersions = new Map(saved.filter((item) => item.category === 'audio').map((item) => [item.id, item.contentVersion]));
   return [
-    ...selectPendingStoryDownloads(storyLibrary, cachedStoryUrls, storyVersions, window.location.origin)
+    ...selectPendingStoryDownloads(storyLibrary, cachedStoryUrls, storyVersions, window.location.origin, completedIds)
       .map((item): PendingOfflineMediaDownload => ({ kind: 'story', item })),
-    ...selectPendingAudioDownloads(audioLibrary, cachedAudioUrls, audioVersions)
+    ...selectPendingAudioDownloads(audioLibrary, cachedAudioUrls, audioVersions, completedIds)
       .map((item): PendingOfflineMediaDownload => ({ kind: 'audio', item })),
   ];
 }
@@ -158,8 +160,12 @@ async function performUpdate(
   setState({ status: 'checking', completed: 0, total: 0 });
   try {
     const since = getRecentOfflineLessonSince();
-    const storiesDownloaded = await updateStories();
-    const audioDownloaded = await updateAudio();
+    const [completedMediaIds, completedLessonIds] = await Promise.all([
+      loadCompletedContentIds('audio'),
+      loadCompletedContentIds('lesson'),
+    ]);
+    const storiesDownloaded = await updateStories(completedMediaIds);
+    const audioDownloaded = await updateAudio(completedMediaIds);
     const builtInDownloaded = await updateBuiltInLessons(loadLesson);
     let privateLessonsAvailable = true;
     const lessons = await fetchOfflineLessons(since).catch(() => {
@@ -169,7 +175,12 @@ async function performUpdate(
     const savedLessons = readOfflineLessons().filter((item) => item.category === 'lessons');
     const activeIds = new Set(lessons.map((lesson) => lesson.id));
     const removed = privateLessonsAvailable
-      ? savedLessons.filter((item) => item.sourceCreatedAt && item.sourceCreatedAt >= since && !activeIds.has(item.id))
+      ? savedLessons.filter((item) => (
+        item.sourceCreatedAt
+        && item.sourceCreatedAt >= since
+        && !activeIds.has(item.id)
+        && (completedLessonIds.has(item.id) || Boolean(item.contentKey && completedLessonIds.has(item.contentKey)))
+      ))
       : [];
     for (const lesson of removed) await removeOfflineLesson(lesson);
     const savedVersions = new Map(readOfflineLessons().filter((item) => item.category === 'lessons')
@@ -215,10 +226,10 @@ async function performUpdate(
   }
 }
 
-async function updateAudio() {
+async function updateAudio(completedIds: ReadonlySet<string>) {
   const activeAudioIds = new Set(audioLibrary.map((audio) => audio.id));
   for (const audio of selectStaleOfflineAudio(readOfflineLessons(), activeAudioIds)) {
-    await removeOfflineLesson(audio);
+    if (completedIds.has(audio.id)) await removeOfflineLesson(audio);
   }
 
   const cachedUrls = await getCachedAudioUrls();
@@ -227,6 +238,7 @@ async function updateAudio() {
     audioLibrary,
     cachedUrls,
     new Map([...saved].map(([id, item]) => [id, item.contentVersion])),
+    completedIds,
   );
   let completed = 0;
   let failed = 0;
@@ -249,10 +261,12 @@ async function updateAudio() {
   return completed;
 }
 
-async function updateStories() {
+async function updateStories(completedIds: ReadonlySet<string>) {
   const activeStoryIds = new Set(storyLibrary.map((story) => story.id));
   const staleStories = selectStaleOfflineStories(readOfflineLessons(), activeStoryIds);
-  for (const story of staleStories) await removeOfflineLesson(story);
+  for (const story of staleStories) {
+    if (completedIds.has(story.id)) await removeOfflineLesson(story);
+  }
 
   const cachedUrls = await getCachedStoryUrls();
   const saved = new Map(readOfflineLessons().filter((item) => item.category === 'stories').map((item) => [item.id, item]));
@@ -261,6 +275,7 @@ async function updateStories() {
     cachedUrls,
     new Map([...saved].map(([id, item]) => [id, item.contentVersion])),
     window.location.origin,
+    completedIds,
   );
   let completed = 0;
   let failed = 0;
@@ -280,6 +295,22 @@ async function updateStories() {
     cachedUrls.has(new URL(item.sourceUrl, window.location.origin).href) && !pendingIds.has(item.id)
   ))) registerOfflineStory(story);
   if (failed > 0) throw new Error(`${failed} audio ${failed === 1 ? 'story' : 'stories'} could not be saved offline.`);
+  return completed;
+}
+
+async function loadCompletedContentIds(category: 'audio' | 'lesson') {
+  const [{ loadAllContentProgress }, { loadContentEngagementSummaries }] = await Promise.all([
+    import('./content-progress.js'),
+    import('./content-engagement.js'),
+  ]);
+  const [progress, engagement] = await Promise.all([
+    loadAllContentProgress(),
+    loadContentEngagementSummaries(category),
+  ]);
+  const completed = new Set(progress.filter((item) => item.category === category && item.completed).map((item) => item.contentId));
+  for (const [id, summary] of engagement) {
+    if (summary.finishes > 0 || summary.fullPlays > 0) completed.add(id);
+  }
   return completed;
 }
 
