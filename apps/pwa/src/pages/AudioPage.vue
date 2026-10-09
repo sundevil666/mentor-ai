@@ -119,7 +119,8 @@ import { configurePlaybackAudioSession, useRecoveringMediaPlayPause } from 'src/
 import AppAudioDock from 'src/components/AppAudioDock.vue';
 import AudioLibraryTabs from 'src/components/AudioLibraryTabs.vue';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
-import { loadContentProgress, saveContentProgress } from 'src/services/content-progress';
+import { loadAllContentProgress, loadContentProgress, saveContentProgress } from 'src/services/content-progress';
+import { isAudioPlaybackCompleted } from 'src/services/audio-completion';
 
 const appStore = useAppStore();
 const listeningTimer = new ActiveLearningTimer({ studentId: () => appStore.studentId, kind: 'audio', contentId: () => selectedAudio.value?.id ?? 'audio' });
@@ -136,6 +137,7 @@ const currentTime = ref(0);
 const duration = ref(0);
 const isOnline = ref(navigator.onLine);
 const engagementSummaries = ref(new Map<string, ContentEngagementSummary>());
+const completedAudioIds = ref(new Set<string>());
 let playbackCycleActive = false;
 let playbackCycleStart = 0;
 let playbackCycleHadForwardSeek = false;
@@ -149,7 +151,7 @@ onMounted(async () => {
   window.addEventListener('online', updateOnlineState);
   window.addEventListener('offline', updateOnlineState);
   configureMediaSession();
-  engagementSummaries.value = await loadContentEngagementSummaries('audio');
+  await refreshAudioCompletion();
   const requestedAudioId = new URLSearchParams(window.location.search).get('audio');
   const requestedAudio = audioLibrary.find((item) => item.id === requestedAudioId);
   if (requestedAudio) await selectAudio(requestedAudio);
@@ -291,12 +293,29 @@ function observePlaybackCycle(player: HTMLAudioElement) {
 function completePlaybackCycle() {
   if (!playbackCycleActive || playbackCycleFinished) return;
   playbackCycleFinished = true;
+  if (selectedAudio.value) completedAudioIds.value = new Set([...completedAudioIds.value, selectedAudio.value.id]);
   persistSyncedProgress(true, true);
   void recordAudioEngagement('finished');
   if (playbackCycleStart <= 2 && !playbackCycleHadForwardSeek) void recordAudioEngagement('full-play');
 }
-function isAudioCompleted(id: string) { return (engagementSummaries.value.get(id)?.fullPlays ?? 0) > 0; }
-async function refreshAudioCompletion() { engagementSummaries.value = await loadContentEngagementSummaries('audio'); }
+function isAudioCompleted(id: string) {
+  return isAudioPlaybackCompleted(
+    completedAudioIds.value.has(id) ? { completed: true } : undefined,
+    engagementSummaries.value.get(id),
+  );
+}
+async function refreshAudioCompletion() {
+  const [summaries, progress] = await Promise.all([
+    loadContentEngagementSummaries('audio'),
+    loadAllContentProgress(),
+  ]);
+  engagementSummaries.value = summaries;
+  completedAudioIds.value = new Set(
+    progress
+      .filter((item) => item.category === 'audio' && item.completed)
+      .map((item) => item.contentId),
+  );
+}
 function handleEnded() {
   const item = selectedAudio.value;
   completePlaybackCycle();
