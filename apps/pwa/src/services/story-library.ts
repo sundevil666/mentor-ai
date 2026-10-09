@@ -28,6 +28,38 @@ export function getStoryContentVersion(story: LibraryStory) {
 }
 
 const storyCatalog: LibraryStory[] = [
+  ...([
+    ['peter-breaks-through', 'Peter Breaks Through', 'peterpan_01_barrie_64kb.mp3', 1_249, 10_002_327],
+    ['the-shadow', 'The Shadow', 'peterpan_02_barrie_64kb.mp3', 1_250, 10_011_939],
+    ['come-away-come-away', 'Come Away, Come Away!', 'peterpan_03_barrie_64kb.mp3', 1_719, 13_764_375],
+    ['the-flight', 'The Flight', 'peterpan_04_barrie_64kb.mp3', 1_167, 9_349_021],
+    ['the-island-come-true', 'The Island Come True', 'peterpan_05_barrie_64kb.mp3', 1_526, 12_218_052],
+    ['the-little-house', 'The Little House', 'peterpan_06_barrie_64kb.mp3', 1_106, 8_857_851],
+    ['the-home-underground', 'The Home Underground', 'peterpan_07_barrie_64kb.mp3', 937, 7_504_614],
+    ['the-mermaids-lagoon', 'The Mermaids’ Lagoon', 'peterpan_08_barrie_64kb.mp3', 1_685, 13_493_267],
+    ['the-never-bird', 'The Never Bird', 'peterpan_09_barrie_64kb.mp3', 465, 3_726_035],
+    ['the-happy-home', 'The Happy Home', 'peterpan_10_barrie_64kb.mp3', 846, 6_773_913],
+    ['wendys-story', 'Wendy’s Story', 'peterpan_11_barrie_64kb.mp3', 1_025, 8_208_321],
+    ['the-children-are-carried-off', 'The Children Are Carried Off', 'peterpan_12_barrie_64kb.mp3', 691, 5_538_250],
+    ['do-you-believe-in-fairies', 'Do You Believe in Fairies?', 'peterpan_13_barrie_64kb.mp3', 1_190, 9_531_659],
+    ['the-pirate-ship', 'The Pirate Ship', 'peterpan_14_barrie_64kb.mp3', 1_012, 8_106_237],
+    ['hook-or-me-this-time', 'Hook or Me This Time', 'peterpan_15_barrie_64kb.mp3', 1_390, 11_132_577],
+    ['the-return-home', 'The Return Home', 'peterpan_16_barrie_64kb.mp3', 1_229, 9_847_105],
+    ['when-wendy-grew-up', 'When Wendy Grew Up', 'peterpan_17_barrie_64kb.mp3', 1_458, 11_680_436],
+  ] as const).map(([slug, chapterTitle, filename, durationSeconds, sizeBytes], index): LibraryStory => ({
+    id: `peter-pan-chapter-${String(index + 1).padStart(2, '0')}-${slug}`,
+    addedAt: '2026-10-09T10:00:00.000Z',
+    title: `Peter Pan · ${String(index + 1).padStart(2, '0')}/17 · ${chapterTitle}`,
+    description: `Chapter ${index + 1} of the complete Peter Pan adventure, read throughout by one narrator for comfortable repeat listening.`,
+    level: 'B1',
+    author: 'J. M. Barrie',
+    reader: 'Phil Chenevert',
+    sourceLabel: 'LibriVox public-domain recording',
+    sourcePageUrl: 'https://librivox.org/peter-pan-by-j-m-barrie-5/',
+    sourceUrl: `https://archive.org/download/peterpan_2105_librivox/${filename}`,
+    durationSeconds,
+    sizeBytes,
+  })),
   {
     id: 'aladdin-and-the-magic-lamp',
     addedAt: '2026-08-26T10:00:00.000Z',
