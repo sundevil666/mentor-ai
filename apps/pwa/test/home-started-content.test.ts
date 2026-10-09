@@ -18,6 +18,7 @@ describe('Home started content', () => {
       progress({ id: 'lesson:partial', contentId: 'partial', position: 2, furthestPosition: 2 }),
       progress({ id: 'lesson:full', contentId: 'full', position: 100, furthestPosition: 100 }),
       progress({ id: 'lesson:historic-completion', contentId: 'historic-completion', position: 25, furthestPosition: 100, completed: true }),
+      progress({ id: 'reading:finished-book', category: 'reading', contentId: 'finished-book', position: 25, furthestPosition: 100, completed: true }),
       progress({ id: 'audio:ended', category: 'audio', contentId: 'ended', position: 99.9, furthestPosition: 99.9, completed: true }),
       progress({ id: 'audio:unfinished-99', category: 'audio', contentId: 'unfinished-99', position: 99, furthestPosition: 99, completed: false }),
     ]);

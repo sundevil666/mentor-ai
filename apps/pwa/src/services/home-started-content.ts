@@ -15,8 +15,10 @@ export function selectUnfinishedStartedContent(progress: ContentProgress[]): Sta
 
   for (const item of progress) {
     // `completed` and `furthestPosition` are intentionally cumulative across
-    // attempts. The Home list describes the current attempt, so only the
-    // current position may decide whether it is started or finished.
+    // attempts. Lessons and audio can have a new attempt after completion, but
+    // a personal book remains finished and must not return to Home's in-progress
+    // list when its current reader position changes.
+    if (item.category === 'reading' && item.completed) continue;
     const position = item.position;
     if (position <= 0 || !item.duration || item.duration <= 0) continue;
     const percent = (position / item.duration) * 100;
