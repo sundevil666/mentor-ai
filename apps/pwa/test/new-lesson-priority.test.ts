@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { GeneratedLesson } from '@mentor-ai/shared';
+import { getAudioContentVersion } from '../src/services/audio-library.js';
+import { getStoryContentVersion } from '../src/services/story-library.js';
 import {
   getRecentOfflineLessonSince,
   prioritizeNewLessons,
+  selectPendingAudioDownloads,
   selectPendingBulkLessonDownloads,
+  selectPendingStoryDownloads,
 } from '../src/services/offline-lesson-updates.js';
 
 function lesson(id: string, priority: number, doFirst = false, createdAt = '2026-09-12T10:00:00.000Z') {
@@ -52,5 +56,25 @@ describe('new lesson catalog priority', () => {
       getRecentOfflineLessonSince(Date.parse('2026-10-09T12:00:00.000Z')),
       '2026-09-09T12:00:00.000Z',
     );
+  });
+
+  it('includes a new audio story until its current version is cached and registered', () => {
+    const story = {
+      id: 'new-story', sourceUrl: '/new-story.mp3', durationSeconds: 60, sizeBytes: 1_000, reader: 'Reader',
+    } as Parameters<typeof selectPendingStoryDownloads>[0][number];
+    const version = new Map<string, string | undefined>([[story.id, undefined]]);
+    assert.deepEqual(selectPendingStoryDownloads([story], new Set(), version, 'https://app.test').map(({ id }) => id), ['new-story']);
+    version.set(story.id, getStoryContentVersion(story));
+    assert.deepEqual(selectPendingStoryDownloads([story], new Set(['https://app.test/new-story.mp3']), version, 'https://app.test'), []);
+  });
+
+  it('includes a new audio program until its current version is cached and registered', () => {
+    const audio = {
+      id: 'new-audio', sourceUrl: 'https://audio.test/new.mp3', durationSeconds: 60, sizeBytes: 1_000, publishedAt: '2026-10-09',
+    } as Parameters<typeof selectPendingAudioDownloads>[0][number];
+    const version = new Map<string, string | undefined>([[audio.id, undefined]]);
+    assert.deepEqual(selectPendingAudioDownloads([audio], new Set(), version).map(({ id }) => id), ['new-audio']);
+    version.set(audio.id, getAudioContentVersion(audio));
+    assert.deepEqual(selectPendingAudioDownloads([audio], new Set([audio.sourceUrl]), version), []);
   });
 });

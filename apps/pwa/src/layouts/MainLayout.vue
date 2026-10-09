@@ -91,7 +91,7 @@
           />
         </div>
         <q-btn
-          v-if="pendingBulkLessonDownloads.length > 0"
+          v-if="pendingBulkDownloadCount > 0"
           class="bulk-lesson-download-button"
           :aria-label="bulkLessonDownloadTooltip"
           color="secondary"
@@ -103,7 +103,7 @@
           @click="downloadAllPendingLessons"
         >
           <q-badge color="deep-orange-7" floating>
-            {{ pendingBulkLessonDownloads.length }}
+            {{ pendingBulkDownloadCount }}
           </q-badge>
           <q-tooltip>{{ bulkLessonDownloadTooltip }}</q-tooltip>
         </q-btn>
@@ -362,12 +362,15 @@ import { mentorDb } from 'src/services/indexed-db';
 import { calculateLevelJourney } from 'src/services/level-journey';
 import {
   downloadGeneratedLessonOffline,
+  downloadOfflineMedia,
   fetchRecentLessonCatalog,
+  findPendingOfflineMediaDownloads,
   getOfflineLessonUpdateState,
   selectPendingBulkLessonDownloads,
   subscribeOfflineLessonUpdates,
   updateOfflineLessons,
   type OfflineLessonUpdateState,
+  type PendingOfflineMediaDownload,
 } from 'src/services/offline-lesson-updates';
 import {
   getInstallHelp,
@@ -419,13 +422,15 @@ const isManualSyncRunning = ref(false);
 const isBulkLessonDownloadRunning = ref(false);
 const bulkLessonDownloadCompleted = ref(0);
 const pendingBulkLessonDownloads = ref<GeneratedLesson[]>([]);
+const pendingBulkMediaDownloads = ref<PendingOfflineMediaDownload[]>([]);
+const pendingBulkDownloadCount = computed(() => pendingBulkLessonDownloads.value.length + pendingBulkMediaDownloads.value.length);
 const pendingUploadCount = computed(() => appStore.pendingSyncCount + pendingActivityCount.value + pendingReadingTranscriptCount.value + pendingMovieReportCount.value);
 const bulkLessonDownloadTooltip = computed(() => {
-  if (!appStore.isOnline) return `${pendingBulkLessonDownloads.value.length} new unfinished lessons are waiting. Connect to download them.`;
+  if (!appStore.isOnline) return `${pendingBulkDownloadCount.value} new offline items are waiting. Connect to download them.`;
   if (isBulkLessonDownloadRunning.value) {
-    return `Downloading new lessons: ${bulkLessonDownloadCompleted.value}/${pendingBulkLessonDownloads.value.length}.`;
+    return `Downloading new offline items: ${bulkLessonDownloadCompleted.value}/${pendingBulkDownloadCount.value}.`;
   }
-  return `Download all ${pendingBulkLessonDownloads.value.length} new unfinished lessons for offline use.`;
+  return `Download all ${pendingBulkDownloadCount.value} new items for offline use.`;
 });
 const levelTrend = computed(() => calculateLevelJourney(appStore.studentModel, levelActivity.value, appStore.statisticsSnapshots, levelTrendNow.value));
 const deferredInstallPrompt = ref<BeforeInstallPromptEvent | null>(null);
@@ -741,9 +746,10 @@ function handleOfflineLessonCatalogChange() {
 async function refreshPendingBulkLessonDownloads() {
   if (!appStore.isHydrated || !navigator.onLine || isBulkLessonDownloadRunning.value) return;
   try {
-    const [catalog, engagement] = await Promise.all([
+    const [catalog, engagement, media] = await Promise.all([
       fetchRecentLessonCatalog(),
       loadContentEngagementSummaries('lesson'),
+      findPendingOfflineMediaDownloads(),
     ]);
     const completedKeys = new Set<string>();
     for (const snapshot of appStore.statisticsSnapshots) {
@@ -763,6 +769,7 @@ async function refreshPendingBulkLessonDownloads() {
       savedIds,
       completedKeys,
     );
+    pendingBulkMediaDownloads.value = media;
   } catch {
     // Keep the last known list; the next online or maintenance event retries it.
   }
@@ -770,7 +777,8 @@ async function refreshPendingBulkLessonDownloads() {
 async function downloadAllPendingLessons() {
   if (isBulkLessonDownloadRunning.value || !navigator.onLine) return;
   const lessons = [...pendingBulkLessonDownloads.value];
-  if (lessons.length === 0) return;
+  const media = [...pendingBulkMediaDownloads.value];
+  if (lessons.length + media.length === 0) return;
   isBulkLessonDownloadRunning.value = true;
   bulkLessonDownloadCompleted.value = 0;
   let failed = 0;
@@ -782,20 +790,28 @@ async function downloadAllPendingLessons() {
       failed += 1;
     }
   }
+  for (const item of media) {
+    try {
+      await downloadOfflineMedia(item);
+      bulkLessonDownloadCompleted.value += 1;
+    } catch {
+      failed += 1;
+    }
+  }
   isBulkLessonDownloadRunning.value = false;
   await refreshPendingBulkLessonDownloads();
   if (failed > 0) {
     Notify.create({
       type: 'warning',
       icon: 'cloud_off',
-      message: `${bulkLessonDownloadCompleted.value} lessons downloaded. ${failed} will retry next time.`,
+      message: `${bulkLessonDownloadCompleted.value} offline items downloaded. ${failed} will retry next time.`,
     });
     return;
   }
   Notify.create({
     type: 'positive',
     icon: 'offline_pin',
-    message: `${bulkLessonDownloadCompleted.value} new lessons are ready offline.`,
+    message: `${bulkLessonDownloadCompleted.value} new items are ready offline.`,
   });
 }
 async function syncLearningDataNow() {

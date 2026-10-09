@@ -15,8 +15,8 @@ import {
   registerOfflineGeneratedLesson,
 } from './offline-library.js';
 import { isSpeechBatchCached, preloadSpeechBatch } from './speech-synthesis.js';
-import { getCachedStoryUrls, getStoryContentVersion, saveStoryOffline, storyLibrary } from './story-library.js';
-import { audioLibrary, getAudioContentVersion, getCachedAudioUrls, saveAudioOffline } from './audio-library.js';
+import { getCachedStoryUrls, getStoryContentVersion, saveStoryOffline, storyLibrary, type LibraryStory } from './story-library.js';
+import { audioLibrary, getAudioContentVersion, getCachedAudioUrls, saveAudioOffline, type LibraryAudio } from './audio-library.js';
 
 export type OfflineLessonUpdateStatus = 'idle' | 'checking' | 'downloading' | 'ready' | 'error';
 export interface OfflineLessonUpdateState {
@@ -38,6 +38,9 @@ export interface OfflineLessonUpdateResult {
 }
 let activeUpdate: Promise<OfflineLessonUpdateResult> | null = null;
 export const recentOfflineLessonDays = 30;
+export type PendingOfflineMediaDownload =
+  | { kind: 'story'; item: LibraryStory }
+  | { kind: 'audio'; item: LibraryAudio };
 const builtInOfflineLessons = [
   { id: 'commute-listening', category: 'listening', title: 'Commute listening' },
   { id: 'shop-listening', category: 'listening', title: 'At a small shop' },
@@ -81,6 +84,55 @@ export async function fetchRecentLessonCatalog(now = Date.now()) {
 
 export function getRecentOfflineLessonSince(now = Date.now()) {
   return new Date(now - recentOfflineLessonDays * 86_400_000).toISOString();
+}
+
+export function selectPendingStoryDownloads(
+  stories: LibraryStory[],
+  cachedUrls: ReadonlySet<string>,
+  savedVersions: ReadonlyMap<string, string | undefined>,
+  origin: string,
+) {
+  return stories.filter((story) => (
+    !cachedUrls.has(new URL(story.sourceUrl, origin).href)
+    || savedVersions.get(story.id) !== getStoryContentVersion(story)
+  ));
+}
+
+export function selectPendingAudioDownloads(
+  audioPrograms: LibraryAudio[],
+  cachedUrls: ReadonlySet<string>,
+  savedVersions: ReadonlyMap<string, string | undefined>,
+) {
+  return audioPrograms.filter((audio) => (
+    !cachedUrls.has(audio.sourceUrl)
+    || savedVersions.get(audio.id) !== getAudioContentVersion(audio)
+  ));
+}
+
+export async function findPendingOfflineMediaDownloads(): Promise<PendingOfflineMediaDownload[]> {
+  const saved = readOfflineLessons();
+  const [cachedStoryUrls, cachedAudioUrls] = await Promise.all([
+    getCachedStoryUrls(),
+    getCachedAudioUrls(),
+  ]);
+  const storyVersions = new Map(saved.filter((item) => item.category === 'stories').map((item) => [item.id, item.contentVersion]));
+  const audioVersions = new Map(saved.filter((item) => item.category === 'audio').map((item) => [item.id, item.contentVersion]));
+  return [
+    ...selectPendingStoryDownloads(storyLibrary, cachedStoryUrls, storyVersions, window.location.origin)
+      .map((item): PendingOfflineMediaDownload => ({ kind: 'story', item })),
+    ...selectPendingAudioDownloads(audioLibrary, cachedAudioUrls, audioVersions)
+      .map((item): PendingOfflineMediaDownload => ({ kind: 'audio', item })),
+  ];
+}
+
+export async function downloadOfflineMedia(item: PendingOfflineMediaDownload) {
+  if (item.kind === 'story') {
+    await saveStoryOffline(item.item);
+    registerOfflineStory(item.item);
+    return;
+  }
+  await saveAudioOffline(item.item);
+  registerOfflineAudio(item.item);
 }
 
 export async function downloadGeneratedLessonOffline(lesson: GeneratedLesson) {
@@ -171,9 +223,11 @@ async function updateAudio() {
 
   const cachedUrls = await getCachedAudioUrls();
   const saved = new Map(readOfflineLessons().filter((item) => item.category === 'audio').map((item) => [item.id, item]));
-  const pending = audioLibrary.filter((audio) => (
-    !cachedUrls.has(audio.sourceUrl) || saved.get(audio.id)?.contentVersion !== getAudioContentVersion(audio)
-  ));
+  const pending = selectPendingAudioDownloads(
+    audioLibrary,
+    cachedUrls,
+    new Map([...saved].map(([id, item]) => [id, item.contentVersion])),
+  );
   let completed = 0;
   let failed = 0;
   for (const audio of pending) {
@@ -202,10 +256,12 @@ async function updateStories() {
 
   const cachedUrls = await getCachedStoryUrls();
   const saved = new Map(readOfflineLessons().filter((item) => item.category === 'stories').map((item) => [item.id, item]));
-  const pending = storyLibrary.filter((story) => (
-    !cachedUrls.has(new URL(story.sourceUrl, window.location.origin).href)
-    || saved.get(story.id)?.contentVersion !== getStoryContentVersion(story)
-  ));
+  const pending = selectPendingStoryDownloads(
+    storyLibrary,
+    cachedUrls,
+    new Map([...saved].map(([id, item]) => [id, item.contentVersion])),
+    window.location.origin,
+  );
   let completed = 0;
   let failed = 0;
   for (const story of pending) {
