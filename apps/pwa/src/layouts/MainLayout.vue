@@ -111,6 +111,9 @@
           {{ levelTrend.currentLevel }}→{{ levelTrend.nextLevel }} · {{ levelTrend.daysLabel }} · {{ levelTrend.reviewLabel }}
           <q-tooltip>{{ levelTrend.tooltip }}</q-tooltip>
         </span>
+        <q-btn class="learning-balance-button" aria-label="Open learning balance" color="primary" flat icon="balance" round :to="{ name: 'learning-balance' }">
+          <q-tooltip>Learning balance</q-tooltip>
+        </q-btn>
         <q-btn
           class="sync-status-button"
           :aria-label="syncStatusTooltip"

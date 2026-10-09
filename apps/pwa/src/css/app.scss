@@ -258,6 +258,7 @@ body .q-menu {
 .app-header .analysis-status-button {
   order: 2;
 }
+.app-header .learning-balance-button { order: 3; }
 .app-header .bulk-lesson-download-button {
   order: 1;
 }
@@ -308,6 +309,38 @@ body .q-menu {
 .app-header .more-nav-button {
   order: 4;
 }
+
+.learning-balance-page { padding: 28px 24px 120px; }
+.learning-balance-shell { display: grid; gap: 22px; margin: 0 auto; max-width: 1120px; }
+.learning-balance-hero { align-items: center; display: flex; gap: 24px; justify-content: space-between; }
+.learning-balance-hero p { color: var(--app-primary); font-weight: 800; margin: 0 0 4px; text-transform: uppercase; }
+.learning-balance-hero h1 { font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.05; margin: 0 0 10px; }
+.learning-balance-hero > div > span, .learning-balance-note { color: var(--app-muted-strong); line-height: 1.55; }
+.learning-balance-score { align-items: center; display: grid; flex: 0 0 auto; justify-items: center; }
+.learning-balance-score span { color: var(--app-muted-strong); font-size: .78rem; margin-top: 4px; }
+.learning-focus-card { background: linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 12%, var(--app-surface)), var(--app-surface)); border-radius: 22px; }
+.learning-focus-card .q-card__section { align-items: center; display: grid; gap: 18px; grid-template-columns: auto minmax(0, 1fr) auto; padding: 22px; }
+.learning-focus-card__icon { align-items: center; background: var(--app-primary); border-radius: 16px; color: white; display: flex; height: 52px; justify-content: center; width: 52px; }
+.learning-focus-card__icon .q-icon { font-size: 28px; }
+.learning-focus-card span { color: var(--app-primary); font-size: .78rem; font-weight: 800; text-transform: uppercase; }
+.learning-focus-card .q-btn .q-btn__content,
+.learning-focus-card .q-btn .q-btn__content span { color: white; }
+.learning-focus-card h2 { font-size: 1.35rem; margin: 3px 0 5px; }
+.learning-focus-card p { color: var(--app-muted-strong); line-height: 1.5; margin: 0; }
+.learning-balance-grid { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.learning-balance-card { background: var(--app-surface); border: 1px solid var(--app-border); border-radius: 18px; display: grid; gap: 14px; padding: 18px; }
+.learning-balance-card--focus { border-color: color-mix(in srgb, #f97316 52%, var(--app-border)); }
+.learning-balance-card__heading { align-items: start; display: flex; gap: 16px; justify-content: space-between; }
+.learning-balance-card__heading > div:first-child { display: grid; gap: 3px; }
+.learning-balance-card__heading span, .learning-balance-card__meta { color: var(--app-muted-strong); font-size: .82rem; }
+.learning-balance-card__impact { display: grid; flex: 0 0 auto; justify-items: end; }
+.learning-balance-card__impact strong { font-size: 1.45rem; }
+.learning-balance-card__impact span { font-size: .72rem; }
+.learning-balance-card__meta, .learning-balance-card__footer { align-items: center; display: flex; gap: 12px; justify-content: space-between; }
+.learning-balance-card__status { font-size: .8rem; font-weight: 800; }
+.learning-balance-card--focus .learning-balance-card__status { color: #d45f00; }
+.learning-balance-card--strong .learning-balance-card__status { color: var(--app-secondary); }
+.learning-balance-note { font-size: .82rem; margin: 0; }
 
 .app-back-button {
   background: color-mix(in srgb, var(--app-surface) 94%, transparent) !important;
@@ -4088,6 +4121,14 @@ body.body--dark .personal-reader__lookup-error {
   .app-header .header-level-trend {
     display: none;
   }
+
+  .learning-balance-page { padding: 18px 14px calc(104px + env(safe-area-inset-bottom)); }
+  .learning-balance-hero { align-items: flex-start; }
+  .learning-balance-hero h1 { font-size: 2.15rem; }
+  .learning-balance-score .q-circular-progress { font-size: .9rem; height: 72px !important; width: 72px !important; }
+  .learning-focus-card .q-card__section { align-items: start; grid-template-columns: auto minmax(0, 1fr); }
+  .learning-focus-card .q-btn { grid-column: 1 / -1; width: 100%; }
+  .learning-balance-grid { grid-template-columns: 1fr; }
 
   .app-header .personal-books__sync-button {
     height: 36px;

@@ -9,6 +9,7 @@ import StoragePage from 'pages/StoragePage.vue';
 import AudioPage from 'pages/AudioPage.vue';
 import PatternsPage from 'pages/PatternsPage.vue';
 import MoviesPage from 'pages/MoviesPage.vue';
+import LearningBalancePage from 'pages/LearningBalancePage.vue';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -66,6 +67,9 @@ const routes: RouteRecordRaw[] = [
         name: 'statistics',
         component: StatisticsPage,
         meta: { routeOrder: 2 },
+      },
+      {
+        path: 'learning-balance', name: 'learning-balance', component: LearningBalancePage, meta: { routeOrder: 2 },
       },
       {
         path: 'settings',
