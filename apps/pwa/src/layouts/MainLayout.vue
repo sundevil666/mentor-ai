@@ -847,15 +847,21 @@ async function syncLearningDataNow() {
     const results = await Promise.allSettled(operations.map(([, operation]) => operation));
     await Promise.all([refreshLevelActivity(), refreshPendingActivityCount(), refreshPendingReadingTranscriptCount(), refreshPendingMovieReportCount()]);
     const failures = results.flatMap((result, index) => result.status === 'rejected'
-      ? [`${operations[index]![0]}: ${syncErrorMessage(result.reason)}`]
+      ? [{ operation: operations[index]![0], detail: syncErrorMessage(result.reason) }]
       : []);
     if (pendingUploadCount.value > 0) {
+      const primaryFailure = pendingMovieReportCount.value > 0
+        ? failures.find((failure) => failure.operation === 'Film report upload') ?? failures[0]
+        : failures[0];
+      const additionalFailures = failures.filter((failure) => failure !== primaryFailure);
       Notify.create({
         type: 'warning',
         icon: 'cloud_off',
-        message: failures[0] ?? `${pendingUploadCount.value} update${pendingUploadCount.value === 1 ? '' : 's'} remain on this device because the server did not acknowledge them.`,
-        caption: failures.length > 1
-          ? `${failures.length} sync operations failed. Your local data is safe.`
+        message: primaryFailure
+          ? `${primaryFailure.operation}: ${primaryFailure.detail}`
+          : `${pendingUploadCount.value} update${pendingUploadCount.value === 1 ? '' : 's'} remain on this device because the server did not acknowledge them.`,
+        caption: additionalFailures.length > 0
+          ? `Also failed: ${additionalFailureSummary(additionalFailures.map((failure) => failure.operation))}. Your local data is safe.`
           : 'Your local data is safe. Fix the issue above, then try again.',
         timeout: 12_000,
       });
@@ -880,6 +886,11 @@ async function syncLearningDataNow() {
   } finally {
     isManualSyncRunning.value = false;
   }
+}
+function additionalFailureSummary(operations: string[]): string {
+  const visible = operations.slice(0, 2).join(', ');
+  const remaining = operations.length - 2;
+  return remaining > 0 ? `${visible}, and ${remaining} more` : visible;
 }
 function syncErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message.trim();

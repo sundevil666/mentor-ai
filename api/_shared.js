@@ -105,7 +105,21 @@ exports.readJsonBody = (request) =>
 
 exports.handleError = (response, error) => {
   console.error(error);
-  exports.sendJson(response, error.statusCode || 500, { message: error.statusCode ? error.message : 'Internal server error' });
+  const publicError = exports.publicErrorDetails(error);
+  exports.sendJson(response, publicError.statusCode, { message: publicError.message });
+};
+
+exports.publicErrorDetails = (error) => {
+  if (error?.statusCode) {
+    return { statusCode: error.statusCode, message: error.message };
+  }
+  if (error?.code === '53000' && /exceeded the quota/i.test(String(error?.message))) {
+    return {
+      statusCode: 503,
+      message: 'Cloud database quota is exhausted. Uploads will resume after the quota resets or the database plan is upgraded.',
+    };
+  }
+  return { statusCode: 500, message: 'Internal server error' };
 };
 
 function readAllowedEmails() {
