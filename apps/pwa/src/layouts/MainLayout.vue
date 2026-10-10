@@ -833,22 +833,34 @@ async function syncLearningDataNow() {
   }
   isManualSyncRunning.value = true;
   try {
-    const results = await Promise.allSettled([
-      appStore.refreshRemoteLearningState(),
-      syncAllContentProgress(),
-      syncContentEngagement(),
-      syncLearningActivity(),
-      syncReadingTranscripts(),
-      syncReadingPageSpeech(appStore.studentId, Date.now(), undefined, true),
-      syncReaderVocabulary(appStore.studentId),
-      syncApplicationTelemetry(),
-      syncMovieLearningReports(),
-    ]);
+    const operations = [
+      ['Learning state refresh', appStore.refreshRemoteLearningState()],
+      ['Content progress upload', syncAllContentProgress()],
+      ['Content engagement upload', syncContentEngagement()],
+      ['Learning activity upload', syncLearningActivity()],
+      ['Reading transcript upload', syncReadingTranscripts()],
+      ['Reading speech upload', syncReadingPageSpeech(appStore.studentId, Date.now(), undefined, true)],
+      ['Reader vocabulary upload', syncReaderVocabulary(appStore.studentId)],
+      ['Diagnostics upload', syncApplicationTelemetry()],
+      ['Film report upload', syncMovieLearningReports()],
+    ] as const;
+    const results = await Promise.allSettled(operations.map(([, operation]) => operation));
     await Promise.all([refreshLevelActivity(), refreshPendingActivityCount(), refreshPendingReadingTranscriptCount(), refreshPendingMovieReportCount()]);
+    const failures = results.flatMap((result, index) => result.status === 'rejected'
+      ? [`${operations[index]![0]}: ${syncErrorMessage(result.reason)}`]
+      : []);
     if (pendingUploadCount.value > 0) {
-      Notify.create({ type: 'warning', icon: 'cloud_off', message: 'Some updates are still saved on this device. Try again later.' });
+      Notify.create({
+        type: 'warning',
+        icon: 'cloud_off',
+        message: failures[0] ?? `${pendingUploadCount.value} update${pendingUploadCount.value === 1 ? '' : 's'} remain on this device because the server did not acknowledge them.`,
+        caption: failures.length > 1
+          ? `${failures.length} sync operations failed. Your local data is safe.`
+          : 'Your local data is safe. Fix the issue above, then try again.',
+        timeout: 12_000,
+      });
     } else {
-      const backgroundRefreshFailed = results.some((result) => result.status === 'rejected');
+      const backgroundRefreshFailed = failures.length > 0;
       Notify.create({
         type: 'positive',
         icon: 'cloud_done',
@@ -857,11 +869,22 @@ async function syncLearningDataNow() {
           : 'Learning data uploaded and refreshed.',
       });
     }
-  } catch {
-    Notify.create({ type: 'negative', icon: 'cloud_off', message: 'Sync failed. Your local data is still saved.' });
+  } catch (error) {
+    Notify.create({
+      type: 'negative',
+      icon: 'cloud_off',
+      message: `Sync failed: ${syncErrorMessage(error)}`,
+      caption: 'Your local data is still saved.',
+      timeout: 12_000,
+    });
   } finally {
     isManualSyncRunning.value = false;
   }
+}
+function syncErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message.trim();
+  if (typeof error === 'string' && error.trim()) return error.trim();
+  return 'Unknown synchronization error.';
 }
 function handleRuntimeError(event: ErrorEvent) {
   void recordApplicationTelemetry({

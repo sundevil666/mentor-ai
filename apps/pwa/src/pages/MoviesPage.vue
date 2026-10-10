@@ -366,20 +366,36 @@ async function saveReport() {
     reportText.value = '';
     reportPage.value = 1;
     await refreshReports();
-    if (appStore.isOnline) await retrySync(false);
-    Notify.create({ type: pendingCount.value ? 'warning' : 'positive', icon: pendingCount.value ? 'cloud_off' : 'cloud_done', message: pendingCount.value ? 'Report saved locally and will be sent later.' : 'Film report sent to the database.' });
+    const syncError = appStore.isOnline ? await retrySync(false) : null;
+    Notify.create({
+      type: pendingCount.value ? 'warning' : 'positive',
+      icon: pendingCount.value ? 'cloud_off' : 'cloud_done',
+      message: pendingCount.value
+        ? syncError ? `Report saved on this device. Upload failed: ${syncError}` : 'Report saved on this device. It will upload when internet returns.'
+        : 'Film report sent to the database.',
+      timeout: pendingCount.value ? 12_000 : undefined,
+    });
   } finally { saving.value = false; }
 }
 async function retrySync(showResult = true) {
-  if (syncing.value || !appStore.isOnline) return;
+  if (syncing.value || !appStore.isOnline) return null;
   syncing.value = true;
   try {
     await syncMovieLearningReports();
     await refreshReports();
     if (showResult) Notify.create({ type: 'positive', icon: 'cloud_done', message: 'Film reports synchronized.' });
-  } catch {
+    return null;
+  } catch (error) {
     await refreshReports();
-    if (showResult) Notify.create({ type: 'warning', icon: 'cloud_off', message: 'Reports remain safely stored on this device.' });
+    const message = error instanceof Error && error.message.trim() ? error.message.trim() : 'Unknown film report synchronization error.';
+    if (showResult) Notify.create({
+      type: 'warning',
+      icon: 'cloud_off',
+      message: `Film report upload failed: ${message}`,
+      caption: 'The report remains safely stored on this device.',
+      timeout: 12_000,
+    });
+    return message;
   } finally { syncing.value = false; }
 }
 

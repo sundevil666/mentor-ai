@@ -210,7 +210,21 @@ describe('PWA API client', () => {
   it('throws on failed synchronization responses', async () => {
     globalThis.fetch = async () => new Response('', { status: 500 });
 
-    await assert.rejects(() => synchronizeLearningEvidence([], [], []), /Synchronization failed/);
+    await assert.rejects(() => synchronizeLearningEvidence([], [], []), /Synchronization failed\. \(HTTP 500\)/);
+  });
+
+  it('includes the server explanation and status in synchronization errors', async () => {
+    globalThis.fetch = async () => new Response(JSON.stringify({
+      data: { message: 'Google sign-in is required for cloud learning synchronization.' },
+    }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    await assert.rejects(
+      () => synchronizeLearningEvidence([], [], []),
+      /Google sign-in is required for cloud learning synchronization\. \(HTTP 401\)/,
+    );
   });
 
   it('loads the reading resume snapshot as JSON', async () => {

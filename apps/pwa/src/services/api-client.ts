@@ -72,13 +72,32 @@ interface LocalTranslationUsageState {
   lastSyncAttemptAt: string | null;
 }
 
+type ApiErrorBody = {
+  data?: { message?: unknown };
+  error?: { message?: unknown };
+  message?: unknown;
+};
+
+export async function apiErrorMessage(response: Response, fallback: string): Promise<string> {
+  const body = await response.json().catch(() => null) as ApiErrorBody | null;
+  const serverMessage = body?.error?.message ?? body?.data?.message ?? body?.message;
+  const detail = typeof serverMessage === 'string' && serverMessage.trim()
+    ? serverMessage.trim()
+    : fallback;
+  return `${detail} (HTTP ${response.status})`;
+}
+
+async function throwApiError(response: Response, fallback: string): Promise<never> {
+  throw new Error(await apiErrorMessage(response, fallback));
+}
+
 export async function fetchStudentState(): Promise<StudentStateResponse> {
   const response = await fetch(`${apiBaseUrl}/api/student-state`, {
     headers: authHeaders(),
   });
 
   if (!response.ok) {
-    throw new Error('Student state request failed.');
+    await throwApiError(response, 'Student state request failed.');
   }
 
   const body = (await response.json()) as ApiResponse<StudentStateResponse>;
@@ -92,7 +111,7 @@ export async function fetchAppConfiguration(): Promise<AppConfiguration> {
   });
 
   if (!response.ok) {
-    throw new Error('App configuration request failed.');
+    await throwApiError(response, 'App configuration request failed.');
   }
 
   const body = (await response.json()) as ApiResponse<AppConfiguration>;
@@ -117,8 +136,7 @@ export async function fetchReaderTextLookup(text: string): Promise<ReaderTextLoo
     if (response.status === 429 && typeof window !== 'undefined') {
       window.dispatchEvent(new Event('translation-usage-updated'));
     }
-    const body = await response.json().catch(() => null) as { data?: { message?: string }; error?: { message?: string } } | null;
-    throw new Error(body?.error?.message ?? body?.data?.message ?? 'Translation is unavailable right now.');
+    await throwApiError(response, 'Translation is unavailable right now.');
   }
   const result = ((await response.json()) as ApiResponse<ReaderTextLookup>).data;
   writeLocalTranslationUsage({ ...usage, usedCharacters: usage.usedCharacters + characterCount });
@@ -235,7 +253,7 @@ export async function synchronizeReadingPageSpeech(pages: ReadingPageSpeechUploa
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ pages }),
   });
-  if (!response.ok) throw new Error('Reading page synchronization failed.');
+  if (!response.ok) await throwApiError(response, 'Reading page synchronization failed.');
   return ((await response.json()) as ApiResponse<ReadingPageSpeechUpload[]>).data;
 }
 
@@ -245,7 +263,7 @@ export async function synchronizeReaderVocabulary(items: ReaderVocabularyItem[])
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ items }),
   });
-  if (!response.ok) throw new Error('Reader vocabulary synchronization failed.');
+  if (!response.ok) await throwApiError(response, 'Reader vocabulary synchronization failed.');
   return ((await response.json()) as ApiResponse<ReaderVocabularyItem[]>).data;
 }
 
@@ -255,7 +273,7 @@ export async function synchronizePersonalReadingBooks(books: PersonalReadingBook
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ books }),
   });
-  if (!response.ok) throw new Error('Book synchronization failed.');
+  if (!response.ok) await throwApiError(response, 'Book synchronization failed.');
   return ((await response.json()) as ApiResponse<PersonalReadingBookArchive[]>).data;
 }
 
@@ -270,7 +288,7 @@ export async function fetchCurrentLesson(context: LearningContext, forceRefresh 
   });
 
   if (!response.ok) {
-    throw new Error('Current lesson request failed.');
+    await throwApiError(response, 'Current lesson request failed.');
   }
 
   const body = (await response.json()) as ApiResponse<GeneratedLesson>;
@@ -282,7 +300,7 @@ export async function fetchOfflineLessons(since: string): Promise<GeneratedLesso
     cache: 'no-store',
     headers: authHeaders(),
   });
-  if (!response.ok) throw new Error('Offline lesson update request failed.');
+  if (!response.ok) await throwApiError(response, 'Offline lesson update request failed.');
   return ((await response.json()) as ApiResponse<GeneratedLesson[]>).data;
 }
 
@@ -292,7 +310,7 @@ export async function fetchSessionHandoffs(): Promise<LearningSessionHandoff[]> 
   });
 
   if (!response.ok) {
-    throw new Error('Session handoffs request failed.');
+    await throwApiError(response, 'Session handoffs request failed.');
   }
 
   const body = (await response.json()) as ApiResponse<LearningSessionHandoff[]>;
@@ -310,7 +328,7 @@ export async function upsertSessionHandoff(handoff: LearningSessionHandoff): Pro
   });
 
   if (!response.ok) {
-    throw new Error('Session handoff update failed.');
+    await throwApiError(response, 'Session handoff update failed.');
   }
 
   const body = (await response.json()) as ApiResponse<LearningSessionHandoff>;
@@ -324,7 +342,7 @@ export async function synchronizeContentProgress(progress: ContentProgress[]): P
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ progress }),
   });
-  if (!response.ok) throw new Error('Content progress synchronization failed.');
+  if (!response.ok) await throwApiError(response, 'Content progress synchronization failed.');
   return ((await response.json()) as ApiResponse<ContentProgress[]>).data;
 }
 
@@ -334,7 +352,7 @@ export async function fetchReadingResumeSnapshot(bookId: string): Promise<Readin
     cache: 'no-store',
   });
   if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
-    throw new Error('Reading device synchronization is temporarily unavailable.');
+    await throwApiError(response, 'Reading device synchronization is temporarily unavailable.');
   }
   return ((await response.json()) as ApiResponse<ReadingResumeSnapshot>).data;
 }
@@ -347,7 +365,7 @@ export async function updateReadingDeviceSession(session: ReadingDeviceSession):
     body: JSON.stringify(session),
   });
   if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
-    throw new Error('Reading device synchronization update failed.');
+    await throwApiError(response, 'Reading device synchronization update failed.');
   }
   return ((await response.json()) as ApiResponse<ReadingResumeSnapshot>).data;
 }
@@ -360,7 +378,7 @@ export async function synchronizeContentEngagement(
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ engagementEvents }),
   });
-  if (!response.ok) throw new Error('Content engagement synchronization failed.');
+  if (!response.ok) await throwApiError(response, 'Content engagement synchronization failed.');
   return ((await response.json()) as ApiResponse<ContentEngagementEvent[]>).data;
 }
 
@@ -373,13 +391,13 @@ export async function synchronizeLearningActivity(
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ activityEvents, activityTotalsSnapshot }),
   });
-  if (!response.ok) throw new Error('Learning activity synchronization failed.');
+  if (!response.ok) await throwApiError(response, 'Learning activity synchronization failed.');
   return ((await response.json()) as ApiResponse<LearningActivitySyncResult>).data;
 }
 
 export async function fetchLearningActivityTotals(): Promise<LearningActivityTotals> {
   const response = await fetch(`${apiBaseUrl}/api/learning-activity-totals`, { headers: authHeaders() });
-  if (!response.ok) throw new Error('Learning activity totals request failed.');
+  if (!response.ok) await throwApiError(response, 'Learning activity totals request failed.');
   return ((await response.json()) as ApiResponse<LearningActivityTotals>).data;
 }
 
@@ -389,7 +407,7 @@ export async function synchronizeStatisticsSnapshots(statisticsSnapshots: Statis
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ statisticsSnapshots }),
   });
-  if (!response.ok) throw new Error('Statistics synchronization failed.');
+  if (!response.ok) await throwApiError(response, 'Statistics synchronization failed.');
   return ((await response.json()) as ApiResponse<StatisticsSnapshot[]>).data;
 }
 
@@ -401,7 +419,7 @@ export async function synchronizeApplicationTelemetry(
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ telemetryEvents }),
   });
-  if (!response.ok) throw new Error('Application telemetry synchronization failed.');
+  if (!response.ok) await throwApiError(response, 'Application telemetry synchronization failed.');
   return ((await response.json()) as ApiResponse<ApplicationTelemetryEvent[]>).data;
 }
 
@@ -413,7 +431,7 @@ export async function synchronizeMovieLearningReports(
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ reports }),
   });
-  if (!response.ok) throw new Error('Movie learning report synchronization failed.');
+  if (!response.ok) await throwApiError(response, 'Movie learning report synchronization failed.');
   return ((await response.json()) as ApiResponse<MovieLearningReport[]>).data;
 }
 
@@ -421,7 +439,7 @@ export async function fetchMovieLearningReports(): Promise<MovieLearningReport[]
   const response = await fetch(`${apiBaseUrl}/api/movie-learning-reports-synchronize`, {
     headers: authHeaders(),
   });
-  if (!response.ok) throw new Error('Movie learning reports could not be loaded.');
+  if (!response.ok) await throwApiError(response, 'Movie learning reports could not be loaded.');
   return ((await response.json()) as ApiResponse<MovieLearningReport[]>).data;
 }
 
@@ -431,7 +449,7 @@ export async function deleteMovieLearningReportFromCloud(reportId: string): Prom
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ reportId }),
   });
-  if (!response.ok) throw new Error('Movie learning report could not be deleted.');
+  if (!response.ok) await throwApiError(response, 'Movie learning report could not be deleted.');
   return ((await response.json()) as ApiResponse<boolean>).data;
 }
 
@@ -458,7 +476,7 @@ export async function saveReadingTranscripts(chunks: ReadingTranscriptChunk[]): 
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ chunks }),
   });
-  if (!response.ok) throw new Error('Reading transcript could not be saved.');
+  if (!response.ok) await throwApiError(response, 'Reading transcript could not be saved.');
   return ((await response.json()) as ApiResponse<ReadingTranscriptChunk[]>).data;
 }
 
@@ -477,7 +495,7 @@ export async function synchronizeLearningEvidence(
   });
 
   if (!response.ok) {
-    throw new Error('Synchronization failed.');
+    await throwApiError(response, 'Synchronization failed.');
   }
 
   const body = (await response.json()) as ApiResponse<SynchronizationResponse>;
