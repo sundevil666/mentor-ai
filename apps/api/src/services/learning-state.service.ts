@@ -136,17 +136,17 @@ export const learningStateService = {
   },
 
   async mergeContentEngagementEvents(incoming: ContentEngagementEvent[], user?: AuthenticatedUser) {
-    const state = await learningStateRepository.read(user);
+    const state = await learningStateRepository.readContentEngagementState(user);
     const merged = new Map(state.contentEngagementEvents.map((event) => [event.id, event]));
 
     for (const candidate of incoming) {
-      const safe = sanitizeContentEngagementEvent(candidate, state.student.id);
+      const safe = sanitizeContentEngagementEvent(candidate, state.studentId);
       if (safe && !merged.has(safe.id)) merged.set(safe.id, safe);
     }
 
     const contentEngagementEvents = [...merged.values()].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-    await learningStateRepository.write({ ...state, contentEngagementEvents }, user);
-    return contentEngagementEvents.filter((event) => event.studentId === state.student.id);
+    await learningStateRepository.writeContentEngagementEvents(contentEngagementEvents, user);
+    return contentEngagementEvents.filter((event) => event.studentId === state.studentId);
   },
 
   async mergeLearningActivityEvents(
@@ -202,40 +202,40 @@ export const learningStateService = {
   },
 
   async mergeStatisticsSnapshots(incoming: StatisticsSnapshot[], user?: AuthenticatedUser) {
-    const state = await learningStateRepository.read(user);
+    const state = await learningStateRepository.readStatisticsState(user);
     const merged = new Map(state.statisticsSnapshots.map((snapshot) => [snapshot.id, snapshot]));
     let changed = false;
     for (const snapshot of incoming) {
-      if (snapshot?.studentId === state.student.id && snapshot.id && Number.isFinite(Date.parse(snapshot.createdAt))) {
+      if (snapshot?.studentId === state.studentId && snapshot.id && Number.isFinite(Date.parse(snapshot.createdAt))) {
         if (!merged.has(snapshot.id)) changed = true;
         merged.set(snapshot.id, snapshot);
       }
     }
     const statisticsSnapshots = [...merged.values()].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-    if (changed) await learningStateRepository.write({ ...state, statisticsSnapshots }, user);
-    return statisticsSnapshots.filter((snapshot) => snapshot.studentId === state.student.id);
+    if (changed) await learningStateRepository.writeStatisticsSnapshots(statisticsSnapshots, user);
+    return statisticsSnapshots.filter((snapshot) => snapshot.studentId === state.studentId);
   },
 
   async mergeApplicationTelemetryEvents(incoming: ApplicationTelemetryEvent[], user?: AuthenticatedUser) {
-    const state = await learningStateRepository.read(user);
+    const state = await learningStateRepository.readApplicationTelemetryState(user);
     const merged = new Map(state.applicationTelemetryEvents.map((event) => [event.id, event]));
     for (const candidate of incoming) {
-      const safe = sanitizeApplicationTelemetryEvent(candidate, state.student.id);
+      const safe = sanitizeApplicationTelemetryEvent(candidate, state.studentId);
       if (safe && !merged.has(safe.id)) merged.set(safe.id, safe);
     }
     const applicationTelemetryEvents = [...merged.values()]
       .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
       .slice(-10_000);
-    await learningStateRepository.write({ ...state, applicationTelemetryEvents }, user);
+    await learningStateRepository.writeApplicationTelemetryEvents(applicationTelemetryEvents, user);
     return applicationTelemetryEvents;
   },
 
   async mergeMovieLearningReports(incoming: MovieLearningReport[], user?: AuthenticatedUser) {
-    const state = await learningStateRepository.read(user);
+    const state = await learningStateRepository.readMovieLearningReportsState(user);
     const merged = new Map(state.movieLearningReports.map((report) => [report.id, report]));
     const accepted: MovieLearningReport[] = [];
     for (const candidate of incoming) {
-      const safe = sanitizeMovieLearningReport(candidate, state.student.id);
+      const safe = sanitizeMovieLearningReport(candidate, state.studentId);
       if (!safe) continue;
       const current = merged.get(safe.id);
       if (!current || safe.updatedAt >= current.updatedAt) merged.set(safe.id, safe);
@@ -244,26 +244,26 @@ export const learningStateService = {
     const movieLearningReports = [...merged.values()]
       .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
       .slice(-2_000);
-    await learningStateRepository.write({ ...state, movieLearningReports }, user);
+    await learningStateRepository.writeMovieLearningReports(movieLearningReports, user);
     return accepted;
   },
 
   async listMovieLearningReports(user?: AuthenticatedUser) {
-    const state = await learningStateRepository.read(user);
+    const state = await learningStateRepository.readMovieLearningReportsState(user);
     return state.movieLearningReports
-      .filter((report) => report.studentId === state.student.id)
+      .filter((report) => report.studentId === state.studentId)
       .sort((left, right) => right.watchedAt.localeCompare(left.watchedAt));
   },
 
   async deleteMovieLearningReport(reportId: string, user?: AuthenticatedUser) {
     const safeReportId = typeof reportId === 'string' ? reportId.trim().slice(0, 180) : '';
     if (!safeReportId) return false;
-    const state = await learningStateRepository.read(user);
+    const state = await learningStateRepository.readMovieLearningReportsState(user);
     const movieLearningReports = state.movieLearningReports.filter(
-      (report) => report.studentId !== state.student.id || report.id !== safeReportId,
+      (report) => report.studentId !== state.studentId || report.id !== safeReportId,
     );
     if (movieLearningReports.length === state.movieLearningReports.length) return false;
-    await learningStateRepository.write({ ...state, movieLearningReports }, user);
+    await learningStateRepository.writeMovieLearningReports(movieLearningReports, user);
     return true;
   },
 

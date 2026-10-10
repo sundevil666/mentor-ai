@@ -239,6 +239,70 @@ export const learningStateRepository = {
     await learningStateRepository.write({ ...state, contentProgress }, user);
   },
 
+  async readContentEngagementState(user?: AuthenticatedUser): Promise<{
+    studentId: string;
+    contentEngagementEvents: ContentEngagementEvent[];
+  }> {
+    const database = await readDatabaseStateSlice<ContentEngagementEvent[]>('contentEngagementEvents', user);
+    if (database) return { studentId: database.studentId, contentEngagementEvents: database.value ?? [] };
+    const state = await learningStateRepository.read(user);
+    return { studentId: state.student.id, contentEngagementEvents: state.contentEngagementEvents };
+  },
+
+  async writeContentEngagementEvents(contentEngagementEvents: ContentEngagementEvent[], user?: AuthenticatedUser): Promise<void> {
+    if (await writeDatabaseStateSlice('contentEngagementEvents', contentEngagementEvents, user)) return;
+    const state = await learningStateRepository.read(user);
+    await learningStateRepository.write({ ...state, contentEngagementEvents }, user);
+  },
+
+  async readStatisticsState(user?: AuthenticatedUser): Promise<{
+    studentId: string;
+    statisticsSnapshots: StatisticsSnapshot[];
+  }> {
+    const database = await readDatabaseStateSlice<StatisticsSnapshot[]>('statisticsSnapshots', user);
+    if (database) return { studentId: database.studentId, statisticsSnapshots: database.value ?? [] };
+    const state = await learningStateRepository.read(user);
+    return { studentId: state.student.id, statisticsSnapshots: state.statisticsSnapshots };
+  },
+
+  async writeStatisticsSnapshots(statisticsSnapshots: StatisticsSnapshot[], user?: AuthenticatedUser): Promise<void> {
+    if (await writeDatabaseStateSlice('statisticsSnapshots', statisticsSnapshots, user)) return;
+    const state = await learningStateRepository.read(user);
+    await learningStateRepository.write({ ...state, statisticsSnapshots }, user);
+  },
+
+  async readApplicationTelemetryState(user?: AuthenticatedUser): Promise<{
+    studentId: string;
+    applicationTelemetryEvents: ApplicationTelemetryEvent[];
+  }> {
+    const database = await readDatabaseStateSlice<ApplicationTelemetryEvent[]>('applicationTelemetryEvents', user);
+    if (database) return { studentId: database.studentId, applicationTelemetryEvents: database.value ?? [] };
+    const state = await learningStateRepository.read(user);
+    return { studentId: state.student.id, applicationTelemetryEvents: state.applicationTelemetryEvents };
+  },
+
+  async writeApplicationTelemetryEvents(applicationTelemetryEvents: ApplicationTelemetryEvent[], user?: AuthenticatedUser): Promise<void> {
+    if (await writeDatabaseStateSlice('applicationTelemetryEvents', applicationTelemetryEvents, user)) return;
+    const state = await learningStateRepository.read(user);
+    await learningStateRepository.write({ ...state, applicationTelemetryEvents }, user);
+  },
+
+  async readMovieLearningReportsState(user?: AuthenticatedUser): Promise<{
+    studentId: string;
+    movieLearningReports: MovieLearningReport[];
+  }> {
+    const database = await readDatabaseStateSlice<MovieLearningReport[]>('movieLearningReports', user);
+    if (database) return { studentId: database.studentId, movieLearningReports: database.value ?? [] };
+    const state = await learningStateRepository.read(user);
+    return { studentId: state.student.id, movieLearningReports: state.movieLearningReports };
+  },
+
+  async writeMovieLearningReports(movieLearningReports: MovieLearningReport[], user?: AuthenticatedUser): Promise<void> {
+    if (await writeDatabaseStateSlice('movieLearningReports', movieLearningReports, user)) return;
+    const state = await learningStateRepository.read(user);
+    await learningStateRepository.write({ ...state, movieLearningReports }, user);
+  },
+
   async readLearningActivityState(user?: AuthenticatedUser): Promise<{
     studentId: string;
     learningActivityEvents: LearningActivityEvent[];
@@ -435,6 +499,41 @@ async function writeDatabaseState(studentId: string, state: LearningStateRecord)
      ON CONFLICT (student_id) DO UPDATE SET state = EXCLUDED.state, updated_at = now()`,
     [studentId, JSON.stringify(state)],
   );
+}
+
+async function readDatabaseStateSlice<T>(field: keyof LearningStateRecord, user?: AuthenticatedUser): Promise<{
+  studentId: string;
+  value: T | null;
+} | null> {
+  if (!user) return null;
+  const pool = getPostgresPool();
+  if (!pool) return null;
+  await ensureLearningStatesTable();
+  const result = await pool.query<{ student_id: string | null; value: T | null }>(
+    `SELECT state->'student'->>'id' AS student_id, state -> $2 AS value
+     FROM learning_states WHERE student_id = $1`,
+    [user.id, field],
+  );
+  const row = result.rows[0];
+  return row?.student_id ? { studentId: row.student_id, value: row.value } : null;
+}
+
+async function writeDatabaseStateSlice(
+  field: keyof LearningStateRecord,
+  value: unknown,
+  user?: AuthenticatedUser,
+): Promise<boolean> {
+  if (!user) return false;
+  const pool = getPostgresPool();
+  if (!pool) return false;
+  await ensureLearningStatesTable();
+  const result = await pool.query(
+    `UPDATE learning_states
+     SET state = jsonb_set(state, ARRAY[$2]::text[], $3::jsonb, true), updated_at = now()
+     WHERE student_id = $1`,
+    [user.id, field, JSON.stringify(value)],
+  );
+  return (result.rowCount ?? 0) > 0;
 }
 
 function stateFilePath(user?: AuthenticatedUser): string {

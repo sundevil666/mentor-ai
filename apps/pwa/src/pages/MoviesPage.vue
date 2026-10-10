@@ -366,14 +366,10 @@ async function saveReport() {
     reportText.value = '';
     reportPage.value = 1;
     await refreshReports();
-    const syncError = appStore.isOnline ? await retrySync(false) : null;
     Notify.create({
-      type: pendingCount.value ? 'warning' : 'positive',
-      icon: pendingCount.value ? 'cloud_off' : 'cloud_done',
-      message: pendingCount.value
-        ? syncError ? `Report saved on this device. Upload failed: ${syncError}` : 'Report saved on this device. It will upload when internet returns.'
-        : 'Film report sent to the database.',
-      timeout: pendingCount.value ? 12_000 : undefined,
+      type: 'positive',
+      icon: 'save',
+      message: 'Report saved on this device. It will upload during the daily sync or when you tap Send.',
     });
   } finally { saving.value = false; }
 }
