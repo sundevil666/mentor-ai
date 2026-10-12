@@ -18,7 +18,16 @@
       </q-card>
 
       <section class="learning-balance-grid" aria-label="Learning activity balance">
-        <article v-for="row in balance.rows" :key="row.kind" class="learning-balance-card" :class="`learning-balance-card--${row.status}`">
+        <article
+          v-for="row in balance.rows"
+          :key="row.kind"
+          class="learning-balance-card"
+          :class="[`learning-balance-card--${row.status}`, row.priorityRank ? `learning-balance-card--priority-${row.priorityRank}` : 'learning-balance-card--unranked']"
+        >
+          <div v-if="row.priorityRank && row.priorityRank <= 3" class="learning-balance-card__priority">
+            <q-icon :name="row.priorityRank === 1 ? 'priority_high' : 'arrow_upward'" />
+            {{ row.priorityRank === 1 ? 'Do this first' : `Priority ${row.priorityRank}` }}
+          </div>
           <div class="learning-balance-card__heading">
             <div><strong>{{ row.label }}</strong><span>{{ row.description }}</span></div>
             <div class="learning-balance-card__impact"><strong>{{ row.impactPercent }}%</strong><span>of impact</span></div>

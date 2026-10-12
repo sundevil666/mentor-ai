@@ -328,8 +328,13 @@ body .q-menu {
 .learning-focus-card h2 { font-size: 1.35rem; margin: 3px 0 5px; }
 .learning-focus-card p { color: var(--app-muted-strong); line-height: 1.5; margin: 0; }
 .learning-balance-grid { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.learning-balance-card { background: var(--app-surface); border: 1px solid var(--app-border); border-radius: 18px; display: grid; gap: 14px; padding: 18px; }
+.learning-balance-card { align-content: start; background: var(--app-surface); border: 1px solid var(--app-border); border-radius: 18px; display: grid; gap: 14px; min-height: 194px; padding: 18px; transition: background-color .25s ease, border-color .25s ease, box-shadow .25s ease; }
 .learning-balance-card--focus { border-color: color-mix(in srgb, #f97316 52%, var(--app-border)); }
+.learning-balance-card--priority-1 { background: linear-gradient(135deg, color-mix(in srgb, #f97316 23%, var(--app-surface)), color-mix(in srgb, #f97316 8%, var(--app-surface))); border-color: color-mix(in srgb, #f97316 78%, var(--app-border)); box-shadow: 0 14px 32px color-mix(in srgb, #f97316 18%, transparent); grid-column: 1 / -1; min-height: 244px; padding: 24px; }
+.learning-balance-card--priority-2 { background: linear-gradient(135deg, color-mix(in srgb, #f97316 14%, var(--app-surface)), color-mix(in srgb, #f97316 4%, var(--app-surface))); border-color: color-mix(in srgb, #f97316 58%, var(--app-border)); min-height: 218px; }
+.learning-balance-card--priority-3 { background: linear-gradient(135deg, color-mix(in srgb, #f59e0b 9%, var(--app-surface)), var(--app-surface)); border-color: color-mix(in srgb, #f59e0b 42%, var(--app-border)); min-height: 206px; }
+.learning-balance-card__priority { align-items: center; color: #b94700; display: flex; font-size: .74rem; font-weight: 900; gap: 5px; letter-spacing: .045em; text-transform: uppercase; }
+.learning-balance-card--priority-1 .learning-balance-card__priority { background: #c84f00; border-radius: 999px; color: white; justify-self: start; padding: 6px 10px; }
 .learning-balance-card__heading { align-items: start; display: flex; gap: 16px; justify-content: space-between; }
 .learning-balance-card__heading > div:first-child { display: grid; gap: 3px; }
 .learning-balance-card__heading span, .learning-balance-card__meta { color: var(--app-muted-strong); font-size: .82rem; }
@@ -4129,6 +4134,7 @@ body.body--dark .personal-reader__lookup-error {
   .learning-focus-card .q-card__section { align-items: start; grid-template-columns: auto minmax(0, 1fr); }
   .learning-focus-card .q-btn { grid-column: 1 / -1; width: 100%; }
   .learning-balance-grid { grid-template-columns: 1fr; }
+  .learning-balance-card--priority-1 { min-height: 232px; padding: 21px; }
 
   .app-header .personal-books__sync-button {
     height: 36px;

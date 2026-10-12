@@ -5,10 +5,11 @@ export type LearningBalanceKind = LearningActivityKind | 'movies';
 export interface LearningBalanceRow {
   kind: LearningBalanceKind; label: string; description: string; impactPercent: number; targetPercent: number;
   gapPercent: number; status: 'focus' | 'balanced' | 'strong'; seconds: number; estimated: boolean;
+  priorityRank: number | null;
   actionLabel: string; route: { name: string; query?: Record<string, string> };
 }
 
-const definitions: Array<Omit<LearningBalanceRow, 'impactPercent' | 'gapPercent' | 'status' | 'seconds' | 'estimated'>> = [
+const definitions: Array<Omit<LearningBalanceRow, 'impactPercent' | 'gapPercent' | 'status' | 'seconds' | 'estimated' | 'priorityRank'>> = [
   { kind: 'speaking', label: 'Speaking', description: 'Active speech and pronunciation feedback', targetPercent: 23, actionLabel: 'Practice speaking', route: { name: 'dashboard', query: { training: 'speaking' } } },
   { kind: 'listening', label: 'Listening practice', description: 'Listening lessons with comprehension work', targetPercent: 19, actionLabel: 'Practice listening', route: { name: 'dashboard', query: { training: 'listening' } } },
   { kind: 'vocabulary', label: 'Vocabulary', description: 'Recall and use words without a prompt', targetPercent: 17, actionLabel: 'Practice vocabulary', route: { name: 'dashboard', query: { training: 'home' } } },
@@ -31,11 +32,15 @@ export function calculateLearningBalance(input: { activity: LearningActivityTota
   const rows = definitions.map((item): LearningBalanceRow => {
     const impactPercent = weightedTotal ? Math.round(secondsByKind[item.kind] * qualityWeights[item.kind] / weightedTotal * 100) : 0;
     const gapPercent = item.targetPercent - impactPercent;
-    return { ...item, impactPercent, gapPercent, seconds: secondsByKind[item.kind], estimated: item.kind === 'movies', status: item.kind === 'movies' ? 'balanced' : gapPercent >= 4 ? 'focus' : gapPercent <= -4 ? 'strong' : 'balanced' };
+    return { ...item, impactPercent, gapPercent, seconds: secondsByKind[item.kind], estimated: item.kind === 'movies', priorityRank: null, status: item.kind === 'movies' ? 'balanced' : gapPercent >= 4 ? 'focus' : gapPercent <= -4 ? 'strong' : 'balanced' };
   });
   const measuredRows = rows.filter((row) => row.kind !== 'movies');
-  const primaryFocus = [...measuredRows].sort((a, b) => b.gapPercent - a.gapPercent)[0]!;
+  const prioritizedRows = [...measuredRows]
+    .sort((a, b) => b.gapPercent - a.gapPercent)
+    .map((row, index) => ({ ...row, priorityRank: index + 1 }));
+  const primaryFocus = prioritizedRows[0]!;
   const strongestArea = [...measuredRows].sort((a, b) => a.gapPercent - b.gapPercent)[0]!;
   const totalGap = measuredRows.reduce((sum, row) => sum + Math.abs(row.gapPercent), 0);
-  return { rows, primaryFocus, strongestArea, balanceScore: Math.max(0, Math.round(100 - totalGap / 2)) };
+  const movieRows = rows.filter((row) => row.kind === 'movies');
+  return { rows: [...prioritizedRows, ...movieRows], primaryFocus, strongestArea, balanceScore: Math.max(0, Math.round(100 - totalGap / 2)) };
 }

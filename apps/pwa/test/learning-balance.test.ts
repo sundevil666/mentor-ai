@@ -21,4 +21,14 @@ describe('learning balance', () => {
     assert.equal(balance.rows.find((row) => row.kind === 'movies')?.impactPercent, 0);
     assert.equal(balance.rows.reduce((sum, row) => sum + row.targetPercent, 0), 100);
   });
+
+  it('orders skills by their current target gap and keeps movies last', () => {
+    const balance = calculateLearningBalance({ activity: { ...emptyActivity, speakingSeconds: 18_000, listeningSeconds: 3_600, totalSeconds: 21_600 }, estimatedMovieSeconds: 7_200 });
+    const measuredRows = balance.rows.filter((row) => row.kind !== 'movies');
+
+    assert.deepEqual(measuredRows.map((row) => row.gapPercent), [...measuredRows].map((row) => row.gapPercent).sort((a, b) => b - a));
+    assert.deepEqual(measuredRows.map((row) => row.priorityRank), [1, 2, 3, 4, 5, 6, 7]);
+    assert.equal(balance.rows.at(-1)?.kind, 'movies');
+    assert.equal(balance.primaryFocus.kind, balance.rows[0]?.kind);
+  });
 });
