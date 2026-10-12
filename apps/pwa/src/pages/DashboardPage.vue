@@ -656,7 +656,7 @@
 import type { GeneratedLesson, LearningActivityTotals, LearningContext, MovieLearningReport, PreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { synchronizeDashboardLessonRoute, type DashboardTrainingCategory } from 'src/services/navigation-category';
+import { resolveDashboardTrainingCategory, synchronizeDashboardLessonRoute, type DashboardTrainingCategory } from 'src/services/navigation-category';
 import { sortMaterialsNewestFirst } from 'src/services/material-order';
 import { groupLessonsByProgressAndReleaseDate } from 'src/services/lesson-library-order';
 import { loadMovieLearningReports, refreshMovieLearningReportsFromCloud } from 'src/services/movie-learning-reports';
@@ -828,7 +828,7 @@ const savedHomeListTab = readHomePreference('mentor-ai:home-list-tab');
 const selectedHomeListTab = ref<HomeListTab>(savedHomeListTab === 'started' ? 'started' : 'required');
 const rawStartedContent = ref<ReturnType<typeof selectUnfinishedStartedContent>>([]);
 const personalBooks = ref<PersonalBook[]>([]);
-const selectedLessonLibrary = ref<TrainingLibraryKey>('home');
+const selectedLessonLibrary = ref<TrainingLibraryKey>(resolveDashboardTrainingCategory(route.query.training) ?? 'home');
 const lessonReturnDestination = ref<LessonReturnDestination>('home');
 const activeEngagementContentId = ref<string | null>(null);
 const currentLessonFeedbackContentId = computed(() => (
