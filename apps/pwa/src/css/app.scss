@@ -892,6 +892,20 @@ body .q-menu {
   line-height: 1.35;
 }
 
+.lesson-answer-reveal__header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  min-height: 32px;
+}
+
+.lesson-answer--concealed {
+  filter: blur(7px);
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+}
+
 .dialogue-drill__matched-word {
   background: color-mix(in srgb, var(--q-positive) 30%, transparent);
   border-radius: 4px;
@@ -1037,6 +1051,11 @@ body .q-menu {
   display: flex;
   gap: 12px;
   padding: 12px;
+}
+
+.audio-row > span {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .training-library {

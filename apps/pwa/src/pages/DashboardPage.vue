@@ -271,8 +271,24 @@
               </div>
 
               <div v-if="dialogueExpectedText" class="dialogue-drill__native">
-                <span>Say in English</span>
-                <strong>
+                <div class="lesson-answer-reveal__header">
+                  <span>Answer</span>
+                  <q-btn
+                    color="primary"
+                    dense
+                    flat
+                    round
+                    :icon="isExerciseAnswerVisible ? 'visibility_off' : 'visibility'"
+                    :aria-label="isExerciseAnswerVisible ? 'Hide answer' : 'Show answer'"
+                    @click="isExerciseAnswerVisible = !isExerciseAnswerVisible"
+                  >
+                    <q-tooltip>{{ isExerciseAnswerVisible ? 'Hide answer' : 'Show answer' }}</q-tooltip>
+                  </q-btn>
+                </div>
+                <strong
+                  :class="{ 'lesson-answer--concealed': !isExerciseAnswerVisible }"
+                  :aria-hidden="!isExerciseAnswerVisible"
+                >
                   <template v-for="(segment, index) in dialogueExpectedSegments" :key="`${index}:${segment.text}`">
                     <mark v-if="segment.matched" class="dialogue-drill__matched-word">{{ segment.text }}</mark>
                     <template v-else>{{ segment.text }}</template>
@@ -375,7 +391,22 @@
                 <q-btn color="primary" flat icon="volume_up" round @click="playAudio">
                   <q-tooltip>Play audio</q-tooltip>
                 </q-btn>
-                <span>{{ currentExercise.audioText }}</span>
+                <span
+                  :class="{ 'lesson-answer--concealed': isSpeakingLesson && !isExerciseAnswerVisible }"
+                  :aria-hidden="isSpeakingLesson && !isExerciseAnswerVisible"
+                >{{ currentExercise.audioText }}</span>
+                <q-btn
+                  v-if="isSpeakingLesson"
+                  color="primary"
+                  dense
+                  flat
+                  round
+                  :icon="isExerciseAnswerVisible ? 'visibility_off' : 'visibility'"
+                  :aria-label="isExerciseAnswerVisible ? 'Hide answer' : 'Show answer'"
+                  @click="isExerciseAnswerVisible = !isExerciseAnswerVisible"
+                >
+                  <q-tooltip>{{ isExerciseAnswerVisible ? 'Hide answer' : 'Show answer' }}</q-tooltip>
+                </q-btn>
               </div>
 
               <q-option-group
@@ -813,6 +844,7 @@ const appStore = useAppStore();
 const route = useRoute();
 const router = useRouter();
 const answer = ref('');
+const isExerciseAnswerVisible = ref(false);
 const activeWordIndex = ref(0);
 const activeWordEndIndex = ref(0);
 const activeExercisePlaybackProgress = ref(0);
@@ -955,6 +987,9 @@ const isListeningPlayer = computed(() => {
 const isDialogueTranslationExercise = computed(
   () => currentExercise.value?.type === 'dialogue-translation',
 );
+const isSpeakingLesson = computed(() => (
+  appStore.session ? generatedLessonCategory(appStore.session.lesson) === 'speaking' : false
+));
 const dialogueExpectedText = computed(() => currentExercisePlaybackText.value);
 const dialogueExpectedSegments = computed(() => getDialogueExpectedSegments(
   speechRecognitionCaptured.value ? answer.value : '',
@@ -1771,6 +1806,7 @@ watch(isListeningPlayer, (isActiveListeningPlayer) => {
 });
 
 watch(currentExercise, () => {
+  isExerciseAnswerVisible.value = false;
   activeExercisePlaybackProgress.value = 0;
   resetActiveAudioTiming();
 });
