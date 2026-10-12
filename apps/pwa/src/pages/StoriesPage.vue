@@ -626,7 +626,7 @@
       </q-card>
     </q-dialog>
 
-    <q-dialog v-model="showDifficultyReview">
+    <q-dialog v-model="showDifficultyReview" persistent>
       <q-card class="book-difficulty-review-dialog">
         <q-card-section>
           <div class="text-h6">How does this book feel?</div>
@@ -639,7 +639,7 @@
           <q-btn color="positive" :icon="difficultyReviewBook?.difficultyAssessment?.readerRating === 'comfortable' ? 'check' : undefined" label="Comfortable → To read" no-caps :outline="difficultyReviewBook?.difficultyAssessment?.readerRating !== 'comfortable'" :unelevated="difficultyReviewBook?.difficultyAssessment?.readerRating === 'comfortable'" @click="submitBookDifficultyReview('comfortable')" />
           <q-btn color="primary" :icon="difficultyReviewBook?.difficultyAssessment?.readerRating === 'easy' ? 'check' : undefined" label="Easy → To read" no-caps :outline="difficultyReviewBook?.difficultyAssessment?.readerRating !== 'easy'" :unelevated="difficultyReviewBook?.difficultyAssessment?.readerRating === 'easy'" @click="submitBookDifficultyReview('easy')" />
         </q-card-section>
-        <q-card-actions align="right"><q-btn flat label="Not now" no-caps v-close-popup /></q-card-actions>
+        <q-card-actions align="right"><q-btn flat label="Not now" no-caps @click="postponeDifficultyReview" /></q-card-actions>
       </q-card>
     </q-dialog>
 
@@ -690,7 +690,7 @@ import { fetchReaderPhonetic, fetchReaderTextLookup, fetchReadingResumeSnapshot,
 import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { assessBookDifficulty } from 'src/services/book-difficulty-assessment';
-import { applyReadingReview, isBookDifficultyReviewDue, preserveBookLaneOnDifficultyCheck, recommendNextFreeBook } from 'src/services/book-reading-guidance';
+import { applyReadingReview, isBookDifficultyReviewDue, postponeBookDifficultyReview, preserveBookLaneOnDifficultyCheck, recommendNextFreeBook } from 'src/services/book-reading-guidance';
 import { calibrateReaderFromBooks, predictBookFit, predictUnseenBookFit } from 'src/services/reader-book-calibration';
 import { bookReaderDifficultyRatingLabel, personalBookAction, personalBookKanbanColumn, personalBookReadingStatus, personalBookReadingStatusLabel, sortPersonalBooksNewestFirst, type PersonalBookKanbanColumn, type PersonalBookReadingStatus } from 'src/services/personal-book-status';
 import { readerWordContext } from 'src/services/reader-word-context';
@@ -1190,6 +1190,24 @@ function openBookDifficultyReview(book: PersonalBook | null) {
   if (!book) return;
   difficultyReviewBook.value = book;
   showDifficultyReview.value = true;
+}
+
+async function postponeDifficultyReview() {
+  const book = difficultyReviewBook.value;
+  showDifficultyReview.value = false;
+  difficultyReviewBook.value = null;
+  if (!book?.difficultyAssessment) return;
+
+  try {
+    await savePersonalBookDifficultyAssessment(book.id, postponeBookDifficultyReview(book.difficultyAssessment));
+    personalBooks.value = await listPersonalBooks();
+    if (selectedBook.value?.id === book.id) {
+      selectedBook.value = personalBooks.value.find((item) => item.id === book.id) ?? selectedBook.value;
+    }
+    void syncPersonalBooks().catch(() => undefined);
+  } catch (error) {
+    Notify.create({ type: 'negative', message: error instanceof Error ? error.message : 'Could not postpone the book review.' });
+  }
 }
 
 async function submitBookDifficultyReview(rating: BookReaderDifficultyRating) {

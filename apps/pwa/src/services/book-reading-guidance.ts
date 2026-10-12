@@ -32,6 +32,17 @@ export function isBookDifficultyReviewDue(assessment: BookDifficultyAssessment |
   return Number.isFinite(dueAt) && now.getTime() >= dueAt;
 }
 
+export function postponeBookDifficultyReview(
+  assessment: BookDifficultyAssessment,
+  now = new Date(),
+): BookDifficultyAssessment {
+  return {
+    ...assessment,
+    reasons: [...assessment.reasons],
+    nextReviewAt: new Date(now.getTime() + bookDifficultyReviewIntervalMs).toISOString(),
+  };
+}
+
 export function preserveBookLaneOnDifficultyCheck(
   assessment: BookDifficultyAssessment,
   currentAction: PersonalBookAction,

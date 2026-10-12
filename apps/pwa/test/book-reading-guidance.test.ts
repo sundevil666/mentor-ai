@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { BookDifficultyAssessment } from '@mentor-ai/shared';
-import { applyReadingReview, isBookDifficultyReviewDue, preserveBookLaneOnDifficultyCheck, recommendNextFreeBook } from '../src/services/book-reading-guidance.js';
+import { applyReadingReview, isBookDifficultyReviewDue, postponeBookDifficultyReview, preserveBookLaneOnDifficultyCheck, recommendNextFreeBook } from '../src/services/book-reading-guidance.js';
 
 const assessment: BookDifficultyAssessment = {
   version: 1, recommendation: 'read', score: 46, confidence: 'low', sampledWords: 1000,
@@ -12,6 +12,15 @@ describe('book reading guidance', () => {
   it('schedules a review after one week', () => {
     assert.equal(isBookDifficultyReviewDue(assessment, new Date('2026-09-07T23:59:59.000Z')), false);
     assert.equal(isBookDifficultyReviewDue(assessment, new Date('2026-09-08T00:00:00.000Z')), true);
+  });
+
+  it('postpones a dismissed review without clearing the saved rating', () => {
+    const rated = { ...assessment, readerRating: 'hard' as const, nextReviewAt: '2026-09-08T00:00:00.000Z' };
+    const postponed = postponeBookDifficultyReview(rated, new Date('2026-09-08T12:00:00.000Z'));
+
+    assert.equal(postponed.readerRating, 'hard');
+    assert.equal(postponed.nextReviewAt, '2026-09-15T12:00:00.000Z');
+    assert.equal(isBookDifficultyReviewDue(postponed, new Date('2026-09-15T11:59:59.000Z')), false);
   });
 
   it('moves only an unbearable book to rewriting without changing its text score', () => {
