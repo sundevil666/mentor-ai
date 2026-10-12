@@ -4,6 +4,13 @@ export type PersonalBookReadingStatus = 'new' | 'started' | 'finished';
 export type PersonalBookAction = 'read' | 'rewrite';
 export type PersonalBookKanbanColumn = PersonalBookAction | 'done';
 
+export function isSynchronizedPersonalBookFinished(progress: ContentProgress | undefined) {
+  const synchronizedRatio = progress?.duration && progress.duration > 0
+    ? progress.furthestPosition / progress.duration
+    : 0;
+  return Boolean(progress?.completed || synchronizedRatio >= 0.995);
+}
+
 export function bookReaderDifficultyRatingLabel(rating: BookReaderDifficultyRating | undefined) {
   if (rating === 'very-hard') return 'Unbearable';
   if (rating === 'hard') return 'Hard, but manageable';
@@ -17,10 +24,7 @@ export function personalBookReadingStatus(
   progress: ContentProgress | undefined,
   localFurthestProgressRatio = 0,
 ): PersonalBookReadingStatus {
-  const synchronizedRatio = progress?.duration && progress.duration > 0
-    ? progress.furthestPosition / progress.duration
-    : 0;
-  if (progress?.completed || synchronizedRatio >= 0.995 || localFurthestProgressRatio >= 0.995) return 'finished';
+  if (isSynchronizedPersonalBookFinished(progress) || localFurthestProgressRatio >= 0.995) return 'finished';
   if ((progress?.furthestPosition ?? 0) > 0 || localFurthestProgressRatio > 0 || book.lastOpenedAt) return 'started';
   return 'new';
 }

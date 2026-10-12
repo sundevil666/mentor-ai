@@ -1,4 +1,5 @@
 import type { ContentProgress } from '@mentor-ai/shared';
+import { isSynchronizedPersonalBookFinished } from './personal-book-status.js';
 
 export interface StartedContentState {
   category: ContentProgress['category'];
@@ -18,7 +19,7 @@ export function selectUnfinishedStartedContent(progress: ContentProgress[]): Sta
     // attempts. Lessons and audio can have a new attempt after completion, but
     // a personal book remains finished and must not return to Home's in-progress
     // list when its current reader position changes.
-    if (item.category === 'reading' && item.completed) continue;
+    if (item.category === 'reading' && isSynchronizedPersonalBookFinished(item)) continue;
     const position = item.position;
     if (position <= 0 || !item.duration || item.duration <= 0) continue;
     const percent = (position / item.duration) * 100;

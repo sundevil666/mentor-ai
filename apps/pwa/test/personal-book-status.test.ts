@@ -33,6 +33,7 @@ describe('personal book reading status', () => {
   });
   it('marks synchronized and local completion as finished', () => {
     assert.equal(personalBookReadingStatus(book, progress({ completed: true })), 'finished');
+    assert.equal(personalBookReadingStatus(book, progress({ position: 99, furthestPosition: 99.5, duration: 100 })), 'finished');
     assert.equal(personalBookReadingStatus(book, undefined, 1), 'finished');
   });
 
