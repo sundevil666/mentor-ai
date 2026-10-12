@@ -18,9 +18,10 @@
       </q-card>
 
       <section class="learning-balance-grid" aria-label="Learning activity balance">
-        <article
+        <router-link
           v-for="row in balance.rows"
           :key="row.kind"
+          :to="row.route"
           class="learning-balance-card"
           :class="[`learning-balance-card--${row.status}`, row.priorityRank ? `learning-balance-card--priority-${row.priorityRank}` : 'learning-balance-card--unranked']"
         >
@@ -36,9 +37,9 @@
           <div class="learning-balance-card__meta"><span>{{ row.estimated ? `${movieReports.length} saved report${movieReports.length === 1 ? '' : 's'}` : `${formatDuration(row.seconds)} recorded` }}</span><span>{{ row.estimated ? 'Not included in balance' : `Target mix ${row.targetPercent}%` }}</span></div>
           <div class="learning-balance-card__footer">
             <span class="learning-balance-card__status">{{ row.estimated ? 'Actual viewing time is unknown' : row.status === 'focus' ? 'Needs more attention' : row.status === 'strong' ? 'Already a strong area' : 'Close to balance' }}</span>
-            <q-btn dense flat color="primary" no-caps :label="row.actionLabel" :to="row.route" />
+            <span class="learning-balance-card__action">{{ row.actionLabel }}<q-icon name="arrow_forward" /></span>
           </div>
-        </article>
+        </router-link>
       </section>
       <p class="learning-balance-note">Percentages show the share of estimated learning impact, not an exam score. Active speech and checked recall receive more weight than passive input. Movie reports remain visible, but do not affect the balance until actual viewing activity can be measured.</p>
     </section>

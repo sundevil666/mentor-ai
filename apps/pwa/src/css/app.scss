@@ -328,7 +328,7 @@ body .q-menu {
 .learning-focus-card h2 { font-size: 1.35rem; margin: 3px 0 5px; }
 .learning-focus-card p { color: var(--app-muted-strong); line-height: 1.5; margin: 0; }
 .learning-balance-grid { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.learning-balance-card { align-content: start; background: var(--app-surface); border: 1px solid var(--app-border); border-radius: 18px; display: grid; gap: 14px; min-height: 194px; padding: 18px; transition: background-color .25s ease, border-color .25s ease, box-shadow .25s ease; }
+.learning-balance-card { align-content: start; background: var(--app-surface); border: 1px solid var(--app-border); border-radius: 18px; color: inherit; display: grid; gap: 14px; min-height: 194px; padding: 18px; text-decoration: none; transform: translateY(0); transition: background-color .25s ease, border-color .25s ease, box-shadow .25s ease, transform .25s cubic-bezier(.2, .8, .2, 1); }
 .learning-balance-card--focus { border-color: color-mix(in srgb, #f97316 52%, var(--app-border)); }
 .learning-balance-card--priority-1 { background: linear-gradient(135deg, color-mix(in srgb, #f97316 23%, var(--app-surface)), color-mix(in srgb, #f97316 8%, var(--app-surface))); border-color: color-mix(in srgb, #f97316 78%, var(--app-border)); box-shadow: 0 14px 32px color-mix(in srgb, #f97316 18%, transparent); grid-column: 1 / -1; min-height: 244px; padding: 24px; }
 .learning-balance-card--priority-2 { background: linear-gradient(135deg, color-mix(in srgb, #f97316 14%, var(--app-surface)), color-mix(in srgb, #f97316 4%, var(--app-surface))); border-color: color-mix(in srgb, #f97316 58%, var(--app-border)); min-height: 218px; }
@@ -343,8 +343,18 @@ body .q-menu {
 .learning-balance-card__impact span { font-size: .72rem; }
 .learning-balance-card__meta, .learning-balance-card__footer { align-items: center; display: flex; gap: 12px; justify-content: space-between; }
 .learning-balance-card__status { font-size: .8rem; font-weight: 800; }
+.learning-balance-card__action { align-items: center; color: var(--app-primary); display: inline-flex; font-size: .82rem; font-weight: 800; gap: 5px; white-space: nowrap; }
+.learning-balance-card__action .q-icon { transition: transform .25s cubic-bezier(.2, .8, .2, 1); }
 .learning-balance-card--focus .learning-balance-card__status { color: #d45f00; }
 .learning-balance-card--strong .learning-balance-card__status { color: var(--app-secondary); }
+.learning-balance-card:focus-visible { border-color: var(--app-primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--app-primary) 22%, transparent), 0 18px 38px rgba(17, 24, 39, .16); outline: none; transform: translateY(-4px); }
+@media (hover: hover) {
+  .learning-balance-card:hover { border-color: color-mix(in srgb, var(--app-primary) 58%, var(--app-border)); box-shadow: 0 18px 38px rgba(17, 24, 39, .16); transform: translateY(-5px); }
+  .learning-balance-card:hover .learning-balance-card__action .q-icon { transform: translateX(4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .learning-balance-card, .learning-balance-card__action .q-icon { transition: none; }
+}
 .learning-balance-note { font-size: .82rem; margin: 0; }
 
 .app-back-button {
