@@ -280,7 +280,7 @@
                     round
                     :icon="isExerciseAnswerVisible ? 'visibility_off' : 'visibility'"
                     :aria-label="isExerciseAnswerVisible ? 'Hide answer' : 'Show answer'"
-                    @click="isExerciseAnswerVisible = !isExerciseAnswerVisible"
+                    @click="toggleExerciseAnswer"
                   >
                     <q-tooltip>{{ isExerciseAnswerVisible ? 'Hide answer' : 'Show answer' }}</q-tooltip>
                   </q-btn>
@@ -403,7 +403,7 @@
                   round
                   :icon="isExerciseAnswerVisible ? 'visibility_off' : 'visibility'"
                   :aria-label="isExerciseAnswerVisible ? 'Hide answer' : 'Show answer'"
-                  @click="isExerciseAnswerVisible = !isExerciseAnswerVisible"
+                  @click="toggleExerciseAnswer"
                 >
                   <q-tooltip>{{ isExerciseAnswerVisible ? 'Hide answer' : 'Show answer' }}</q-tooltip>
                 </q-btn>
@@ -1948,6 +1948,12 @@ async function submit() {
   await appStore.submitCurrentExercise(submittedAnswer);
 }
 
+function toggleExerciseAnswer() {
+  const willReveal = !isExerciseAnswerVisible.value;
+  isExerciseAnswerVisible.value = willReveal;
+  if (willReveal) void appStore.revealCurrentExerciseHint();
+}
+
 async function completeListeningExercise() {
   answer.value = 'listened';
   stopListeningAudio();
@@ -1963,6 +1969,8 @@ async function recordDialogueAnswer() {
     stopDialogueSpeechRecording();
     return;
   }
+
+  void appStore.recordCurrentExerciseSpeechAttempt();
 
   speechRecognitionError.value = '';
   speechRecognitionCaptured.value = false;

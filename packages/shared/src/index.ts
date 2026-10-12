@@ -83,6 +83,7 @@ export type LearningEventType =
   | 'exercise-finished'
   | 'audio-replayed'
   | 'speech-attempted'
+  | 'hint-revealed'
   | 'manual-feedback'
   | 'synchronization';
 
@@ -503,6 +504,8 @@ export interface ExerciseResult {
   attempts: number;
   responseTimeMs: number;
   hintCount: number;
+  hintTiming?: 'immediate' | 'after-thinking' | 'after-attempt';
+  hintDelayMs?: number;
   skipped: boolean;
   abandoned: boolean;
   repeatedMistake: boolean;
@@ -1196,17 +1199,28 @@ export function createObservationFromResults(
 ): Observation | undefined {
   const completed = results.filter((result) => result.completionState === 'completed');
   const incorrect = completed.find((result) => !result.correct);
+  const supported = completed.find((result) => result.hintCount > 0);
 
-  if (!incorrect) {
+  if (!incorrect && !supported) {
     return undefined;
   }
 
+  const evidence = incorrect ?? supported;
+  if (!evidence) return undefined;
+  const supportDescription = evidence.hintTiming === 'immediate'
+    ? 'The answer was revealed before an independent attempt.'
+    : evidence.hintTiming === 'after-attempt'
+      ? 'The answer was revealed after an independent speaking attempt.'
+      : evidence.hintCount > 0
+        ? 'The answer was revealed after thinking time.'
+        : '';
+
   return {
-    id: `observation-${studentId}-${incorrect.exerciseId}-${createdAt}`,
+    id: `observation-${studentId}-${evidence.exerciseId}-${createdAt}`,
     studentId,
-    description: `${labelSkill(incorrect.targetSkill)} needs review based on the latest lesson evidence.`,
-    skill: incorrect.targetSkill,
-    evidenceIds: incorrect.evidenceEventIds,
+    description: `${labelSkill(evidence.targetSkill)} needs review based on the latest lesson evidence.${supportDescription ? ` ${supportDescription}` : ''}`,
+    skill: evidence.targetSkill,
+    evidenceIds: evidence.evidenceEventIds,
     confidence: completed.length < 3 ? 0.4 : 0.6,
     createdAt,
   };

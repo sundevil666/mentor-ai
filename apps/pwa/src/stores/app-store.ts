@@ -521,6 +521,7 @@ export const useAppStore = defineStore('app', {
         submittedAt,
         Math.max(0, Date.parse(submittedAt) - Date.parse(this.session.exerciseStartedAt)),
         createEvidenceId(finishedEvent),
+        this.session.events,
       );
 
       this.session.events.push(finishedEvent);
@@ -545,16 +546,22 @@ export const useAppStore = defineStore('app', {
             response.trim().length > 0,
           ),
         );
-        this.session.events.push(
-          createLearningEvent(
+        const exerciseStartedAt = Date.parse(this.session.exerciseStartedAt);
+        const speechAttemptAlreadyRecorded = this.session.events.some((event) => (
+          event.type === 'speech-attempted'
+          && event.exerciseId === exercise.id
+          && Date.parse(event.occurredAt) >= exerciseStartedAt
+        ));
+        if (!speechAttemptAlreadyRecorded) {
+          this.session.events.push(createLearningEvent(
             this.studentId,
             this.session.id,
             this.session.lesson,
             exercise.id,
             'speech-attempted',
             submittedAt,
-          ),
-        );
+          ));
+        }
       }
 
       const nextIndex = this.session.currentExerciseIndex + 1;
@@ -598,6 +605,56 @@ export const useAppStore = defineStore('app', {
         ),
       );
 
+      await this.persistSession();
+      await this.publishSessionHandoff();
+    },
+
+    async recordCurrentExerciseSpeechAttempt() {
+      if (!this.session || this.currentExercise === null) return;
+      const exercise = this.currentExercise;
+      const startedAt = Date.parse(this.session.exerciseStartedAt);
+      const alreadyRecorded = this.session.events.some((event) => (
+        event.type === 'speech-attempted'
+        && event.exerciseId === exercise.id
+        && Date.parse(event.occurredAt) >= startedAt
+      ));
+      if (alreadyRecorded) return;
+
+      this.session.events.push(createLearningEvent(
+        this.studentId,
+        this.session.id,
+        this.session.lesson,
+        exercise.id,
+        'speech-attempted',
+        now(),
+      ));
+      await this.persistSession();
+      await this.publishSessionHandoff();
+    },
+
+    async revealCurrentExerciseHint() {
+      if (!this.session || this.currentExercise === null) return;
+      const exercise = this.currentExercise;
+      const startedAt = Date.parse(this.session.exerciseStartedAt);
+      const alreadyRecorded = this.session.events.some((event) => (
+        event.type === 'hint-revealed'
+        && event.exerciseId === exercise.id
+        && Date.parse(event.occurredAt) >= startedAt
+      ));
+      if (alreadyRecorded) return;
+
+      const revealedAt = now();
+      this.session.events.push(createLearningEvent(
+        this.studentId,
+        this.session.id,
+        this.session.lesson,
+        exercise.id,
+        'hint-revealed',
+        revealedAt,
+        {
+          delayMs: Math.max(0, Date.parse(revealedAt) - startedAt),
+        },
+      ));
       await this.persistSession();
       await this.publishSessionHandoff();
     },
@@ -1460,8 +1517,28 @@ function createExerciseResult(
   completedAt: string,
   responseTimeMs: number,
   evidenceId: string,
+  events: LearningEvent[],
 ): ExerciseResult {
   const correct = isLessonAnswerReady(exercise, response, lesson.localEvaluation);
+  const exerciseStartedAt = events
+    .filter((event) => event.exerciseId === exercise.id && event.type === 'exercise-started')
+    .at(-1)?.occurredAt;
+  const hintEvents = events.filter((event) => (
+    event.exerciseId === exercise.id
+    && event.type === 'hint-revealed'
+    && (!exerciseStartedAt || event.occurredAt >= exerciseStartedAt)
+    && event.occurredAt <= completedAt
+  ));
+  const firstHint = hintEvents[0];
+  const hintDelayMs = firstHint
+    ? Number(firstHint.data?.delayMs ?? Math.max(0, Date.parse(firstHint.occurredAt) - Date.parse(exerciseStartedAt ?? firstHint.occurredAt)))
+    : undefined;
+  const attemptedBeforeHint = Boolean(firstHint && events.some((event) => (
+    event.exerciseId === exercise.id
+    && event.type === 'speech-attempted'
+    && (!exerciseStartedAt || event.occurredAt >= exerciseStartedAt)
+    && event.occurredAt < firstHint.occurredAt
+  )));
   return {
     id: `result-${exercise.id}-${Date.now()}`,
     studentId,
@@ -1476,7 +1553,15 @@ function createExerciseResult(
     correct,
     attempts: 1,
     responseTimeMs,
-    hintCount: 0,
+    hintCount: hintEvents.length,
+    hintTiming: firstHint
+      ? attemptedBeforeHint
+        ? 'after-attempt'
+        : (hintDelayMs ?? 0) <= 5_000
+          ? 'immediate'
+          : 'after-thinking'
+      : undefined,
+    hintDelayMs,
     skipped: response.trim().length === 0,
     abandoned: false,
     repeatedMistake: false,

@@ -480,6 +480,21 @@ describe('shared domain helpers', () => {
     assert.equal(recommendation.reason.length > 0, true);
   });
 
+  it('tells the mentor when a correct answer required immediate reveal support', () => {
+    const result = {
+      id: 'result-supported-speaking', studentId: demoStudent.id, sessionId: 'session-supported',
+      lessonId: 'lesson-supported', exerciseId: 'exercise-supported', exerciseType: 'dialogue-translation',
+      targetSkill: 'speaking', ...conceptFields, correct: true, attempts: 1, responseTimeMs: 3000,
+      hintCount: 1, hintTiming: 'immediate', hintDelayMs: 1200, completionState: 'completed',
+      evidenceEventIds: ['event-supported'], completedAt: '2026-06-28T08:01:00.000Z',
+    };
+
+    const observation = createObservationFromResults(demoStudent.id, [result], '2026-06-28T08:04:00.000Z');
+
+    assert.match(observation?.description ?? '', /before an independent attempt/i);
+    assert.equal(observation?.skill, 'speaking');
+  });
+
   it('respects manual concept selection in lesson planning', () => {
     const plan = createLessonPlan(
       initialStudentModel,
