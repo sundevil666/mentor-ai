@@ -94,15 +94,18 @@
           v-if="pendingBulkDownloadCount > 0"
           class="bulk-lesson-download-button"
           :aria-label="bulkLessonDownloadTooltip"
+          :aria-busy="isBulkLessonDownloadRunning"
           color="secondary"
           :disable="!appStore.isOnline"
           flat
-          icon="download_for_offline"
-          :loading="isBulkLessonDownloadRunning"
-          round
+          :icon="isBulkLessonDownloadRunning ? undefined : 'download_for_offline'"
+          :label="isBulkLessonDownloadRunning ? `${bulkLessonDownloadPercent}%` : undefined"
+          no-caps
+          :round="!isBulkLessonDownloadRunning"
+          :rounded="isBulkLessonDownloadRunning"
           @click="downloadAllPendingLessons"
         >
-          <q-badge color="deep-orange-7" floating>
+          <q-badge v-if="!isBulkLessonDownloadRunning" color="deep-orange-7" floating>
             {{ pendingBulkDownloadCount }}
           </q-badge>
           <q-tooltip>{{ bulkLessonDownloadTooltip }}</q-tooltip>
@@ -424,14 +427,20 @@ const pendingMovieReportCount = ref(0);
 const isManualSyncRunning = ref(false);
 const isBulkLessonDownloadRunning = ref(false);
 const bulkLessonDownloadCompleted = ref(0);
+const bulkLessonDownloadTotal = ref(0);
 const pendingBulkLessonDownloads = ref<GeneratedLesson[]>([]);
 const pendingBulkMediaDownloads = ref<PendingOfflineMediaDownload[]>([]);
 const pendingBulkDownloadCount = computed(() => pendingBulkLessonDownloads.value.length + pendingBulkMediaDownloads.value.length);
+const bulkLessonDownloadPercent = computed(() => (
+  bulkLessonDownloadTotal.value > 0
+    ? Math.round((bulkLessonDownloadCompleted.value / bulkLessonDownloadTotal.value) * 100)
+    : 0
+));
 const pendingUploadCount = computed(() => appStore.pendingSyncCount + pendingActivityCount.value + pendingReadingTranscriptCount.value + pendingMovieReportCount.value);
 const bulkLessonDownloadTooltip = computed(() => {
   if (!appStore.isOnline) return `${pendingBulkDownloadCount.value} new offline items are waiting. Connect to download them.`;
   if (isBulkLessonDownloadRunning.value) {
-    return `Downloading new offline items: ${bulkLessonDownloadCompleted.value}/${pendingBulkDownloadCount.value}.`;
+    return `Downloading new offline items: ${bulkLessonDownloadPercent.value}% · ${bulkLessonDownloadCompleted.value}/${bulkLessonDownloadTotal.value}.`;
   }
   return `Download all ${pendingBulkDownloadCount.value} new items for offline use.`;
 });
@@ -792,6 +801,7 @@ async function downloadAllPendingLessons() {
   if (lessons.length + media.length === 0) return;
   isBulkLessonDownloadRunning.value = true;
   bulkLessonDownloadCompleted.value = 0;
+  bulkLessonDownloadTotal.value = lessons.length + media.length;
   let failed = 0;
   for (const lesson of lessons) {
     try {
