@@ -29,8 +29,7 @@ export interface SystemSpeechHandlers {
 export const speechCacheMaxEntries = 160;
 export const speechCacheMaxAgeMs = 30 * 86_400_000;
 export const speechMemoryMaxEntries = 12;
-const speechRequestTimeoutMs = 20_000;
-const speechFailureCooldownMs = 60_000;
+const speechRequestTimeoutMs = 55_000;
 const speechApiBaseUrl = resolveSpeechApiBaseUrl(
   process.env.API_BASE_URL,
   Boolean(process.env.DEV),
@@ -45,7 +44,6 @@ const statusListeners = new Set<() => void>();
 const generatedSpeechCache = new Map<string, Promise<Blob>>();
 let lastSpeechCacheCleanupAt = 0;
 let activeSystemSpeechCleanup: ((completed: boolean, notifyError?: boolean) => void) | null = null;
-let speechPreloadUnavailableUntil = 0;
 
 export function isSpeechSynthesisAvailable() {
   return (
@@ -214,7 +212,7 @@ export async function preloadSpeechBatch(
   const uniqueTexts = Array.from(new Set(texts.map((text) => text.trim()).filter(Boolean)));
   const total = uniqueTexts.length;
 
-  if (total === 0 || !isSpeechSynthesisAvailable() || Date.now() < speechPreloadUnavailableUntil) {
+  if (total === 0 || !isSpeechSynthesisAvailable()) {
     return { completed: 0, failed: total, total } as const;
   }
 
@@ -234,7 +232,6 @@ export async function preloadSpeechBatch(
 
         if (!text || !(await preloadSpeech(text))) {
           failed += 1;
-          speechPreloadUnavailableUntil = Date.now() + speechFailureCooldownMs;
         }
 
         completed += 1;

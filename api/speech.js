@@ -6,7 +6,8 @@ const voices = {
   tom: 'echo',
 };
 const maxTextLength = 4_000;
-const speechRequestTimeoutMs = 30_000;
+const speechRequestTimeoutMs = 20_000;
+const speechRequestAttempts = 2;
 
 module.exports = async (request, response) => {
   if (request.method !== 'POST') {
@@ -35,7 +36,7 @@ module.exports = async (request, response) => {
     if (!process.env.OPENAI_API_KEY) throw new Error('Speech synthesis is not configured.');
     const audioParts = [];
     for (const segment of segments) {
-      audioParts.push(await requestSpeechAudio(segment));
+      audioParts.push(await requestSpeechAudioWithRetry(segment));
     }
     const audio = Buffer.concat(audioParts);
 
@@ -50,6 +51,18 @@ module.exports = async (request, response) => {
     response.end('Speech synthesis failed.');
   }
 };
+
+async function requestSpeechAudioWithRetry(segment) {
+  let lastError;
+  for (let attempt = 0; attempt < speechRequestAttempts; attempt += 1) {
+    try {
+      return await requestSpeechAudio(segment);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
 
 function requestSpeechAudio(segment) {
   const payload = Buffer.from(JSON.stringify({
