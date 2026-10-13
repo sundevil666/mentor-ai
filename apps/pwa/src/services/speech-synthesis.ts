@@ -218,7 +218,10 @@ export async function preloadSpeechBatch(
   let nextIndex = 0;
   let completed = 0;
   let failed = 0;
-  const workerCount = Math.min(3, total);
+  // The speech provider keeps one WebSocket per request. Parallel preloading can
+  // leave every request waiting until the serverless timeout, which prevents a
+  // lesson from ever being registered for offline use.
+  const workerCount = 1;
 
   await Promise.all(
     Array.from({ length: workerCount }, async () => {
