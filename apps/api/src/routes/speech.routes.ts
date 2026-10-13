@@ -1,23 +1,19 @@
 import { Router } from 'express';
+import { config } from '../config/env.js';
 
 type SpeechVoice = 'mia' | 'tom';
-
-interface SpeechChunk {
-  type: string;
-  data?: Uint8Array;
-}
 
 interface SpeechSegment {
   text: string;
   voice: SpeechVoice;
 }
 
-const voices: Record<SpeechVoice, string> = {
-  mia: 'en-US-AvaMultilingualNeural',
-  tom: 'en-US-AndrewMultilingualNeural',
+const voices: Record<SpeechVoice, 'coral' | 'echo'> = {
+  mia: 'coral',
+  tom: 'echo',
 };
 const maxTextLength = 4_000;
-const speechConnectionTimeoutMs = 20_000;
+const speechRequestTimeoutMs = 30_000;
 
 export const speechRouter = Router();
 
@@ -31,16 +27,7 @@ speechRouter.post('/', async (request, response) => {
   }
 
   try {
-    const { Communicate } = await import('edge-tts-universal');
-    const audioParts: Buffer[] = [];
-    for (const segment of segments) {
-      const speech = new Communicate(segment.text, {
-        voice: voices[segment.voice],
-        connectionTimeout: speechConnectionTimeoutMs,
-      });
-      audioParts.push(await collectSpeechAudio(speech.stream()));
-    }
-    const audio = Buffer.concat(audioParts);
+    const audio = await synthesizeSpeechSegments(segments);
 
     response.status(200);
     response.setHeader('Content-Type', 'audio/mpeg');
@@ -53,14 +40,39 @@ speechRouter.post('/', async (request, response) => {
   }
 });
 
-export async function collectSpeechAudio(chunks: AsyncIterable<SpeechChunk>): Promise<Buffer> {
+export async function synthesizeSpeechSegments(
+  segments: SpeechSegment[],
+  request: typeof fetch = fetch,
+): Promise<Buffer> {
+  if (!config.openAiApiKey) throw new Error('Speech synthesis is not configured on the server.');
   const audioParts: Buffer[] = [];
-  for await (const chunk of chunks) {
-    if (chunk.type === 'audio' && chunk.data?.length) {
-      audioParts.push(Buffer.from(chunk.data));
+  for (const segment of segments) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), speechRequestTimeoutMs);
+    try {
+      const response = await request('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${config.openAiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini-tts',
+          voice: voices[segment.voice],
+          input: segment.text,
+          instructions: 'Speak clear, natural American English at a calm learning pace.',
+          response_format: 'mp3',
+        }),
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`Speech provider request failed with HTTP ${response.status}.`);
+      const audio = Buffer.from(await response.arrayBuffer());
+      if (!audio.length) throw new Error('Speech synthesis returned no audio.');
+      audioParts.push(audio);
+    } finally {
+      clearTimeout(timeout);
     }
   }
-  if (audioParts.length === 0) throw new Error('Speech synthesis returned no audio.');
   return Buffer.concat(audioParts);
 }
 

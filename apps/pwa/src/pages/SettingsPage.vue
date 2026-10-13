@@ -118,7 +118,7 @@
           <span>Voice</span>
         </div>
         <div class="activity-signal">
-          <span>Ava Multilingual Neural · American English</span>
+          <span>AI-generated voice · American English</span>
           <strong>Same voice on every device</strong>
         </div>
 

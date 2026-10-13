@@ -139,10 +139,8 @@ export async function downloadOfflineMedia(item: PendingOfflineMediaDownload) {
 
 export async function downloadGeneratedLessonOffline(lesson: GeneratedLesson) {
   const speechTexts = getSpeechTexts(lesson);
-  if (speechTexts.length) await preloadSpeechBatch(speechTexts);
-  // The lesson content is useful offline even when the optional online voice
-  // provider is temporarily unavailable. Keep any audio that did succeed and
-  // never discard the lesson itself because speech generation failed.
+  const result = speechTexts.length ? await preloadSpeechBatch(speechTexts) : { failed: 0 };
+  if (result.failed > 0) throw new Error(`Could not download the complete audio for ${lesson.title}.`);
   await registerOfflineGeneratedLesson(lesson, speechTexts);
   await refreshOfflineSizes();
 }
