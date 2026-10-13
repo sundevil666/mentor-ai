@@ -1,4 +1,5 @@
 const { readJsonBody } = require('./_shared');
+const https = require('node:https');
 
 const voices = {
   mia: 'coral',
@@ -34,33 +35,7 @@ module.exports = async (request, response) => {
     if (!process.env.OPENAI_API_KEY) throw new Error('Speech synthesis is not configured.');
     const audioParts = [];
     for (const segment of segments) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), speechRequestTimeoutMs);
-      try {
-        const speechResponse = await fetch('https://api.openai.com/v1/audio/speech', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini-tts',
-            voice: voices[segment.voice],
-            input: segment.text,
-            instructions: 'Speak clear, natural American English at a calm learning pace.',
-            response_format: 'mp3',
-          }),
-          signal: controller.signal,
-        });
-        if (!speechResponse.ok) {
-          throw new Error(`Speech provider request failed with HTTP ${speechResponse.status}.`);
-        }
-        const audio = Buffer.from(await speechResponse.arrayBuffer());
-        if (!audio.length) throw new Error('Speech synthesis returned no audio.');
-        audioParts.push(audio);
-      } finally {
-        clearTimeout(timeout);
-      }
+      audioParts.push(await requestSpeechAudio(segment));
     }
     const audio = Buffer.concat(audioParts);
 
@@ -75,3 +50,45 @@ module.exports = async (request, response) => {
     response.end('Speech synthesis failed.');
   }
 };
+
+function requestSpeechAudio(segment) {
+  const payload = Buffer.from(JSON.stringify({
+    model: 'gpt-4o-mini-tts',
+    voice: voices[segment.voice],
+    input: segment.text,
+    instructions: 'Speak clear, natural American English at a calm learning pace.',
+    response_format: 'mp3',
+  }));
+
+  return new Promise((resolve, reject) => {
+    const speechRequest = https.request({
+      hostname: 'api.openai.com',
+      path: '/v1/audio/speech',
+      method: 'POST',
+      timeout: speechRequestTimeoutMs,
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Content-Length': payload.length,
+      },
+    }, (speechResponse) => {
+      const chunks = [];
+      speechResponse.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+      speechResponse.on('end', () => {
+        const audio = Buffer.concat(chunks);
+        if (speechResponse.statusCode !== 200) {
+          reject(new Error(`Speech provider request failed with HTTP ${speechResponse.statusCode}.`));
+          return;
+        }
+        if (!audio.length) {
+          reject(new Error('Speech synthesis returned no audio.'));
+          return;
+        }
+        resolve(audio);
+      });
+    });
+    speechRequest.on('timeout', () => speechRequest.destroy(new Error('Speech provider request timed out.')));
+    speechRequest.on('error', reject);
+    speechRequest.end(payload);
+  });
+}
