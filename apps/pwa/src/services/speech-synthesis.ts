@@ -29,6 +29,8 @@ export interface SystemSpeechHandlers {
 export const speechCacheMaxEntries = 160;
 export const speechCacheMaxAgeMs = 30 * 86_400_000;
 export const speechMemoryMaxEntries = 12;
+const speechRequestTimeoutMs = 20_000;
+const speechFailureCooldownMs = 60_000;
 const speechApiBaseUrl = resolveSpeechApiBaseUrl(
   process.env.API_BASE_URL,
   Boolean(process.env.DEV),
@@ -43,6 +45,7 @@ const statusListeners = new Set<() => void>();
 const generatedSpeechCache = new Map<string, Promise<Blob>>();
 let lastSpeechCacheCleanupAt = 0;
 let activeSystemSpeechCleanup: ((completed: boolean, notifyError?: boolean) => void) | null = null;
+let speechPreloadUnavailableUntil = 0;
 
 export function isSpeechSynthesisAvailable() {
   return (
@@ -211,7 +214,7 @@ export async function preloadSpeechBatch(
   const uniqueTexts = Array.from(new Set(texts.map((text) => text.trim()).filter(Boolean)));
   const total = uniqueTexts.length;
 
-  if (total === 0 || !isSpeechSynthesisAvailable()) {
+  if (total === 0 || !isSpeechSynthesisAvailable() || Date.now() < speechPreloadUnavailableUntil) {
     return { completed: 0, failed: total, total } as const;
   }
 
@@ -231,6 +234,7 @@ export async function preloadSpeechBatch(
 
         if (!text || !(await preloadSpeech(text))) {
           failed += 1;
+          speechPreloadUnavailableUntil = Date.now() + speechFailureCooldownMs;
         }
 
         completed += 1;
@@ -334,11 +338,19 @@ async function generateAndCacheSpeech(segments: SpeechSegment[]) {
   }
 
   setModelStatus('generating', 0);
-  const response = await fetch(`${speechApiBaseUrl}/api/speech`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ segments }),
-  });
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), speechRequestTimeoutMs);
+  let response: Response;
+  try {
+    response = await fetch(`${speechApiBaseUrl}/api/speech`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ segments }),
+      signal: controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     throw new Error('The online voice is temporarily unavailable.');
