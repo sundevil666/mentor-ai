@@ -33,7 +33,7 @@
                   <q-icon :name="appStore.isOnline ? 'wifi' : 'wifi_off'" :color="appStore.isOnline ? 'positive' : 'negative'" size="22px" />
                 </div>
               </q-card-section>
-              <div ref="chatScroll" class="movie-chat-messages" aria-live="polite">
+              <div ref="chatScroll" class="movie-chat-messages" aria-live="polite" @scroll.passive="rememberChatScrollPosition">
                 <article v-for="message in chatMessages" :key="message.id" class="movie-chat-message" :class="`movie-chat-message--${message.role}`">
                   <strong>{{ message.role === 'user' ? 'You' : 'Movie coach' }}</strong>
                   <div class="movie-chat-message__content">
@@ -213,6 +213,7 @@ type MovieLearningTab = 'discuss' | 'memory' | 'report';
 type ChatScrollBehavior = 'auto' | 'smooth';
 const movieLearningTabStorageKey = 'mentor-ai:movie-learning-tab:v1';
 const movieChatFontSizeStorageKey = 'mentor-ai:movie-chat-font-size:v1';
+const movieChatScrollPositionStorageKey = 'mentor-ai:movie-chat-scroll-position:v1';
 const minimumChatFontSize = 14;
 const maximumChatFontSize = 22;
 const chatFontSizeStep = 2;
@@ -264,7 +265,7 @@ const visibleReportPages = computed(() => {
 
 watch(activeTab, async (tab) => {
   localStorage.setItem(movieLearningTabStorageKey, tab);
-  if (tab === 'discuss') await scrollChatToEnd('auto');
+  if (tab === 'discuss') await restoreChatScrollPosition();
 });
 
 watch(totalReportPages, (total) => {
@@ -277,7 +278,7 @@ onMounted(async () => {
   userMemory.value = loadMovieChatUserMemory();
   chatMessages.value = await loadMovieChatMessages();
   await refreshReports();
-  await scrollChatToEnd();
+  if (activeTab.value === 'discuss') await restoreChatScrollPosition();
   if (appStore.isOnline) {
     await refreshMovieLearningReportsFromCloud().then(refreshReports).catch(() => undefined);
   }
@@ -348,6 +349,20 @@ async function requestChatReply() {
 async function scrollChatToEnd(behavior: ChatScrollBehavior = 'smooth') {
   await nextTick();
   chatScroll.value?.scrollTo({ top: chatScroll.value.scrollHeight, behavior });
+}
+function rememberChatScrollPosition() {
+  if (!chatScroll.value) return;
+  localStorage.setItem(movieChatScrollPositionStorageKey, String(chatScroll.value.scrollTop));
+}
+async function restoreChatScrollPosition() {
+  await nextTick();
+  const scrollElement = chatScroll.value;
+  if (!scrollElement) return;
+  const storedValue = localStorage.getItem(movieChatScrollPositionStorageKey);
+  const storedPosition = storedValue === null ? Number.NaN : Number(storedValue);
+  scrollElement.scrollTop = Number.isFinite(storedPosition)
+    ? Math.max(0, Math.min(storedPosition, scrollElement.scrollHeight - scrollElement.clientHeight))
+    : scrollElement.scrollHeight;
 }
 async function openReportPage(page: number) {
   reportPage.value = page;
