@@ -8,69 +8,103 @@
         </div>
       </header>
 
-      <section class="learning-overview">
-        <div class="metric-tile">
-          <span>Total practice</span>
-          <strong>{{ formatDuration(activityTotals.totalSeconds) }}</strong>
+      <section
+        class="stats-highlights"
+        aria-label="Learning results"
+      >
+        <article
+          v-for="metric in highlights"
+          :key="metric.label"
+          class="stats-card"
+          :style="{ '--metric-color': metric.color }"
+        >
+          <div class="stats-icon">
+            <q-icon
+              :name="metric.icon"
+              size="25px"
+            />
+          </div>
+          <span class="stats-label">{{ metric.label }}</span>
+          <strong class="stats-value">{{ metric.value }}</strong>
+          <span class="stats-caption">{{ metric.caption }}</span>
+        </article>
+      </section>
+
+      <section
+        class="stats-practice"
+        aria-labelledby="practice-title"
+      >
+        <div class="stats-section-heading">
+          <div>
+            <h2 id="practice-title">
+              Your practice mix
+            </h2><p>Measured time across your learning activities</p>
+          </div>
+          <div class="stats-total">
+            <q-icon name="schedule" /> {{ formatDuration(activityTotals.totalSeconds) }} <span>total practice</span>
+          </div>
         </div>
-        <div class="metric-tile">
-          <span>Grammar</span>
-          <strong>{{ formatDuration(activityTotals.grammarSeconds) }}</strong>
+        <div class="stats-activities">
+          <article
+            v-for="activity in activities"
+            :key="activity.label"
+            class="stats-activity"
+            :style="{ '--metric-color': activity.color }"
+          >
+            <div class="stats-activity-top">
+              <div class="stats-icon">
+                <q-icon
+                  :name="activity.icon"
+                  size="23px"
+                />
+              </div><span>{{ activity.label }}</span>
+            </div>
+            <strong>{{ formatDuration(activity.seconds) }}</strong>
+            <div
+              class="stats-track"
+              aria-hidden="true"
+            >
+              <div :style="{ width: `${activity.share * 100}%` }" />
+            </div>
+            <span class="stats-caption">{{ Math.round(activity.share * 100) }}% of practice time</span>
+          </article>
         </div>
-        <div class="metric-tile">
-          <span>Lesson listening</span>
-          <strong>{{ formatDuration(activityTotals.listeningSeconds) }}</strong>
+        <p
+          v-if="!activityTotals.totalSeconds"
+          class="stats-empty"
+        >
+          Your practice mix will appear as you spend time learning.
+        </p>
+      </section>
+
+      <section
+        class="stats-movies"
+        aria-label="Movie learning"
+      >
+        <div class="stats-icon">
+          <q-icon
+            name="local_movies"
+            size="28px"
+          />
         </div>
-        <div class="metric-tile">
-          <span>Speaking</span>
-          <strong>{{ formatDuration(activityTotals.speakingSeconds) }}</strong>
+        <div class="stats-movies-intro">
+          <h2>Learning through movies</h2><p>Viewing estimate: 2 hours per saved movie report.</p>
         </div>
-        <div class="metric-tile">
-          <span>Phrases</span>
-          <strong>{{ formatDuration(activityTotals.phrasesSeconds) }}</strong>
+        <div class="stats-movie-number">
+          <strong>{{ movieSummary.movieCount }}</strong><span>Movies watched</span>
         </div>
-        <div class="metric-tile">
-          <span>Audio</span>
-          <strong>{{ formatDuration(activityTotals.audioSeconds) }}</strong>
-        </div>
-        <div class="metric-tile">
-          <span>Reading</span>
-          <strong>{{ formatDuration(activityTotals.readingSeconds) }}</strong>
-        </div>
-        <div class="metric-tile">
-          <span>Vocabulary</span>
-          <strong>{{ formatDuration(activityTotals.vocabularySeconds) }}</strong>
-        </div>
-        <div class="metric-tile">
-          <span>Lessons</span>
-          <strong>{{ serverSummary.lessons }}</strong>
-        </div>
-        <div class="metric-tile">
-          <span>Words spoken</span>
-          <strong>{{ serverSummary.spokenWords.toLocaleString() }}</strong>
-        </div>
-        <div class="metric-tile">
-          <span>Average accuracy</span>
-          <strong>{{ averageAccuracy }}</strong>
-        </div>
-        <div class="metric-tile">
-          <span>Practice days</span>
-          <strong>{{ serverSummary.practiceDays }}</strong>
-        </div>
-        <div class="metric-tile">
-          <span>Movies watched</span>
-          <strong>{{ movieSummary.movieCount }}</strong>
-        </div>
-        <div class="metric-tile">
-          <span>Estimated movie viewing</span>
-          <strong>≈ {{ formatDuration(movieSummary.estimatedViewingSeconds) }}</strong>
+        <div class="stats-movie-number">
+          <strong>≈ {{ formatDuration(movieSummary.estimatedViewingSeconds) }}</strong><span>Estimated viewing</span>
         </div>
       </section>
 
       <section class="learning-panels">
         <div class="learning-panel">
           <div class="panel-heading">
-            <span>Student model</span>
+            <span><q-icon
+              name="insights"
+              class="q-mr-sm"
+            />Skill profile</span>
           </div>
           <div class="skill-list">
             <div
@@ -92,7 +126,10 @@
 
         <div class="learning-panel">
           <div class="panel-heading">
-            <span>Sync</span>
+            <span><q-icon
+              name="cloud_sync"
+              class="q-mr-sm"
+            />Learning sync</span>
             <q-btn
               dense
               flat
@@ -152,6 +189,21 @@ const latestAccuracy = computed(() => {
 const averageAccuracy = computed(() => serverSummary.value.averageAccuracy === null
   ? '—'
   : `${Math.round(serverSummary.value.averageAccuracy * 100)}%`);
+const highlights = computed(() => [
+  { label: 'Lessons', value: serverSummary.value.lessons, icon: 'school', color: '#4361c2', caption: 'Recorded lesson results' },
+  { label: 'Words spoken', value: serverSummary.value.spokenWords.toLocaleString(), icon: 'mic', color: '#9b4580', caption: 'Speaking practice' },
+  { label: 'Average accuracy', value: averageAccuracy.value, icon: 'track_changes', color: '#187b69', caption: 'Across recorded lessons' },
+  { label: 'Practice days', value: serverSummary.value.practiceDays, icon: 'event_available', color: '#a56824', caption: 'Days with lesson results' },
+]);
+const activities = computed(() => [
+  { label: 'Grammar', seconds: activityTotals.value.grammarSeconds, icon: 'spellcheck', color: '#4361c2' },
+  { label: 'Lesson listening', seconds: activityTotals.value.listeningSeconds, icon: 'hearing', color: '#247f92' },
+  { label: 'Speaking', seconds: activityTotals.value.speakingSeconds, icon: 'mic', color: '#9b4580' },
+  { label: 'Phrases', seconds: activityTotals.value.phrasesSeconds, icon: 'forum', color: '#a56824' },
+  { label: 'Audio', seconds: activityTotals.value.audioSeconds, icon: 'headphones', color: '#7355b4' },
+  { label: 'Reading', seconds: activityTotals.value.readingSeconds, icon: 'auto_stories', color: '#187b69' },
+  { label: 'Vocabulary', seconds: activityTotals.value.vocabularySeconds, icon: 'style', color: '#a55345' },
+].map((activity) => ({ ...activity, share: activityTotals.value.totalSeconds > 0 ? Math.min(1, Math.max(0, activity.seconds / activityTotals.value.totalSeconds)) : 0 })));
 const skillRows = computed(() => [
   { label: 'Vocabulary', value: appStore.studentModel.vocabulary.score.value },
   { label: 'Grammar', value: appStore.studentModel.grammar.score.value },
@@ -223,6 +275,7 @@ async function refreshMovieReports() {
 
 function formatDuration(seconds: number) {
   const minutes = Math.floor(Math.max(0, seconds) / 60);
+  if (seconds > 0 && minutes === 0) return '<1 min';
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
@@ -230,3 +283,43 @@ function formatDuration(seconds: number) {
 }
 
 </script>
+
+<style scoped lang="scss">
+.stats-highlights { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.stats-card, .stats-practice, .stats-movies { border: 1px solid var(--app-border); border-radius: 22px; background: var(--app-surface); }
+.stats-card { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 22px; background: linear-gradient(145deg, color-mix(in srgb, var(--metric-color) 7%, var(--app-surface)), var(--app-surface) 75%); }
+.stats-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 46px; height: 46px; border-radius: 15px; background: color-mix(in srgb, var(--metric-color) 11%, var(--app-surface)); color: color-mix(in srgb, var(--metric-color) 72%, var(--app-text-strong)); }
+.stats-label { margin-top: 8px; color: var(--app-text); font-size: 14px; font-weight: 600; }
+.stats-value { font-size: clamp(28px, 3vw, 38px); line-height: 1.2; color: var(--app-text-strong); letter-spacing: -1px; }
+.stats-caption { color: var(--app-muted-strong); font-size: 12px; line-height: 1.5; }
+.stats-practice { padding: 24px; }
+.stats-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+h2 { margin: 0; font-size: 19px; line-height: 1.4; font-weight: 700; color: var(--app-text-strong); }
+.stats-section-heading p, .stats-movies p { margin: 6px 0 0; color: var(--app-muted-strong); font-size: 13px; line-height: 1.5; }
+.stats-total { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; font-size: 20px; font-weight: 700; color: var(--app-text-strong); }
+.stats-total span { font-size: 12px; font-weight: 400; color: var(--app-muted-strong); }
+.stats-activities { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.stats-activity { padding: 16px; border-radius: 17px; background: var(--app-surface-soft); display: flex; flex-direction: column; gap: 10px; }
+.stats-activity-top { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; color: var(--app-text); }
+.stats-activity .stats-icon { width: 38px; height: 38px; border-radius: 12px; }
+.stats-activity > strong { font-size: 23px; line-height: 1.3; color: var(--app-text-strong); }
+.stats-track { height: 6px; border-radius: 8px; background: var(--app-border); overflow: hidden; }
+.stats-track > div { height: 100%; border-radius: inherit; background: var(--metric-color); }
+.stats-empty { color: var(--app-muted-strong); margin: 18px 0 0; }
+.stats-movies { --metric-color: #7355b4; display: flex; align-items: center; gap: 20px; padding: 24px; background: var(--app-surface); }
+.stats-movies-intro { flex: 1; }
+.stats-movie-number { display: flex; flex-direction: column; gap: 5px; min-width: 130px; }
+.stats-movie-number strong { font-size: 25px; line-height: 1.3; color: var(--app-text-strong); }
+.stats-movie-number span { font-size: 12px; color: var(--app-muted-strong); }
+@media (max-width: 1000px) { .stats-activities { grid-template-columns: repeat(3, minmax(0, 1fr)); } .stats-movies { flex-wrap: wrap; } }
+@media (max-width: 650px) {
+  .stats-highlights, .stats-activities { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .stats-card { padding: 16px; border-radius: 18px; }
+  .stats-practice, .stats-movies { padding: 16px; }
+  .stats-section-heading { align-items: flex-start; flex-direction: column; gap: 12px; margin-bottom: 18px; }
+  .stats-activity { padding: 12px; }
+  .stats-activity-top { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .stats-movies-intro { flex-basis: calc(100% - 70px); }
+  .stats-movie-number { flex: 1; min-width: 0; }
+}
+</style>
