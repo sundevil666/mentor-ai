@@ -90,6 +90,11 @@ export function getOfflineLessonContentVersion(lesson: GeneratedLesson) {
   }
   return (hash >>> 0).toString(36);
 }
+export async function isGeneratedLessonAvailableOffline(lesson: GeneratedLesson) {
+  const saved = readOfflineLessons().find((item) => item.id === lesson.id && item.category === 'lessons');
+  if (!saved || saved.contentVersion !== getOfflineLessonContentVersion(lesson)) return false;
+  return !saved.speechTexts?.length || await isSpeechBatchCached(saved.speechTexts);
+}
 export function getSpeechTextsContentVersion(texts: string[]) {
   return getStringContentVersion(JSON.stringify(texts.map((text) => text.trim()).filter(Boolean)));
 }
@@ -128,7 +133,7 @@ export function markOfflineLessonOpened(id: string, category: OfflineCategory) {
     ? { ...lesson, lastOpenedAt: new Date().toISOString() } : lesson));
 }
 export function forgetOfflineLesson(id: string, category: OfflineCategory) {
-  saveLessons(readOfflineLessons().filter((lesson) => !(lesson.id === id && lesson.category === category)));
+  saveLessons(readOfflineLessons().filter((lesson) => !(lesson.id === id && lesson.category === category)), true);
 }
 export async function refreshOfflineSizes() {
   const refreshed = await Promise.all(readOfflineLessons().map(async (lesson) => ({ ...lesson,
@@ -162,7 +167,7 @@ export async function removeOfflineLesson(lesson: OfflineLesson) {
   if (lesson.story) await deleteOfflineStory(lesson.story);
   if (lesson.audio) await deleteOfflineAudio(lesson.audio);
   if (lesson.category === 'lessons') await (await getMentorDb()).delete('lessons', lesson.id);
-  saveLessons(readOfflineLessons().filter((item) => !(item.id === lesson.id && item.category === lesson.category)));
+  saveLessons(readOfflineLessons().filter((item) => !(item.id === lesson.id && item.category === lesson.category)), true);
   if (lesson.category === 'lessons') notifyGeneratedLessonOfflineChange();
 }
 export async function clearOfflineCategory(category: OfflineCategory) {
@@ -241,7 +246,7 @@ function upsert(input: Pick<OfflineLesson, 'id' | 'category' | 'title' | 'estima
   const previous = lessons.find((item) => item.id === input.id && item.category === input.category);
   saveLessons([...lessons.filter((item) => !(item.id === input.id && item.category === input.category)), {
     ...input, downloadedAt: previous?.downloadedAt ?? now, lastOpenedAt: previous?.lastOpenedAt ?? now,
-  } as OfflineLesson]);
+  } as OfflineLesson], true);
 }
 function splitLessonSpeechTexts(exercises: Array<{ audioText?: string }>) {
   return exercises.flatMap(({ audioText }) => {
@@ -267,7 +272,10 @@ function getStringContentVersion(value: string) {
   }
   return (hash >>> 0).toString(36);
 }
-function saveLessons(lessons: OfflineLesson[]) { localStorage.setItem(lessonsKey, JSON.stringify(lessons)); }
+function saveLessons(lessons: OfflineLesson[], notify = false) {
+  localStorage.setItem(lessonsKey, JSON.stringify(lessons));
+  if (notify && typeof window !== 'undefined') window.dispatchEvent(new Event('mentor-ai:offline-library-changed'));
+}
 function notifyGeneratedLessonOfflineChange() {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('mentor-ai:offline-lessons-changed'));
 }

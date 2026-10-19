@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createLessonPlan, generateLessonFromPlan, initialStudentModel, type GeneratedLesson, type LearningContext } from '@mentor-ai/shared';
-import { getSpeechTextsContentVersion, isOfflineSpeechLessonUpdateAvailable, selectExpiredOfflineLessons, selectOfflineLesson, selectOfflineLessonsOverLimit, selectStaleOfflineStories, type OfflineLesson } from '../src/services/offline-library.js';
+import { getOfflineLessonContentVersion, isGeneratedLessonAvailableOffline, registerOfflineSpeechLesson, forgetOfflineLesson, markOfflineLessonOpened, getSpeechTextsContentVersion, isOfflineSpeechLessonUpdateAvailable, selectExpiredOfflineLessons, selectOfflineLesson, selectOfflineLessonsOverLimit, selectStaleOfflineStories, type OfflineLesson } from '../src/services/offline-library.js';
 import { audioLibrary, getAudioContentVersion } from '../src/services/audio-library.js';
 import { getStoryContentVersion, storyLibrary } from '../src/services/story-library.js';
 
@@ -115,3 +115,55 @@ function createSpeakingLesson(lessonTemplateKey: string, createdAt: string): Gen
   }, createdAt);
   return generateLessonFromPlan(plan, createdAt);
 }
+
+
+describe('offline card availability', () => {
+  it('recognizes bulk downloads by lesson ID and rejects changed or incomplete audio', async () => {
+    const originalStorage = globalThis.localStorage;
+    const originalWindow = globalThis.window;
+    const originalCaches = globalThis.caches;
+    let saved: OfflineLesson[] = [];
+    let audioPresent = false;
+    const cacheStorage = { open: async () => ({ match: async () => audioPresent ? new Response('audio') : undefined }) };
+    Object.assign(globalThis, {
+      localStorage: { getItem: () => JSON.stringify(saved) },
+      window: { caches: cacheStorage, crypto: globalThis.crypto, location: { origin: 'https://mentor.test' } },
+      caches: cacheStorage,
+    });
+    try {
+      const lesson = createSpeakingLesson('personal-speaking', '2026-10-19T10:00:00.000Z');
+      assert.equal(await isGeneratedLessonAvailableOffline(lesson), false);
+      saved = [{ id: lesson.id, category: 'lessons', title: lesson.title,
+        downloadedAt: lesson.createdAt, lastOpenedAt: lesson.createdAt, estimatedBytes: 1,
+        contentVersion: getOfflineLessonContentVersion(lesson), speechTexts: [],
+      }];
+      assert.equal(await isGeneratedLessonAvailableOffline(lesson), true);
+      assert.equal(await isGeneratedLessonAvailableOffline({ ...lesson, title: 'Updated' }), false);
+      saved[0]!.speechTexts = ['A complete phrase.'];
+      assert.equal(await isGeneratedLessonAvailableOffline(lesson), false);
+      audioPresent = true;
+      assert.equal(await isGeneratedLessonAvailableOffline(lesson), true);
+    } finally {
+      Object.assign(globalThis, { localStorage: originalStorage, window: originalWindow, caches: originalCaches });
+    }
+  });
+
+  it('notifies open cards after saving and removing a download, without notifying on opening', () => {
+    const originalStorage = globalThis.localStorage;
+    const originalWindow = globalThis.window;
+    let value = '[]';
+    const events: string[] = [];
+    Object.assign(globalThis, {
+      localStorage: { getItem: () => value, setItem: (_key: string, next: string) => { value = next; } },
+      window: { dispatchEvent: (event: Event) => { events.push(event.type); } },
+    });
+    try {
+      registerOfflineSpeechLesson({ id: 'commute', category: 'listening', title: 'Commute', speechTexts: ['Hello.'] });
+      markOfflineLessonOpened('commute', 'listening');
+      forgetOfflineLesson('commute', 'listening');
+      assert.deepEqual(events, ['mentor-ai:offline-library-changed', 'mentor-ai:offline-library-changed']);
+    } finally {
+      Object.assign(globalThis, { localStorage: originalStorage, window: originalWindow });
+    }
+  });
+});

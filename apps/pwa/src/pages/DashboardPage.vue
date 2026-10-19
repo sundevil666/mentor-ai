@@ -753,6 +753,7 @@ import {
   isOfflineSpeechLessonUpdateAvailable,
   markOfflineLessonOpened,
   readOfflineLessons,
+  isGeneratedLessonAvailableOffline,
   readOfflineGeneratedLessons,
   registerOfflineSpeechLesson,
   replaceOfflineSpeechLesson,
@@ -1518,7 +1519,7 @@ function lessonCategoryLabel(category: DashboardTrainingCategory) {
 async function openTrainingLibrary(library: DashboardTrainingCategory) {
   if (appStore.session) await returnToLessonChoice();
   selectedLessonLibrary.value = library;
-  await refreshLibraryDownloadStatuses(trainingLibraries[library].lessons);
+  await refreshLibraryDownloadStatuses(lessonsByTrainingCategory.value[library]);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1586,13 +1587,14 @@ async function installPendingLessonUpdate() {
 async function downloadLibraryLesson(lesson: TrainingLibraryLesson) {
   libraryDownloadStatus.value[lesson.templateKey] = 'downloading';
   try {
-    const generatedLesson = await appStore.loadLesson(createLearningContext(currentSuggestion.value, {
+    const generatedLesson = newLessonCatalog.value.find((item) => (item.lessonTemplateKey ?? item.id) === lesson.templateKey)
+      ?? await appStore.loadLesson(createLearningContext(currentSuggestion.value, {
       mode: lesson.mode,
       selectedConcept: lesson.concept ?? 'learning',
       manualConceptChoice: true,
       lessonTemplateKey: lesson.templateKey,
     }), new Date().toISOString());
-    if (lesson.mode === 'home') {
+    if (lesson.mode === 'home' || newLessonCatalog.value.some((item) => item.id === generatedLesson.id)) {
       await downloadGeneratedLessonOffline(generatedLesson);
       libraryDownloadStatus.value[lesson.templateKey] = 'ready';
       return;
@@ -1610,8 +1612,14 @@ async function downloadLibraryLesson(lesson: TrainingLibraryLesson) {
 
 async function refreshLibraryDownloadStatuses(lessons: TrainingLibraryLesson[]) {
   await Promise.all(lessons.map(async (lesson) => {
+    if (libraryDownloadStatus.value[lesson.templateKey] === 'downloading') return;
     libraryDownloadStatus.value[lesson.templateKey] = 'checking';
     try {
+      const catalogLesson = newLessonCatalog.value.find((item) => (item.lessonTemplateKey ?? item.id) === lesson.templateKey);
+      if (catalogLesson) {
+        libraryDownloadStatus.value[lesson.templateKey] = await isGeneratedLessonAvailableOffline(catalogLesson) ? 'ready' : 'idle';
+        return;
+      }
       const generatedLesson = await appStore.loadLesson(createLearningContext(currentSuggestion.value, {
         mode: lesson.mode,
         selectedConcept: lesson.concept ?? 'learning',
@@ -1627,14 +1635,25 @@ async function refreshLibraryDownloadStatuses(lessons: TrainingLibraryLesson[]) 
       const texts = getLessonOfflineSpeechTexts(generatedLesson.exercises);
       const ready = await isSpeechBatchCached(texts);
       libraryDownloadStatus.value[lesson.templateKey] = ready ? 'ready' : 'idle';
-      if (ready) {
-        registerOfflineSpeechLesson({ id: lesson.templateKey, category: lesson.mode, title: lesson.title, speechTexts: texts });
-      }
     } catch {
       libraryDownloadStatus.value[lesson.templateKey] = 'idle';
     }
   }));
 }
+
+let offlineLibraryRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+function handleOfflineLibraryChange() {
+  clearTimeout(offlineLibraryRefreshTimer);
+  offlineLibraryRefreshTimer = setTimeout(refreshVisibleLibraryDownloadStatuses, 150);
+}
+
+function refreshVisibleLibraryDownloadStatuses() {
+  if (selectedLessonLibrary.value !== 'home') {
+    void refreshLibraryDownloadStatuses(activeTrainingLibrary.value.lessons);
+  }
+}
+
+watch(() => activeTrainingLibrary.value.lessons, handleOfflineLibraryChange);
 
 function getLessonOfflineSpeechTexts(exercises: Array<{ audioText?: string }>) {
   return exercises.flatMap((exercise) => {
@@ -1697,6 +1716,7 @@ onMounted(async () => {
     await openTrainingLibrary(route.query.training);
   }
 
+  window.addEventListener('mentor-ai:offline-library-changed', handleOfflineLibraryChange);
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
   window.addEventListener('beforeunload', handlePageExit);
@@ -1710,9 +1730,11 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  clearTimeout(offlineLibraryRefreshTimer);
   stopListeningAudio();
   stopDialogueSpeechRecording();
   resetListeningAutoScroll();
+  window.removeEventListener('mentor-ai:offline-library-changed', handleOfflineLibraryChange);
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
   window.removeEventListener('beforeunload', handlePageExit);
