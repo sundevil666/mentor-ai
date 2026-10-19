@@ -2,17 +2,25 @@
   <details
     v-if="collectionId"
     class="audio-collection"
+    :class="{ 'content-library-card--completed': completed }"
     :open="expanded"
     @toggle="saveExpanded"
   >
     <summary class="audio-collection__heading">
       <q-icon
-        name="library_books"
+        :name="completed ? 'verified' : 'library_books'"
         class="audio-collection__icon"
       />
       <span class="audio-collection__title">
         <strong>{{ title }}</strong>
-        <small>{{ trackCount }} audio tracks · {{ expanded ? 'Hide tracks' : 'Show tracks' }}</small>
+        <small>{{ trackCount }} audio tracks · {{ completedCount }} of {{ trackCount }} listened</small>
+        <span
+          v-if="completed"
+          class="content-library-card__completed-label"
+        >
+          <q-icon name="check_circle" /> Completed
+        </span>
+        <small>{{ expanded ? 'Hide tracks' : 'Show tracks' }}</small>
       </span>
       <q-icon
         name="expand_more"
@@ -27,9 +35,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
-const props = defineProps<{ collectionId?: string; title: string; trackCount: number }>();
+const props = defineProps<{ collectionId?: string; title: string; trackCount: number; completedCount: number }>();
+const completed = computed(() => props.trackCount > 0 && props.completedCount === props.trackCount);
 const preferenceKey = `mentor-ai:audio-collection-expanded:v1:${props.collectionId ?? ''}`;
 function readExpanded() {
   try { return localStorage.getItem(preferenceKey) === 'true'; } catch { return false; }

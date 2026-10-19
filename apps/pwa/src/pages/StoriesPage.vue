@@ -67,6 +67,7 @@
           :collection-id="entry.collectionId"
           :title="entry.title"
           :track-count="entry.items.length"
+          :completed-count="entry.items.filter((story) => isStoryCompleted(story.id)).length"
         >
           <article
             v-for="story in entry.items"

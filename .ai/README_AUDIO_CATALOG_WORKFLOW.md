@@ -20,7 +20,11 @@ with their listening order preserved.
   The story library already uses these; another catalog renderer must be wired
   to them before adding multipart recordings there.
 - Keep standalone tracks as ordinary cards. Collections start collapsed and show
-  a distinct header, expansion arrow, track count, and Show/Hide tracks hint.
+  a distinct header, expansion arrow, total track count, completed track count,
+  and Show/Hide tracks hint. Pass `completedCount` from the same persisted
+  per-track completion state used by track cards. Highlight the collection and
+  show Completed only when every track is completed; opening or downloading a
+  track does not count as listening.
 - Preserve each collection's expanded state on the device across navigation and
   reloads using the existing `mentor-ai:audio-collection-expanded:v1:<id>` key.
   Keep collection IDs stable so saved preferences survive catalog updates.
