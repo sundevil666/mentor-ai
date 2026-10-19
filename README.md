@@ -18,6 +18,12 @@ The evidence-first contract for improving both teaching quality and application
 reliability is documented in
 [`docs/20-learning-and-application-observability.md`](docs/20-learning-and-application-observability.md).
 
+## Adding Audio Books and Stories
+
+When adding or editing audio catalog entries, follow
+[the audio catalog workflow](.ai/README_AUDIO_CATALOG_WORKFLOW.md).
+Multi-track books and stories must appear as one expandable collection.
+
 ## Server Request Budget
 
 Mentor AI is offline-first and treats server requests as a limited resource. New

@@ -24,3 +24,10 @@ it('uses explicit entity identity, sorts chapters, and leaves single tracks unco
   assert.equal(entries[2]?.collectionId, undefined);
   assert.equal(tracks[0]?.id, '2');
 });
+
+it('groups both Bequest parts under one stable collection in listening order', () => {
+  const entries = groupAudioCollections(storyLibrary);
+  const book = entries.find((entry) => entry.collectionId === 'the-30000-bequest');
+  assert.equal(book?.title, 'The $30,000 Bequest');
+  assert.deepEqual(book?.items.map((item) => item.id), ['the-30000-bequest-part-1', 'the-30000-bequest-part-2']);
+});

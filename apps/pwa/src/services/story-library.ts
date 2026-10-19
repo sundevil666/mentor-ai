@@ -92,6 +92,7 @@ const storyCatalog: LibraryStory[] = [
   },
   {
     id: 'the-30000-bequest-part-1',
+    collection: { id: 'the-30000-bequest', title: 'The $30,000 Bequest', position: 1 },
     addedAt: '2026-08-26T10:00:00.000Z',
     title: 'The $30,000 Bequest · Part 1 of 2',
     description: 'The first half of Mark Twain’s humorous story about a couple whose imagined fortune changes their lives.',
@@ -106,6 +107,7 @@ const storyCatalog: LibraryStory[] = [
   },
   {
     id: 'the-30000-bequest-part-2',
+    collection: { id: 'the-30000-bequest', title: 'The $30,000 Bequest', position: 2 },
     addedAt: '2026-08-26T10:00:00.000Z',
     title: 'The $30,000 Bequest · Part 2 of 2',
     description: 'The concluding half of the same story, kept as a separate 37-minute listening session.',
