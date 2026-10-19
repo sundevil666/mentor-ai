@@ -3,6 +3,7 @@ import { sortMaterialsNewestFirst } from './material-order.js';
 export type LibraryStory = {
   id: string;
   addedAt: string;
+  collection?: { id: string; title: string; position: number };
   title: string;
   description: string;
   level: 'A2' | 'A2–B1' | 'B1';
@@ -49,6 +50,7 @@ const storyCatalog: LibraryStory[] = [
   ] as const).map(([slug, chapterTitle, filename, durationSeconds, sizeBytes], index): LibraryStory => ({
     id: `peter-pan-chapter-${String(index + 1).padStart(2, '0')}-${slug}`,
     addedAt: '2026-10-09T10:00:00.000Z',
+    collection: { id: 'peter-pan', title: 'Peter Pan', position: index + 1 },
     title: `Peter Pan · ${String(index + 1).padStart(2, '0')}/17 · ${chapterTitle}`,
     description: `Chapter ${index + 1} of the complete Peter Pan adventure, read throughout by one narrator for comfortable repeat listening.`,
     level: 'B1',

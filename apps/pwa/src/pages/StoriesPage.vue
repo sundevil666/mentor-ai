@@ -61,32 +61,40 @@
       </template>
 
       <section v-if="isAudioLibrary && !selectedStory" class="video-library" aria-label="Audio stories library">
-        <article
-          v-for="story in storyLibrary"
-          :key="story.id"
-          class="video-card"
-          :class="{ 'content-library-card--completed': isStoryCompleted(story.id) }"
-          role="link"
-          tabindex="0"
-          @click="openStory(story.id)"
-          @keydown.enter="openStory(story.id)"
-          @keydown.space.prevent="openStory(story.id)"
+        <AudioCollection
+          v-for="entry in audioStoryEntries"
+          :key="entry.id"
+          :collection-id="entry.collectionId"
+          :title="entry.title"
+          :track-count="entry.items.length"
         >
-          <q-icon class="video-card__play-backdrop" :name="isStoryCompleted(story.id) ? 'verified' : 'headphones'" />
-          <div class="video-card__body">
-            <div class="video-card__heading">
-              <h2>{{ story.title }}</h2>
-              <span v-if="isStoryCompleted(story.id)" class="content-library-card__completed-label"><q-icon name="check_circle" /> Completed</span>
+          <article
+            v-for="story in entry.items"
+            :key="story.id"
+            class="video-card"
+            :class="{ 'content-library-card--completed': isStoryCompleted(story.id) }"
+            role="link"
+            tabindex="0"
+            @click="openStory(story.id)"
+            @keydown.enter="openStory(story.id)"
+            @keydown.space.prevent="openStory(story.id)"
+          >
+            <q-icon class="video-card__play-backdrop" :name="isStoryCompleted(story.id) ? 'verified' : 'headphones'" />
+            <div class="video-card__body">
+              <div class="video-card__heading">
+                <h2>{{ story.title }}</h2>
+                <span v-if="isStoryCompleted(story.id)" class="content-library-card__completed-label"><q-icon name="check_circle" /> Completed</span>
+              </div>
+              <p v-if="!isStoryCompleted(story.id)">{{ story.description }}</p>
+              <div class="video-card__meta">
+                <span><q-icon name="school" /> {{ story.level }}</span>
+                <span><q-icon name="schedule" /> {{ formatStoryDuration(story.durationSeconds) }}</span>
+                <span><q-icon name="menu_book" /> {{ story.author }}</span>
+                <span class="video-card__engagement"><q-icon name="insights" /> {{ engagementLabel(story.id) }}</span>
+              </div>
             </div>
-            <p v-if="!isStoryCompleted(story.id)">{{ story.description }}</p>
-            <div class="video-card__meta">
-              <span><q-icon name="school" /> {{ story.level }}</span>
-              <span><q-icon name="schedule" /> {{ formatStoryDuration(story.durationSeconds) }}</span>
-              <span><q-icon name="menu_book" /> {{ story.author }}</span>
-              <span class="video-card__engagement"><q-icon name="insights" /> {{ engagementLabel(story.id) }}</span>
-            </div>
-          </div>
-        </article>
+          </article>
+        </AudioCollection>
       </section>
 
       <section v-else-if="selectedStory" class="video-detail video-detail--subtitles-hidden">
@@ -675,6 +683,8 @@ import type { BookReaderDifficultyRating } from '@mentor-ai/shared';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import AppDetailLayout from 'src/components/AppDetailLayout.vue';
 import AppAudioDock from 'src/components/AppAudioDock.vue';
+import AudioCollection from 'src/components/AudioCollection.vue';
+import { groupAudioCollections } from 'src/services/audio-collections';
 import AudioLibraryTabs from 'src/components/AudioLibraryTabs.vue';
 import { loadContentEngagementSummaries, recordContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
 import { getContentProgressDeviceId, loadContentProgress, saveContentProgress, syncAllContentProgress } from 'src/services/content-progress';
@@ -723,6 +733,7 @@ const listeningActivityTimer = new ActiveLearningTimer({ studentId: () => appSto
 const readingActivityTimer = new ActiveLearningTimer({ studentId: () => appStore.studentId, kind: 'reading', contentId: () => selectedBook.value?.id ?? 'book' });
 type ReadingCategory = 'fiction';
 const activeReadingCategory = ref<ReadingCategory>('fiction');
+const audioStoryEntries = groupAudioCollections(storyLibrary);
 const isAudioLibrary = computed(() => props.libraryMode === 'audio');
 const selectedStoryId = ref<string | null>(null);
 const selectedBook = ref<PersonalBook | null>(null);
