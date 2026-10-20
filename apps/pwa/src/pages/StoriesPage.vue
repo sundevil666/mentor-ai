@@ -602,7 +602,7 @@
           @seek="seek"
           @toggle-playback="togglePlayback"
           @update:playback-rate="setPlaybackRate"
-          @update:repeat="repeat = $event"
+          @update:repeat="setStoryRepeat"
         />
       </template>
     </AppDetailLayout>
@@ -678,7 +678,8 @@
 
 <script setup lang="ts">
 import { Dialog, Notify } from 'quasar';
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { resolveAudioResumePosition } from 'src/services/audio-resume';
+import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { ContentProgress, ReaderTextLookup, ReadingChapter, ReadingDeviceSession, ReadingPage } from '@mentor-ai/shared';
 import type { BookReaderDifficultyRating } from '@mentor-ai/shared';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
@@ -837,6 +838,7 @@ const currentTime = ref(0);
 const duration = ref(0);
 const playing = ref(false);
 const repeat = ref(false);
+let storyProgressReady = false;
 const playbackRate = ref(1);
 const busy = ref(false);
 let lastProgressSave = 0;
@@ -1059,6 +1061,7 @@ onMounted(async () => {
     await openStory(requestedStoryId);
   }
 });
+onBeforeUnmount(() => { persistProgress(); });
 onUnmounted(() => {
   if (readingDayTimer) clearTimeout(readingDayTimer);
   void listeningActivityTimer.stop();
@@ -1085,6 +1088,11 @@ onUnmounted(() => {
 
 async function openStory(id: string) {
   configurePlaybackAudioSession();
+  if (selectedStoryId.value) closeStory();
+  storyProgressReady = false;
+  currentTime.value = 0;
+  duration.value = 0;
+  repeat.value = localStorage.getItem(`mentor-ai:audio-repeat:${id}`) === 'true';
   selectedStoryId.value = id;
   markOfflineLessonOpened(id, 'stories');
   await nextTick();
@@ -2899,7 +2907,12 @@ function handlePlay() {
   listeningActivityTimer.start();
   if (selectedStory.value) void recordEngagement(selectedStory.value.id, 'started');
 }
+function setStoryRepeat(value: boolean) {
+  repeat.value = value;
+  if (selectedStory.value) localStorage.setItem(`mentor-ai:audio-repeat:${selectedStory.value.id}`, String(value));
+}
 function handlePause() {
+  persistProgress();
   void listeningActivityTimer.stop();
   playing.value = false;
   setMediaSessionPlaybackState('paused');
@@ -2929,16 +2942,19 @@ async function refreshCompletedStories() {
 async function restoreProgress() {
   const story = selectedStory.value;
   const audio = audioElement.value;
-  if (!story || !audio) return;
+  if (!story || !audio || storyProgressReady) return;
   audio.playbackRate = playbackRate.value;
   duration.value = Number.isFinite(audio.duration) ? audio.duration : story.durationSeconds;
   const progress = await loadContentProgress('audio', story.id);
-  if (progress && !progress.completed) audio.currentTime = Math.min(progress.position, Math.max(0, duration.value - 1));
+  if (selectedStory.value?.id !== story.id || audioElement.value !== audio) return;
+  audio.currentTime = resolveAudioResumePosition(progress?.position ?? 0, duration.value);
+  currentTime.value = audio.currentTime;
+  storyProgressReady = true;
 }
 function persistProgress(completed = false) {
   const story = selectedStory.value;
   const audio = audioElement.value;
-  if (!story || !audio || !Number.isFinite(audio.currentTime)) return;
+  if (!story || !audio || !storyProgressReady || !Number.isFinite(audio.currentTime)) return;
   lastProgressSave = Date.now();
   const resolvedDuration = duration.value || story.durationSeconds;
   const position = completed ? resolvedDuration : audio.currentTime;

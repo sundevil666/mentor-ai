@@ -73,7 +73,7 @@
         </div>
 
         <section class="audio-player" aria-label="Audio player">
-          <audio ref="audioElement" :src="playbackUrl" controls :loop="repeatEnabled" preload="metadata" @ended="handleEnded" @pause="handlePause" @play="handlePlay" @seeking="handleSeeking" @timeupdate="saveProgress" />
+          <audio ref="audioElement" :src="playbackUrl" controls :loop="repeatEnabled" preload="metadata" @loadedmetadata="restoreAudioProgress" @ended="handleEnded" @pause="handlePause" @play="handlePlay" @seeking="handleSeeking" @timeupdate="saveProgress" />
           <div class="audio-player__actions">
             <a :href="selectedAudio.articleUrl" target="_blank" rel="noopener">Transcript and source <q-icon name="open_in_new" /></a>
           </div>
@@ -119,6 +119,7 @@ import { configurePlaybackAudioSession, useRecoveringMediaPlayPause } from 'src/
 import AppAudioDock from 'src/components/AppAudioDock.vue';
 import AudioLibraryTabs from 'src/components/AudioLibraryTabs.vue';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
+import { resolveAudioResumePosition } from 'src/services/audio-resume';
 import { loadAllContentProgress, loadContentProgress, saveContentProgress } from 'src/services/content-progress';
 import { isAudioPlaybackCompleted } from 'src/services/audio-completion';
 
@@ -132,6 +133,7 @@ const playbackUrl = ref('');
 const playbackIsOffline = ref(false);
 const playbackRate = ref(1);
 const repeatEnabled = ref(false);
+let audioProgressReady = false;
 const isPlaying = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
@@ -165,9 +167,12 @@ onBeforeUnmount(() => {
 });
 
 async function selectAudio(item: LibraryAudio) {
+  if (selectedAudio.value) closeAudio();
+  audioProgressReady = false;
   selectedAudio.value = item;
   markOfflineLessonOpened(item.id, 'audio');
   const playback = await resolveAudioPlaybackUrl(item);
+  if (selectedAudio.value?.id !== item.id) return;
   playbackUrl.value = playback.url;
   playbackIsOffline.value = playback.offline;
   if (playback.offline && !cachedUrls.value.has(item.sourceUrl)) {
@@ -178,12 +183,21 @@ async function selectAudio(item: LibraryAudio) {
   await nextTick();
   const player = audioElement.value;
   if (!player) return;
-  const syncedProgress = await loadContentProgress('audio', item.id);
-  player.currentTime = Math.max(readProgress(item.id), syncedProgress?.completed ? 0 : (syncedProgress?.position ?? 0));
-  currentTime.value = player.currentTime;
-  duration.value = item.durationSeconds;
   player.playbackRate = playbackRate.value;
+  if (player.readyState >= 1) await restoreAudioProgress();
   updateMediaMetadata(item);
+}
+
+async function restoreAudioProgress() {
+  const item = selectedAudio.value;
+  const player = audioElement.value;
+  if (!item || !player || audioProgressReady) return;
+  const progress = await loadContentProgress('audio', item.id);
+  if (selectedAudio.value?.id !== item.id || audioElement.value !== player || audioProgressReady) return;
+  duration.value = Number.isFinite(player.duration) ? player.duration : item.durationSeconds;
+  player.currentTime = resolveAudioResumePosition(progress?.position ?? readProgress(item.id), duration.value);
+  currentTime.value = player.currentTime;
+  audioProgressReady = true;
 }
 
 function closeAudio() {
@@ -230,7 +244,7 @@ function readRepeatPreference(id: string) { return localStorage.getItem(`mentor-
 function saveProgress() {
   const player = audioElement.value;
   const item = selectedAudio.value;
-  if (!player || !item || !Number.isFinite(player.currentTime)) return;
+  if (!player || !item || !audioProgressReady || !Number.isFinite(player.currentTime)) return;
   currentTime.value = player.currentTime;
   duration.value = Number.isFinite(player.duration) ? player.duration : item.durationSeconds;
   localStorage.setItem(`mentor-ai:audio-progress:${item.id}`, String(Math.floor(player.currentTime)));
@@ -242,7 +256,7 @@ function saveProgress() {
 function persistSyncedProgress(completed = false, force = false) {
   const player = audioElement.value;
   const item = selectedAudio.value;
-  if (!player || !item || !Number.isFinite(player.currentTime)) return;
+  if (!player || !item || !audioProgressReady || !Number.isFinite(player.currentTime)) return;
   const now = Date.now();
   if (!completed && !force && now - lastProgressSave < 5_000) return;
   lastProgressSave = now;
