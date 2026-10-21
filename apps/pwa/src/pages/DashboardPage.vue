@@ -88,62 +88,81 @@
               <q-icon :name="activeTrainingLibrary.icon" size="42px" color="primary" />
             </div>
 
-            <div class="training-library__list">
-              <section
-                v-for="section in activeTrainingLessonSections"
-                :key="section.state"
-                class="training-library__progress-section"
-              >
-                <h2 class="training-library__progress-heading">{{ section.label }}</h2>
-                <section
-                  v-for="group in section.groups"
-                  :key="group.dateKey"
-                  class="training-library__date-group"
+            <div class="training-library__workspace" :class="{ 'training-library__workspace--dates': selectedLessonLibrary === 'speaking' }">
+              <nav v-if="selectedLessonLibrary === 'speaking'" class="speaking-dates" aria-label="Speaking lesson dates">
+                <p class="speaking-dates__title">Lesson dates</p>
+                <button
+                  v-for="date in speakingLessonDates"
+                  :key="date.dateKey"
+                  type="button"
+                  class="speaking-dates__button"
+                  :class="{ 'speaking-dates__button--selected': selectedSpeakingDate === date.dateKey, 'speaking-dates__button--completed': date.completed === date.total }"
+                  :aria-current="selectedSpeakingDate === date.dateKey ? 'date' : undefined"
+                  :aria-label="`${date.dateLabel}: ${date.completed} of ${date.total} completed${date.completed === date.total ? ', all completed' : ''}`"
+                  @click="selectSpeakingDate(date.dateKey)"
                 >
-                  <h3 class="training-library__date-heading">
-                    <q-icon name="calendar_today" />
-                    <time :datetime="group.dateKey">{{ group.dateLabel }}</time>
-                  </h3>
-                  <article
-                    v-for="lesson in group.lessons"
-                    :key="lesson.templateKey"
-                    class="training-library-card"
-                    :class="`training-library-card--${lessonProgressState(lesson.templateKey)}`"
+                  <q-icon :name="date.completed === date.total ? 'check_circle' : 'calendar_today'" size="20px" />
+                  <span><time :datetime="date.dateKey">{{ date.dateLabel }}</time><small>{{ date.completed }} / {{ date.total }} completed</small></span>
+                  <q-icon v-if="selectedSpeakingDate === date.dateKey" name="chevron_right" size="20px" />
+                </button>
+              </nav>
+              <div class="training-library__list">
+                <section
+                  v-for="section in activeTrainingLessonSections"
+                  :key="section.state"
+                  class="training-library__progress-section"
+                >
+                  <h2 class="training-library__progress-heading">{{ section.label }}</h2>
+                  <section
+                    v-for="group in section.groups"
+                    :key="group.dateKey"
+                    class="training-library__date-group"
                   >
-                    <button type="button" class="training-library-card__body" @click="startLibraryLesson(lesson)">
-                      <span class="training-library-card__topline">
-                        <span class="training-library-card__title">{{ lesson.title }}</span>
-                        <span class="training-library-card__status">
-                          <q-icon :name="lessonProgressIcon(lesson.templateKey)" />
-                          {{ lessonProgressLabel(lesson.templateKey) }}
+                    <h3 class="training-library__date-heading">
+                      <q-icon name="calendar_today" />
+                      <time :datetime="group.dateKey">{{ group.dateLabel }}</time>
+                    </h3>
+                    <article
+                      v-for="lesson in group.lessons"
+                      :key="lesson.templateKey"
+                      class="training-library-card"
+                      :class="`training-library-card--${lessonProgressState(lesson.templateKey)}`"
+                    >
+                      <button type="button" class="training-library-card__body" @click="startLibraryLesson(lesson)">
+                        <span class="training-library-card__topline">
+                          <span class="training-library-card__title">{{ lesson.title }}</span>
+                          <span class="training-library-card__status">
+                            <q-icon :name="lessonProgressIcon(lesson.templateKey)" />
+                            {{ lessonProgressLabel(lesson.templateKey) }}
+                          </span>
                         </span>
-                      </span>
-                      <strong v-if="lessonProgressState(lesson.templateKey) !== 'completed'">{{ lesson.focus }}</strong>
-                      <span>{{ lesson.minutes }} min</span>
-                    </button>
-                    <ContentMentorFeedback category="lesson" :content-id="lesson.templateKey" hide-select-after-feedback />
-                    <div class="training-library-card__offline">
-                      <q-icon
-                        :name="libraryDownloadIcon(lesson.templateKey)"
-                        :color="libraryDownloadStatus[lesson.templateKey] === 'ready' ? 'positive' : 'grey-7'"
-                        size="20px"
-                      />
-                      <span>{{ libraryDownloadLabel(lesson.templateKey) }}</span>
-                      <q-btn
-                        color="primary"
-                        :icon="libraryDownloadStatus[lesson.templateKey] === 'ready' ? 'check' : 'download'"
-                        :label="libraryDownloadStatus[lesson.templateKey] === 'ready' ? 'Downloaded' : 'Download'"
-                        :loading="libraryDownloadStatus[lesson.templateKey] === 'downloading'"
-                        :disable="libraryDownloadStatus[lesson.templateKey] === 'ready'"
-                        dense
-                        flat
-                        no-caps
-                        @click="downloadLibraryLesson(lesson)"
-                      />
-                    </div>
-                  </article>
+                        <strong v-if="lessonProgressState(lesson.templateKey) !== 'completed'">{{ lesson.focus }}</strong>
+                        <span>{{ lesson.minutes }} min</span>
+                      </button>
+                      <ContentMentorFeedback category="lesson" :content-id="lesson.templateKey" hide-select-after-feedback />
+                      <div class="training-library-card__offline">
+                        <q-icon
+                          :name="libraryDownloadIcon(lesson.templateKey)"
+                          :color="libraryDownloadStatus[lesson.templateKey] === 'ready' ? 'positive' : 'grey-7'"
+                          size="20px"
+                        />
+                        <span>{{ libraryDownloadLabel(lesson.templateKey) }}</span>
+                        <q-btn
+                          color="primary"
+                          :icon="libraryDownloadStatus[lesson.templateKey] === 'ready' ? 'check' : 'download'"
+                          :label="libraryDownloadStatus[lesson.templateKey] === 'ready' ? 'Downloaded' : 'Download'"
+                          :loading="libraryDownloadStatus[lesson.templateKey] === 'downloading'"
+                          :disable="libraryDownloadStatus[lesson.templateKey] === 'ready'"
+                          dense
+                          flat
+                          no-caps
+                          @click="downloadLibraryLesson(lesson)"
+                        />
+                      </div>
+                    </article>
+                  </section>
                 </section>
-              </section>
+              </div>
             </div>
           </section>
         </section>
@@ -689,7 +708,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { resolveDashboardTrainingCategory, synchronizeDashboardLessonRoute, type DashboardTrainingCategory } from 'src/services/navigation-category';
 import { sortMaterialsNewestFirst } from 'src/services/material-order';
-import { groupLessonsByProgressAndReleaseDate } from 'src/services/lesson-library-order';
+import { groupLessonsByProgressAndReleaseDate, groupLessonDates, resolveSelectedLessonDate } from 'src/services/lesson-library-order';
 import { loadMovieLearningReports, refreshMovieLearningReportsFromCloud } from 'src/services/movie-learning-reports';
 import { summarizeMovieViewing } from 'src/services/movie-viewing-summary';
 import {
@@ -1261,10 +1280,31 @@ function lessonProgressState(templateKey: string): LessonProgressState {
   }
   return 'new';
 }
-const activeTrainingLessonSections = computed(() => groupLessonsByProgressAndReleaseDate(
-  activeTrainingLibrary.value.lessons,
+const speakingDateStorageKey = 'mentor-ai:speaking-selected-date';
+function readSelectedSpeakingDate(): string | null {
+  try { return localStorage.getItem(speakingDateStorageKey); } catch { return null; }
+}
+const savedSpeakingDate = ref(readSelectedSpeakingDate());
+const speakingLessonDates = computed(() => groupLessonDates(
+  lessonsByTrainingCategory.value.speaking,
   (lesson) => lessonProgressState(lesson.templateKey),
 ));
+const selectedSpeakingDate = computed(() => resolveSelectedLessonDate(savedSpeakingDate.value, speakingLessonDates.value));
+function selectSpeakingDate(dateKey: string) {
+  savedSpeakingDate.value = dateKey;
+  try { localStorage.setItem(speakingDateStorageKey, dateKey); } catch { /* Keep selection usable when storage is unavailable. */ }
+}
+const activeTrainingLessonSections = computed(() => {
+  const sections = groupLessonsByProgressAndReleaseDate(
+    activeTrainingLibrary.value.lessons,
+    (lesson) => lessonProgressState(lesson.templateKey),
+  );
+  if (selectedLessonLibrary.value !== 'speaking') return sections;
+  return sections.map((section) => ({
+    ...section,
+    groups: section.groups.filter((group) => group.dateKey === selectedSpeakingDate.value),
+  })).filter((section) => section.groups.length > 0);
+});
 function lessonProgressLabel(templateKey: string) {
   const state = lessonProgressState(templateKey);
   if (state === 'completed') return 'Completed';

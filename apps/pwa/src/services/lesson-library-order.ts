@@ -64,3 +64,22 @@ function formatReleaseDate(dateKey: string) {
     ? formatDisplayDate(`${dateKey}T12:00:00`)
     : dateKey;
 }
+
+export function groupLessonDates<T extends ReleasedLesson>(
+  lessons: readonly T[],
+  getProgress: (lesson: T) => LessonProgressState,
+) {
+  const dates = new Map<string, { dateKey: string; dateLabel: string; total: number; completed: number }>();
+  for (const lesson of lessons) {
+    const dateKey = releaseDateKey(lesson.addedAt);
+    const group = dates.get(dateKey) ?? { dateKey, dateLabel: formatReleaseDate(dateKey), total: 0, completed: 0 };
+    group.total += 1;
+    if (getProgress(lesson) === 'completed') group.completed += 1;
+    dates.set(dateKey, group);
+  }
+  return [...dates.values()].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+}
+
+export function resolveSelectedLessonDate(saved: string | null, dates: readonly { dateKey: string }[]): string | null {
+  return dates.find((date) => date.dateKey === saved)?.dateKey ?? dates[0]?.dateKey ?? null;
+}
