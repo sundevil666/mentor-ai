@@ -5,6 +5,7 @@ import { getAudioContentVersion } from '../src/services/audio-library.js';
 import { getStoryContentVersion } from '../src/services/story-library.js';
 import {
   getRecentOfflineLessonSince,
+  fetchNewLessonCatalog,
   prioritizeNewLessons,
   selectPendingAudioDownloads,
   selectPendingBulkLessonDownloads,
@@ -84,4 +85,19 @@ describe('new lesson catalog priority', () => {
     } as Parameters<typeof selectPendingAudioDownloads>[0][number];
     assert.deepEqual(selectPendingAudioDownloads([audio], new Set(), new Map(), new Set([audio.id])), []);
   });
+});
+
+it('keeps locally imported lessons eligible for bulk download while the cloud is unavailable', async () => {
+  const imported = { ...lesson('local-import', 90), lessonTemplateKey: 'local-import-template' };
+  const catalog = await fetchNewLessonCatalog(async () => { throw new Error('quota'); }, async () => [imported]);
+  assert.deepEqual(selectPendingBulkLessonDownloads(catalog, new Set(), new Set()).map((item) => item.id), ['local-import']);
+  assert.deepEqual(selectPendingBulkLessonDownloads(catalog, new Set(['local-import']), new Set()), []);
+  assert.deepEqual(selectPendingBulkLessonDownloads(catalog, new Set(), new Set(['local-import-template'])), []);
+});
+it('merges cloud and local catalogs without duplicating IDs, preferring the fresh cloud copy', async () => {
+  const local = lesson('same-id', 1);
+  const remote = lesson('same-id', 90);
+  const catalog = await fetchNewLessonCatalog(async () => [remote], async () => [local, lesson('local-only', 2)]);
+  assert.equal(catalog.length, 2);
+  assert.equal(catalog.find((item) => item.id === 'same-id')?.priority, 90);
 });

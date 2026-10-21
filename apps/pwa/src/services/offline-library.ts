@@ -90,10 +90,14 @@ export function getOfflineLessonContentVersion(lesson: GeneratedLesson) {
   }
   return (hash >>> 0).toString(36);
 }
+export function getGeneratedLessonSpeechTexts(lesson: GeneratedLesson) {
+  return splitLessonSpeechTexts(lesson.exercises);
+}
 export async function isGeneratedLessonAvailableOffline(lesson: GeneratedLesson) {
   const saved = readOfflineLessons().find((item) => item.id === lesson.id && item.category === 'lessons');
   if (!saved || saved.contentVersion !== getOfflineLessonContentVersion(lesson)) return false;
-  return !saved.speechTexts?.length || await isSpeechBatchCached(saved.speechTexts);
+  const requiredTexts = [...new Set([...getGeneratedLessonSpeechTexts(lesson), ...(saved.speechTexts ?? [])])];
+  return requiredTexts.length === 0 || await isSpeechBatchCached(requiredTexts);
 }
 export function getSpeechTextsContentVersion(texts: string[]) {
   return getStringContentVersion(JSON.stringify(texts.map((text) => text.trim()).filter(Boolean)));

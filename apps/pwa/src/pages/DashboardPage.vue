@@ -1764,6 +1764,7 @@ onMounted(async () => {
   }
 
   window.addEventListener('mentor-ai:offline-library-changed', handleOfflineLibraryChange);
+  window.addEventListener('mentor-ai:lesson-catalog-changed', refreshNewLessonCatalog);
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
   window.addEventListener('beforeunload', handlePageExit);
@@ -1782,6 +1783,7 @@ onUnmounted(() => {
   stopDialogueSpeechRecording();
   resetListeningAutoScroll();
   window.removeEventListener('mentor-ai:offline-library-changed', handleOfflineLibraryChange);
+  window.removeEventListener('mentor-ai:lesson-catalog-changed', refreshNewLessonCatalog);
   window.removeEventListener('online', handleOnline);
   window.removeEventListener('offline', handleOffline);
   window.removeEventListener('beforeunload', handlePageExit);

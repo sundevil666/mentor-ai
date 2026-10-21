@@ -210,6 +210,7 @@ async function importLocalLessons(event: Event) {
       added += 1;
     }
     await tx.done;
+    if (added > 0) window.dispatchEvent(new Event('mentor-ai:lesson-catalog-changed'));
     lessonImportMessage.value = `${added} lessons added on this device. Open Speak to start.`;
     Notify.create({ type: 'positive', message: lessonImportMessage.value });
   } catch (error) {

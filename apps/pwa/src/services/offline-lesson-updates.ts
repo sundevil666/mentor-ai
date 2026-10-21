@@ -2,6 +2,8 @@ import type { GeneratedLesson, LearningContext } from '@mentor-ai/shared';
 import { fetchOfflineLessons } from './api-client.js';
 import {
   cleanupExpiredOfflineLessons,
+  readOfflineGeneratedLessons,
+  getGeneratedLessonSpeechTexts,
   getOfflineLessonContentVersion,
   getSpeechTextsContentVersion,
   readOfflineLessons,
@@ -14,6 +16,7 @@ import {
   refreshOfflineSizes,
   registerOfflineGeneratedLesson,
 } from './offline-library.js';
+import { mergeAvailableLessonCatalog } from './lesson-category-progress.js';
 import { isSpeechBatchCached, preloadSpeechBatch } from './speech-synthesis.js';
 import { getCachedStoryUrls, getStoryContentVersion, saveStoryOffline, storyLibrary, type LibraryStory } from './story-library.js';
 import { audioLibrary, getAudioContentVersion, getCachedAudioUrls, saveAudioOffline, type LibraryAudio } from './audio-library.js';
@@ -74,8 +77,15 @@ export function selectPendingBulkLessonDownloads(
   }));
 }
 
-export async function fetchNewLessonCatalog() {
-  return prioritizeNewLessons(await fetchOfflineLessons(new Date(0).toISOString()));
+export async function fetchNewLessonCatalog(
+  fetchRemote: () => Promise<GeneratedLesson[]> = () => fetchOfflineLessons(new Date(0).toISOString()),
+  readLocal: () => Promise<GeneratedLesson[]> = readOfflineGeneratedLessons,
+) {
+  const [remote, local] = await Promise.all([
+    fetchRemote().catch(() => []),
+    readLocal().catch(() => []),
+  ]);
+  return prioritizeNewLessons(mergeAvailableLessonCatalog(remote, local, null, []));
 }
 
 export function getRecentOfflineLessonSince(now = Date.now()) {
@@ -359,9 +369,5 @@ function prioritizeNewest(lessons: GeneratedLesson[]) {
 }
 
 function getSpeechTexts(lesson: GeneratedLesson) {
-  return lesson.exercises.flatMap((exercise) => {
-    const text = exercise.audioText?.trim();
-    if (!text) return [];
-    return text.match(/[^.!?]+[.!?]+(?:[”'"]+)?|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) ?? [];
-  });
+  return getGeneratedLessonSpeechTexts(lesson);
 }

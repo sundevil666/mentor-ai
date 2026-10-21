@@ -132,12 +132,13 @@ describe('offline card availability', () => {
     });
     try {
       const lesson = createSpeakingLesson('personal-speaking', '2026-10-19T10:00:00.000Z');
+      lesson.exercises[0]!.audioText = 'A complete phrase.';
       assert.equal(await isGeneratedLessonAvailableOffline(lesson), false);
       saved = [{ id: lesson.id, category: 'lessons', title: lesson.title,
         downloadedAt: lesson.createdAt, lastOpenedAt: lesson.createdAt, estimatedBytes: 1,
         contentVersion: getOfflineLessonContentVersion(lesson), speechTexts: [],
       }];
-      assert.equal(await isGeneratedLessonAvailableOffline(lesson), true);
+      assert.equal(await isGeneratedLessonAvailableOffline(lesson), false);
       assert.equal(await isGeneratedLessonAvailableOffline({ ...lesson, title: 'Updated' }), false);
       saved[0]!.speechTexts = ['A complete phrase.'];
       assert.equal(await isGeneratedLessonAvailableOffline(lesson), false);

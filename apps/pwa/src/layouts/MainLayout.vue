@@ -356,7 +356,7 @@ import { fetchTranslationUsage } from 'src/services/api-client';
 import { recordApplicationTelemetry } from 'src/services/application-telemetry';
 import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
 import { formatDisplayDateTime } from 'src/services/date-format';
-import { cleanupExpiredOfflineLessons, readOfflineLessons } from 'src/services/offline-library';
+import { cleanupExpiredOfflineLessons, isGeneratedLessonAvailableOffline } from 'src/services/offline-library';
 import { loadLearningActivityTotals, pendingLearningActivityCount, syncLearningActivity } from 'src/services/learning-activity';
 import { loadAllContentProgress, syncAllContentProgress } from 'src/services/content-progress';
 import { loadContentEngagementSummaries, syncContentEngagement } from 'src/services/content-engagement';
@@ -643,6 +643,8 @@ onMounted(async () => {
   window.addEventListener('mentor-movie-reports-updated', refreshPendingMovieReportCount);
   window.addEventListener('mentor-content-engagement', handleLessonEngagementChange);
   window.addEventListener('mentor-ai:offline-lessons-changed', handleOfflineLessonCatalogChange);
+  window.addEventListener('mentor-ai:lesson-catalog-changed', handleOfflineLessonCatalogChange);
+  window.addEventListener('mentor-ai:offline-library-changed', handleOfflineLessonCatalogChange);
   window.addEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyServerMaintenanceFinished);
   window.addEventListener('error', handleRuntimeError);
   window.addEventListener('unhandledrejection', handleUnhandledRejection);
@@ -676,6 +678,9 @@ onBeforeUnmount(() => {
   window.removeEventListener('mentor-movie-reports-updated', refreshPendingMovieReportCount);
   window.removeEventListener('mentor-content-engagement', handleLessonEngagementChange);
   window.removeEventListener('mentor-ai:offline-lessons-changed', handleOfflineLessonCatalogChange);
+  window.removeEventListener('mentor-ai:lesson-catalog-changed', handleOfflineLessonCatalogChange);
+  clearTimeout(bulkCatalogRefreshTimer);
+  window.removeEventListener('mentor-ai:offline-library-changed', handleOfflineLessonCatalogChange);
   window.removeEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyServerMaintenanceFinished);
   window.removeEventListener('error', handleRuntimeError);
   window.removeEventListener('unhandledrejection', handleUnhandledRejection);
@@ -753,8 +758,10 @@ async function refreshPendingMovieReportCount() {
 function handleLessonEngagementChange() {
   void refreshPendingBulkLessonDownloads();
 }
+let bulkCatalogRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 function handleOfflineLessonCatalogChange() {
-  void refreshPendingBulkLessonDownloads();
+  clearTimeout(bulkCatalogRefreshTimer);
+  bulkCatalogRefreshTimer = setTimeout(() => { void refreshPendingBulkLessonDownloads(); }, 150);
 }
 async function refreshPendingBulkLessonDownloads() {
   if (!appStore.isHydrated || !navigator.onLine || isBulkLessonDownloadRunning.value) return;
@@ -780,11 +787,11 @@ async function refreshPendingBulkLessonDownloads() {
     for (const item of progress) {
       if (item.category === 'audio' && item.completed) completedMediaIds.add(item.contentId);
     }
-    const savedIds = new Set(
-      readOfflineLessons()
-        .filter((lesson) => lesson.category === 'lessons')
-        .map((lesson) => lesson.id),
-    );
+    const readiness = await Promise.all(catalog.map(async (lesson) => ({
+      id: lesson.id,
+      ready: await isGeneratedLessonAvailableOffline(lesson),
+    })));
+    const savedIds = new Set(readiness.filter((lesson) => lesson.ready).map((lesson) => lesson.id));
     pendingBulkLessonDownloads.value = selectPendingBulkLessonDownloads(
       catalog,
       savedIds,
