@@ -4,6 +4,7 @@
     :class="[
       `category-theme--${selectedLessonLibrary}`,
       { 'learning-page--lesson': appStore.session && !appStore.isLessonComplete && currentExercise },
+      { 'learning-page--speaking-library': !appStore.session && selectedLessonLibrary === 'speaking' },
     ]"
   >
     <section class="learning-shell">
@@ -106,7 +107,12 @@
                   <q-icon v-if="selectedSpeakingDate === date.dateKey" name="chevron_right" size="20px" />
                 </button>
               </nav>
-              <div class="training-library__list">
+              <div
+                class="training-library__list"
+                :role="selectedLessonLibrary === 'speaking' ? 'region' : undefined"
+                :aria-label="selectedLessonLibrary === 'speaking' ? 'Lessons for selected date' : undefined"
+                :tabindex="selectedLessonLibrary === 'speaking' ? 0 : undefined"
+              >
                 <section
                   v-for="section in activeTrainingLessonSections"
                   :key="section.state"
