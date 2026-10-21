@@ -28,8 +28,9 @@ const progressLabels: Record<LessonProgressState, string> = {
 export function groupLessonsByProgressAndReleaseDate<T extends ReleasedLesson>(
   lessons: readonly T[],
   getProgress: (lesson: T) => LessonProgressState,
+  states: readonly LessonProgressState[] = progressOrder,
 ): LessonProgressSection<T>[] {
-  return progressOrder.flatMap((state) => {
+  return states.flatMap((state) => {
     const groups = new Map<string, T[]>();
     for (const lesson of lessons.filter((item) => getProgress(item) === state)) {
       const dateKey = releaseDateKey(lesson.addedAt);

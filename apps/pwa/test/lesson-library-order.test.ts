@@ -44,3 +44,13 @@ it('aggregates whole dates across progress states and marks completion only afte
   const complete = groupLessonDates(lessons, () => 'completed');
   assert.equal(complete[0]?.completed, complete[0]?.total);
 });
+
+it('orders Speaking cards as started, untouched, then completed', () => {
+  const lessons = [
+    { templateKey: 'new', addedAt: '2026-10-21T10:00:00Z' },
+    { templateKey: 'completed', addedAt: '2026-10-21T11:00:00Z' },
+    { templateKey: 'started', addedAt: '2026-10-21T09:00:00Z' },
+  ];
+  const sections = groupLessonsByProgressAndReleaseDate(lessons, (lesson) => lesson.templateKey as LessonProgressState, ['started', 'new', 'completed']);
+  assert.deepEqual(sections.flatMap((section) => section.groups.flatMap((group) => group.lessons.map((lesson) => lesson.templateKey))), ['started', 'new', 'completed']);
+});

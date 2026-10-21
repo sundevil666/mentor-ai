@@ -118,13 +118,13 @@
                   :key="section.state"
                   class="training-library__progress-section"
                 >
-                  <h2 class="training-library__progress-heading">{{ section.label }}</h2>
+                  <h2 v-if="selectedLessonLibrary !== 'speaking'" class="training-library__progress-heading">{{ section.label }}</h2>
                   <section
                     v-for="group in section.groups"
                     :key="group.dateKey"
                     class="training-library__date-group"
                   >
-                    <h3 class="training-library__date-heading">
+                    <h3 v-if="selectedLessonLibrary !== 'speaking'" class="training-library__date-heading">
                       <q-icon name="calendar_today" />
                       <time :datetime="group.dateKey">{{ group.dateLabel }}</time>
                     </h3>
@@ -1304,6 +1304,7 @@ const activeTrainingLessonSections = computed(() => {
   const sections = groupLessonsByProgressAndReleaseDate(
     activeTrainingLibrary.value.lessons,
     (lesson) => lessonProgressState(lesson.templateKey),
+    selectedLessonLibrary.value === 'speaking' ? ['started', 'new', 'completed'] : undefined,
   );
   if (selectedLessonLibrary.value !== 'speaking') return sections;
   return sections.map((section) => ({

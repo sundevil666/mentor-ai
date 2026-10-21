@@ -5206,3 +5206,7 @@ p.lesson-complete__eyebrow,
 @media (max-width: 700px) {
   .training-library__workspace--dates > .speaking-dates { scrollbar-width: none; }
 }
+
+.training-library__workspace--dates > .training-library__list { gap: 16px; }
+.training-library__workspace--dates .training-library__progress-section,
+.training-library__workspace--dates .training-library__date-group { display: contents; }
