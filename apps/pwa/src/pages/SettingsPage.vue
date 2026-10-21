@@ -22,6 +22,17 @@
 
       <section class="settings-section">
         <div class="settings-section__heading">
+          <q-icon name="library_add" />
+          <span>Local lessons</span>
+        </div>
+        <p>Import private speaking lessons on this device. Progress is saved locally and queued for synchronization. Model audio requires a separate download for offline use.</p>
+        <input ref="lessonFileInput" type="file" accept="application/json,.json" hidden @change="importLocalLessons">
+        <q-btn color="primary" label="Import local lessons" no-caps unelevated :loading="lessonImportBusy" @click="lessonFileInput?.click()" />
+        <p v-if="lessonImportMessage" role="status">{{ lessonImportMessage }}</p>
+      </section>
+
+      <section class="settings-section">
+        <div class="settings-section__heading">
           <q-icon name="info" />
           <span>Versions</span>
         </div>
@@ -142,6 +153,9 @@
 </template>
 
 <script setup lang="ts">
+import { Notify } from 'quasar';
+import { mentorDb } from 'src/services/indexed-db';
+import { parseLocalLessonImport } from 'src/services/local-lesson-import';
 import type { WorkShift } from '@mentor-ai/shared';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -176,6 +190,37 @@ const appVersion = process.env.APP_VERSION ?? 'development';
 const lessonVersion = ref('Checking…');
 const lessonCount = ref('—');
 const router = useRouter();
+const lessonFileInput = ref<HTMLInputElement | null>(null);
+const lessonImportBusy = ref(false);
+const lessonImportMessage = ref('');
+async function importLocalLessons(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  lessonImportBusy.value = true;
+  try {
+    if (file.size > 1_000_000) throw new Error('Lesson file is too large.');
+    const lessons = parseLocalLessonImport(await file.text());
+    const db = await mentorDb;
+    const tx = db.transaction('lessons', 'readwrite');
+    let added = 0;
+    for (const lesson of lessons) {
+      if (await tx.store.get(lesson.id)) continue;
+      await tx.store.add(lesson);
+      added += 1;
+    }
+    await tx.done;
+    lessonImportMessage.value = `${added} lessons added on this device. Open Speak to start.`;
+    Notify.create({ type: 'positive', message: lessonImportMessage.value });
+  } catch (error) {
+    lessonImportMessage.value = error instanceof Error ? error.message : 'Import failed.';
+    Notify.create({ type: 'negative', message: lessonImportMessage.value });
+  } finally {
+    lessonImportBusy.value = false;
+    input.value = '';
+  }
+}
+
 const selectedShift = ref<WorkShift>('unknown');
 const myShiftConfigured = isMyShiftConfigured();
 const myShiftConnected = ref(isMyShiftConnected());
