@@ -21,3 +21,9 @@ Private authored lessons may be staged locally in `.ai/private/lessons/lesson-li
 - Keep the model answer concealed until the learner requests it; record answer reveals as hints.
 - A typed fallback must not count as completion of the spoken step. Explain microphone unavailability and allow retry. Do not claim pronunciation assessment when only recognized words are checked.
 - When correcting input behavior in existing lessons, preserve lesson/exercise IDs, completion status, completion history, and saved progress. Do not reset completed lessons or create replacement lesson identities.
+
+## Required privacy verification
+
+Before committing, pushing, or publishing lesson-related changes, run `npm run test:privacy` and inspect the exact files included in the change. Keep private lessons, learning results, profiles, access tokens, database URLs and environment files outside Git. Never print secret values in tool output, reports or commit messages. Retrieve only the credentials needed for the authorized action. Report the scope and result of the check without claiming that a pattern scan proves the absence of every possible secret.
+
+If the cloud database is unavailable, preserve authored lessons in the private synchronization queue and report the actual failure. Do not mark an upload as successful or imply a local queue runs automatically. Retry through `npm run lessons:queue:sync`; preserve all existing lesson identities and completed progress.
