@@ -245,7 +245,7 @@
 
           <transition :name="exerciseTransitionName">
             <div
-              v-if="isDialogueTranslationExercise"
+              v-if="isSpokenExercise"
               :key="currentExercise.id"
               class="dialogue-drill"
             >
@@ -265,7 +265,7 @@
                 <p>{{ currentExercise.microLesson }}</p>
               </div>
 
-              <div class="dialogue-drill__prompt">
+              <div v-if="currentExercise.nativePrompt" class="dialogue-drill__prompt">
                 <span>{{ currentExercise.phraseFocus ?? 'spoken pattern' }}</span>
                 <strong>{{ currentExercise.nativePrompt }}</strong>
               </div>
@@ -768,7 +768,7 @@ import {
   selectProgressLessonCatalog,
   type LessonProgressState,
 } from 'src/services/lesson-category-progress';
-import { isLessonAnswerReady, requiresExactLessonAnswer } from 'src/services/lesson-answer-readiness';
+import { isLessonAnswerReady, requiresExactLessonAnswer, requiresSpokenLessonAnswer } from 'src/services/lesson-answer-readiness';
 import { loadLearningActivityTotals } from 'src/services/learning-activity';
 import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { audioLibrary } from 'src/services/audio-library';
@@ -952,7 +952,7 @@ const displayedLessonProgress = computed(() => {
   ) * 100);
 });
 const currentExercisePlaybackText = computed(() => (
-  currentExercise.value?.type === 'dialogue-translation'
+  currentExercise.value && requiresSpokenLessonAnswer(currentExercise.value)
     ? resolveDialogueExpectedText(currentExercise.value)
     : currentExercise.value?.audioText?.trim() ?? ''
 ));
@@ -985,8 +985,8 @@ const isListeningPlayer = computed(() => {
 
   return currentExercise.value.type === 'listening-text';
 });
-const isDialogueTranslationExercise = computed(
-  () => currentExercise.value?.type === 'dialogue-translation',
+const isSpokenExercise = computed(
+  () => Boolean(currentExercise.value && requiresSpokenLessonAnswer(currentExercise.value)),
 );
 const isSpeakingLesson = computed(() => (
   appStore.session ? generatedLessonCategory(appStore.session.lesson) === 'speaking' : false
@@ -1010,17 +1010,17 @@ const standardAnswerRequiresMatch = computed(() => Boolean(currentExercise.value
   appStore.session?.lesson.localEvaluation ?? [],
 )));
 const standardAnswerStatus = computed(() => {
-  if (isDialogueTranslationExercise.value || isListeningPlayer.value || !standardAnswerRequiresMatch.value || !answer.value.trim()) return 'idle';
+  if (isSpokenExercise.value || isListeningPlayer.value || !standardAnswerRequiresMatch.value || !answer.value.trim()) return 'idle';
   return standardAnswerReady.value ? 'correct' : 'incorrect';
 });
 const exerciseNavigation = computed(() => getLessonExerciseNavigation(
   isRepeatedLesson.value,
   appStore.session?.currentExerciseIndex ?? 0,
   isListeningPlayer.value
-    || (isDialogueTranslationExercise.value
+    || (isSpokenExercise.value
       ? dialogueAnswerStatus.value === 'correct'
       : standardAnswerReady.value),
-  isDialogueTranslationExercise.value || standardAnswerRequiresMatch.value,
+  isSpokenExercise.value || standardAnswerRequiresMatch.value,
 ));
 const localSpeechRecognitionAvailable = computed(() => (
   typeof navigator !== 'undefined'
@@ -1804,7 +1804,7 @@ watch(
       return;
     }
 
-    if (isDialogueTranslationExercise.value && localSpeechRecognitionAvailable.value) {
+    if (isSpokenExercise.value && localSpeechRecognitionAvailable.value) {
       prepareLocalSpeechTranscriber();
     }
 
@@ -1963,7 +1963,7 @@ async function submit() {
     answer.value = currentExercise.value?.expectedResponse?.trim() ?? 'completed';
   }
 
-  const submittedAnswer = isDialogueTranslationExercise.value && dialogueAnswerStatus.value === 'correct'
+  const submittedAnswer = isSpokenExercise.value && dialogueAnswerStatus.value === 'correct'
     ? currentExercise.value?.expectedResponse?.trim() ?? answer.value
     : answer.value;
   setForwardTransition();
