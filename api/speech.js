@@ -1,4 +1,4 @@
-const { readJsonBody } = require('./_shared');
+const { readJsonBody, requireLearningIdentity } = require('./_shared');
 const https = require('node:https');
 
 const voices = {
@@ -18,6 +18,7 @@ module.exports = async (request, response) => {
   }
 
   try {
+    if (requireLearningIdentity(request, response) === null) return;
     const body = await readJsonBody(request);
     const segments = Array.isArray(body.segments)
       ? body.segments.map((segment) => ({
@@ -47,7 +48,8 @@ module.exports = async (request, response) => {
     response.end(audio);
   } catch (error) {
     console.error(error);
-    response.statusCode = 502;
+    response.statusCode = error.statusCode === 429 ? 429 : 502;
+    if (response.statusCode === 429) response.setHeader('Retry-After', '60');
     response.end('Speech synthesis failed.');
   }
 };
@@ -58,6 +60,7 @@ async function requestSpeechAudioWithRetry(segment) {
     try {
       return await requestSpeechAudio(segment);
     } catch (error) {
+      if (error.retryable === false) throw error;
       lastError = error;
     }
   }
@@ -90,7 +93,10 @@ function requestSpeechAudio(segment) {
       speechResponse.on('end', () => {
         const audio = Buffer.concat(chunks);
         if (speechResponse.statusCode !== 200) {
-          reject(new Error(`Speech provider request failed with HTTP ${speechResponse.statusCode}.`));
+          const error = new Error(`Speech provider request failed with HTTP ${speechResponse.statusCode}.`);
+          error.statusCode = speechResponse.statusCode;
+          error.retryable = speechResponse.statusCode >= 500;
+          reject(error);
           return;
         }
         if (!audio.length) {

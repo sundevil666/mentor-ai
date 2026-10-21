@@ -77,6 +77,7 @@ import { syncApplicationTelemetry } from 'src/services/application-telemetry';
 import { syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
 import { mentorDb } from 'src/services/indexed-db';
 import { syncReadingPageSpeech, readingPageSpeechSyncIntervalMs } from 'src/services/reading-page-speech-outbox';
+import { syncPersonalBookCloud } from 'src/services/personal-book-cloud-sync';
 import { runServerMaintenance } from 'src/services/server-maintenance';
 import { syncReaderVocabulary } from 'src/services/reader-vocabulary';
 import { updateOfflineLessons } from 'src/services/offline-lesson-updates';
@@ -400,16 +401,13 @@ function handleServiceWorkerMessage(event: MessageEvent) {
 }
 
 async function handleServerMaintenanceWakeup() {
-  const hasPendingActivity = (await pendingLearningActivityCount().catch(() => 0)) > 0;
-  const hasPendingTranscripts = (await mentorDb.then((db) => db.count('reading-transcript-outbox')).catch(() => 0)) > 0;
-  const hasPendingMovieReports = (await pendingMovieLearningReportCount().catch(() => 0)) > 0;
-  void runDailyServerMaintenance(hasPendingActivity || hasPendingTranscripts || hasPendingMovieReports || appStore.pendingSyncCount > 0);
+  void runDailyServerMaintenance();
 }
 
-async function runDailyServerMaintenance(force = false) {
+async function runDailyServerMaintenance() {
   if (!navigator.onLine) return;
+  if (!appStore.isHydrated) await appStore.hydrate();
   await runServerMaintenance(async () => {
-    if (!appStore.isHydrated) await appStore.hydrate();
     const syncResults = await Promise.allSettled([
       appStore.refreshMyShiftActivity(false),
       appStore.refreshRemoteLearningState(),
@@ -432,6 +430,8 @@ async function runDailyServerMaintenance(force = false) {
         }
       }),
       fetchTranslationUsage(),
+      syncPersonalBookCloud(),
+      appStore.publishSessionHandoff(true),
     ]);
     window.dispatchEvent(new Event('mentor-ai:daily-server-maintenance-finished'));
     if ([2, 3, 4, 6, 7, 8, 9].some((index) => syncResults[index]?.status === 'rejected')
@@ -441,7 +441,7 @@ async function runDailyServerMaintenance(force = false) {
       || (await pendingMovieLearningReportCount()) > 0) {
       throw new Error('Learning data remains queued for synchronization');
     }
-  }, { force }).catch(() => undefined);
+  }, { scope: appStore.studentId }).catch(() => undefined);
 }
 
 </script>

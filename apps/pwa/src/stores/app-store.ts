@@ -1,3 +1,4 @@
+import { runServerMaintenance } from 'src/services/server-maintenance';
 import { defineStore } from 'pinia';
 import {
   createEvidenceId,
@@ -1172,7 +1173,14 @@ export const useAppStore = defineStore('app', {
       }
     },
 
-    async refreshRemoteLearningState(): Promise<boolean> {
+    async refreshRemoteLearningState(force = false): Promise<boolean> {
+      if (!this.isOnline) return false;
+      return runServerMaintenance(async () => {
+        await this.refreshRemoteLearningStateNow();
+      }, { scope: `:learning-state:${this.studentId}`, force });
+    },
+
+    async refreshRemoteLearningStateNow(): Promise<boolean> {
       if (!this.isOnline || this.isSyncRefreshing) {
         return false;
       }
@@ -1269,7 +1277,8 @@ export const useAppStore = defineStore('app', {
       }
     },
 
-    async publishSessionHandoff() {
+    async publishSessionHandoff(force = false) {
+      if (!force) return;
       if (!this.session || !this.isOnline || this.session.completedAt) {
         return;
       }

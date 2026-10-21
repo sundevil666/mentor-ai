@@ -1,7 +1,8 @@
+import type { PersonalReadingBookArchive } from '@mentor-ai/shared';
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-import { fetchLearningActivityTotals, fetchOfflineLessons, fetchReaderTextLookup, fetchReadingResumeSnapshot, fetchTranslationUsage, ReaderTranslationSignInRequiredError, saveReadingTranscripts, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, synchronizeStatisticsSnapshots, upsertSessionHandoff } from '../src/services/api-client.js';
+import { fetchLearningActivityTotals, fetchOfflineLessons, fetchReaderTextLookup, fetchReadingResumeSnapshot, fetchTranslationUsage, ReaderTranslationSignInRequiredError, saveReadingTranscripts, synchronizePersonalReadingBooks, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, synchronizeStatisticsSnapshots, upsertSessionHandoff } from '../src/services/api-client.js';
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
@@ -19,6 +20,39 @@ describe('PWA API client', () => {
     globalThis.fetch = async () => {
       throw new Error('Unexpected fetch call.');
     };
+  });
+
+  it('does not transfer unchanged book bodies', async () => {
+    const book = { book: { id: 'book-1', updatedAt: '2026-10-21T12:00:00.000Z' }, pages: [{ text: 'Private book body' }] } as unknown as PersonalReadingBookArchive;
+    const payloads: unknown[] = [];
+    globalThis.fetch = async (_url, init) => {
+      payloads.push(JSON.parse(String(init?.body)));
+      return jsonResponse({ 'book-1': book.book.updatedAt });
+    };
+    assert.deepEqual(await synchronizePersonalReadingBooks([book]), []);
+    assert.deepEqual(payloads, [{ manifest: true }]);
+  });
+
+  it('uploads only newer books and supplies versions to avoid repeated downloads', async () => {
+    const oldVersion = '2026-10-20T12:00:00.000Z';
+    const newVersion = '2026-10-21T12:00:00.000Z';
+    const books = ['unchanged', 'changed'].map((id) => ({ book: { id, updatedAt: newVersion } })) as PersonalReadingBookArchive[];
+    const payloads: Array<Record<string, unknown>> = [];
+    globalThis.fetch = async (_url, init) => {
+      const payload = JSON.parse(String(init?.body));
+      payloads.push(payload);
+      return payload.manifest ? jsonResponse({ unchanged: newVersion, changed: oldVersion }) : jsonResponse([]);
+    };
+    await synchronizePersonalReadingBooks(books);
+    assert.deepEqual(payloads[1]?.books, [books[1]]);
+    assert.deepEqual(payloads[1]?.knownBooks, { unchanged: newVersion, changed: newVersion });
+  });
+
+  it('preserves books locally when the version check is rejected', async () => {
+    let calls = 0;
+    globalThis.fetch = async () => { calls++; return new Response('{}', { status: 503 }); };
+    await assert.rejects(synchronizePersonalReadingBooks([]));
+    assert.equal(calls, 1);
   });
 
   it('counts translations locally and synchronizes one absolute snapshot per day', async () => {

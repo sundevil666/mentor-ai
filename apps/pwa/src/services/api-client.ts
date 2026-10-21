@@ -268,13 +268,22 @@ export async function synchronizeReaderVocabulary(items: ReaderVocabularyItem[])
 }
 
 export async function synchronizePersonalReadingBooks(books: PersonalReadingBookArchive[]): Promise<PersonalReadingBookArchive[]> {
-  const response = await fetch(`${apiBaseUrl}/api/reader/books-synchronize`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ books }),
-  });
-  if (!response.ok) await throwApiError(response, 'Book synchronization failed.');
-  return ((await response.json()) as ApiResponse<PersonalReadingBookArchive[]>).data;
+  const exchange = async (payload: unknown) => {
+    const response = await fetch(`${apiBaseUrl}/api/reader/books-synchronize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) await throwApiError(response, 'Book synchronization failed.');
+    return (await response.json()).data;
+  };
+  const remote = await exchange({ manifest: true }) as Record<string, string>;
+  // Older deployments return an array; don't upload the full library to them.
+  if (!remote || Array.isArray(remote)) throw new Error('Book synchronization requires the latest server version.');
+  const knownBooks = Object.fromEntries(books.map((archive) => [archive.book.id, archive.book.updatedAt]));
+  const changed = books.filter((archive) => !remote[archive.book.id] || archive.book.updatedAt > remote[archive.book.id]);
+  if (!changed.length && Object.entries(remote).every(([id, version]) => knownBooks[id] === version)) return [];
+  return await exchange({ books: changed, knownBooks }) as PersonalReadingBookArchive[];
 }
 
 export async function fetchCurrentLesson(context: LearningContext, forceRefresh = false): Promise<GeneratedLesson> {

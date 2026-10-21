@@ -8,11 +8,52 @@ const maxBookTextCharacters = 30 * 1024 * 1024;
 export async function synchronizePersonalReadingBooks(
   incoming: PersonalReadingBookArchive[],
   user: AuthenticatedUser,
+  knownBooks?: Record<string, string>,
 ): Promise<PersonalReadingBookArchive[]> {
   const pool = getPostgresPool();
   if (!pool) throw new Error('Book synchronization is unavailable because DATABASE_URL is not configured.');
 
-  await pool.query(`
+  await ensureBookTable();
+
+  for (const candidate of incoming.slice(0, maxBooksPerAccount)) {
+    const archive = sanitizePersonalReadingBookArchive(candidate);
+    if (!archive) continue;
+    await pool.query(
+      `INSERT INTO personal_reading_books (student_id, book_id, archive, book_updated_at, stored_at)
+       VALUES ($1, $2, $3::jsonb, $4, now())
+       ON CONFLICT (student_id, book_id) DO UPDATE SET
+         archive = EXCLUDED.archive, book_updated_at = EXCLUDED.book_updated_at, stored_at = now()
+       WHERE personal_reading_books.book_updated_at < EXCLUDED.book_updated_at`,
+      [user.id, archive.book.id, JSON.stringify(archive), archive.book.updatedAt],
+    );
+  }
+  const result = await pool.query<{ archive: PersonalReadingBookArchive }>(
+    `SELECT archive FROM personal_reading_books
+     WHERE student_id = $1
+       AND ($3::jsonb IS NULL OR (archive->'book'->>'updatedAt') IS DISTINCT FROM ($3::jsonb ->> book_id))
+     ORDER BY book_updated_at DESC LIMIT $2`,
+    [user.id, maxBooksPerAccount, knownBooks ? JSON.stringify(knownBooks) : null],
+  );
+  return result.rows.map((row) => row.archive);
+}
+
+export async function listPersonalReadingBookVersions(user: AuthenticatedUser): Promise<Record<string, string>> {
+  const pool = getPostgresPool();
+  if (!pool) throw new Error('Book synchronization is unavailable because DATABASE_URL is not configured.');
+  await ensureBookTable();
+  const result = await pool.query<{ book_id: string; version: string }>(
+    `SELECT book_id, archive->'book'->>'updatedAt' AS version
+     FROM personal_reading_books WHERE student_id = $1 ORDER BY book_updated_at DESC LIMIT $2`,
+    [user.id, maxBooksPerAccount],
+  );
+  return Object.fromEntries(result.rows.map((row) => [row.book_id, row.version]));
+}
+
+let tableReady: Promise<void> | undefined;
+function ensureBookTable(): Promise<void> {
+  const pool = getPostgresPool();
+  if (!pool) return Promise.reject(new Error('Book storage is unavailable.'));
+  tableReady ??= pool.query(`
     CREATE TABLE IF NOT EXISTS personal_reading_books (
       student_id TEXT NOT NULL,
       book_id TEXT NOT NULL,
@@ -21,41 +62,9 @@ export async function synchronizePersonalReadingBooks(
       stored_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       PRIMARY KEY (student_id, book_id)
     )
-  `);
+  `).then(() => undefined).catch((error) => { tableReady = undefined; throw error; });
 
-  let acceptedBooks = 0;
-  for (const candidate of incoming.slice(0, maxBooksPerAccount)) {
-    const archive = sanitizePersonalReadingBookArchive(candidate);
-    if (!archive) continue;
-    acceptedBooks += 1;
-    await pool.query(
-      `INSERT INTO personal_reading_books (student_id, book_id, archive, book_updated_at, stored_at)
-       VALUES ($1, $2, $3::jsonb, $4, now())
-       ON CONFLICT (student_id, book_id) DO UPDATE SET
-         archive = EXCLUDED.archive,
-         book_updated_at = EXCLUDED.book_updated_at,
-         stored_at = now()
-       WHERE personal_reading_books.book_updated_at <= EXCLUDED.book_updated_at`,
-      [user.id, archive.book.id, JSON.stringify(archive), archive.book.updatedAt],
-    );
-  }
-
-  const result = await pool.query<{ archive: PersonalReadingBookArchive }>(
-    `SELECT archive
-     FROM personal_reading_books
-     WHERE student_id = $1
-     ORDER BY book_updated_at DESC
-     LIMIT $2`,
-    [user.id, maxBooksPerAccount],
-  );
-  console.info(JSON.stringify({
-    event: 'personal-books.synchronized',
-    account: user.id.slice(-8),
-    incomingBooks: incoming.length,
-    acceptedBooks,
-    storedBooks: result.rows.length,
-  }));
-  return result.rows.map((row) => row.archive);
+  return tableReady;
 }
 
 export function sanitizePersonalReadingBookArchive(

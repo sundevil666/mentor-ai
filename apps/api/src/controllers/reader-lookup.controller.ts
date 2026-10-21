@@ -1,3 +1,6 @@
+import { getPostgresPool } from '../repositories/postgres-client.js';
+import { learningStateRepository } from '../repositories/learning-state.repository.js';
+import { listPersonalReadingBookVersions, synchronizePersonalReadingBooks as exchangePersonalReadingBooks } from '../services/personal-reading-books.service.js';
 import type { RequestHandler } from 'express';
 import { lookupReaderPhonetic, lookupReaderText } from '../services/reader-lookup.service.js';
 import type { PersonalReadingBookArchive, ReaderVocabularyItem, ReadingTranscriptChunk } from '@mentor-ai/shared';
@@ -54,7 +57,20 @@ export const synchronizeReaderVocabulary: RequestHandler = async (req, res, next
 export const synchronizePersonalReadingBooks: RequestHandler = async (req, res, next) => {
   try {
     const books = Array.isArray(req.body?.books) ? req.body.books as PersonalReadingBookArchive[] : [];
-    res.json({ data: await learningStateService.mergePersonalReadingBooks(books, req.authUser) });
+    const knownBooks = req.body?.knownBooks && typeof req.body.knownBooks === 'object' && !Array.isArray(req.body.knownBooks)
+      ? req.body.knownBooks as Record<string, string> : undefined;
+    if (req.authUser && getPostgresPool()) {
+      res.json({ data: req.body?.manifest === true
+        ? await listPersonalReadingBookVersions(req.authUser)
+        : await exchangePersonalReadingBooks(books, req.authUser, knownBooks) });
+      return;
+    }
+    const local = req.body?.manifest === true
+      ? (await learningStateRepository.readFields(['personalReadingBooks'], req.authUser)).personalReadingBooks
+      : await learningStateService.mergePersonalReadingBooks(books, req.authUser);
+    res.json({ data: req.body?.manifest === true
+      ? Object.fromEntries(local.map((archive) => [archive.book.id, archive.book.updatedAt]))
+      : local.filter((archive) => !knownBooks || knownBooks[archive.book.id] !== archive.book.updatedAt) });
   } catch (error) {
     next(error);
   }

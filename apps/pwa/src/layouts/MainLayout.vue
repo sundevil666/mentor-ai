@@ -340,6 +340,7 @@
 import type { GeneratedLesson, LearningActivityTotals, TranslationUsage } from '@mentor-ai/shared';
 import { Dark, Notify } from 'quasar';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { syncPersonalBookCloud } from 'src/services/personal-book-cloud-sync';
 import { personalBookSyncControl } from 'src/services/personal-book-sync-control';
 import { openDashboardHome, resolveDashboardTrainingCategory } from 'src/services/navigation-category';
 import {
@@ -844,7 +845,9 @@ async function syncLearningDataNow() {
   isManualSyncRunning.value = true;
   try {
     const operations = [
-      ['Learning state refresh', appStore.refreshRemoteLearningState()],
+      ['Book library upload', syncPersonalBookCloud(true)],
+      ['Lesson continuation upload', appStore.publishSessionHandoff(true)],
+      ['Learning state refresh', appStore.refreshRemoteLearningState(true)],
       ['Content progress upload', syncAllContentProgress()],
       ['Content engagement upload', syncContentEngagement()],
       ['Learning activity upload', syncLearningActivity()],

@@ -25,9 +25,20 @@ describe('daily server maintenance gate', () => {
     assert.equal(isServerMaintenanceDue(first.getTime() + serverMaintenanceIntervalMs), true);
   });
 
-  it('retries after failure instead of consuming the daily window', async () => {
-    await assert.rejects(runServerMaintenance(async () => { throw new Error('offline'); }));
-    assert.equal(isServerMaintenanceDue(), true);
+  it('retains a daily backoff after failure but permits explicit retries', async () => {
+    await assert.rejects(runServerMaintenance(async () => { throw new Error('quota'); }));
+    assert.equal(isServerMaintenanceDue(), false);
+    let calls = 0;
+    assert.equal(await runServerMaintenance(async () => { calls++; }), false);
+    assert.equal(await runServerMaintenance(async () => { calls++; }, { force: true }), true);
+    assert.equal(calls, 1);
+  });
+
+  it('keeps account and book-library windows independent', async () => {
+    await runServerMaintenance(async () => {}, { scope: ':first' });
+    assert.equal(isServerMaintenanceDue(Date.now(), ':first'), false);
+    assert.equal(isServerMaintenanceDue(Date.now(), ':second'), true);
+    assert.equal(isServerMaintenanceDue(Date.now(), ':books:first'), true);
   });
 
   it('deduplicates concurrent wakeups', async () => {

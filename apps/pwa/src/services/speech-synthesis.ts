@@ -1,3 +1,4 @@
+import { getAuthToken } from './auth.js';
 export const SPEECH_CACHE_NAME = 'mentor-ai-speech-dialogue-v2';
 
 export type SpeechVoiceProfile = 'mia' | 'tom';
@@ -35,6 +36,7 @@ const speechApiBaseUrl = resolveSpeechApiBaseUrl(
   Boolean(process.env.DEV),
 );
 
+let speechRateLimitUntil = 0;
 let activeAudio: HTMLAudioElement | null = null;
 let activeAudioUrl: string | null = null;
 let activeRequestId = 0;
@@ -334,6 +336,7 @@ async function generateAndCacheSpeech(segments: SpeechSegment[]) {
     }
   }
 
+  if (Date.now() < speechRateLimitUntil) throw new Error('The online voice reached its request limit. Please retry later.');
   setModelStatus('generating', 0);
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), speechRequestTimeoutMs);
@@ -341,7 +344,7 @@ async function generateAndCacheSpeech(segments: SpeechSegment[]) {
   try {
     response = await fetch(`${speechApiBaseUrl}/api/speech`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {}) },
       body: JSON.stringify({ segments }),
       signal: controller.signal,
     });
@@ -350,6 +353,10 @@ async function generateAndCacheSpeech(segments: SpeechSegment[]) {
   }
 
   if (!response.ok) {
+    if (response.status === 429) {
+      const retrySeconds = Number(response.headers.get('Retry-After')) || 60;
+      speechRateLimitUntil = Date.now() + Math.max(60, retrySeconds) * 1000;
+    }
     throw new Error('The online voice is temporarily unavailable.');
   }
 

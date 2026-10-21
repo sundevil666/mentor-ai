@@ -139,6 +139,39 @@ export const learningStateRepository = {
     await writeFile(filePath, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
   },
 
+  async readFields<K extends keyof LearningStateRecord>(fields: K[], user?: AuthenticatedUser): Promise<Pick<LearningStateRecord, K>> {
+    if (user && getPostgresPool()) {
+      await ensureLearningStatesTable();
+      const result = await getPostgresPool()!.query<{ state: Partial<LearningStateRecord> }>(
+        `SELECT jsonb_object_agg(field, state -> field) AS state
+         FROM learning_states CROSS JOIN unnest($2::text[]) AS field
+         WHERE student_id = $1 GROUP BY student_id`,
+        [user.id, fields],
+      );
+      if (result.rows[0]?.state) {
+        const state = normalizeState(result.rows[0].state, user);
+        return Object.fromEntries(fields.map((field) => [field, state[field]])) as Pick<LearningStateRecord, K>;
+      }
+    }
+    const state = await learningStateRepository.read(user);
+    return Object.fromEntries(fields.map((field) => [field, state[field]])) as Pick<LearningStateRecord, K>;
+  },
+
+  async writeFields(patch: Partial<LearningStateRecord>, user?: AuthenticatedUser, clearFields: Array<keyof LearningStateRecord> = []): Promise<void> {
+    if (user && getPostgresPool()) {
+      await ensureLearningStatesTable();
+      const result = await getPostgresPool()!.query(
+        `UPDATE learning_states SET state = (state || $2::jsonb) - $3::text[], updated_at = now() WHERE student_id = $1`,
+        [user.id, JSON.stringify(patch), clearFields],
+      );
+      if ((result.rowCount ?? 0) > 0) return;
+    }
+    const state = await learningStateRepository.read(user);
+    const merged = { ...state, ...patch };
+    for (const field of clearFields) delete merged[field];
+    await learningStateRepository.write(merged, user);
+  },
+
   async readStudentOverview(user?: AuthenticatedUser): Promise<Pick<LearningStateRecord,
     'student' | 'studentModel' | 'recommendations' | 'statisticsSnapshots'>> {
     if (user && getPostgresPool()) {

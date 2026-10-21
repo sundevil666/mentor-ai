@@ -1,3 +1,4 @@
+import { requireLearningIdentity } from '../middleware/auth-context.js';
 import { Router } from 'express';
 import { config } from '../config/env.js';
 
@@ -17,7 +18,7 @@ const speechRequestTimeoutMs = 30_000;
 
 export const speechRouter = Router();
 
-speechRouter.post('/', async (request, response) => {
+speechRouter.post('/', requireLearningIdentity, async (request, response) => {
   const segments = normalizeSpeechSegments(request.body?.segments);
   const textLength = segments.reduce((length, segment) => length + segment.text.length, 0);
 

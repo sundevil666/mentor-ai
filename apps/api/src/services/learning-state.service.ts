@@ -49,7 +49,7 @@ export const learningStateService = {
     user?: AuthenticatedUser,
     forceRefresh = false,
   ) {
-    const state = await learningStateRepository.read(user);
+    const state = await learningStateRepository.readFields(['studentModel', 'currentLesson', 'exerciseResults'], user);
 
     if (!forceRefresh && state.currentLesson && isLessonSuitableForContext(state.currentLesson, context)) {
       return state.currentLesson;
@@ -68,7 +68,7 @@ export const learningStateService = {
           generateLessonFromPlan(aiTeacherService.planLesson(state.studentModel, context, createdAt), createdAt);
     const lesson = context.mode === 'listening' ? ensureLongListeningLesson(selectedLesson) : selectedLesson;
 
-    await learningStateRepository.write({
+    await learningStateRepository.writeFields({
       ...state,
       currentLesson: lesson,
     }, user);
@@ -77,7 +77,7 @@ export const learningStateService = {
   },
 
   async getRecommendations(user?: AuthenticatedUser) {
-    const state = await learningStateRepository.read(user);
+    const state = await learningStateRepository.readFields(['recommendations'], user);
     return state.recommendations;
   },
 
@@ -268,7 +268,7 @@ export const learningStateService = {
   },
 
   async mergeReaderVocabularyItems(incoming: ReaderVocabularyItem[], user?: AuthenticatedUser) {
-    const state = await learningStateRepository.read(user);
+    const state = await learningStateRepository.readFields(['student', 'studentModel', 'readerVocabularyItems'], user);
     const merged = new Map(state.readerVocabularyItems.map((item) => [item.id, item]));
     for (const candidate of incoming) {
       const safe = sanitizeReaderVocabularyItem(candidate, state.student.id);
@@ -344,12 +344,12 @@ export const learningStateService = {
       ],
       updatedAt: now(),
     };
-    await learningStateRepository.write({ ...state, studentModel, readerVocabularyItems }, user);
+    await learningStateRepository.writeFields({ ...state, studentModel, readerVocabularyItems }, user);
     return readerVocabularyItems.filter((item) => item.studentId === state.student.id);
   },
 
   async mergePersonalReadingBooks(incoming: PersonalReadingBookArchive[], user?: AuthenticatedUser) {
-    const state = await learningStateRepository.read(user);
+    const state = await learningStateRepository.readFields(['student', 'personalReadingBooks'], user);
     const merged = new Map(state.personalReadingBooks.map((archive) => [archive.book.id, archive]));
     for (const candidate of incoming.slice(0, 50)) {
       const safe = sanitizePersonalReadingBook(candidate);
@@ -360,12 +360,12 @@ export const learningStateService = {
     const personalReadingBooks = [...merged.values()]
       .sort((left, right) => right.book.updatedAt.localeCompare(left.book.updatedAt))
       .slice(0, 50);
-    await learningStateRepository.write({ ...state, personalReadingBooks }, user);
+    await learningStateRepository.writeFields({ ...state, personalReadingBooks }, user);
     return personalReadingBooks;
   },
 
   async saveReadingTranscriptChunks(candidates: ReadingTranscriptChunk[], user?: AuthenticatedUser) {
-    const state = await learningStateRepository.read(user);
+    const state = await learningStateRepository.readFields(['student', 'readingTranscriptChunks'], user);
     const safe = candidates.slice(0, 100).map((candidate) => sanitizeReadingTranscriptChunk(candidate, state.student.id));
     if (safe.some((chunk) => !chunk)) throw new Error('Invalid reading transcript.');
     const chunks = safe as ReadingTranscriptChunk[];
@@ -374,12 +374,12 @@ export const learningStateService = {
       ...state.readingTranscriptChunks.filter((chunk) => !incomingIds.has(chunk.id)),
       ...chunks,
     ].sort((left, right) => left.capturedAt.localeCompare(right.capturedAt)).slice(-2_000);
-    await learningStateRepository.write({ ...state, readingTranscriptChunks }, user);
+    await learningStateRepository.writeFields({ ...state, readingTranscriptChunks }, user);
     return chunks;
   },
 
   async upsertSessionHandoff(handoff: LearningSessionHandoff, user?: AuthenticatedUser) {
-    const state = await learningStateRepository.read(user);
+    const state = await learningStateRepository.readFields(['student', 'sessionHandoffs'], user);
 
     if (handoff.studentId !== state.student.id) {
       throw new Error('Session handoff failed identity validation.');
@@ -395,7 +395,7 @@ export const learningStateService = {
       resolvedHandoff,
     ].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 
-    await learningStateRepository.write({
+    await learningStateRepository.writeFields({
       ...state,
       sessionHandoffs,
     }, user);
@@ -409,7 +409,7 @@ export const learningStateService = {
     speechResults: SpeechResult[] = [],
     user?: AuthenticatedUser,
   ) {
-    const state = await learningStateRepository.read(user);
+    const state = await learningStateRepository.readFields(['student', 'studentModel', 'currentLesson', 'acceptedEvents', 'exerciseResults', 'speechResults', 'statisticsSnapshots', 'observations', 'teacherJournal', 'teacherMemory', 'recommendations', 'acknowledgements'], user);
     const acceptedEventIds = new Set(state.acceptedEvents.map((event) => event.id));
     const acceptedResultIds = new Set(state.exerciseResults.map((result) => result.id));
     const acceptedSpeechResultIds = new Set(state.speechResults.map((result) => result.id));
@@ -462,7 +462,7 @@ export const learningStateService = {
       (event) => event.type === 'lesson-finished' && event.lessonId === state.currentLesson?.id,
     );
 
-    await learningStateRepository.write({
+    await learningStateRepository.writeFields({
       ...state,
       studentModel: analyzedState.studentModel,
       currentLesson: finishedCurrentLesson ? undefined : state.currentLesson,
@@ -475,7 +475,7 @@ export const learningStateService = {
       teacherMemory: nextTeacherMemory,
       recommendations: nextRecommendations,
       acknowledgements: [...state.acknowledgements, ...acknowledgements],
-    }, user);
+    }, user, finishedCurrentLesson ? ['currentLesson'] : []);
 
     return {
       acknowledgements,

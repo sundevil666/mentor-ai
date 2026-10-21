@@ -51,7 +51,13 @@ module.exports = async (request, response) => {
       }
       const books = Array.isArray(body?.books) ? body.books : [];
       const service = await import('../apps/api/src/services/personal-reading-books.service.js');
-      sendJson(response, 200, await service.synchronizePersonalReadingBooks(books, user));
+      if (body?.manifest === true) {
+        sendJson(response, 200, await service.listPersonalReadingBookVersions(user));
+        return;
+      }
+      const knownBooks = body?.knownBooks && typeof body.knownBooks === 'object' && !Array.isArray(body.knownBooks)
+        ? body.knownBooks : undefined;
+      sendJson(response, 200, await service.synchronizePersonalReadingBooks(books, user, knownBooks));
       return;
     }
     if (request.query?.action === 'reading-transcript') {
