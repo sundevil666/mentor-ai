@@ -5289,13 +5289,19 @@ body .app-page-container .q-page::after { opacity: .12; animation: none; }
   background-color: color-mix(in srgb, var(--app-surface) 91%, transparent);
 }
 
-/* Reading has its own opaque fullscreen surface, so carry the same photograph
-   into the paper itself with a stronger wash for uninterrupted reading. */
-.personal-reader .personal-reader__paper,
-.personal-reader--focus .personal-reader__paper {
+/* Paint on the viewport, not the multicolumn article: restoring a later page
+   scrolls the article horizontally and must not scroll the portrait away. */
+.personal-reader .personal-reader__content,
+.personal-reader--focus .personal-reader__content {
+  background-attachment: scroll;
   background-color: var(--reader-paper-background);
   background-image: linear-gradient(to right, transparent 45%, var(--reader-paper-background) 100%), linear-gradient(color-mix(in srgb, var(--reader-paper-background) 91%, transparent), color-mix(in srgb, var(--reader-paper-background) 95%, transparent)), var(--inspiration-image);
   background-position: left center;
   background-repeat: no-repeat;
   background-size: cover, cover, contain;
+}
+
+.personal-reader .personal-reader__paper,
+.personal-reader--focus .personal-reader__paper {
+  background: transparent;
 }
