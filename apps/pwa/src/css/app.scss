@@ -609,6 +609,10 @@ body .q-menu {
   min-height: 0;
 }
 
+.learning-page--lesson .app-detail-layout--active:not(.app-detail-layout--with-bottom-navigation-inset) {
+  height: calc(100% - 88px - env(safe-area-inset-bottom));
+}
+
 .settings-page,
 .statistics-page {
   align-items: flex-start;

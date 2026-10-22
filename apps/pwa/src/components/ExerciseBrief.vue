@@ -12,12 +12,14 @@
         <q-icon class="exercise-brief__spark" name="auto_awesome" size="17px" />
       </div>
     </header>
-    <section class="exercise-brief__task">
+    <section class="exercise-brief__task" :class="{ 'exercise-brief__task--illustrated': isHelpRequest }">
+      <div class="exercise-brief__task-copy">
       <h2><q-icon name="near_me" size="18px" />{{ mode.taskLabel }}</h2>
       <p class="exercise-brief__prompt">{{ exercise.prompt }}</p>
       <div v-if="exercise.nativePrompt" class="exercise-brief__native">
         <span v-if="exercise.phraseFocus">{{ exercise.phraseFocus }}</span>
         <strong>{{ exercise.nativePrompt }}</strong>
+      </div>
       </div>
       <HelpRequestScene v-if="isHelpRequest" :key="exercise.id" />
     </section>
@@ -71,6 +73,13 @@ const mode = computed(() => {
 .exercise-brief .exercise-brief__prompt { color: var(--app-text-strong); font-size: clamp(1.1rem, 1.4vw, 1.3rem); line-height: 1.6; font-weight: 550; white-space: pre-line; }
 .exercise-brief__task { padding-top: 20px; border-top: 1px solid var(--app-border); }
 .exercise-brief__task h2 { color: var(--category-accent); }
+.exercise-brief__task-copy { min-width: 0; }
+.exercise-brief__task--illustrated { display: grid; grid-template-columns: minmax(0, 1fr) 180px; gap: 18px; align-items: center; }
+.exercise-brief__task--illustrated :deep(.help-scene) { margin: 0; padding: 4px 6px 8px; }
+@media (max-width: 600px) {
+  .exercise-brief__task--illustrated { grid-template-columns: minmax(0, 1fr) 110px; gap: 10px; }
+  .exercise-brief__task--illustrated :deep(figcaption) { display: none; }
+}
 .exercise-brief__native { display: grid; gap: 8px; margin-top: 16px; padding: 16px; border: 1px solid var(--category-border); border-radius: 14px; background: var(--app-surface); }
 .exercise-brief__native span { color: var(--app-muted); font-size: .82rem; }
 .exercise-brief__native strong { color: var(--app-text-strong); font-size: 1.15rem; line-height: 1.6; }
