@@ -19,6 +19,7 @@
         <span v-if="exercise.phraseFocus">{{ exercise.phraseFocus }}</span>
         <strong>{{ exercise.nativePrompt }}</strong>
       </div>
+      <HelpRequestScene v-if="isHelpRequest" :key="exercise.id" />
     </section>
     <section v-if="exercise.microLesson" class="exercise-brief__explanation">
       <h2><q-icon name="menu_book" size="18px" />Коротко о задаче</h2>
@@ -34,7 +35,11 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Exercise } from '@mentor-ai/shared';
+import HelpRequestScene from './HelpRequestScene.vue';
 const props = defineProps<{ exercise: Exercise; lessonTitle: string; step: number; total: number; compact?: boolean; showTip?: boolean }>();
+const isHelpRequest = computed(() => /(?:could|can|would) you (?:please )?help|(?:можете|можешь|могли бы|мог бы).{0,24}помочь|помоги(?:те)? мне/i.test(
+  `${props.exercise.nativePrompt ?? ''} ${props.exercise.prompt}`,
+));
 const mode = computed(() => {
   if (['listening-text', 'listening-comprehension'].includes(props.exercise.type)) {
     return { label: 'Listening', title: 'Слушаем и понимаем', taskLabel: 'Что сделать', icon: 'headphones' };
