@@ -455,7 +455,9 @@ async function runDailyServerMaintenance() {
   place-items: center;
   overflow: hidden;
   padding: 24px;
-  background: linear-gradient(145deg, rgba(240, 253, 250, 0.98), rgba(239, 246, 255, 0.99));
+  isolation: isolate;
+  background: var(--app-bg);
+  color: var(--app-text);
   cursor: wait;
   touch-action: none;
   user-select: none;
@@ -466,25 +468,46 @@ async function runDailyServerMaintenance() {
   top: calc(env(safe-area-inset-top) + 12px);
   left: max(12px, env(safe-area-inset-left));
   z-index: 1;
-  color: #0f766e;
+  color: var(--app-primary);
 }
 
 .app-update-overlay__glow {
   position: absolute;
-  width: min(82vw, 560px);
-  aspect-ratio: 1;
+  inset: -30%;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 25% 35%, rgba(20, 184, 166, 0.25), transparent 48%),
+    radial-gradient(ellipse at 75% 65%, rgba(59, 130, 246, 0.2), transparent 48%),
+    radial-gradient(ellipse at 55% 15%, rgba(139, 92, 246, 0.14), transparent 45%);
+  animation: update-aurora 22s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.app-update-overlay__glow::before,
+.app-update-overlay__glow::after {
+  content: '';
+  position: absolute;
+  inset: 12%;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(20, 184, 166, 0.2), transparent 68%);
-  animation: update-glow 2.4s ease-in-out infinite;
+  background: radial-gradient(ellipse, rgba(45, 212, 191, 0.2), transparent 65%);
+  animation: update-aurora 16s ease-in-out -8s infinite alternate-reverse;
+}
+
+.app-update-overlay__glow::after {
+  inset: 25% 5%;
+  background: radial-gradient(ellipse, rgba(129, 140, 248, 0.18), transparent 65%);
+  animation-duration: 29s;
+  animation-delay: -14s;
 }
 
 .app-update-overlay__card {
   position: relative;
   width: min(100%, 420px);
   padding: 36px 28px 30px;
-  border: 1px solid rgba(15, 118, 110, 0.13);
+  border: 1px solid var(--app-border);
   border-radius: 28px;
-  background: rgba(255, 255, 255, 0.88);
+  background: var(--app-surface);
+  background: color-mix(in srgb, var(--app-surface) 88%, transparent);
   box-shadow: 0 28px 80px rgba(15, 23, 42, 0.16);
   text-align: center;
   backdrop-filter: blur(18px);
@@ -503,7 +526,7 @@ async function runDailyServerMaintenance() {
 
 .app-update-overlay__eyebrow {
   margin-bottom: 6px;
-  color: #0f766e;
+  color: var(--app-primary);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.16em;
@@ -512,7 +535,7 @@ async function runDailyServerMaintenance() {
 
 .app-update-overlay h1 {
   margin: 0;
-  color: #0f172a;
+  color: var(--app-text);
   font-size: clamp(24px, 7vw, 32px);
   font-weight: 800;
   line-height: 1.15;
@@ -520,7 +543,7 @@ async function runDailyServerMaintenance() {
 
 .app-update-overlay p {
   margin: 14px auto 22px;
-  color: #475569;
+  color: var(--app-muted);
   font-size: 16px;
   line-height: 1.55;
 }
@@ -533,8 +556,8 @@ async function runDailyServerMaintenance() {
   min-height: 48px;
   padding: 10px 14px;
   border-radius: 16px;
-  color: #115e59;
-  background: #ccfbf1;
+  color: var(--app-primary);
+  background: var(--app-surface-soft);
   font-size: 14px;
   font-weight: 700;
 }
@@ -544,12 +567,23 @@ async function runDailyServerMaintenance() {
 .update-overlay-enter-from,
 .update-overlay-leave-to { opacity: 0; }
 
-@keyframes update-glow {
-  0%, 100% { opacity: 0.7; transform: scale(0.94); }
-  50% { opacity: 1; transform: scale(1.06); }
+@keyframes update-aurora {
+  0% { transform: translate3d(-5%, -3%, 0) rotate(-12deg) scale(1); }
+  50% { transform: translate3d(5%, 4%, 0) rotate(8deg) scale(1.12); }
+  100% { transform: translate3d(-2%, 6%, 0) rotate(24deg) scale(1.04); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .app-update-overlay__glow { animation: none; }
+  .app-update-overlay__glow,
+  .app-update-overlay__glow::before,
+  .app-update-overlay__glow::after {
+    animation: none;
+    will-change: auto;
+  }
+
+  .app-update-overlay__spinner :deep(svg) { animation: none !important; }
+
+  .update-overlay-enter-active,
+  .update-overlay-leave-active { transition: none; }
 }
 </style>
