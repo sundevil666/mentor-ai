@@ -274,30 +274,19 @@
               :key="currentExercise.id"
               class="dialogue-drill"
             >
-              <div>
-                <p class="lesson-stage__eyebrow">
-                  {{ appStore.session.lesson.title }}
-                  <q-icon
-                    v-if="appStore.session.lesson.preferredDevice"
-                    :name="deviceRecommendation(appStore.session.lesson.preferredDevice).icon"
-                    size="18px"
-                    class="lesson-device-icon"
-                  >
-                    <q-tooltip>{{ deviceRecommendation(appStore.session.lesson.preferredDevice).tooltip }}</q-tooltip>
-                  </q-icon>
-                </p>
-                <h1>{{ currentExercise.prompt }}</h1>
-                <p>{{ currentExercise.microLesson }}</p>
-              </div>
-
-              <div v-if="currentExercise.nativePrompt" class="dialogue-drill__prompt">
-                <span>{{ currentExercise.phraseFocus ?? 'spoken pattern' }}</span>
-                <strong>{{ currentExercise.nativePrompt }}</strong>
-              </div>
+              <ExerciseBrief
+                :exercise="currentExercise"
+                :show-tip="isExerciseAnswerVisible"
+                :lesson-title="appStore.session.lesson.title"
+                :step="appStore.session.currentExerciseIndex + 1"
+                :total="appStore.session.lesson.exercises.length"
+              />
+              <section class="exercise-workspace" aria-label="Ответ и проверка">
+                <div class="exercise-workspace__heading"><q-icon name="forum" size="20px" /><h2>Твой ответ</h2></div>
 
               <div v-if="dialogueExpectedText" class="dialogue-drill__native">
                 <div class="lesson-answer-reveal__header">
-                  <span>Answer</span>
+                  <span>Образец ответа</span>
                   <q-btn
                     color="primary"
                     dense
@@ -392,25 +381,18 @@
                   />
                 </template>
               </q-input>
-
+              </section>
             </div>
 
             <div v-else-if="!isListeningPlayer" :key="currentExercise.id" class="exercise-standard">
-              <div>
-                <p class="lesson-stage__eyebrow">
-                  {{ appStore.session.lesson.title }}
-                  <q-icon
-                    v-if="appStore.session.lesson.preferredDevice"
-                    :name="deviceRecommendation(appStore.session.lesson.preferredDevice).icon"
-                    size="18px"
-                    class="lesson-device-icon"
-                  >
-                    <q-tooltip>{{ deviceRecommendation(appStore.session.lesson.preferredDevice).tooltip }}</q-tooltip>
-                  </q-icon>
-                </p>
-                <h1>{{ currentExercise.prompt }}</h1>
-                <p>{{ currentExercise.microLesson }}</p>
-              </div>
+              <ExerciseBrief
+                :exercise="currentExercise"
+                :lesson-title="appStore.session.lesson.title"
+                :step="appStore.session.currentExerciseIndex + 1"
+                :total="appStore.session.lesson.exercises.length"
+              />
+              <section class="exercise-workspace" aria-label="Ответ и проверка">
+                <div class="exercise-workspace__heading"><q-icon name="forum" size="20px" /><h2>Твой ответ</h2></div>
 
               <div v-if="currentExercise.audioText" class="audio-row">
                 <q-btn color="primary" flat icon="volume_up" round @click="playAudio">
@@ -453,7 +435,6 @@
               />
 
               <div class="lesson-actions">
-                <span>{{ currentExercise.successTip }}</span>
                 <q-btn
                   v-if="exerciseNavigation.showPrevious"
                   color="primary"
@@ -472,9 +453,18 @@
                   @click="submit"
                 />
               </div>
+              </section>
             </div>
 
             <div v-else :key="currentExercise.id" class="listening-player">
+              <ExerciseBrief
+                :exercise="currentExercise"
+                :show-tip="false"
+                :lesson-title="appStore.session.lesson.title"
+                :step="appStore.session.currentExerciseIndex + 1"
+                :total="appStore.session.lesson.exercises.length"
+                compact
+              />
               <div
                 :class="[
                   'listening-player__body',
@@ -743,6 +733,7 @@ import {
   stopSpeech,
 } from 'src/services/speech-synthesis';
 import AudioPlaybackSpeedMenu from 'src/components/AudioPlaybackSpeedMenu.vue';
+import ExerciseBrief from 'src/components/ExerciseBrief.vue';
 import AppDetailLayout from 'src/components/AppDetailLayout.vue';
 import {
   type ContinuousSpeechRecognition,

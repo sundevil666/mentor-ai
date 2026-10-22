@@ -5210,3 +5210,40 @@ p.lesson-complete__eyebrow,
 .training-library__workspace--dates > .training-library__list { gap: 16px; }
 .training-library__workspace--dates .training-library__progress-section,
 .training-library__workspace--dates .training-library__date-group { display: contents; }
+
+/* Shared lesson workspace: readable instructions on the left, practice on the right. */
+.learning-page--lesson .learning-shell { max-width: 1440px; }
+.lesson-stage .dialogue-drill,
+.lesson-stage .exercise-standard {
+  grid-template-columns: minmax(0, 1.15fr) minmax(340px, .85fr);
+  gap: 24px;
+  align-items: start;
+}
+.exercise-workspace {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--category-border);
+  border-radius: 24px;
+  background: var(--app-surface);
+}
+.exercise-workspace__heading { display: flex; align-items: center; gap: 10px; color: var(--category-accent); }
+.exercise-workspace__heading h2 { margin: 0; font-size: 1rem; font-weight: 750; color: var(--app-text-strong); }
+.exercise-workspace .dialogue-drill__native { background: var(--app-surface-soft); }
+.exercise-workspace .dialogue-drill__native strong { font-size: 1.15rem; line-height: 1.6; }
+.exercise-workspace .dialogue-drill__recorder { gap: 12px; padding: 16px; }
+.exercise-workspace .q-field__native { font-size: 1rem; line-height: 1.6; }
+.exercise-workspace .lesson-actions { justify-content: flex-end; }
+.exercise-workspace .exercise-options .q-radio { font-size: 1rem; }
+@media (min-width: 1000px) {
+  .lesson-stage__feedback { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 8px 12px; }
+  .lesson-stage__feedback .content-mentor-feedback__actions { flex: 0 1 320px; margin: 0; }
+  .exercise-workspace { position: sticky; top: 0; }
+}
+@media (max-width: 999px) {
+  .lesson-stage .dialogue-drill,
+  .lesson-stage .exercise-standard { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .exercise-workspace { padding: 20px; }
+}
