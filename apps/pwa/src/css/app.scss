@@ -553,14 +553,23 @@ body .q-menu {
   position: relative;
 }
 
-/* A shared, still portrait accompanies every route. Contain preserves the hat
-   and face on narrow screens; category photography fills the remaining space. */
+/* Keep the portrait at the left edge and dissolve its edges into the category
+   scenery. A square layer preserves the complete photograph on every screen. */
 .app-page-container::before {
-  background: linear-gradient(color-mix(in srgb, var(--app-bg) 76%, transparent), color-mix(in srgb, var(--app-bg) 86%, transparent)), var(--inspiration-image) center / contain no-repeat;
+  background-image: linear-gradient(color-mix(in srgb, var(--app-bg) 76%, transparent), color-mix(in srgb, var(--app-bg) 86%, transparent)), var(--inspiration-image);
+  background-position: left top;
+  background-repeat: no-repeat;
+  background-size: cover;
   content: '';
-  inset: 55px 0 0;
+  height: min(100vw, calc(100dvh - 55px));
+  inset: 55px auto auto 0;
+  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 48%, transparent 100%), linear-gradient(to bottom, #000 0%, #000 65%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, #000 0%, #000 48%, transparent 100%), linear-gradient(to bottom, #000 0%, #000 65%, transparent 100%);
+  mask-composite: intersect;
   pointer-events: none;
   position: fixed;
+  width: min(100vw, calc(100dvh - 55px));
 }
 
 .app-page-container .q-page {
@@ -5285,15 +5294,8 @@ body .app-page-container .q-page::after { opacity: .12; animation: none; }
 .personal-reader .personal-reader__paper,
 .personal-reader--focus .personal-reader__paper {
   background-color: var(--reader-paper-background);
-  background-image: linear-gradient(color-mix(in srgb, var(--reader-paper-background) 91%, transparent), color-mix(in srgb, var(--reader-paper-background) 95%, transparent)), var(--inspiration-image);
-  background-position: center;
+  background-image: linear-gradient(to right, transparent 45%, var(--reader-paper-background) 100%), linear-gradient(color-mix(in srgb, var(--reader-paper-background) 91%, transparent), color-mix(in srgb, var(--reader-paper-background) 95%, transparent)), var(--inspiration-image);
+  background-position: left center;
   background-repeat: no-repeat;
-  background-size: cover, contain;
-}
-
-@media (max-width: 599px) {
-  .app-page-container::before {
-    background-size: cover, auto min(100%, 620px);
-    background-position: center, center 24%;
-  }
+  background-size: cover, cover, contain;
 }
