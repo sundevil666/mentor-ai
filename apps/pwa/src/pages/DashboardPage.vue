@@ -672,10 +672,10 @@
           <q-btn
             color="primary"
             icon="check_circle"
-            label="OK"
+            label="Back to lessons"
             no-caps
             unelevated
-            @click="finishLessonAndReturnHome"
+            @click="finishLessonAndReturnToLibrary"
           />
         </section>
       </transition>
@@ -2683,11 +2683,12 @@ async function returnToLessonChoice(destination?: LessonReturnDestination) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-async function finishLessonAndReturnHome() {
-  await returnToLessonChoice('home');
-  if (route.path !== '/' || route.query.training !== 'home') {
-    await router.push({ path: '/', query: { training: 'home' } });
-  }
+async function finishLessonAndReturnToLibrary() {
+  const destination = appStore.session
+    ? generatedLessonCategory(appStore.session.lesson)
+    : lessonReturnDestination.value;
+  await returnToLessonChoice(destination);
+  await refreshLessonProgressStates();
 }
 
 async function handleLessonBack() {
