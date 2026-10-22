@@ -9,13 +9,14 @@
     </header>
     <section class="exercise-brief__task">
       <h2><q-icon name="near_me" size="18px" />{{ mode.taskLabel }}</h2>
-      <p class="exercise-brief__prompt">{{ exercise.prompt }}</p>
-      <div v-if="exercise.nativePrompt || isHelpRequest" class="exercise-brief__situation" :class="{ 'exercise-brief__situation--illustrated': isHelpRequest }">
+      <p v-if="exercise.nativePrompt || !scene" class="exercise-brief__prompt">{{ exercise.prompt }}</p>
+      <div v-if="exercise.nativePrompt || scene" class="exercise-brief__situation" :class="{ 'exercise-brief__situation--illustrated': scene }">
         <div v-if="exercise.nativePrompt" class="exercise-brief__native">
           <span>Фраза для перевода</span>
           <strong>{{ exercise.nativePrompt }}</strong>
         </div>
-        <HelpRequestScene v-if="isHelpRequest" :key="exercise.id" />
+        <p v-if="!exercise.nativePrompt && scene" class="exercise-brief__prompt exercise-brief__prompt--situation">{{ exercise.prompt }}</p>
+        <ExerciseSituationScene v-if="scene" :key="exercise.id" :scene="scene" />
       </div>
     </section>
     <section v-if="exercise.microLesson" class="exercise-brief__explanation">
@@ -32,11 +33,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Exercise } from '@mentor-ai/shared';
-import HelpRequestScene from './HelpRequestScene.vue';
+import ExerciseSituationScene from './ExerciseSituationScene.vue';
+import { resolveExerciseScene } from 'src/services/exercise-scene';
 const props = defineProps<{ exercise: Exercise; lessonTitle: string; step: number; total: number; compact?: boolean; showTip?: boolean }>();
-const isHelpRequest = computed(() => /(?:could|can|would) you (?:please )?help|(?:можете|можешь|могли бы|мог бы).{0,24}помочь|помоги(?:те)? мне/i.test(
-  `${props.exercise.nativePrompt ?? ''} ${props.exercise.prompt}`,
-));
+const scene = computed(() => resolveExerciseScene(`${props.exercise.nativePrompt ?? ''} ${props.exercise.prompt}`));
 const mode = computed(() => {
   if (['listening-text', 'listening-comprehension'].includes(props.exercise.type)) {
     return { label: 'Listening', title: 'Слушаем и понимаем', taskLabel: 'Что сделать', icon: 'headphones' };
@@ -61,6 +61,7 @@ const mode = computed(() => {
 .exercise-brief__situation--illustrated { grid-template-columns: minmax(0, 1fr) 150px; }
 .exercise-brief__native { display: grid; gap: 10px; min-width: 0; }
 .exercise-brief__native span { color: var(--app-muted-strong); font-size: .78rem; }
+.exercise-brief .exercise-brief__prompt--situation { color: var(--app-text-strong); font-size: 1.1rem; line-height: 1.65; }
 .exercise-brief__native strong { color: var(--app-text-strong); font-size: clamp(1.15rem, 1.6vw, 1.4rem); font-weight: 650; line-height: 1.5; }
 .exercise-brief__explanation { padding-left: 14px; border-left: 2px solid var(--category-border); }
 .exercise-brief__tip { padding: 16px; border-radius: 12px; background: var(--app-surface-soft); }

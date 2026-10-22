@@ -18,6 +18,13 @@ The evidence-first contract for improving both teaching quality and application
 reliability is documented in
 [`docs/20-learning-and-application-observability.md`](docs/20-learning-and-application-observability.md).
 
+## Lesson Layout and Illustrations
+
+Use the shared lesson template and follow the
+[lesson presentation and illustration rules](.ai/README.md#shared-lesson-presentation-and-illustrations).
+Keep scenes compact beside the task, static by default, and animate only meaningful actions.
+Preserve completion history and reserve space for the bottom navigation.
+
 ## Adding Audio Books and Stories
 
 When adding or editing audio catalog entries, follow
