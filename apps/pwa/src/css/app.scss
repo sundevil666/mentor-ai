@@ -1,5 +1,6 @@
 body {
   --app-bg: #f4f7f6;
+  --inspiration-image: url('/category-backgrounds/inspiration.webp');
   --app-surface: #ffffff;
   --app-surface-soft: #e8f2ef;
   --app-surface-active: #edf7f4;
@@ -549,6 +550,21 @@ body .q-menu {
   background: var(--app-bg);
   min-height: 100vh;
   overflow-x: clip;
+  position: relative;
+}
+
+/* A shared, still portrait accompanies every route. Contain preserves the hat
+   and face on narrow screens; category photography fills the remaining space. */
+.app-page-container::before {
+  background: linear-gradient(color-mix(in srgb, var(--app-bg) 76%, transparent), color-mix(in srgb, var(--app-bg) 86%, transparent)), var(--inspiration-image) center / contain no-repeat;
+  content: '';
+  inset: 55px 0 0;
+  pointer-events: none;
+  position: fixed;
+}
+
+.app-page-container .q-page {
+  background-color: transparent;
   position: relative;
 }
 
@@ -5254,4 +5270,30 @@ body.body--dark .learning-page--lesson::before { background-image: none; }
   .lesson-stage .dialogue-drill,
   .lesson-stage .exercise-standard { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .exercise-workspace { padding: 20px; }
+}
+
+/* Category scenery stays secondary to the personal inspiration portrait. */
+body .app-page-container .q-page::before { opacity: .1; }
+body .app-page-container .q-page::after { opacity: .12; animation: none; }
+
+.app-page-container .q-card {
+  background-color: color-mix(in srgb, var(--app-surface) 91%, transparent);
+}
+
+/* Reading has its own opaque fullscreen surface, so carry the same photograph
+   into the paper itself with a stronger wash for uninterrupted reading. */
+.personal-reader .personal-reader__paper,
+.personal-reader--focus .personal-reader__paper {
+  background-color: var(--reader-paper-background);
+  background-image: linear-gradient(color-mix(in srgb, var(--reader-paper-background) 91%, transparent), color-mix(in srgb, var(--reader-paper-background) 95%, transparent)), var(--inspiration-image);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover, contain;
+}
+
+@media (max-width: 599px) {
+  .app-page-container::before {
+    background-size: cover, auto min(100%, 620px);
+    background-position: center, center 24%;
+  }
 }
