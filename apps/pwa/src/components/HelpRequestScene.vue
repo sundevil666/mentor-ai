@@ -21,12 +21,12 @@
         <circle cx="234" cy="57" r="2.5" />
       </g>
     </svg>
-    <figcaption>Обращаемся за помощью</figcaption>
+
   </figure>
 </template>
 
 <style scoped>
-.help-scene { margin: 18px 0 0; padding: 8px 16px 12px; border: 1px solid var(--app-border); border-radius: 16px; background: #f5f4f0; color: #25272a; }
+.help-scene { margin: 0; padding: 0; color: var(--app-text-strong); opacity: .8; }
 .help-scene svg { display: block; width: 100%; max-width: 440px; height: auto; margin: auto; }
 .help-scene__drawing { fill: none; stroke: currentColor; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
 .help-scene__smile { stroke-width: 3; }

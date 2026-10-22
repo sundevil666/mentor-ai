@@ -597,6 +597,7 @@ body .q-menu {
 }
 
 .learning-page--lesson {
+  background: var(--app-bg);
   box-sizing: border-box;
   height: calc(100dvh - 55px - env(safe-area-inset-top));
   min-height: 0 !important;
@@ -5217,6 +5218,8 @@ p.lesson-complete__eyebrow,
 
 /* Shared lesson workspace: readable instructions on the left, practice on the right. */
 .learning-page--lesson .learning-shell { max-width: 1440px; }
+.learning-page--lesson::before,
+body.body--dark .learning-page--lesson::before { background-image: none; }
 .lesson-stage .dialogue-drill,
 .lesson-stage .exercise-standard {
   grid-template-columns: minmax(0, 1.15fr) minmax(340px, .85fr);
@@ -5229,15 +5232,16 @@ p.lesson-complete__eyebrow,
   gap: 18px;
   min-width: 0;
   padding: 24px;
-  border: 1px solid var(--category-border);
-  border-radius: 24px;
+  border: 1px solid var(--app-border);
+  border-radius: 20px;
   background: var(--app-surface);
 }
 .exercise-workspace__heading { display: flex; align-items: center; gap: 10px; color: var(--category-accent); }
 .exercise-workspace__heading h2 { margin: 0; font-size: 1rem; font-weight: 750; color: var(--app-text-strong); }
 .exercise-workspace .dialogue-drill__native { background: var(--app-surface-soft); }
 .exercise-workspace .dialogue-drill__native strong { font-size: 1.15rem; line-height: 1.6; }
-.exercise-workspace .dialogue-drill__recorder { gap: 12px; padding: 16px; }
+.exercise-workspace .dialogue-drill__recorder { flex-wrap: wrap; gap: 12px; padding: 16px; }
+.exercise-workspace .dialogue-drill__recorder-status { flex-basis: 100%; order: -1; }
 .exercise-workspace .q-field__native { font-size: 1rem; line-height: 1.6; }
 .exercise-workspace .lesson-actions { justify-content: flex-end; }
 .exercise-workspace .exercise-options .q-radio { font-size: 1rem; }

@@ -326,7 +326,7 @@
                   class="dialogue-drill__record-button"
                   :color="isRecognizingSpeech ? 'negative' : 'primary'"
                   :icon="isRecognizingSpeech ? 'stop_circle' : 'mic'"
-                  :label="isRecognizingSpeech ? 'Stop' : speechRecognitionCaptured ? 'Again' : 'Record'"
+                  :label="isRecognizingSpeech ? 'Остановить' : speechRecognitionCaptured ? 'Ещё раз' : 'Записать ответ'"
                   unelevated
                   no-caps
                   :disable="!speechRecognitionAvailable"
@@ -369,7 +369,7 @@
                 :color="dialogueAnswerStatus === 'correct' ? 'positive' : undefined"
                 :error="dialogueAnswerStatus === 'incorrect'"
                 hide-bottom-space
-                label="Recognized answer"
+                label="Распознанная речь"
                 outlined
                 readonly
                 tabindex="-1"
@@ -1065,7 +1065,7 @@ const speechSupportMessage = computed(() => {
     return 'Voice recognition is not available on this device.';
   }
 
-  return 'Tap Record answer, speak, then tap Stop recording.';
+  return 'Нажми «Записать ответ», произнеси фразу и останови запись.';
 });
 const speechStatusTitle = computed(() => {
   if (isRecognizingSpeech.value) return 'Recording now';
@@ -1073,7 +1073,7 @@ const speechStatusTitle = computed(() => {
   if (dialogueAnswerStatus.value === 'correct') return 'Correct answer';
   if (dialogueAnswerStatus.value === 'incorrect') return 'Try again';
   if (!speechRecognitionAvailable.value) return 'Voice recording unavailable';
-  return 'Ready to record';
+  return 'Можно говорить';
 });
 const speechStatusIcon = computed(() => {
   if (isRecognizingSpeech.value) return 'graphic_eq';
