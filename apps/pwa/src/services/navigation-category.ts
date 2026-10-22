@@ -2,6 +2,13 @@ import type { LearningMode } from '@mentor-ai/shared';
 
 export type DashboardTrainingCategory = 'grammar' | 'listening' | 'speaking';
 
+export function resolveLessonReturnDestination(
+  activeCategory: DashboardTrainingCategory | undefined,
+  previousDestination: DashboardTrainingCategory | 'home' | 'specific-lessons',
+) {
+  return activeCategory ?? previousDestination;
+}
+
 type DashboardHomeNavigationActions = {
   leaveActiveLesson: () => Promise<void>;
   showHome: () => Promise<void>;

@@ -4,10 +4,25 @@ import { describe, it } from 'node:test';
 import {
   openDashboardHome,
   resolveDashboardTrainingCategory,
+  resolveLessonReturnDestination,
   synchronizeDashboardLessonRoute,
 } from '../src/services/navigation-category.js';
 
 describe('dashboard navigation category', () => {
+  it('returns to the resumed lesson category after visiting another section', async () => {
+    const replacements: string[] = [];
+    const category = await synchronizeDashboardLessonRoute('speaking', 'grammar', async (training) => {
+      replacements.push(training);
+    });
+    assert.equal(resolveLessonReturnDestination(category, 'home'), 'speaking');
+    assert.equal(resolveLessonReturnDestination(category, 'grammar'), 'speaking');
+    assert.deepEqual(replacements, ['speaking']);
+  });
+
+  it('retains the fallback destination when there is no active lesson', () => {
+    assert.equal(resolveLessonReturnDestination(undefined, 'home'), 'home');
+    assert.equal(resolveLessonReturnDestination(undefined, 'specific-lessons'), 'specific-lessons');
+  });
   it('uses the active lesson category when a recommended lesson starts from Home', () => {
     assert.equal(resolveDashboardTrainingCategory(undefined, 'listening'), 'listening');
     assert.equal(resolveDashboardTrainingCategory(undefined, 'speaking'), 'speaking');

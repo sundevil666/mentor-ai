@@ -702,7 +702,7 @@
 import type { GeneratedLesson, LearningActivityTotals, LearningContext, MovieLearningReport, PreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { resolveDashboardTrainingCategory, synchronizeDashboardLessonRoute, type DashboardTrainingCategory } from 'src/services/navigation-category';
+import { resolveDashboardTrainingCategory, resolveLessonReturnDestination, synchronizeDashboardLessonRoute, type DashboardTrainingCategory } from 'src/services/navigation-category';
 import { sortMaterialsNewestFirst } from 'src/services/material-order';
 import { groupLessonsByProgressAndReleaseDate, groupLessonDates, resolveSelectedLessonDate } from 'src/services/lesson-library-order';
 import { loadMovieLearningReports, refreshMovieLearningReportsFromCloud } from 'src/services/movie-learning-reports';
@@ -1993,7 +1993,10 @@ async function syncActiveLessonNavigation() {
     },
   );
 
-  if (training) selectedLessonLibrary.value = training;
+  if (training) {
+    selectedLessonLibrary.value = training;
+    lessonReturnDestination.value = training;
+  }
 }
 
 async function submit() {
@@ -2656,7 +2659,10 @@ async function scrollActiveListeningPhraseIntoView() {
 }
 
 async function returnToLessonChoice(destination?: LessonReturnDestination) {
-  const returnDestination = destination ?? lessonReturnDestination.value;
+  const returnDestination = destination ?? resolveLessonReturnDestination(
+    appStore.session ? generatedLessonCategory(appStore.session.lesson) : undefined,
+    lessonReturnDestination.value,
+  );
   answer.value = '';
   isListeningPlaylistVisible.value = false;
   isLessonLibraryVisible.value = false;
