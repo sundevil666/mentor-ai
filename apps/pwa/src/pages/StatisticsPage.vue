@@ -32,10 +32,11 @@
 
       <PracticeHistoryChart
         :events="activityHistory"
+        :movies="movieReports"
         :snapshots="appStore.statisticsSnapshots"
         :loading="historyLoading"
         :error="historyError"
-        @refresh="refreshHistory(true)"
+        @refresh="refreshChart"
       />
 
       <section
@@ -283,6 +284,9 @@ async function refreshFromServer() {
 async function refreshActivityTotals() {
   activityTotals.value = await loadLearningActivityTotals();
   await refreshHistory();
+}
+async function refreshChart() {
+  await Promise.all([refreshHistory(true), refreshMovieReports()]);
 }
 async function refreshHistory(remote = false) {
   if (remote) historyLoading.value = true;

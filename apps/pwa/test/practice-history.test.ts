@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
-import type { LearningActivityEvent, StatisticsSnapshot } from '@mentor-ai/shared';
+import type { LearningActivityEvent, MovieLearningReport, StatisticsSnapshot } from '@mentor-ai/shared';
 import { buildPracticeHistory } from '../src/services/practice-history.js';
 const event = (overrides: Partial<LearningActivityEvent> = {}): LearningActivityEvent => ({ id: 'one', studentId: 'student', kind: 'reading', contentId: 'daily-category-total', sourceDeviceId: 'device', activeSeconds: 120, startedAt: '2026-10-25T12:00:00', endedAt: '2026-10-25T12:02:00', ...overrides });
 it('fills empty days and deduplicates synchronized and pending events', () => {
@@ -42,4 +42,13 @@ it('does not credit a whole legacy batch to a partially selected month', () => {
   const result = buildPracticeHistory([event({ startedAt: '2026-10-01T12:00:00' })], [], '2026-10-24', '2026-10-26', 'month');
   assert.equal(result.buckets[0]?.seconds.reading, 0);
   assert.equal(result.undatedSeconds, 120);
+});
+
+it('counts movies by watched date, deduplicates reports, and never adds estimated minutes', () => {
+  const movie = { id: 'movie-one', watchedAt: '2026-10-25', createdAt: '2026-10-27T12:00:00Z' } as MovieLearningReport;
+  for (const grouping of ['day', 'week', 'month', 'year'] as const) {
+    const result = buildPracticeHistory([], [], '2026-10-24', '2026-10-26', grouping, [movie, movie, { ...movie, id: 'outside', watchedAt: '2026-10-27' }]);
+    assert.equal(result.buckets.reduce((sum, bucket) => sum + bucket.movies, 0), 1);
+    assert.equal(result.buckets.reduce((sum, bucket) => sum + Object.values(bucket.seconds).reduce((a, b) => a + b, 0), 0), 0);
+  }
 });

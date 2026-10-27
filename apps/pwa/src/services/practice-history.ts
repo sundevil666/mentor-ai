@@ -1,4 +1,4 @@
-import { learningActivityKinds, type LearningActivityEvent, type StatisticsSnapshot } from '@mentor-ai/shared';
+import { learningActivityKinds, type LearningActivityEvent, type MovieLearningReport, type StatisticsSnapshot } from '@mentor-ai/shared';
 
 export type HistoryGrouping = 'day' | 'week' | 'month' | 'year';
 export const practiceSeries = [
@@ -21,12 +21,12 @@ function bucketDate(date: Date, grouping: HistoryGrouping): Date {
   if (grouping === 'year') result.setMonth(0);
   return result;
 }
-export function buildPracticeHistory(events: LearningActivityEvent[], snapshots: StatisticsSnapshot[], start: string, end: string, grouping: HistoryGrouping) {
+export function buildPracticeHistory(events: LearningActivityEvent[], snapshots: StatisticsSnapshot[], start: string, end: string, grouping: HistoryGrouping, movies: MovieLearningReport[] = []) {
   const from = new Date(`${start}T00:00:00`);
   const until = new Date(`${end}T23:59:59.999`);
   const buckets = [];
   for (const cursor = bucketDate(from, grouping); cursor <= until && buckets.length < 3700;) {
-    buckets.push({ key: localDateKey(cursor), seconds: Object.fromEntries(learningActivityKinds.map((kind) => [kind, 0])) as Record<typeof learningActivityKinds[number], number>, lessons: 0, exercises: 0, words: 0, accuracySum: 0 });
+    buckets.push({ key: localDateKey(cursor), seconds: Object.fromEntries(learningActivityKinds.map((kind) => [kind, 0])) as Record<typeof learningActivityKinds[number], number>, movies: 0, lessons: 0, exercises: 0, words: 0, accuracySum: 0 });
     if (grouping === 'year') cursor.setFullYear(cursor.getFullYear() + 1);
     else if (grouping === 'month') cursor.setMonth(cursor.getMonth() + 1);
     else cursor.setDate(cursor.getDate() + (grouping === 'week' ? 7 : 1));
@@ -56,6 +56,12 @@ export function buildPracticeHistory(events: LearningActivityEvent[], snapshots:
     bucket.exercises += Math.max(0, snapshot.completedExercises);
     bucket.words += Math.max(0, snapshot.spokenWords ?? 0);
     bucket.accuracySum += snapshot.accuracy;
+  }
+  for (const movie of new Map(movies.map((movie) => [movie.id, movie])).values()) {
+    const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(movie.watchedAt) ? `${movie.watchedAt}T12:00:00` : movie.watchedAt);
+    if (!Number.isFinite(date.getTime()) || date < from || date > until) continue;
+    const bucket = byKey.get(localDateKey(bucketDate(date, grouping)));
+    if (bucket) bucket.movies++;
   }
   return { buckets, undatedSeconds };
 }
