@@ -5136,7 +5136,7 @@ p.lesson-complete__eyebrow,
   gap: 24px;
   align-items: start;
 }
-.speaking-dates {
+.lesson-dates {
   position: sticky;
   top: 88px;
   display: grid;
@@ -5146,8 +5146,8 @@ p.lesson-complete__eyebrow,
   border-radius: 18px;
   background: var(--app-surface);
 }
-.speaking-dates__title { margin: 0 0 4px; color: var(--app-muted); font-size: .8rem; font-weight: 700; }
-.speaking-dates__button {
+.lesson-dates__title { margin: 0 0 4px; color: var(--app-muted); font-size: .8rem; font-weight: 700; }
+.lesson-dates__button {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -5161,43 +5161,43 @@ p.lesson-complete__eyebrow,
   font: inherit;
   cursor: pointer;
 }
-.speaking-dates__button > span { flex: 1; display: grid; gap: 3px; }
-.speaking-dates__button time { font-weight: 750; }
-.speaking-dates__button small { color: var(--app-muted); font-size: .72rem; }
-.speaking-dates__button--completed { background: color-mix(in srgb, var(--q-positive) 10%, var(--app-surface)); }
-.speaking-dates__button--completed > .q-icon:first-child { color: var(--q-positive); }
-.speaking-dates__button--selected { border-color: var(--category-accent); box-shadow: inset 3px 0 var(--category-accent); }
-.speaking-dates__button:hover, .speaking-dates__button:focus-visible { outline: 2px solid var(--category-accent); outline-offset: 2px; }
+.lesson-dates__button > span { flex: 1; display: grid; gap: 3px; }
+.lesson-dates__button time { font-weight: 750; }
+.lesson-dates__button small { color: var(--app-muted); font-size: .72rem; }
+.lesson-dates__button--completed { background: color-mix(in srgb, var(--q-positive) 10%, var(--app-surface)); }
+.lesson-dates__button--completed > .q-icon:first-child { color: var(--q-positive); }
+.lesson-dates__button--selected { border-color: var(--category-accent); box-shadow: inset 3px 0 var(--category-accent); }
+.lesson-dates__button:hover, .lesson-dates__button:focus-visible { outline: 2px solid var(--category-accent); outline-offset: 2px; }
 @media (max-width: 700px) {
   .training-library__workspace--dates { grid-template-columns: minmax(0, 1fr); gap: 16px; }
-  .speaking-dates { position: static; display: flex; overflow-x: auto; padding: 8px; }
-  .speaking-dates__title { display: none; }
-  .speaking-dates__button { flex: 0 0 160px; }
+  .lesson-dates { position: static; display: flex; overflow-x: auto; padding: 8px; }
+  .lesson-dates__title { display: none; }
+  .lesson-dates__button { flex: 0 0 160px; }
 }
 
 /* Keep both Speaking library panes inside the space between app navigation bars. */
-.learning-page--speaking-library {
+.learning-page--dated-library {
   box-sizing: border-box;
   height: calc(100dvh - 55px - env(safe-area-inset-top));
   min-height: 0 !important;
   overflow: hidden;
 }
-.learning-page--speaking-library .learning-shell,
-.learning-page--speaking-library .learning-start,
-.learning-page--speaking-library .training-library {
+.learning-page--dated-library .learning-shell,
+.learning-page--dated-library .learning-start,
+.learning-page--dated-library .training-library {
   height: 100%;
   min-height: 0;
   min-width: 0;
 }
-.learning-page--speaking-library .learning-start { grid-template-rows: minmax(0, 1fr); }
-.learning-page--speaking-library .training-library { grid-template-rows: auto minmax(0, 1fr); }
+.learning-page--dated-library .learning-start { grid-template-rows: minmax(0, 1fr); }
+.learning-page--dated-library .training-library { grid-template-rows: auto minmax(0, 1fr); }
 .training-library__workspace--dates {
   height: 100%;
   min-height: 0;
   overflow: hidden;
   align-items: stretch;
 }
-.training-library__workspace--dates > .speaking-dates {
+.training-library__workspace--dates > .lesson-dates {
   position: static;
   height: 100%;
   min-height: 0;
@@ -5218,15 +5218,15 @@ p.lesson-complete__eyebrow,
 }
 @media (max-width: 700px) {
   .training-library__workspace--dates { grid-template-rows: auto minmax(0, 1fr); }
-  .training-library__workspace--dates > .speaking-dates {
+  .training-library__workspace--dates > .lesson-dates {
     height: auto;
     overflow-y: hidden;
     scrollbar-width: none;
   }
-  .training-library__workspace--dates > .speaking-dates::-webkit-scrollbar { display: none; }
+  .training-library__workspace--dates > .lesson-dates::-webkit-scrollbar { display: none; }
 }
 
-.training-library__workspace--dates > .speaking-dates,
+.training-library__workspace--dates > .lesson-dates,
 .training-library__workspace--dates > .training-library__list {
   scrollbar-width: thin;
   scrollbar-color: var(--category-accent) transparent;
@@ -5236,7 +5236,7 @@ p.lesson-complete__eyebrow,
   outline-offset: -2px;
 }
 @media (max-width: 700px) {
-  .training-library__workspace--dates > .speaking-dates { scrollbar-width: none; }
+  .training-library__workspace--dates > .lesson-dates { scrollbar-width: none; }
 }
 
 .training-library__workspace--dates > .training-library__list { gap: 16px; }

@@ -4,7 +4,7 @@
     :class="[
       `category-theme--${selectedLessonLibrary}`,
       { 'learning-page--lesson': appStore.session && !appStore.isLessonComplete && currentExercise },
-      { 'learning-page--speaking-library': !appStore.session && selectedLessonLibrary === 'speaking' },
+      { 'learning-page--dated-library': !appStore.session && hasLessonDates },
     ]"
   >
     <section class="learning-shell">
@@ -89,42 +89,42 @@
               <q-icon :name="activeTrainingLibrary.icon" size="42px" color="primary" />
             </div>
 
-            <div class="training-library__workspace" :class="{ 'training-library__workspace--dates': selectedLessonLibrary === 'speaking' }">
-              <nav v-if="selectedLessonLibrary === 'speaking'" class="speaking-dates" aria-label="Speaking lesson dates">
-                <p class="speaking-dates__title">Lesson dates</p>
+            <div class="training-library__workspace" :class="{ 'training-library__workspace--dates': hasLessonDates }">
+              <nav v-if="hasLessonDates" class="lesson-dates" :aria-label="`${activeTrainingLibrary.label} lesson dates`">
+                <p class="lesson-dates__title">Lesson dates</p>
                 <button
-                  v-for="date in speakingLessonDates"
+                  v-for="date in activeLessonDates"
                   :key="date.dateKey"
                   type="button"
-                  class="speaking-dates__button"
-                  :class="{ 'speaking-dates__button--selected': selectedSpeakingDate === date.dateKey, 'speaking-dates__button--completed': date.completed === date.total }"
-                  :aria-current="selectedSpeakingDate === date.dateKey ? 'date' : undefined"
+                  class="lesson-dates__button"
+                  :class="{ 'lesson-dates__button--selected': selectedLessonDate === date.dateKey, 'lesson-dates__button--completed': date.completed === date.total }"
+                  :aria-current="selectedLessonDate === date.dateKey ? 'date' : undefined"
                   :aria-label="`${date.dateLabel}: ${date.completed} of ${date.total} completed${date.completed === date.total ? ', all completed' : ''}`"
-                  @click="selectSpeakingDate(date.dateKey)"
+                  @click="selectLessonDate(date.dateKey)"
                 >
                   <q-icon :name="date.completed === date.total ? 'check_circle' : 'calendar_today'" size="20px" />
                   <span><time :datetime="date.dateKey">{{ date.dateLabel }}</time><small>{{ date.completed }} / {{ date.total }} completed</small></span>
-                  <q-icon v-if="selectedSpeakingDate === date.dateKey" name="chevron_right" size="20px" />
+                  <q-icon v-if="selectedLessonDate === date.dateKey" name="chevron_right" size="20px" />
                 </button>
               </nav>
               <div
                 class="training-library__list"
-                :role="selectedLessonLibrary === 'speaking' ? 'region' : undefined"
-                :aria-label="selectedLessonLibrary === 'speaking' ? 'Lessons for selected date' : undefined"
-                :tabindex="selectedLessonLibrary === 'speaking' ? 0 : undefined"
+                :role="hasLessonDates ? 'region' : undefined"
+                :aria-label="hasLessonDates ? 'Lessons for selected date' : undefined"
+                :tabindex="hasLessonDates ? 0 : undefined"
               >
                 <section
                   v-for="section in activeTrainingLessonSections"
                   :key="section.state"
                   class="training-library__progress-section"
                 >
-                  <h2 v-if="selectedLessonLibrary !== 'speaking'" class="training-library__progress-heading">{{ section.label }}</h2>
+                  <h2 v-if="!hasLessonDates" class="training-library__progress-heading">{{ section.label }}</h2>
                   <section
                     v-for="group in section.groups"
                     :key="group.dateKey"
                     class="training-library__date-group"
                   >
-                    <h3 v-if="selectedLessonLibrary !== 'speaking'" class="training-library__date-heading">
+                    <h3 v-if="!hasLessonDates" class="training-library__date-heading">
                       <q-icon name="calendar_today" />
                       <time :datetime="group.dateKey">{{ group.dateLabel }}</time>
                     </h3>
@@ -1277,30 +1277,34 @@ function lessonProgressState(templateKey: string): LessonProgressState {
   }
   return 'new';
 }
-const speakingDateStorageKey = 'mentor-ai:speaking-selected-date';
-function readSelectedSpeakingDate(): string | null {
-  try { return localStorage.getItem(speakingDateStorageKey); } catch { return null; }
+const hasLessonDates = computed(() => selectedLessonLibrary.value === 'speaking' || selectedLessonLibrary.value === 'listening');
+function readSelectedLessonDate(category: string): string | null {
+  try { return localStorage.getItem(`mentor-ai:${category}-selected-date`); } catch { return null; }
 }
-const savedSpeakingDate = ref(readSelectedSpeakingDate());
-const speakingLessonDates = computed(() => groupLessonDates(
-  lessonsByTrainingCategory.value.speaking,
+const savedLessonDates = ref<Record<string, string | null>>({
+  speaking: readSelectedLessonDate('speaking'),
+  listening: readSelectedLessonDate('listening'),
+});
+const activeLessonDates = computed(() => groupLessonDates(
+  activeTrainingLibrary.value.lessons,
   (lesson) => lessonProgressState(lesson.templateKey),
 ));
-const selectedSpeakingDate = computed(() => resolveSelectedLessonDate(savedSpeakingDate.value, speakingLessonDates.value));
-function selectSpeakingDate(dateKey: string) {
-  savedSpeakingDate.value = dateKey;
-  try { localStorage.setItem(speakingDateStorageKey, dateKey); } catch { /* Keep selection usable when storage is unavailable. */ }
+const selectedLessonDate = computed(() => resolveSelectedLessonDate(savedLessonDates.value[selectedLessonLibrary.value] ?? null, activeLessonDates.value));
+function selectLessonDate(dateKey: string) {
+  const category = selectedLessonLibrary.value;
+  savedLessonDates.value[category] = dateKey;
+  try { localStorage.setItem(`mentor-ai:${category}-selected-date`, dateKey); } catch { /* Keep selection usable when storage is unavailable. */ }
 }
 const activeTrainingLessonSections = computed(() => {
   const sections = groupLessonsByProgressAndReleaseDate(
     activeTrainingLibrary.value.lessons,
     (lesson) => lessonProgressState(lesson.templateKey),
-    selectedLessonLibrary.value === 'speaking' ? ['started', 'new', 'completed'] : undefined,
+    hasLessonDates.value ? ['started', 'new', 'completed'] : undefined,
   );
-  if (selectedLessonLibrary.value !== 'speaking') return sections;
+  if (!hasLessonDates.value) return sections;
   return sections.map((section) => ({
     ...section,
-    groups: section.groups.filter((group) => group.dateKey === selectedSpeakingDate.value),
+    groups: section.groups.filter((group) => group.dateKey === selectedLessonDate.value),
   })).filter((section) => section.groups.length > 0);
 });
 function lessonProgressLabel(templateKey: string) {
