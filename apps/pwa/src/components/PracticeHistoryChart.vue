@@ -250,7 +250,7 @@ const range = computed(() => {
 });
 const invalidRange = computed(() => !/^\d{4}-\d{2}-\d{2}$/.test(range.value.start) || !/^\d{4}-\d{2}-\d{2}$/.test(range.value.end) || range.value.start > range.value.end || !Number.isFinite(Date.parse(range.value.start)) || !Number.isFinite(Date.parse(range.value.end)) || Date.parse(range.value.end) - Date.parse(range.value.start) > 3660 * 86400000);
 const history = computed(() => buildPracticeHistory(props.events, props.snapshots, invalidRange.value ? today : range.value.start, invalidRange.value ? today : range.value.end, grouping.value, props.movies));
-const seriesOptions = computed(() => metric.value === 'time' ? [...practiceSeries, { kind: 'movies', label: 'Movies', color: '#d99836' }] : [{ kind: metric.value, label: metrics.find((item) => item.value === metric.value)!.label, color: '#5875de' }]);
+const seriesOptions = computed(() => metric.value === 'time' ? [...practiceSeries, { kind: 'movies', label: 'Movies', color: '#e1ce35' }] : [{ kind: metric.value, label: metrics.find((item) => item.value === metric.value)!.label, color: '#5875de' }]);
 const visibleSeries = computed(() => seriesOptions.value.filter((series) => !hidden.value.includes(series.kind)));
 function value(index: number, kind: string): number | null {
   const bucket = history.value.buckets[index]!;
@@ -291,7 +291,7 @@ p { color: var(--app-muted-strong); font-size: 13px; }
 .history-plot { overflow-x: auto; }
 svg { display: block; width: 100%; min-width: 0; }
 svg text { fill: var(--app-muted-strong); font-size: 11px; }
-.movie-axis { fill: #d99836; }
+.movie-axis { fill: #e1ce35; }
 .history-grid { stroke: var(--app-border); }
 .history-cursor { stroke: var(--app-muted-strong); stroke-dasharray: 4; pointer-events: none; }
 .history-legend { display: flex; flex-wrap: wrap; gap: 8px; }
