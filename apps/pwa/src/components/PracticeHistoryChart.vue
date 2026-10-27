@@ -86,9 +86,12 @@
       <p class="history-range">
         {{ dateLabel(range.start) }} – {{ dateLabel(range.end) }} · {{ unit }}
       </p>
-      <div class="history-plot">
+      <div
+        ref="plotElement"
+        class="history-plot"
+      >
         <svg
-          viewBox="0 0 900 280"
+          :viewBox="`0 0 ${chartWidth} 280`"
           role="img"
           :aria-label="`${unit} by ${grouping}, ${range.start} to ${range.end}`"
         >
@@ -98,7 +101,7 @@
           >
             <line
               x1="48"
-              x2="880"
+              :x2="chartWidth - 20"
               :y1="230 - tick * 50"
               :y2="230 - tick * 50"
               class="history-grid"
@@ -138,9 +141,9 @@
             :key="bucket.key"
           >
             <rect
-              :x="x(index) - Math.max(2, 416 / history.buckets.length)"
+              :x="x(index) - Math.max(2, (chartWidth - 68) / 2 / history.buckets.length)"
               y="25"
-              :width="Math.max(4, 832 / history.buckets.length)"
+              :width="Math.max(4, (chartWidth - 68) / history.buckets.length)"
               height="210"
               fill="transparent"
               tabindex="0"
@@ -150,11 +153,11 @@
               @click="selected = index"
             ><title>{{ bucketDescription(index) }}</title></rect>
             <text
-              v-if="index === 0 || index === history.buckets.length - 1 || (history.buckets.length > 4 && index === Math.floor(history.buckets.length / 2))"
+              v-if="index === 0 || index === history.buckets.length - 1 || (chartWidth > 500 && history.buckets.length > 4 && index === Math.floor(history.buckets.length / 2))"
               :x="x(index)"
               y="258"
               :text-anchor="index === 0 ? 'start' : index === history.buckets.length - 1 ? 'end' : 'middle'"
-            >{{ dateLabel(bucket.key) }}</text>
+            >{{ chartDateLabel(bucket.key) }}</text>
           </g>
           <line
             v-if="selectedBucket"
@@ -206,11 +209,20 @@
   </section>
 </template>
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import type { LearningActivityEvent, StatisticsSnapshot } from '@mentor-ai/shared';
 import { buildPracticeHistory, localDateKey, practiceSeries, type HistoryGrouping } from 'src/services/practice-history';
 const props = defineProps<{ events: LearningActivityEvent[]; snapshots: StatisticsSnapshot[]; loading: boolean; error: string }>();
 defineEmits<{ refresh: [] }>();
+const plotElement = ref<HTMLElement | null>(null);
+const chartWidth = ref(900);
+let resizeObserver: ResizeObserver | undefined;
+onMounted(() => {
+  resizeObserver = new ResizeObserver(([entry]) => { if (entry) chartWidth.value = Math.max(230, entry.contentRect.width); });
+  if (plotElement.value) resizeObserver.observe(plotElement.value);
+});
+onBeforeUnmount(() => resizeObserver?.disconnect());
+watch(plotElement, (element) => { resizeObserver?.disconnect(); if (element) resizeObserver?.observe(element); });
 const grouping = ref<HistoryGrouping>('day'), period = ref('month'), metric = ref('time');
 const today = localDateKey(new Date());
 const customStart = ref(today), customEnd = ref(today), selected = ref(-1), hidden = ref<string[]>([]);
@@ -244,8 +256,9 @@ const totalExercises = computed(() => history.value.buckets.reduce((sum, bucket)
 const accuracy = computed(() => totalLessons.value ? history.value.buckets.reduce((sum, bucket) => sum + bucket.accuracySum, 0) / totalLessons.value : null);
 const selectedBucket = computed(() => history.value.buckets[selected.value]);
 const unit = computed(() => ({ time: 'Minutes', exercises: 'Exercises', accuracy: 'Accuracy (%)', words: 'Words spoken' }[metric.value]));
-function x(index: number) { return 48 + index * 832 / Math.max(1, history.value.buckets.length - 1); }
+function x(index: number) { return 48 + index * (chartWidth.value - 68) / Math.max(1, history.value.buckets.length - 1); }
 function points(kind: string) { let connected = false; return history.value.buckets.map((_, index) => { const amount = value(index, kind); if (amount === null) { connected = false; return ''; } const command = connected ? 'L' : 'M'; connected = true; return `${command}${x(index)},${230 - amount / maxValue.value * 200}`; }).join(' '); }
+function chartDateLabel(key: string) { return new Date(`${key}T12:00:00`).toLocaleDateString('en-GB', grouping.value === 'year' ? { year: 'numeric' } : { day: 'numeric', month: 'short' }); }
 function dateLabel(key: string) { return new Date(`${key}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 function bucketDescription(index: number) { const bucket = history.value.buckets[index]; return bucket ? `${dateLabel(bucket.key)}: ${visibleSeries.value.map((series) => { const amount = value(index, series.kind); return `${series.label} ${amount === null ? 'not measured' : `${Math.round(amount * 10) / 10}${metric.value === 'accuracy' ? '%' : metric.value === 'time' ? ' min' : ''}`}`; }).join(' · ')}` : ''; }
 function toggle(kind: string) { hidden.value = hidden.value.includes(kind) ? hidden.value.filter((item) => item !== kind) : [...hidden.value, kind]; }
@@ -262,7 +275,7 @@ p { color: var(--app-muted-strong); font-size: 13px; }
 .history-summary { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 20px 0; font-size: 12px; color: var(--app-muted-strong); }
 .history-summary strong { font-size: 22px; color: var(--app-text-strong); margin-right: 4px; }
 .history-plot { overflow-x: auto; }
-svg { display: block; width: 100%; min-width: 560px; }
+svg { display: block; width: 100%; min-width: 0; }
 svg text { fill: var(--app-muted-strong); font-size: 11px; }
 .history-grid { stroke: var(--app-border); }
 .history-cursor { stroke: var(--app-muted-strong); stroke-dasharray: 4; pointer-events: none; }
