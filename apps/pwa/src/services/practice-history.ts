@@ -2,14 +2,16 @@ import { learningActivityKinds, type LearningActivityEvent, type MovieLearningRe
 
 export type HistoryGrouping = 'day' | 'week' | 'month' | 'year';
 export const practiceSeries = [
-  { kind: 'grammar', label: 'Grammar', color: '#5875de' },
-  { kind: 'listening', label: 'Lesson listening', color: '#2795ad' },
-  { kind: 'speaking', label: 'Speaking', color: '#c45b9e' },
-  { kind: 'phrases', label: 'Phrases', color: '#b58029' },
-  { kind: 'audio', label: 'Audio', color: '#9571d4' },
-  { kind: 'reading', label: 'Reading', color: '#269c7e' },
-  { kind: 'vocabulary', label: 'Vocabulary', color: '#ce7056' },
+  { kind: 'grammar', label: 'Grammar', color: '#4775f5' },
+  { kind: 'listening', label: 'Lesson listening', color: '#14b7c8' },
+  { kind: 'speaking', label: 'Speaking', color: '#e34da0' },
+  { kind: 'phrases', label: 'Phrases', color: '#f09228' },
+  { kind: 'audio', label: 'Audio', color: '#9359df' },
+  { kind: 'reading', label: 'Reading', color: '#2aaf55' },
+  { kind: 'vocabulary', label: 'Vocabulary', color: '#e64b43' },
 ] as const;
+
+export const movieSeries = { kind: 'movies', label: 'Movies', color: '#c5d52b' } as const;
 
 export function localDateKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;

@@ -88,6 +88,7 @@
 
       <section
         class="stats-movies"
+        :style="{ '--metric-color': movieSeries.color }"
         aria-label="Movie learning"
       >
         <div class="stats-icon">
@@ -168,6 +169,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useAppStore } from 'src/stores/app-store';
 import { formatDisplayDate } from 'src/services/date-format';
+import { practiceSeries, movieSeries } from 'src/services/practice-history';
 import PracticeHistoryChart from 'src/components/PracticeHistoryChart.vue';
 import { loadLearningActivityHistory, loadLearningActivityTotals, syncLearningActivity } from 'src/services/learning-activity';
 import { loadMovieLearningReports, refreshMovieLearningReportsFromCloud } from 'src/services/movie-learning-reports';
@@ -208,15 +210,11 @@ const highlights = computed(() => [
   { label: 'Average accuracy', value: averageAccuracy.value, icon: 'track_changes', color: '#187b69', caption: 'Across recorded lessons' },
   { label: 'Practice days', value: serverSummary.value.practiceDays, icon: 'event_available', color: '#a56824', caption: 'Days with lesson results' },
 ]);
-const activities = computed(() => [
-  { label: 'Grammar', seconds: activityTotals.value.grammarSeconds, icon: 'spellcheck', color: '#4361c2' },
-  { label: 'Lesson listening', seconds: activityTotals.value.listeningSeconds, icon: 'hearing', color: '#247f92' },
-  { label: 'Speaking', seconds: activityTotals.value.speakingSeconds, icon: 'mic', color: '#9b4580' },
-  { label: 'Phrases', seconds: activityTotals.value.phrasesSeconds, icon: 'forum', color: '#a56824' },
-  { label: 'Audio', seconds: activityTotals.value.audioSeconds, icon: 'headphones', color: '#7355b4' },
-  { label: 'Reading', seconds: activityTotals.value.readingSeconds, icon: 'auto_stories', color: '#187b69' },
-  { label: 'Vocabulary', seconds: activityTotals.value.vocabularySeconds, icon: 'style', color: '#a55345' },
-].map((activity) => ({ ...activity, share: activityTotals.value.totalSeconds > 0 ? Math.min(1, Math.max(0, activity.seconds / activityTotals.value.totalSeconds)) : 0 })));
+const activityIcons = { grammar: 'spellcheck', listening: 'hearing', speaking: 'mic', phrases: 'forum', audio: 'headphones', reading: 'auto_stories', vocabulary: 'style' };
+const activities = computed(() => practiceSeries.map((activity) => {
+  const seconds = activityTotals.value[`${activity.kind}Seconds`];
+  return { ...activity, seconds, icon: activityIcons[activity.kind], share: activityTotals.value.totalSeconds > 0 ? Math.min(1, Math.max(0, seconds / activityTotals.value.totalSeconds)) : 0 };
+}));
 const skillRows = computed(() => [
   { label: 'Vocabulary', value: appStore.studentModel.vocabulary.score.value },
   { label: 'Grammar', value: appStore.studentModel.grammar.score.value },
@@ -340,7 +338,7 @@ h2 { margin: 0; font-size: 19px; line-height: 1.4; font-weight: 700; color: var(
 .stats-track { height: 6px; border-radius: 8px; background: var(--app-border); overflow: hidden; }
 .stats-track > div { height: 100%; border-radius: inherit; background: var(--metric-color); }
 .stats-empty { color: var(--app-muted-strong); margin: 18px 0 0; }
-.stats-movies { --metric-color: #7355b4; display: flex; align-items: center; gap: 20px; padding: 24px; background: var(--app-surface); }
+.stats-movies { display: flex; align-items: center; gap: 20px; padding: 24px; background: var(--app-surface); }
 .stats-movies-intro { flex: 1; }
 .stats-movie-number { display: flex; flex-direction: column; gap: 5px; min-width: 130px; }
 .stats-movie-number strong { font-size: 25px; line-height: 1.3; color: var(--app-text-strong); }
