@@ -5212,6 +5212,8 @@ p.lesson-complete__eyebrow,
   overflow-y: auto;
   overscroll-behavior: contain;
   align-content: start;
+  // Preserve the full card content; overflow belongs to the list viewport.
+  grid-auto-rows: max-content;
   padding: 4px 6px 8px 4px;
 }
 @media (max-width: 700px) {
