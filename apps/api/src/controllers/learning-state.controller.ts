@@ -122,3 +122,7 @@ export const synchronizeLearningEvents: RequestHandler = async (req, res, next) 
 };
 
 export const getConfiguration: RequestHandler = sendData(() => learningStateService.getConfiguration());
+
+export const getLearningActivityHistory: RequestHandler = sendData((req) =>
+  learningStateService.getLearningActivityHistory(req.authUser),
+);

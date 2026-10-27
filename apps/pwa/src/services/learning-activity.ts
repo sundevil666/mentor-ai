@@ -1,5 +1,5 @@
 import type { LearningActivityEvent, LearningActivityKind, LearningActivityTotals } from '@mentor-ai/shared';
-import { synchronizeLearningActivity } from './api-client';
+import { fetchLearningActivityHistory, synchronizeLearningActivity } from './api-client';
 import { readAuthSession } from './auth';
 import { mentorDb } from './indexed-db';
 import { buildActivityBaselineEvents, preferLocalTotals } from './learning-activity-totals';
@@ -21,7 +21,9 @@ export async function recordLearningActivity(input: {
   const activeSeconds = Math.max(1, Math.round(input.activeSeconds));
   const endedAt = input.endedAt ?? new Date().toISOString();
   const db = await mentorDb;
-  const id = `activity:${getDeviceId()}:${getBatchId()}:${input.kind}`;
+  const date = new Date(endedAt);
+  const day = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+  const id = `activity:${getDeviceId()}:${getBatchId()}:${day}:${input.kind}`;
   const previous = await db.get('learning-activity-outbox', id) as LearningActivityEvent | undefined;
   const latestEvent: LearningActivityEvent = {
       id,
@@ -66,6 +68,7 @@ async function performLearningActivitySync(): Promise<LearningActivityTotals> {
     rotateBatchId();
     const result = await synchronizeLearningActivity(pending, localTotals);
     const acknowledged = new Set(result.acknowledgedIds);
+    await cacheAcknowledgedActivity(pending.filter((event) => acknowledged.has(event.id)));
     for (const event of pending) if (acknowledged.has(event.id)) await db.delete('learning-activity-outbox', event.id);
     remoteTotals = result.totals;
   } else {
@@ -151,4 +154,31 @@ function getBatchId() {
 
 function rotateBatchId() {
   localStorage.setItem(batchKey, crypto.randomUUID());
+}
+
+// Reuse the summary store for an account-scoped offline history cache.
+export async function loadLearningActivityHistory(refresh = false): Promise<LearningActivityEvent[]> {
+  const db = await mentorDb;
+  const key = `history:${readAuthSession()?.user.id ?? 'local'}`;
+  if (refresh && navigator.onLine) {
+    const events = await fetchLearningActivityHistory();
+    await db.put('learning-activity-summary', { id: key, events });
+  }
+  const cached = await db.get('learning-activity-summary', key) as { events: LearningActivityEvent[] } | undefined;
+  const pending = await db.getAll('learning-activity-outbox') as LearningActivityEvent[];
+  const studentId = readAuthSession()?.user.id;
+  const merged = new Map((cached?.events ?? []).map((event) => [event.id, event]));
+  for (const event of pending) {
+    if (!studentId || event.studentId === studentId) merged.set(event.id, event);
+  }
+  return [...merged.values()];
+}
+
+async function cacheAcknowledgedActivity(events: LearningActivityEvent[]) {
+  const db = await mentorDb;
+  const key = `history:${readAuthSession()?.user.id ?? 'local'}`;
+  const cached = await db.get('learning-activity-summary', key) as { events: LearningActivityEvent[] } | undefined;
+  const merged = new Map((cached?.events ?? []).map((event) => [event.id, event]));
+  for (const event of events) merged.set(event.id, event);
+  await db.put('learning-activity-summary', { id: key, events: [...merged.values()].slice(-50_000) });
 }

@@ -5,6 +5,7 @@ import {
   getRecommendations,
   getReadingResumeSnapshot,
   getLearningActivityTotals,
+  getLearningActivityHistory,
   getStudentState,
   listSessionHandoffs,
   listContentProgress,
@@ -39,6 +40,7 @@ learningStateRouter.put('/reading-resume', upsertReadingDeviceSession);
 learningStateRouter.post('/content-engagement-synchronize', mergeContentEngagementEvents);
 learningStateRouter.post('/learning-activity-synchronize', mergeLearningActivityEvents);
 learningStateRouter.get('/learning-activity-totals', getLearningActivityTotals);
+learningStateRouter.get('/learning-activity-history', getLearningActivityHistory);
 learningStateRouter.post('/application-telemetry-synchronize', mergeApplicationTelemetryEvents);
 learningStateRouter.post('/movie-learning-reports-synchronize', mergeMovieLearningReports);
 learningStateRouter.get('/movie-learning-reports-synchronize', listMovieLearningReports);

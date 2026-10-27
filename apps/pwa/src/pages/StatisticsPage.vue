@@ -30,6 +30,14 @@
         </article>
       </section>
 
+      <PracticeHistoryChart
+        :events="activityHistory"
+        :snapshots="appStore.statisticsSnapshots"
+        :loading="historyLoading"
+        :error="historyError"
+        @refresh="refreshHistory(true)"
+      />
+
       <section
         class="stats-practice"
         aria-labelledby="practice-title"
@@ -159,14 +167,18 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useAppStore } from 'src/stores/app-store';
 import { formatDisplayDate } from 'src/services/date-format';
-import { loadLearningActivityTotals, syncLearningActivity } from 'src/services/learning-activity';
+import PracticeHistoryChart from 'src/components/PracticeHistoryChart.vue';
+import { loadLearningActivityHistory, loadLearningActivityTotals, syncLearningActivity } from 'src/services/learning-activity';
 import { loadMovieLearningReports, refreshMovieLearningReportsFromCloud } from 'src/services/movie-learning-reports';
 import { summarizeMovieViewing } from 'src/services/movie-viewing-summary';
-import type { LearningActivityTotals } from '@mentor-ai/shared';
+import type { LearningActivityEvent, LearningActivityTotals } from '@mentor-ai/shared';
 import type { MovieLearningReport } from '@mentor-ai/shared';
 
 const appStore = useAppStore();
 const activityTotals = ref<LearningActivityTotals>({ grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null });
+const activityHistory = ref<LearningActivityEvent[]>([]);
+const historyLoading = ref(false);
+const historyError = ref('');
 const movieReports = ref<MovieLearningReport[]>([]);
 const movieSummary = computed(() => summarizeMovieViewing(movieReports.value));
 
@@ -240,6 +252,7 @@ onMounted(async () => {
     await appStore.hydrate();
   }
   await refreshActivityTotals();
+  await refreshHistory();
   await refreshMovieReports();
   appStore.markStatisticsSeen();
   if (appStore.isOnline) void refreshFromServer();
@@ -263,10 +276,26 @@ async function refreshFromServer() {
   await appStore.refreshRemoteLearningState();
   activityTotals.value = await syncLearningActivity().catch(() => loadLearningActivityTotals());
   await refreshMovieReports();
+  await refreshHistory(true);
   appStore.markStatisticsSeen();
 }
 
-async function refreshActivityTotals() { activityTotals.value = await loadLearningActivityTotals(); }
+async function refreshActivityTotals() {
+  activityTotals.value = await loadLearningActivityTotals();
+  await refreshHistory();
+}
+async function refreshHistory(remote = false) {
+  if (remote) historyLoading.value = true;
+  try {
+    activityHistory.value = await loadLearningActivityHistory(remote);
+    if (remote) historyError.value = '';
+  } catch {
+    historyError.value = 'Cloud history is unavailable. Showing locally saved records; try refreshing when online.';
+    activityHistory.value = await loadLearningActivityHistory();
+  } finally {
+    if (remote) historyLoading.value = false;
+  }
+}
 
 async function refreshMovieReports() {
   if (navigator.onLine) await refreshMovieLearningReportsFromCloud().catch(() => 0);
@@ -285,6 +314,7 @@ function formatDuration(seconds: number) {
 </script>
 
 <style scoped lang="scss">
+.statistics-shell { min-width: 0; grid-template-columns: minmax(0, 1fr); }
 .stats-highlights { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .stats-card, .stats-practice, .stats-movies { border: 1px solid var(--app-border); border-radius: 22px; background: var(--app-surface); }
 .stats-card { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 22px; background: linear-gradient(145deg, color-mix(in srgb, var(--metric-color) 7%, var(--app-surface)), var(--app-surface) 75%); }

@@ -5,6 +5,7 @@ import {
   getConfiguration,
   getCurrentLesson,
   getLearningActivityTotals,
+  getLearningActivityHistory,
   getStudentState,
   synchronizeLearningEvents,
   upsertSessionHandoff,
@@ -43,6 +44,12 @@ describe('learning state controllers', () => {
 
     assert.equal(typeof res.body.data.totalSeconds, 'number');
     assert.equal(res.body.data.totalSeconds >= 0, true);
+  });
+
+  it('returns dated practice events through the history endpoint', async () => {
+    const { res } = createMockResponse();
+    await getLearningActivityHistory({}, res, throwNext);
+    assert.equal(Array.isArray(res.body.data), true);
   });
 
   it('synchronizes speech evidence into pronunciation statistics', async () => {

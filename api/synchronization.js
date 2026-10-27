@@ -72,6 +72,14 @@ module.exports = async (request, response) => {
     }
 
     const { learningStateService } = await import('../apps/api/src/services/learning-state.service.js');
+    if (request.query?.action === 'activity-history') {
+      if (request.method !== 'GET') {
+        sendJson(response, 405, { message: 'Method not allowed.' });
+        return;
+      }
+      sendJson(response, 200, await learningStateService.getLearningActivityHistory(user));
+      return;
+    }
     if (request.query?.action === 'reading-resume') {
       if (request.method === 'GET') {
         sendJson(response, 200, await learningStateService.getReadingResumeSnapshot(String(request.query?.bookId || ''), user));

@@ -196,6 +196,10 @@ export const learningStateService = {
     return { acknowledgedIds, totals: summarizeLearningActivity(learningActivityTotals, state.contentProgress, state.statisticsSnapshots) };
   },
 
+  async getLearningActivityHistory(user?: AuthenticatedUser) {
+    return learningStateRepository.readLearningActivityHistory(user);
+  },
+
   async getLearningActivityTotals(user?: AuthenticatedUser) {
     const state = await learningStateRepository.readLearningActivitySummary(user);
     return summarizeLearningActivity(state.learningActivityTotals, state.contentProgress, state.statisticsSnapshots);

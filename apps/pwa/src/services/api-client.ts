@@ -516,3 +516,9 @@ function authHeaders(): Record<string, string> {
 
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
+
+export async function fetchLearningActivityHistory(): Promise<LearningActivityEvent[]> {
+  const response = await fetch(`${apiBaseUrl}/api/learning-activity-history`, { headers: authHeaders() });
+  if (!response.ok) throw new Error('Could not load practice history');
+  return ((await response.json()) as ApiResponse<LearningActivityEvent[]>).data;
+}

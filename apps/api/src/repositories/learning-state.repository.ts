@@ -336,6 +336,13 @@ export const learningStateRepository = {
     await learningStateRepository.write({ ...state, movieLearningReports }, user);
   },
 
+  async readLearningActivityHistory(user?: AuthenticatedUser): Promise<LearningActivityEvent[]> {
+    const database = await readDatabaseStateSlice<LearningActivityEvent[]>('learningActivityEvents', user);
+    if (database) return database.value ?? [];
+    const state = await learningStateRepository.read(user);
+    return state.learningActivityEvents;
+  },
+
   async readLearningActivityState(user?: AuthenticatedUser): Promise<{
     studentId: string;
     learningActivityEvents: LearningActivityEvent[];
