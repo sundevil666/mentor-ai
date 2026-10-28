@@ -23,8 +23,8 @@ describe('daily reading progress', () => {
 
     assert.equal(first.readingDaysRemaining, 9);
     assert.equal(idleNextDay.readingDaysRemaining, 9);
-    assert.equal(first.finishDate.getDate(), 21);
-    assert.equal(idleNextDay.finishDate.getDate(), 22);
+    assert.equal(first.finishDate.getDate(), 22);
+    assert.equal(idleNextDay.finishDate.getDate(), 23);
   });
 
   it('shortens the reading forecast after progress beyond the daily target', () => {
@@ -32,7 +32,7 @@ describe('daily reading progress', () => {
 
     assert.equal(forecast.wordsRemaining, 23_000);
     assert.equal(forecast.readingDaysRemaining, 23 / 3);
-    assert.equal(forecast.finishDate.getDate(), 20);
+    assert.equal(forecast.finishDate.getDate(), 21);
   });
 
   it('reduces fractional reading days with each page while keeping one finish date', () => {
@@ -51,8 +51,19 @@ describe('daily reading progress', () => {
     assert.equal(formatReadingDaysRemaining(afterTwoDays.readingDaysRemaining), '3,02 reading days left');
     assert.deepEqual(
       [before, afterOnePage, afterTwoPages, afterTwoDays].map(({ finishDate }) => finishDate.toDateString()),
-      [23, 23, 23, 24].map((day) => new Date(2026, 8, day).toDateString()),
+      [24, 24, 24, 25].map((day) => new Date(2026, 8, day).toDateString()),
     );
+  });
+
+  it('rounds remaining reading days up to whole calendar days', () => {
+    const today = new Date(2026, 9, 28);
+    for (const [wordsRemaining, expectedDate] of [[2_610, 29], [1, 29], [3_000, 29], [3_001, 30]] as const) {
+      const forecast = bookReadingForecast(100_000, 100_000 - wordsRemaining, 3_000, today);
+      assert.equal(forecast.finishDate.getDate(), expectedDate);
+      assert.equal(forecast.readingDaysRemaining, wordsRemaining / 3_000);
+    }
+    const monthEnd = bookReadingForecast(3_000, 390, 3_000, new Date(2026, 11, 31));
+    assert.deepEqual(monthEnd.finishDate, new Date(2027, 0, 1));
   });
 
   it('shows no remaining days when the book is complete', () => {

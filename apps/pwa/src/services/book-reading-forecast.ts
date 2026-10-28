@@ -20,7 +20,7 @@ export function bookReadingForecast(
   const wordsRemaining = safeTotal - safePosition;
   const readingDaysRemaining = wordsRemaining / safeTarget;
   const finishDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  finishDate.setDate(finishDate.getDate() + Math.max(0, Math.ceil(readingDaysRemaining) - 1));
+  finishDate.setDate(finishDate.getDate() + Math.ceil(readingDaysRemaining));
 
   return { finishDate, readingDaysRemaining, wordsRemaining };
 }
