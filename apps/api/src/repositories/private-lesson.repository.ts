@@ -13,19 +13,17 @@ export const privateLessonRepository = {
     if (pool) {
       try {
         await ensurePrivateLessonsTable();
-        const result = await pool.query<{ lesson: GeneratedLesson; changed_at: Date | string }>(
+        const result = await pool.query<{ lesson: GeneratedLesson }>(
           `
-            SELECT lesson, updated_at AS changed_at
+            SELECT lesson
             FROM private_lessons
             WHERE is_active = true AND updated_at >= $1
             ORDER BY updated_at DESC
           `,
           [since.toISOString()],
         );
-        const databaseLessons = result.rows.map((row) => ({
-          ...row.lesson,
-          createdAt: new Date(row.changed_at).toISOString(),
-        })).filter(isGeneratedLesson);
+        // updated_at discovers changed content; createdAt keeps its original library date.
+        const databaseLessons = result.rows.map((row) => row.lesson).filter(isGeneratedLesson);
         if (databaseLessons.length > 0) return databaseLessons;
       } catch {
         // The private environment fallback keeps lessons available while the database quota is blocked.
