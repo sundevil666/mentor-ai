@@ -3549,7 +3549,8 @@ body.body--dark .personal-reader__book-heading h1 {
   border-radius: var(--app-radius-md);
   display: grid;
   gap: 8px;
-  min-height: min(36dvh, 320px);
+  flex-shrink: 0;
+  min-height: 0;
   padding: 12px;
 }
 
@@ -3633,7 +3634,7 @@ body.body--dark .personal-reader__lookup-text {
 }
 
 .personal-reader__lookup-result > * {
-  min-height: 100%;
+  min-height: 0;
 }
 
 .personal-reader__lookup-translation {

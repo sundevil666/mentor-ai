@@ -506,7 +506,6 @@
             :class="{ 'personal-reader__lookup--empty': !selectedReaderText && !readerLookupLoading && !readerLookupError }"
             aria-live="polite"
             aria-label="Selected text helper"
-            :style="{ fontSize: `${readerFontSize}px` }"
           >
             <div v-if="selectedReaderText" class="personal-reader__lookup-heading">
               <strong>{{ readerLookupKind === 'word' ? 'Word' : 'Phrase' }}</strong>
@@ -524,7 +523,7 @@
                 <q-btn aria-label="Play selected text" color="primary" icon="volume_up" round size="sm" unelevated @click="speakReaderText(selectedReaderText)" />
               </div>
             </div>
-            <p v-if="selectedReaderText" class="personal-reader__lookup-text">{{ selectedReaderText }}</p>
+            <ReaderLookupText v-if="selectedReaderText" class="personal-reader__lookup-text" :text="selectedReaderText" :max-font-size="readerFontSize * 1.08" label="Selected text" />
             <div v-if="readerPhonetic" class="personal-reader__lookup-phonetic">
               <span>Transcription</span>
               <strong>{{ readerPhonetic }}</strong>
@@ -538,7 +537,7 @@
                 <q-spinner color="primary" size="24px" />
                 <span>Translating…</span>
               </div>
-              <p v-else-if="readerLookup?.translation" class="personal-reader__lookup-translation">{{ readerLookup.translation }}</p>
+              <ReaderLookupText v-else-if="readerLookup?.translation" class="personal-reader__lookup-translation" :text="readerLookup.translation" :max-font-size="readerFontSize * 0.96" label="Translation" />
               <p v-else-if="readerLookup?.translationError" class="personal-reader__lookup-error">{{ readerLookup.translationError }}</p>
               <div v-else-if="readerLookupError" class="personal-reader__lookup-error">
                 <p>{{ readerLookupError }}</p>
@@ -667,6 +666,7 @@ import AppDetailLayout from 'src/components/AppDetailLayout.vue';
 import AppAudioDock from 'src/components/AppAudioDock.vue';
 import AudioCollection from 'src/components/AudioCollection.vue';
 import { groupAudioCollections } from 'src/services/audio-collections';
+import ReaderLookupText from 'src/components/ReaderLookupText.vue';
 import AudioLibraryTabs from 'src/components/AudioLibraryTabs.vue';
 import { loadContentEngagementSummaries, recordContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
 import { loadContentProgress, saveContentProgress } from 'src/services/content-progress';
