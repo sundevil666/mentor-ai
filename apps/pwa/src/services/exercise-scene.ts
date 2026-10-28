@@ -1,5 +1,5 @@
 /** Generic visual vocabulary; never store personalized lesson text or IDs here. */
-export type ExerciseScene = 'help' | 'check' | 'parcel' | 'door' | 'door-open' | 'keys' | 'repair' | 'cafe' | 'wait' | 'relief' | 'explain' | 'traffic' | 'run' | 'phone' | 'tickets';
+export type ExerciseScene = 'help' | 'check' | 'parcel' | 'door' | 'door-open' | 'window' | 'keys' | 'repair' | 'cafe' | 'wait' | 'relief' | 'explain' | 'traffic' | 'run' | 'phone' | 'tickets';
 export function resolveExerciseScene(prompt: string): ExerciseScene | null {
   const rules: Array<[RegExp, ExerciseScene]> = [
     [/беж|побеж|\brun\b|\bran\b/i, 'run'],
@@ -9,9 +9,10 @@ export function resolveExerciseScene(prompt: string): ExerciseScene | null {
     [/ключ|\bkeys\b/i, 'keys'],
     [/билет|tickets/i, 'tickets'],
     [/пробк|traffic/i, 'traffic'],
-    [/позвон|called|\bcall\b/i, 'phone'],
+    [/позвон|телефон|called|\bcall\b|\bphone\b/i, 'phone'],
+    [/окно|окна|\bwindow\b/i, 'window'],
     [/кофе|кафе|счёт|счет|coffee|\bpay\b/i, 'cafe'],
-    [/подож|hold on|\bwait\b/i, 'wait'],
+    [/подож|минут|hold on|\bwait\b|\bminute\b/i, 'wait'],
     [/облегч|relieved/i, 'relief'],
     [/понима|объясн|understand|explaining/i, 'explain'],
     [/помо|попрос|could you|\bhelp\b/i, 'help'],

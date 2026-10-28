@@ -16,6 +16,10 @@
         <template v-else-if="scene === 'parcel'">
           <path d="m133 78 38-20 37 20v47l-37 19-38-19zm0 0 38 20 37-20m-37 20v46m-18-76 37 20v20" />
         </template>
+        <template v-else-if="scene === 'window'">
+          <path d="M132 48h78v79h-78zm39 0v79m-39-40h78m-85 47h92" />
+          <path d="m137 55 27 7v54l-27 5zm41 7 25-7v66l-25-5z" />
+        </template>
         <template v-else-if="scene === 'door' || scene === 'door-open'">
           <path d="M132 140V26h76v114" />
           <g class="situation-scene__door"><path d="M137 30h66v107h-66z" /><circle cx="190" cy="87" r="3" /></g>
@@ -62,7 +66,7 @@ const props = defineProps<{ scene: ExerciseScene }>();
 const paused = ref(false);
 const animated = computed(() => ['door-open', 'run'].includes(props.scene));
 const descriptions: Record<ExerciseScene, string> = {
-  help: 'Просьба о помощи', check: 'Человек проверяет запись', parcel: 'Человек и посылка', door: 'Человек возле двери', 'door-open': 'Человек открывает дверь', keys: 'Человек ищет ключи', repair: 'Человек и инструмент для ремонта', cafe: 'Человек в кафе', wait: 'Человек ждёт', relief: 'Человек испытывает облегчение', explain: 'Человек разбирается в объяснении', traffic: 'Транспорт на дороге', run: 'Человек бежит к автобусу', phone: 'Человек и телефонный звонок', tickets: 'Человек забирает билеты',
+  window: 'Человек возле окна', help: 'Просьба о помощи', check: 'Человек проверяет запись', parcel: 'Человек и посылка', door: 'Человек возле двери', 'door-open': 'Человек открывает дверь', keys: 'Человек ищет ключи', repair: 'Человек и инструмент для ремонта', cafe: 'Человек в кафе', wait: 'Человек ждёт', relief: 'Человек испытывает облегчение', explain: 'Человек разбирается в объяснении', traffic: 'Транспорт на дороге', run: 'Человек бежит к автобусу', phone: 'Человек и телефонный звонок', tickets: 'Человек забирает билеты',
 };
 const description = computed(() => descriptions[props.scene]);
 </script>
