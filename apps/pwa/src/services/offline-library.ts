@@ -170,7 +170,7 @@ export async function removeOfflineLesson(lesson: OfflineLesson) {
   if (lesson.speechTexts) await deleteSpeechBatch(lesson.speechTexts);
   if (lesson.story) await deleteOfflineStory(lesson.story);
   if (lesson.audio) await deleteOfflineAudio(lesson.audio);
-  if (lesson.category === 'lessons') await (await getMentorDb()).delete('lessons', lesson.id);
+  // Removing offline media must not remove a locally imported lesson from the catalog.
   saveLessons(readOfflineLessons().filter((item) => !(item.id === lesson.id && item.category === lesson.category)), true);
   if (lesson.category === 'lessons') notifyGeneratedLessonOfflineChange();
 }

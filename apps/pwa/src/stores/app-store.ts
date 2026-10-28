@@ -1319,10 +1319,8 @@ export const useAppStore = defineStore('app', {
 
     async pruneLocalStorage() {
       const db = await mentorDb;
-      const currentLessonId = this.session?.lesson.id;
-      const protectedLessonIds = new Set(currentLessonId ? [currentLessonId] : []);
-
-      await pruneStore(db, 'lessons', defaultRetentionPolicy.maxLessons, protectedLessonIds);
+      // Lessons also contain locally imported catalog entries that may have no cloud copy.
+      // Keep their small JSON records; prune learning evidence independently.
       await pruneStore(db, 'statistics', defaultRetentionPolicy.maxStatisticsSnapshots);
       await pruneStore(db, 'activity-snapshots', defaultRetentionPolicy.maxActivitySnapshots);
       await pruneStore(db, 'concept-evidence', defaultRetentionPolicy.maxConceptEvidence);
@@ -1366,7 +1364,6 @@ export const useAppStore = defineStore('app', {
 async function pruneStore(
   db: Awaited<typeof mentorDb>,
   storeName:
-    | 'lessons'
     | 'statistics'
     | 'activity-snapshots'
     | 'concept-evidence',

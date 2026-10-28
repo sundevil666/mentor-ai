@@ -9,7 +9,6 @@ export interface RetentionRecord {
 }
 
 export interface RetentionPolicy {
-  maxLessons: number;
   maxStatisticsSnapshots: number;
   maxActivitySnapshots: number;
   maxConceptEvidence: number;
@@ -17,7 +16,6 @@ export interface RetentionPolicy {
 }
 
 export const defaultRetentionPolicy: RetentionPolicy = {
-  maxLessons: 20,
   maxStatisticsSnapshots: 120,
   maxActivitySnapshots: 80,
   maxConceptEvidence: 120,
