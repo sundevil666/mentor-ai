@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import type { LearningActivityEvent, MovieLearningReport, StatisticsSnapshot } from '@mentor-ai/shared';
-import { buildPracticeHistory } from '../src/services/practice-history.js';
+import { buildPracticeHistory, suggestedPracticeGoal, summarizeHistoryValues, nearestHistoryIndex } from '../src/services/practice-history.js';
 const event = (overrides: Partial<LearningActivityEvent> = {}): LearningActivityEvent => ({ id: 'one', studentId: 'student', kind: 'reading', contentId: 'daily-category-total', sourceDeviceId: 'device', activeSeconds: 120, startedAt: '2026-10-25T12:00:00', endedAt: '2026-10-25T12:02:00', ...overrides });
 it('fills empty days and deduplicates synchronized and pending events', () => {
   const result = buildPracticeHistory([event(), event()], [], '2026-10-24', '2026-10-26', 'day');
@@ -51,4 +51,25 @@ it('counts movies by watched date, deduplicates reports, and never adds estimate
     assert.equal(result.buckets.reduce((sum, bucket) => sum + bucket.movies, 0), 1);
     assert.equal(result.buckets.reduce((sum, bucket) => sum + Object.values(bucket.seconds).reduce((a, b) => a + b, 0), 0), 0);
   }
+});
+
+it('distinguishes unmeasured accuracy from zero activity when finding extremes', () => {
+  assert.deepEqual(summarizeHistoryValues([null, 80, 95]), { min: 80, max: 95 });
+  assert.deepEqual(summarizeHistoryValues([0, 10, 5]), { min: 0, max: 10 });
+  assert.deepEqual(summarizeHistoryValues([null, NaN]), { min: null, max: null });
+});
+it('suggests goals in the correct units without imposing a daily movie quota', () => {
+  assert.equal(suggestedPracticeGoal('time', 'reading', 'day'), 10);
+  assert.equal(suggestedPracticeGoal('time', 'reading', 'week'), 70);
+  assert.equal(suggestedPracticeGoal('accuracy', 'accuracy', 'year'), 80);
+  assert.equal(suggestedPracticeGoal('words', 'words', 'month'), 1500);
+  assert.equal(suggestedPracticeGoal('time', 'movies', 'day'), null);
+  assert.equal(suggestedPracticeGoal('movies', 'movies', 'week'), 1);
+});
+it('selects the nearest date from chart coordinates and clamps the edges', () => {
+  assert.equal(nearestHistoryIndex(48, 486, 5), 0);
+  assert.equal(nearestHistoryIndex(248, 486, 5), 2);
+  assert.equal(nearestHistoryIndex(448, 486, 5), 4);
+  assert.equal(nearestHistoryIndex(-100, 486, 5), 0);
+  assert.equal(nearestHistoryIndex(999, 486, 5), 4);
 });

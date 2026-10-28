@@ -67,3 +67,19 @@ export function buildPracticeHistory(events: LearningActivityEvent[], snapshots:
   }
   return { buckets, undatedSeconds };
 }
+
+/** Editable starting points, not measured skill thresholds or a personalized plan. */
+export function suggestedPracticeGoal(metric: string, kind: string, grouping: HistoryGrouping): number | null {
+  if (kind === 'movies') return grouping === 'day' ? null : { week: 1, month: 4, year: 52 }[grouping];
+  if (metric === 'accuracy') return 80;
+  return (metric === 'words' ? 50 : 10) * { day: 1, week: 7, month: 30, year: 365 }[grouping];
+}
+
+export function summarizeHistoryValues(values: Array<number | null>) {
+  const measured = values.filter((value): value is number => value !== null && Number.isFinite(value));
+  return { min: measured.length ? Math.min(...measured) : null, max: measured.length ? Math.max(...measured) : null };
+}
+
+export function nearestHistoryIndex(position: number, width: number, count: number): number {
+  return Math.max(0, Math.min(count - 1, Math.round((position - 48) / (width - 86) * Math.max(1, count - 1))));
+}
