@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getReaderPhonetic, getReaderTranslationUsage, saveReadingTranscript, saveReadingPageSpeech, synchronizePersonalReadingBooks, synchronizeReaderTranslationUsage, synchronizeReaderVocabulary, translateReaderText } from '../controllers/reader-lookup.controller.js';
+import { saveBookReadingAnalytics, getReaderPhonetic, getReaderTranslationUsage, saveReadingTranscript, saveReadingPageSpeech, synchronizePersonalReadingBooks, synchronizeReaderTranslationUsage, synchronizeReaderVocabulary, translateReaderText } from '../controllers/reader-lookup.controller.js';
 import { requireLearningIdentity } from '../middleware/auth-context.js';
 
 export const readerLookupRouter = Router();
@@ -12,3 +12,5 @@ readerLookupRouter.post('/vocabulary-synchronize', synchronizeReaderVocabulary);
 readerLookupRouter.post('/books-synchronize', synchronizePersonalReadingBooks);
 readerLookupRouter.post('/reading-transcripts', saveReadingTranscript);
 readerLookupRouter.post('/page-speech', saveReadingPageSpeech);
+
+readerLookupRouter.post('/book-analytics', saveBookReadingAnalytics);

@@ -1,3 +1,4 @@
+import type { BookReadingAnalytics, BookReadingAnalyticsReceipt } from '@mentor-ai/shared';
 import type {
   ApiResponse,
   ApplicationTelemetryEvent,
@@ -521,4 +522,16 @@ export async function fetchLearningActivityHistory(): Promise<LearningActivityEv
   const response = await fetch(`${apiBaseUrl}/api/learning-activity-history`, { headers: authHeaders() });
   if (!response.ok) throw new Error('Could not load practice history');
   return ((await response.json()) as ApiResponse<LearningActivityEvent[]>).data;
+}
+
+
+export async function synchronizeBookReadingAnalytics(books: BookReadingAnalytics[]): Promise<BookReadingAnalyticsReceipt[]> {
+  const response = await fetch(`${apiBaseUrl}/api/reader/book-analytics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ books }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) await throwApiError(response, 'Book reading analytics synchronization failed.');
+  return ((await response.json()) as ApiResponse<BookReadingAnalyticsReceipt[]>).data;
 }

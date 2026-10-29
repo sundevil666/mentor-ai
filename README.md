@@ -48,6 +48,18 @@ batched into the shared once-per-day maintenance window whenever possible.
 - Keep only requests required for an explicit user action or live safety feature
   outside the daily batch (for example sign-in, a requested translation, manual
   refresh, lesson generation, or active cross-device reader coordination).
+- Book reading analytics use cumulative per-device/book snapshots in IndexedDB.
+  Collection makes no network requests. A separate transactional 24-hour attempt
+  gate (including failed attempts) allows one request of at most 10 books / 64 KiB
+  in daily maintenance. No automatic retry loop or manual-sync bypass is used.
+  Server upserts accept only newer revisions, so retries cannot double counts;
+  acknowledgements clear only the sent revision. The latest local summary stays
+  available offline as a bounded working record, not a growing event log.
+  Counts cover activity collected after this feature was enabled; missing history
+  is unknown, never evidence of zero difficulty. Page completion/recognized words
+  are distinct from navigation position and do not prove comprehension. Speech
+  non-matches are review candidates, not diagnosed pronunciation errors. Examples
+  are bounded and marked when truncated; full books/audio are never uploaded here.
 - During active product testing, application-version checks are the deliberate
   exception: they run every minute while the PWA is visible so a new build is
   installed automatically. Revisit this exception when the testing phase ends.

@@ -1,3 +1,4 @@
+import { storeBookReadingAnalytics } from '../services/book-reading-analytics.service.js';
 import { getPostgresPool } from '../repositories/postgres-client.js';
 import { learningStateRepository } from '../repositories/learning-state.repository.js';
 import { listPersonalReadingBookVersions, synchronizePersonalReadingBooks as exchangePersonalReadingBooks } from '../services/personal-reading-books.service.js';
@@ -95,4 +96,15 @@ export const saveReadingPageSpeech: RequestHandler = async (req, res, next) => {
     if (!req.authUser) { res.status(401).json({ error: { message: 'Sign in to save reading progress.' } }); return; }
     res.json({ data: await storeReadingPageSpeech(req.body?.pages, req.authUser) });
   } catch (error) { next(error); }
+};
+
+
+export const saveBookReadingAnalytics: RequestHandler = async (req, res, next) => {
+  if (!req.authUser) { res.status(401).json({ data: { message: 'Sign in to save book reading analytics.' } }); return; }
+  try {
+    res.json({ data: await storeBookReadingAnalytics(req.body?.books, req.authUser) });
+  } catch (error) {
+    if (error instanceof RangeError) { res.status(400).json({ data: { message: error.message } }); return; }
+    next(error);
+  }
 };

@@ -1,3 +1,4 @@
+import { recordBookReadingAnalytics } from './book-reading-analytics';
 import type { ReaderTextLookup, ReaderVocabularyItem } from '@mentor-ai/shared';
 import { mentorDb } from './indexed-db';
 import { synchronizeReaderVocabulary } from './api-client';
@@ -13,6 +14,10 @@ export async function recordReaderVocabularyInteraction(input: {
   translationRequested?: boolean;
   pronunciationRequested?: boolean;
 }): Promise<ReaderVocabularyItem> {
+  await recordBookReadingAnalytics(input.studentId, input.bookId, {
+    kind: 'lookup', text: input.text, context: input.contextText,
+    translation: Boolean(input.translationRequested), pronunciation: Boolean(input.pronunciationRequested),
+  });
   await waitForVocabularySync();
   const normalizedText = input.text.toLocaleLowerCase('en').replace(/\s+/g, ' ').trim();
   const id = `reader-vocabulary:${input.studentId}:${normalizedText}`;

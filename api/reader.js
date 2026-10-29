@@ -6,6 +6,19 @@ module.exports = async (request, response) => {
     if (user === null) return;
 
     const action = request.query?.action;
+    if (action === 'book-analytics' && request.method === 'POST') {
+      if (!user) { sendJson(response, 401, { message: 'Sign in to save book reading analytics.' }); return; }
+      const body = await readJsonBody(request);
+      const analytics = await import('../apps/api/src/services/book-reading-analytics.service.js');
+      try {
+        sendJson(response, 200, await analytics.storeBookReadingAnalytics(body?.books, user));
+      } catch (error) {
+        if (error instanceof RangeError) { sendJson(response, 400, { message: error.message }); return; }
+        throw error;
+      }
+      return;
+    }
+
     const usageService = await import('../apps/api/src/services/translation-usage.service.js');
 
     if (action === 'usage' && request.method === 'GET') {

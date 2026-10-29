@@ -13,7 +13,7 @@
       "dest": "/api/synchronization?action=activity-history"
     },
     {
-      "src": "^/api/reader/(lookup|usage|phonetic)$",
+      "src": "^/api/reader/(lookup|usage|phonetic|book-analytics)$",
       "dest": "/api/reader?action=$1"
     },
     {

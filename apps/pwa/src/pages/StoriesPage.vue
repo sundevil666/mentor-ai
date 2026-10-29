@@ -161,7 +161,7 @@
           <small>{{ readerBookCalibration.evidenceCount ? `Based on ${readerBookCalibration.evidenceCount} books` : 'Provisional starting estimate' }} · {{ readerBookCalibration.confidence }} confidence</small>
         </div>
 
-        <details class="personal-books__fit-evidence">
+        <details class="personal-books__fit-evidence" @toggle="refreshBookAnalytics">
           <summary>How is this estimated?</summary>
           <p>Approximate fit on our text-difficulty scale, not a comprehension test or CEFR level. Your latest rating counts most. Reaching the end or making substantial progress gives weaker support; neither proves understanding. Each book counts once. Breaks never lower your estimate.</p>
           <ul v-if="readerBookCalibration.evidence.length">
@@ -169,6 +169,20 @@
               <strong>{{ item.title }}</strong>: {{ item.description }}. Text difficulty {{ item.difficulty }}/100.
             </li>
           </ul>
+          <template v-if="localBookAnalytics.length">
+            <p><strong>Reading activity saved on this device</strong></p>
+            <ul>
+              <li v-for="record in localBookAnalytics" :key="record.id">
+                <strong>{{ personalBooks.find(book => book.id === record.snapshot.bookId)?.title ?? 'Removed book' }}</strong>:
+                {{ record.snapshot.readWords }} observed words, {{ record.snapshot.wordLookups }} word translation requests,
+                {{ record.snapshot.passageLookups }} passage translation requests, {{ record.snapshot.pronunciationRequests }} pronunciation requests.
+                Speech: {{ record.snapshot.speechMatchedWords }}/{{ record.snapshot.speechPageWords }} page words matched.
+                {{ record.snapshot.revision > record.acknowledgedRevision ? 'Saved locally · waiting for daily upload.' : 'Uploaded · offline summary kept.' }}
+                {{ record.snapshot.examplesTruncated ? 'Examples are a limited sample.' : '' }}
+              </li>
+            </ul>
+            <p>Activity collected since this feature was enabled; earlier activity is not reconstructed. Speech non-matches include unread words and recognition misses, not confirmed pronunciation errors. This activity is being collected for future book selection; it does not yet change the fit score.</p>
+          </template>
           <p>The calculation starts at an assumed 45/100 and adjusts with this evidence. Progress alone only raises the estimate. Books without a rating need completion or at least 2,000 words and 10% reached to count. {{ readerBookCalibration.excludedBookCount }} books currently lack usable evidence or a text analysis. Add “How does it feel?” ratings to improve the estimate.</p>
         </details>
 
@@ -694,6 +708,7 @@ import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { assessBookDifficulty } from 'src/services/book-difficulty-assessment';
 import { applyReadingReview, isBookDifficultyReviewDue, postponeBookDifficultyReview, preserveBookLaneOnDifficultyCheck, recommendNextFreeBook } from 'src/services/book-reading-guidance';
+import { listBookReadingAnalytics, recordBookReadingAnalytics } from 'src/services/book-reading-analytics';
 import { calibrateReaderFromBooks, predictBookFit, predictUnseenBookFit } from 'src/services/reader-book-calibration';
 import { bookReaderDifficultyRatingLabel, personalBookAction, personalBookKanbanColumn, personalBookReadingStatus, personalBookReadingStatusLabel, sortPersonalBooksNewestFirst, type PersonalBookKanbanColumn, type PersonalBookReadingStatus } from 'src/services/personal-book-status';
 import { readerWordContext } from 'src/services/reader-word-context';
@@ -796,6 +811,11 @@ let readingSpeechPaceSampleAt = 0;
 let readingSpeechSuppressedForLookup = false;
 const dailyReadingProgress = ref<DailyReadingProgress>(readDailyReadingProgress());
 const personalBooks = ref<PersonalBook[]>([]);
+const localBookAnalytics = ref<Awaited<ReturnType<typeof listBookReadingAnalytics>>>([]);
+async function refreshBookAnalytics() {
+  localBookAnalytics.value = await listBookReadingAnalytics(appStore.studentId).catch(() => []);
+}
+
 const personalBookStatuses = ref<Record<string, PersonalBookReadingStatus>>({});
 const personalBookContentProgress = ref<Record<string, ContentProgress | undefined>>({});
 type PersonalBookSection = PersonalBookKanbanColumn | 'recommendations';
@@ -1615,7 +1635,7 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
     pageIndex: currentBookPageIndex.value,
     translationRequested: true,
     pronunciationRequested: speakImmediately,
-  }).catch(() => undefined) : Promise.resolve();
+  }).catch(showAnalyticsStorageWarning) : Promise.resolve();
   const shouldResumeReadingSpeech = readingSpeechActive.value;
   const requestId = ++readerLookupRequestId;
   try {
@@ -1753,7 +1773,7 @@ async function speakReaderText(text: string, recordInteraction = true) {
       chapterId: selectedBookPages.value[currentBookChapterIndex.value]?.chapterId,
       text,
       pronunciationRequested: true,
-    }).catch(() => undefined);
+    }).catch(showAnalyticsStorageWarning);
   }
   const microphoneTracks = readingSpeechStream?.getAudioTracks() ?? [];
   const muteMicrophone = () => {
@@ -2434,14 +2454,28 @@ function loadReadingPageSpeech(pageIndex: number) {
 function saveReadingPageSpeech() {
   const book = selectedBook.value;
   if (!book || !readingPageSpeech?.attempted || typeof localStorage === 'undefined') return;
-  saveReadingPageSummary(appStore.studentId, book.id, readingPageSpeech.summary());
+  const summary = readingPageSpeech.summary();
+  saveReadingPageSummary(appStore.studentId, book.id, summary);
+  persistBookAnalytics(book.id, {
+    kind: 'speech', indexes: getReadingPageWords(summary.pageIndex).map((word) => word.index), missed: summary.missedWords,
+  });
   if (readingSpeechFurthestWordIndex >= 0) void persistSpokenReadingProgress(readingSpeechFurthestWordIndex);
+}
+let analyticsStorageWarningShown = false;
+function showAnalyticsStorageWarning() {
+  if (analyticsStorageWarningShown) return;
+  analyticsStorageWarningShown = true;
+  Notify.create({ type: 'warning', message: 'Reading analytics could not be saved on this device. Check available storage.' });
+}
+function persistBookAnalytics(bookId: string, event: Parameters<typeof recordBookReadingAnalytics>[2]) {
+  void recordBookReadingAnalytics(appStore.studentId, bookId, event).catch(showAnalyticsStorageWarning);
 }
 function recordCompletedReaderPage(pageIndex: number) {
   const book = selectedBook.value;
   if (!book || typeof localStorage === 'undefined') return;
   const wordIndexes = getReadingPageWords(pageIndex).map((word) => word.index);
   if (!wordIndexes.length) return;
+  persistBookAnalytics(book.id, { kind: 'read', indexes: wordIndexes });
   readerFurthestWordPosition.value = Math.max(readerFurthestWordPosition.value, Math.max(...wordIndexes) + 1);
   dailyReadingProgress.value = prepareDailyReadingProgress(dailyReadingProgress.value);
   dailyReadingProgress.value = recordDailyReadWords(dailyReadingProgress.value, book.id, wordIndexes);

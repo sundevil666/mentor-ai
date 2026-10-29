@@ -79,6 +79,7 @@ import { mentorDb } from 'src/services/indexed-db';
 import { syncReadingPageSpeech, readingPageSpeechSyncIntervalMs } from 'src/services/reading-page-speech-outbox';
 import { syncPersonalBookCloud } from 'src/services/personal-book-cloud-sync';
 import { runServerMaintenance } from 'src/services/server-maintenance';
+import { syncBookReadingAnalytics } from 'src/services/book-reading-analytics';
 import { syncReaderVocabulary } from 'src/services/reader-vocabulary';
 import { updateOfflineLessons } from 'src/services/offline-lesson-updates';
 import { fetchTranslationUsage } from 'src/services/api-client';
@@ -432,9 +433,10 @@ async function runDailyServerMaintenance() {
       fetchTranslationUsage(),
       syncPersonalBookCloud(),
       appStore.publishSessionHandoff(true),
+      syncBookReadingAnalytics(appStore.studentId),
     ]);
     window.dispatchEvent(new Event('mentor-ai:daily-server-maintenance-finished'));
-    if ([2, 3, 4, 6, 7, 8, 9].some((index) => syncResults[index]?.status === 'rejected')
+    if ([2, 3, 4, 6, 7, 8, 9, 14].some((index) => syncResults[index]?.status === 'rejected')
       || (await pendingLearningActivityCount()) > 0
       || (await (await mentorDb).count('reading-transcript-outbox')) > 0
       || (await (await mentorDb).count('vocabulary-practice-items')) > 0
