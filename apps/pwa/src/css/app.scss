@@ -2160,6 +2160,7 @@ body.body--dark .mobile-start-dock__button--movies { --dock-accent: #f1a08f; --d
   border-radius: 14px;
   color: var(--app-text-muted);
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 10px 14px;
 }
@@ -5308,3 +5309,12 @@ body .app-page-container .q-page::after { opacity: .12; animation: none; }
 .personal-reader--focus .personal-reader__paper {
   background: transparent;
 }
+
+.personal-books__fit-evidence {
+  color: var(--app-text-muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.personal-books__fit-evidence summary { cursor: pointer; color: var(--category-accent); }
+.personal-books__fit-evidence ul { padding-left: 20px; }

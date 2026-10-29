@@ -3,10 +3,20 @@ import type { PersonalBookReadingStatus } from './personal-book-status';
 
 export type BookFitBand = 'easy' | 'good-fit' | 'stretch' | 'too-hard';
 
+export interface ReadingFitEvidence {
+  bookId: string;
+  title: string;
+  kind: 'rating' | 'finished' | 'progress';
+  description: string;
+  difficulty: number;
+}
+
 export interface ReaderBookCalibration {
   readerAbility: number;
   evidenceCount: number;
   confidence: 'low' | 'medium' | 'high';
+  evidence: ReadingFitEvidence[];
+  excludedBookCount: number;
 }
 
 export interface BookFitPrediction {
@@ -16,34 +26,69 @@ export interface BookFitPrediction {
   label: string;
 }
 
+/** A heuristic on the book-difficulty scale, not a comprehension or CEFR test.
+ * Ratings estimate a level; reading positions only provide weak lower bounds.
+ * One book contributes once, and inactivity is never evidence of inability.
+ */
 export function calibrateReaderFromBooks(
   books: readonly PersonalReadingBook[],
   statuses: Readonly<Record<string, PersonalBookReadingStatus>>,
+  wordsReached: Readonly<Record<string, number>> = {},
 ): ReaderBookCalibration {
-  const observations: Array<{ ability: number; weight: number }> = [];
+  const evidence: ReadingFitEvidence[] = [];
+  const ratings: Array<{ ability: number; weight: number }> = [];
+  const lowerBounds: Array<{ ability: number; weight: number }> = [];
+  const seen = new Set<string>();
   for (const book of books) {
+    if (seen.has(book.id)) continue;
+    seen.add(book.id);
     const assessment = book.difficultyAssessment;
     if (!assessment) continue;
     const raw = assessment.initialScore ?? assessment.score;
+    if (!Number.isFinite(raw) || raw < 0 || raw > 100) continue;
+    const quality = assessment.confidence === 'high' ? 1 : assessment.confidence === 'medium' ? 0.75 : 0.5;
+    const base = { bookId: book.id, title: book.title, difficulty: raw };
     if (assessment.readerRating) {
       const offset = { 'very-hard': -15, hard: -6, comfortable: 6, easy: 15 }[assessment.readerRating];
-      observations.push({ ability: raw + offset, weight: 2 });
+      const label = { 'very-hard': 'Unbearable', hard: 'Hard, but manageable', comfortable: 'Comfortable', easy: 'Easy' }[assessment.readerRating];
+      ratings.push({ ability: clamp(raw + offset, 10, 90), weight: 2 * quality });
+      evidence.push({ ...base, kind: 'rating', description: `Your rating: ${label}` });
+      continue;
     }
-    if (assessment.readingState === 'stalled') observations.push({ ability: raw - 14, weight: 1.5 });
-    if (statuses[book.id] === 'finished' && assessment.recommendation === 'read') {
-      observations.push({ ability: raw + 8, weight: 1 });
+    // Finishing a difficult book still counts when its automatic recommendation
+    // was rewrite. Completion does not establish unaided understanding.
+    if (statuses[book.id] === 'finished') {
+      lowerBounds.push({ ability: clamp(raw - 6, 10, 90), weight: 0.75 * quality });
+      evidence.push({ ...base, kind: 'finished', description: 'Reached the end — understanding not checked' });
+      continue;
+    }
+    const reached = wordsReached[book.id] ?? 0;
+    if (Number.isFinite(reached) && book.wordCount > 0 && reached >= 2000 && reached / book.wordCount >= 0.1) {
+      lowerBounds.push({ ability: clamp(raw - 12, 10, 90), weight: 0.35 * quality });
+      evidence.push({ ...base, kind: 'progress', description: `Reached ${Math.round(clamp(reached / book.wordCount, 0, 1) * 100)}% — understanding not checked` });
     }
   }
 
+  // Keep the provisional starting assumption visible in the UI. Passive
+  // progress can raise this estimate but easier books cannot lower it.
   const priorAbility = 45;
   const priorWeight = 3;
-  const evidenceWeight = observations.reduce((sum, item) => sum + item.weight, 0);
-  const weightedAbility = observations.reduce((sum, item) => sum + item.ability * item.weight, priorAbility * priorWeight);
-  const readerAbility = Math.round(clamp(weightedAbility / (priorWeight + evidenceWeight), 10, 90));
+  const ratingWeight = ratings.reduce((sum, item) => sum + item.weight, 0);
+  const ratingTotal = ratings.reduce((sum, item) => sum + item.ability * item.weight, priorAbility * priorWeight);
+  let ability = ratingTotal / (priorWeight + ratingWeight);
+  for (const observation of lowerBounds.sort((a, b) => a.ability - b.ability)) {
+    if (observation.ability > ability) {
+      ability += (observation.ability - ability) * observation.weight / (priorWeight + ratingWeight + observation.weight);
+    }
+  }
+  const ratedBooks = evidence.filter((item) => item.kind === 'rating').length;
   return {
-    readerAbility,
-    evidenceCount: observations.length,
-    confidence: observations.length >= 5 ? 'high' : observations.length >= 2 ? 'medium' : 'low',
+    readerAbility: Math.round(clamp(ability, 10, 90)),
+    evidenceCount: evidence.length,
+    // Passive positions alone never justify high confidence.
+    confidence: ratedBooks >= 5 && ratingWeight >= 7 ? 'high' : ratedBooks >= 2 && ratingWeight >= 2 ? 'medium' : 'low',
+    evidence,
+    excludedBookCount: seen.size - evidence.length,
   };
 }
 

@@ -157,9 +157,20 @@
         <p class="personal-books__formats">Supported formats: EPUB, FB2, TXT. Maximum file size: 30 MB.</p>
         <div class="personal-books__ability" :class="`personal-books__ability--${readerBookCalibration.confidence}`">
           <q-icon name="auto_graph" />
-          <span><small>Your reading fit</small><strong>{{ readerBookCalibration.readerAbility }}/100</strong></span>
-          <small>Calibrated from {{ readerBookCalibration.evidenceCount }} real {{ readerBookCalibration.evidenceCount === 1 ? 'signal' : 'signals' }}</small>
+          <span><small>Your reading fit</small><strong>≈{{ readerBookCalibration.readerAbility }}/100</strong></span>
+          <small>{{ readerBookCalibration.evidenceCount ? `Based on ${readerBookCalibration.evidenceCount} books` : 'Provisional starting estimate' }} · {{ readerBookCalibration.confidence }} confidence</small>
         </div>
+
+        <details class="personal-books__fit-evidence">
+          <summary>How is this estimated?</summary>
+          <p>Approximate fit on our text-difficulty scale, not a comprehension test or CEFR level. Your latest rating counts most. Reaching the end or making substantial progress gives weaker support; neither proves understanding. Each book counts once. Breaks never lower your estimate.</p>
+          <ul v-if="readerBookCalibration.evidence.length">
+            <li v-for="item in readerBookCalibration.evidence" :key="item.bookId">
+              <strong>{{ item.title }}</strong>: {{ item.description }}. Text difficulty {{ item.difficulty }}/100.
+            </li>
+          </ul>
+          <p>The calculation starts at an assumed 45/100 and adjusts with this evidence. Progress alone only raises the estimate. Books without a rating need completion or at least 2,000 words and 10% reached to count. {{ readerBookCalibration.excludedBookCount }} books currently lack usable evidence or a text analysis. Add “How does it feel?” ratings to improve the estimate.</p>
+        </details>
 
         <q-tabs
           v-if="personalBooks.length"
@@ -844,7 +855,15 @@ const personalBookColumn = (book: PersonalBook) => personalBookKanbanColumn(book
 const readBookCount = computed(() => personalBooks.value.filter((book) => personalBookColumn(book) === 'read').length);
 const rewriteBookCount = computed(() => personalBooks.value.filter((book) => personalBookColumn(book) === 'rewrite').length);
 const doneBookCount = computed(() => personalBooks.value.filter((book) => personalBookColumn(book) === 'done').length);
-const readerBookCalibration = computed(() => calibrateReaderFromBooks(personalBooks.value, personalBookStatuses.value));
+const readerBookCalibration = computed(() => calibrateReaderFromBooks(
+  personalBooks.value,
+  personalBookStatuses.value,
+  Object.fromEntries(personalBooks.value.map((book) => {
+    const local = readBookProgress(book.id, book.chapterCount);
+    const synced = personalBookContentProgress.value[book.id];
+    return [book.id, Math.max(local.wordPosition ?? 0, (local.furthestProgressRatio ?? 0) * book.wordCount, synced?.furthestPosition ?? 0)];
+  })),
+));
 function bookFitPrediction(book: PersonalBook) {
   return book.difficultyAssessment
     ? predictBookFit(book.difficultyAssessment, readerBookCalibration.value, personalBookStatuses.value[book.id] ?? 'new')
