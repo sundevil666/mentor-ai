@@ -60,6 +60,14 @@ batched into the shared once-per-day maintenance window whenever possible.
   are distinct from navigation position and do not prove comprehension. Speech
   non-matches are review candidates, not diagnosed pronunciation errors. Examples
   are bounded and marked when truncated; full books/audio are never uploaded here.
+  Reading fit is derived locally from explicit ratings and assistance requests per
+  1,000 observed words, with minimum coverage and provisional confidence. It
+  refreshes on local analytics changes, on book completion and on library load;
+  completion increases the book's evidence weight. Device samples are selected,
+  not summed, to avoid overlapping page counts. Speech non-matches and listening
+  requests never reduce comprehension fit. Recalculation makes no server calls
+  and does not bypass the daily upload budget. Recommendations can use analytics
+  without a manual rating; sparse evidence stays close to the estimated level.
 - During active product testing, application-version checks are the deliberate
   exception: they run every minute while the PWA is visible so a new build is
   installed automatically. Revisit this exception when the testing phase ends.

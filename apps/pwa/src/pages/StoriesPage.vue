@@ -158,12 +158,12 @@
         <div class="personal-books__ability" :class="`personal-books__ability--${readerBookCalibration.confidence}`">
           <q-icon name="auto_graph" />
           <span><small>Your reading fit</small><strong>≈{{ readerBookCalibration.readerAbility }}/100</strong></span>
-          <small>{{ readerBookCalibration.evidenceCount ? `Based on ${readerBookCalibration.evidenceCount} books` : 'Provisional starting estimate' }} · {{ readerBookCalibration.confidence }} confidence</small>
+          <small>{{ readerBookCalibration.evidenceCount ? `Based on ${readerBookCalibration.evidenceCount} ${readerBookCalibration.evidenceCount === 1 ? 'book' : 'books'} · ${readerBookCalibration.analyticsBookCount} with analytics · ${readerBookCalibration.finishedBookCount} finished` : 'Provisional starting estimate' }} · {{ readerBookCalibration.confidence }} confidence</small>
         </div>
 
         <details class="personal-books__fit-evidence" @toggle="refreshBookAnalytics">
           <summary>How is this estimated?</summary>
-          <p>Approximate fit on our text-difficulty scale, not a comprehension test or CEFR level. Your latest rating counts most. Reaching the end or making substantial progress gives weaker support; neither proves understanding. Each book counts once. Breaks never lower your estimate.</p>
+          <p>Approximate fit on our text-difficulty scale, not a comprehension test or CEFR level. Your latest rating counts most. Translation requests per 1,000 observed words estimate how much help you need. Finished books carry more weight; completion alone does not prove understanding. Each book counts once. Breaks never lower your estimate.</p>
           <ul v-if="readerBookCalibration.evidence.length">
             <li v-for="item in readerBookCalibration.evidence" :key="item.bookId">
               <strong>{{ item.title }}</strong>: {{ item.description }}. Text difficulty {{ item.difficulty }}/100.
@@ -181,9 +181,9 @@
                 {{ record.snapshot.examplesTruncated ? 'Examples are a limited sample.' : '' }}
               </li>
             </ul>
-            <p>Activity collected since this feature was enabled; earlier activity is not reconstructed. Speech non-matches include unread words and recognition misses, not confirmed pronunciation errors. This activity is being collected for future book selection; it does not yet change the fit score.</p>
+            <p>Activity collected since this feature was enabled; earlier activity is not reconstructed. Speech non-matches include unread words and recognition misses, not confirmed pronunciation errors. Usable translation samples already adjust your fit and next-book recommendation. Pronunciation requests and speech non-matches never lower reading fit.</p>
           </template>
-          <p>The calculation starts at an assumed 45/100 and adjusts with this evidence. Progress alone only raises the estimate. Books without a rating need completion or at least 2,000 words and 10% reached to count. {{ readerBookCalibration.excludedBookCount }} books currently lack usable evidence or a text analysis. Add “How does it feel?” ratings to improve the estimate.</p>
+          <p>The calculation starts at an assumed 45/100 and adjusts with this evidence. The estimate updates locally as activity is saved and whenever a book is finished. Translation samples need at least 10% coverage and 2,000 observed words (500–2,000 for short books); fewer than three requests do not establish ease. Completed books without usable analytics still provide weaker support. Device samples are not added together. These are approximate rules, not a language test. {{ readerBookCalibration.excludedBookCount }} books currently lack usable evidence or a text analysis. Add “How does it feel?” ratings to improve the estimate.</p>
         </details>
 
         <q-tabs
@@ -306,7 +306,7 @@
         </q-card>
         <div v-else-if="activeBookSection === 'recommendations'" class="personal-books__filtered-empty">
           <q-icon name="recommend" size="38px" />
-          <p>Rate a book as comfortable or easy to get your next recommendation.</p>
+          <p>Read and translate with tracking, finish a book, or add a reading rating to build your estimate. A free recommendation appears when an unimported book fits the estimate.</p>
         </div>
       </section>
 
@@ -707,7 +707,7 @@ import { fetchReaderPhonetic, fetchReaderTextLookup, ReaderTranslationSignInRequ
 import { getAuthToken } from 'src/services/auth';
 import { enrichReaderVocabularyLookup, findReaderVocabularyLookup, listReaderVocabulary, recordReaderVocabularyInteraction } from 'src/services/reader-vocabulary';
 import { assessBookDifficulty } from 'src/services/book-difficulty-assessment';
-import { applyReadingReview, isBookDifficultyReviewDue, postponeBookDifficultyReview, preserveBookLaneOnDifficultyCheck, recommendNextFreeBook } from 'src/services/book-reading-guidance';
+import { applyReadingReview, isBookDifficultyReviewDue, postponeBookDifficultyReview, preserveBookLaneOnDifficultyCheck, recommendNextBookForReader } from 'src/services/book-reading-guidance';
 import { listBookReadingAnalytics, recordBookReadingAnalytics } from 'src/services/book-reading-analytics';
 import { calibrateReaderFromBooks, predictBookFit, predictUnseenBookFit } from 'src/services/reader-book-calibration';
 import { bookReaderDifficultyRatingLabel, personalBookAction, personalBookKanbanColumn, personalBookReadingStatus, personalBookReadingStatusLabel, sortPersonalBooksNewestFirst, type PersonalBookKanbanColumn, type PersonalBookReadingStatus } from 'src/services/personal-book-status';
@@ -813,8 +813,18 @@ const dailyReadingProgress = ref<DailyReadingProgress>(readDailyReadingProgress(
 const personalBooks = ref<PersonalBook[]>([]);
 const localBookAnalytics = ref<Awaited<ReturnType<typeof listBookReadingAnalytics>>>([]);
 async function refreshBookAnalytics() {
-  localBookAnalytics.value = await listBookReadingAnalytics(appStore.studentId).catch(() => []);
+  const studentId = appStore.studentId;
+  const records = await listBookReadingAnalytics(studentId).catch(() => null);
+  if (records && studentId === appStore.studentId) localBookAnalytics.value = records;
 }
+let bookAnalyticsRefreshTimer = 0;
+function scheduleBookAnalyticsRefresh(event: Event) {
+  const detail = (event as CustomEvent<{ studentId: string }>).detail;
+  if (detail?.studentId !== appStore.studentId) return;
+  window.clearTimeout(bookAnalyticsRefreshTimer);
+  bookAnalyticsRefreshTimer = window.setTimeout(() => { void refreshBookAnalytics(); }, 200);
+}
+function refreshBookCalibration() { void refreshPersonalBookStatuses(); }
 
 const personalBookStatuses = ref<Record<string, PersonalBookReadingStatus>>({});
 const personalBookContentProgress = ref<Record<string, ContentProgress | undefined>>({});
@@ -883,6 +893,7 @@ const readerBookCalibration = computed(() => calibrateReaderFromBooks(
     const synced = personalBookContentProgress.value[book.id];
     return [book.id, Math.max(local.wordPosition ?? 0, (local.furthestProgressRatio ?? 0) * book.wordCount, synced?.furthestPosition ?? 0)];
   })),
+  localBookAnalytics.value.map((record) => record.snapshot),
 ));
 function bookFitPrediction(book: PersonalBook) {
   return book.difficultyAssessment
@@ -892,15 +903,7 @@ function bookFitPrediction(book: PersonalBook) {
 const displayedPersonalBooks = computed(() => sortPersonalBooksNewestFirst(
   personalBooks.value.filter((book) => activeBookSection.value !== 'recommendations' && personalBookColumn(book) === activeBookSection.value),
 ));
-const nextFreeBookRecommendation = computed(() => {
-  const flowingBooks = personalBooks.value.filter((book) => book.difficultyAssessment?.recommendation === 'read' && (
-    book.difficultyAssessment.readerRating === 'easy' || book.difficultyAssessment.readerRating === 'comfortable'
-  ));
-  const source = flowingBooks.sort((left, right) => (right.difficultyAssessment?.analyzedAt ?? '').localeCompare(left.difficultyAssessment?.analyzedAt ?? ''))[0];
-  return source?.difficultyAssessment
-    ? recommendNextFreeBook(readerBookCalibration.value.readerAbility, personalBooks.value.map((book) => book.title))
-    : null;
-});
+const nextFreeBookRecommendation = computed(() => recommendNextBookForReader(readerBookCalibration.value, personalBooks.value));
 const nextFreeBookFit = computed(() => nextFreeBookRecommendation.value
   ? predictUnseenBookFit(nextFreeBookRecommendation.value.targetDifficulty, readerBookCalibration.value)
   : null);
@@ -1060,6 +1063,8 @@ onMounted(async () => {
   }
   document.addEventListener('visibilitychange', handleVisibilityChange);
   window.addEventListener('online', handleBookSyncWakeup);
+  window.addEventListener('mentor-ai:book-reading-analytics-changed', scheduleBookAnalyticsRefresh);
+  window.addEventListener('mentor-ai:daily-server-maintenance-finished', refreshBookCalibration);
   window.addEventListener('mentor-ai:google-sign-in-complete', retryReaderTranslationAfterSignIn);
   document.addEventListener('keydown', handleReaderKeydown);
   document.addEventListener('selectionchange', handleReaderSelectionChange);
@@ -1084,6 +1089,9 @@ onUnmounted(() => {
   clearMediaSession();
   document.removeEventListener('visibilitychange', handleVisibilityChange);
   window.removeEventListener('online', handleBookSyncWakeup);
+  window.removeEventListener('mentor-ai:book-reading-analytics-changed', scheduleBookAnalyticsRefresh);
+  window.removeEventListener('mentor-ai:daily-server-maintenance-finished', refreshBookCalibration);
+  window.clearTimeout(bookAnalyticsRefreshTimer);
   window.removeEventListener('mentor-ai:google-sign-in-complete', retryReaderTranslationAfterSignIn);
   document.removeEventListener('keydown', handleReaderKeydown);
   document.removeEventListener('selectionchange', handleReaderSelectionChange);
@@ -1301,6 +1309,12 @@ async function refreshPersonalBookStatuses() {
   }));
   personalBookStatuses.value = Object.fromEntries(entries.map((entry) => [entry.bookId, entry.status]));
   personalBookContentProgress.value = Object.fromEntries(entries.map((entry) => [entry.bookId, entry.progress]));
+  await refreshBookAnalytics();
+}
+function updateBookCalibrationProgress(book: PersonalBook, progress: ContentProgress) {
+  personalBookContentProgress.value = { ...personalBookContentProgress.value, [book.id]: progress };
+  const local = readBookProgress(book.id, book.chapterCount);
+  personalBookStatuses.value = { ...personalBookStatuses.value, [book.id]: personalBookReadingStatus(book, progress, local.furthestProgressRatio) };
 }
 
 function handleBookSyncWakeup() {
@@ -2351,6 +2365,10 @@ function persistBookProgress(updatedAt = new Date().toISOString()) {
     wordPosition,
     updatedAt,
   }));
+  personalBookStatuses.value = {
+    ...personalBookStatuses.value,
+    [book.id]: personalBookReadingStatus(book, personalBookContentProgress.value[book.id], Math.max(previous.furthestProgressRatio ?? 0, progressRatio)),
+  };
 }
 function bookProgressKey(bookId: string) { return `mentor-ai:personal-book-progress:${bookId}`; }
 const dailyReadingProgressKey = 'mentor-ai:daily-reading-progress';
@@ -2407,7 +2425,7 @@ async function persistSpokenReadingProgress(furthestWordIndex: number) {
   const book = selectedBook.value;
   if (!book) return;
   const wordCount = readerReferenceWords.value.length;
-  await saveContentProgress({
+  const saved = await saveContentProgress({
     studentId: appStore.studentId,
     category: 'reading',
     contentId: book.id,
@@ -2417,6 +2435,7 @@ async function persistSpokenReadingProgress(furthestWordIndex: number) {
     completed: wordCount > 0 && furthestWordIndex >= wordCount - 1,
     updatedAt: new Date().toISOString(),
   });
+  updateBookCalibrationProgress(book, saved);
 }
 async function persistReaderNavigationProgress(preferredWordIndex?: number, updatedAt = new Date().toISOString()) {
   const book = selectedBook.value;
@@ -2424,7 +2443,7 @@ async function persistReaderNavigationProgress(preferredWordIndex?: number, upda
   const wordIndex = preferredWordIndex ?? getStableReaderWordPosition();
   if (wordIndex < 0) return;
   const wordCount = readerReferenceWords.value.length;
-  await saveContentProgress({
+  const saved = await saveContentProgress({
     studentId: appStore.studentId,
     category: 'reading',
     contentId: book.id,
@@ -2434,6 +2453,7 @@ async function persistReaderNavigationProgress(preferredWordIndex?: number, upda
     completed: wordCount > 0 && wordIndex >= wordCount - 1,
     updatedAt,
   });
+  updateBookCalibrationProgress(book, saved);
 }
 function getReadingPageWords(pageIndex: number): ReadingPageWord[] {
   return readerPageWordCache.get(pageIndex) ?? [];

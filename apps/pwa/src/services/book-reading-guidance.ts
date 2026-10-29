@@ -1,4 +1,5 @@
-import type { BookDifficultyAssessment, BookReaderDifficultyRating } from '@mentor-ai/shared';
+import type { BookDifficultyAssessment, BookReaderDifficultyRating, PersonalReadingBook } from '@mentor-ai/shared';
+import type { ReaderBookCalibration } from './reader-book-calibration';
 import type { PersonalBookAction } from './personal-book-status';
 
 export const bookDifficultyReviewIntervalMs = 7 * 24 * 60 * 60 * 1000;
@@ -84,13 +85,24 @@ export function applyReadingReview(
   };
 }
 
-export function recommendNextFreeBook(currentDifficulty: number, excludedTitles: readonly string[] = []): FreeBookRecommendation | null {
+export function recommendNextFreeBook(currentDifficulty: number, excludedTitles: readonly string[] = [], growth = 5): FreeBookRecommendation | null {
   const excluded = new Set(excludedTitles.map(normalizeBookTitle));
-  const target = clamp(currentDifficulty + 5, 20, 65);
+  const target = clamp(currentDifficulty + growth, 20, 65);
   return [...freeReadingLadder]
     .filter((book) => !excluded.has(normalizeBookTitle(book.title)))
     .sort((left, right) => Math.abs(left.targetDifficulty - target) - Math.abs(right.targetDifficulty - target))[0]
     ?? null;
+}
+
+/** Recommendations unlock from actual history, including analytics without a
+ * self-rating. Sparse evidence stays near the estimate rather than pushing up.
+ */
+export function recommendNextBookForReader(
+  calibration: ReaderBookCalibration, books: readonly PersonalReadingBook[],
+): FreeBookRecommendation | null {
+  if (!calibration.evidenceCount) return null;
+  const candidate = recommendNextFreeBook(calibration.readerAbility, books.map((book) => book.title), calibration.confidence === 'low' ? 0 : 5);
+  return candidate && candidate.targetDifficulty <= calibration.readerAbility + 7 ? candidate : null;
 }
 
 function normalizeBookTitle(title: string) {

@@ -18,6 +18,9 @@ export async function recordBookReadingAnalytics(studentId: string, bookId: stri
   const next = applyBookAnalyticsEvent(current ?? fresh, event, now);
   if (next !== current && next.snapshot.revision > 0) await tx.store.put(next);
   await tx.done;
+  if (next !== current && next.snapshot.revision > 0 && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('mentor-ai:book-reading-analytics-changed', { detail: { studentId, bookId } }));
+  }
 }
 
 export async function listBookReadingAnalytics(studentId: string): Promise<LocalBookAnalytics[]> {
