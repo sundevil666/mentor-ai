@@ -147,9 +147,12 @@ let playbackCycleFinished = false;
 let lastObservedPlaybackPosition = 0;
 let lastProgressSave = 0;
 
+async function refreshCachedAudio() { cachedUrls.value = await getCachedAudioUrls(); }
+
 onMounted(async () => {
   configurePlaybackAudioSession();
   cachedUrls.value = await getCachedAudioUrls();
+  window.addEventListener('mentor-ai:offline-library-changed', refreshCachedAudio);
   window.addEventListener('online', updateOnlineState);
   window.addEventListener('offline', updateOnlineState);
   configureMediaSession();
@@ -162,6 +165,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   persistSyncedProgress(false, true);
   void listeningTimer.stop();
+  window.removeEventListener('mentor-ai:offline-library-changed', refreshCachedAudio);
   window.removeEventListener('online', updateOnlineState);
   window.removeEventListener('offline', updateOnlineState);
 });
@@ -276,6 +280,7 @@ function readProgress(id: string) { const saved = Number(localStorage.getItem(`m
 function handlePlay() {
   configurePlaybackAudioSession();
   isPlaying.value = true;
+  if (selectedAudio.value) markOfflineLessonOpened(selectedAudio.value.id, 'audio');
   setMediaSessionPlaybackState('playing');
   listeningTimer.start();
   if (playbackCycleActive || !selectedAudio.value) return;

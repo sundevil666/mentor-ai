@@ -67,7 +67,7 @@ import {
   type MyShiftActivity,
 } from 'src/services/my-shift';
 import { cacheMyShiftActivity, readCachedMyShiftActivity } from 'src/services/my-shift-cache';
-import { findOfflineLesson } from 'src/services/offline-library';
+import { findOfflineLesson, markOfflineLessonOpened } from 'src/services/offline-library';
 import { selectRetainedUpdateNotifications } from 'src/services/update-notification-retention';
 import { resolveRestoredLessonSessions } from 'src/services/lesson-session-restoration';
 import { rewindLessonSession } from 'src/services/lesson-step-navigation';
@@ -412,6 +412,10 @@ export const useAppStore = defineStore('app', {
       const learningContext =
         context ?? createDefaultLearningContext(this.activitySnapshots, this.preferredWorkShift, this.myShiftActivity);
       const lesson = await this.loadLesson(learningContext, createdAt, forceRefresh);
+      markOfflineLessonOpened(lesson.id, 'lessons');
+      if (learningContext.lessonTemplateKey && (learningContext.mode === 'listening' || learningContext.mode === 'speaking')) {
+        markOfflineLessonOpened(learningContext.lessonTemplateKey, learningContext.mode);
+      }
       const sessionId = createSessionId(createdAt);
       const firstExercise = lesson.exercises[0];
       const startedEvent = createLearningEvent(this.studentId, sessionId, lesson, undefined, 'lesson-started', createdAt);
@@ -732,6 +736,10 @@ export const useAppStore = defineStore('app', {
         : this.pausedSessions[this.pausedSessions.length - 1];
       if (!pausedSession) return false;
       this.session = toStorageRecord(pausedSession);
+      markOfflineLessonOpened(pausedSession.lesson.id, 'lessons');
+      if (pausedSession.context.lessonTemplateKey && (pausedSession.context.mode === 'listening' || pausedSession.context.mode === 'speaking')) {
+        markOfflineLessonOpened(pausedSession.context.lessonTemplateKey, pausedSession.context.mode);
+      }
       this.pausedSessions = this.pausedSessions.filter((session) => session.id !== pausedSession.id);
       await this.persistPausedSessions();
       await this.persistSession();

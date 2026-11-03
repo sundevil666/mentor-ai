@@ -16,6 +16,7 @@ export interface OfflineLesson {
   contentBytes?: number;
   contentVersion?: string;
   speechTexts?: string[];
+  generatedLesson?: GeneratedLesson;
   story?: LibraryStory;
   audio?: LibraryAudio;
   sourceCreatedAt?: string;
@@ -32,7 +33,7 @@ export const offlineCategories: Array<{ id: OfflineCategory; label: string; icon
 const lessonsKey = 'mentor-ai:offline-lessons:v1';
 const retentionKey = 'mentor-ai:offline-retention:v1';
 const maxBytesKey = 'mentor-ai:offline-max-bytes:v1';
-const legacySpeechCatalog = [
+export const builtInOfflineLessons = [
   { id: 'commute-listening', category: 'listening', title: 'Commute listening' },
   { id: 'shop-listening', category: 'listening', title: 'At a small shop' },
   { id: 'weekly-weak-spots-dialogue', category: 'speaking', title: 'Work conversation' },
@@ -41,7 +42,7 @@ const legacySpeechCatalog = [
 
 export function readOfflineLessons(): OfflineLesson[] { return readJson(lessonsKey, []); }
 export function readOfflineRetention(): Record<OfflineCategory, RetentionDays> {
-  return { lessons: 30, listening: 30, speaking: 30, audio: 30, stories: 30, videos: 30, ...readJson(retentionKey, {}) };
+  return { lessons: 30, listening: 30, speaking: 30, audio: 30, stories: 30, videos: 30 };
 }
 export function readOfflineMaxBytes() { return readJson(maxBytesKey, defaultOfflineMaxBytes); }
 export function saveOfflineMaxBytes(bytes: number) { localStorage.setItem(maxBytesKey, JSON.stringify(bytes)); }
@@ -64,12 +65,18 @@ export function registerOfflineAudio(audio: LibraryAudio) {
 }
 export async function registerOfflineGeneratedLesson(lesson: GeneratedLesson, speechTexts: string[]) {
   const storedLesson = JSON.parse(JSON.stringify(lesson)) as GeneratedLesson;
-  const previous = readOfflineLessons().find((item) => item.id === lesson.id && item.category === 'lessons');
-  const db = await getMentorDb();
-  await db.put('lessons', storedLesson);
+  const builtIn = builtInOfflineLessons.find((item) => item.id === lesson.lessonTemplateKey);
+  const id = builtIn?.id ?? lesson.id;
+  const category = builtIn?.category ?? 'lessons';
+  const previous = readOfflineLessons().find((item) => item.id === id && item.category === category);
+  if (!builtIn) {
+    const db = await getMentorDb();
+    await db.put('lessons', storedLesson);
+  }
   upsert({
-    id: lesson.id,
-    category: 'lessons',
+    id,
+    category,
+    ...(builtIn ? { generatedLesson: storedLesson } : {}),
     title: lesson.title,
     contentKey: lesson.lessonTemplateKey,
     sourceCreatedAt: lesson.createdAt,
@@ -94,7 +101,8 @@ export function getGeneratedLessonSpeechTexts(lesson: GeneratedLesson) {
   return splitLessonSpeechTexts(lesson.exercises);
 }
 export async function isGeneratedLessonAvailableOffline(lesson: GeneratedLesson) {
-  const saved = readOfflineLessons().find((item) => item.id === lesson.id && item.category === 'lessons');
+  const saved = readOfflineLessons().find((item) => (item.id === lesson.id && item.category === 'lessons')
+    || (item.id === lesson.lessonTemplateKey && item.generatedLesson?.id === lesson.id));
   if (!saved || saved.contentVersion !== getOfflineLessonContentVersion(lesson)) return false;
   const requiredTexts = [...new Set([...getGeneratedLessonSpeechTexts(lesson), ...(saved.speechTexts ?? [])])];
   return requiredTexts.length === 0 || await isSpeechBatchCached(requiredTexts);
@@ -109,9 +117,9 @@ export function isOfflineSpeechLessonUpdateAvailable(saved: OfflineLesson | unde
 }
 export async function findOfflineLesson(context: LearningContext): Promise<GeneratedLesson | null> {
   const db = await getMentorDb();
-  const lessons = (await db.getAll('lessons')) as GeneratedLesson[];
+  const lessons = [...(await db.getAll('lessons')) as GeneratedLesson[],
+    ...readOfflineLessons().flatMap((item) => item.generatedLesson ? [item.generatedLesson] : [])];
   const match = selectOfflineLesson(lessons, context);
-  if (match) markOfflineLessonOpened(match.id, 'lessons');
   return match;
 }
 export async function readOfflineGeneratedLessons(): Promise<GeneratedLesson[]> {
@@ -149,7 +157,7 @@ export async function refreshOfflineSizes() {
   return refreshed;
 }
 export async function migrateLegacySpeechDownloads(loadLesson: (context: LearningContext, createdAt: string) => Promise<GeneratedLesson>) {
-  for (const item of legacySpeechCatalog) {
+  for (const item of builtInOfflineLessons) {
     if (readOfflineLessons().some((lesson) => lesson.id === item.id && lesson.category === item.category)) continue;
     try {
       const lesson = await loadLesson({
@@ -167,7 +175,11 @@ export async function migrateLegacySpeechDownloads(loadLesson: (context: Learnin
   }
 }
 export async function removeOfflineLesson(lesson: OfflineLesson) {
-  if (lesson.speechTexts) await deleteSpeechBatch(lesson.speechTexts);
+  if (lesson.speechTexts) {
+    const others = readOfflineLessons().filter((item) => !(item.id === lesson.id && item.category === lesson.category));
+    const referenced = new Set(others.flatMap((item) => item.speechTexts ?? []).map((text) => text.trim()));
+    await deleteSpeechBatch(lesson.speechTexts.filter((text) => !referenced.has(text.trim())));
+  }
   if (lesson.story) await deleteOfflineStory(lesson.story);
   if (lesson.audio) await deleteOfflineAudio(lesson.audio);
   // Removing offline media must not remove a locally imported lesson from the catalog.
@@ -183,11 +195,11 @@ export function selectExpiredOfflineLessons(
   now = Date.now(),
   completedKeys: ReadonlySet<string> = new Set(),
 ) {
+  void retention;
+  void completedKeys;
   return lessons.filter((lesson) => {
     const lastUsed = Date.parse(lesson.lastOpenedAt || lesson.downloadedAt);
-    return isOfflineContentCompleted(lesson, completedKeys)
-      && Number.isFinite(lastUsed)
-      && now - lastUsed >= Math.max(30, retention[lesson.category]) * 86_400_000;
+    return Number.isFinite(lastUsed) && now - lastUsed >= 30 * 86_400_000;
   });
 }
 export function selectOfflineLessonsOverLimit(
@@ -198,8 +210,8 @@ export function selectOfflineLessonsOverLimit(
 ) {
   let total = lessons.reduce((sum, lesson) => sum + Math.max(0, lesson.estimatedBytes), 0);
   if (total <= maxBytes) return [];
-  const removable = lessons.filter((lesson) => isOfflineContentCompleted(lesson, completedKeys)
-    && now - Date.parse(lesson.lastOpenedAt || lesson.downloadedAt) >= 30 * 86_400_000)
+  void completedKeys;
+  const removable = lessons.filter((lesson) => now - Date.parse(lesson.lastOpenedAt || lesson.downloadedAt) >= 30 * 86_400_000)
     .sort((left, right) => Date.parse(left.downloadedAt) - Date.parse(right.downloadedAt));
   const selected: OfflineLesson[] = [];
   for (const lesson of removable) {
@@ -209,9 +221,6 @@ export function selectOfflineLessonsOverLimit(
   }
   return selected;
 }
-function isOfflineContentCompleted(lesson: OfflineLesson, completedKeys: ReadonlySet<string>) {
-  return completedKeys.has(lesson.id) || Boolean(lesson.contentKey && completedKeys.has(lesson.contentKey));
-}
 export function selectStaleOfflineStories(lessons: OfflineLesson[], activeStoryIds: ReadonlySet<string>) {
   return lessons.filter((lesson) => lesson.category === 'stories' && !activeStoryIds.has(lesson.id));
 }
@@ -220,24 +229,11 @@ export function selectStaleOfflineAudio(lessons: OfflineLesson[], activeAudioIds
 }
 export async function cleanupExpiredOfflineLessons(now = Date.now()) {
   await purgeLegacyVideoLibrary();
-  const completedKeys = await loadCompletedOfflineContentKeys();
-  const expired = selectExpiredOfflineLessons(readOfflineLessons(), readOfflineRetention(), now, completedKeys);
+  const expired = selectExpiredOfflineLessons(readOfflineLessons(), readOfflineRetention(), now);
   for (const lesson of expired) await removeOfflineLesson(lesson);
-  const oversized = selectOfflineLessonsOverLimit(readOfflineLessons(), readOfflineMaxBytes(), now, completedKeys);
+  const oversized = selectOfflineLessonsOverLimit(readOfflineLessons(), readOfflineMaxBytes(), now);
   for (const lesson of oversized) await removeOfflineLesson(lesson);
   return [...expired, ...oversized];
-}
-async function loadCompletedOfflineContentKeys() {
-  const [{ loadAllContentProgress }, { loadAllContentEngagement }] = await Promise.all([
-    import('./content-progress.js'),
-    import('./content-engagement.js'),
-  ]);
-  const [progress, engagement] = await Promise.all([loadAllContentProgress(), loadAllContentEngagement()]);
-  const completed = new Set(progress.filter((item) => item.completed).map((item) => item.contentId));
-  for (const event of engagement) {
-    if (event.type === 'finished' || event.type === 'full-play') completed.add(event.contentId);
-  }
-  return completed;
 }
 async function purgeLegacyVideoLibrary() {
   const legacyVideos = readOfflineLessons().filter((lesson) => lesson.category === 'videos');

@@ -120,6 +120,14 @@ describe('speech synthesis voices', () => {
     assert.equal(audio.loop, true);
   });
 
+  it('protects all downloaded lesson speech from the temporary cache age and count limits', () => {
+    const entries = Array.from({ length: speechCacheMaxEntries + 20 }, (_, index) => ({
+      url: `downloaded-${index}`, createdAt: '2026-01-01T00:00:00Z',
+    }));
+    const protectedUrls = new Set(entries.map((entry) => entry.url));
+    assert.deepEqual(selectSpeechCacheUrlsToDelete([...entries, { url: 'temporary', createdAt: '2026-01-01T00:00:00Z' }], Date.parse('2026-11-03T00:00:00Z'), protectedUrls), ['temporary']);
+  });
+
   it('expires old speech and keeps only the newest cache entries', () => {
     const now = Date.parse('2026-08-30T12:00:00.000Z');
     const entries = [

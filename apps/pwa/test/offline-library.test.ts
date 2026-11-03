@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createLessonPlan, generateLessonFromPlan, initialStudentModel, type GeneratedLesson, type LearningContext } from '@mentor-ai/shared';
-import { getOfflineLessonContentVersion, isGeneratedLessonAvailableOffline, registerOfflineSpeechLesson, forgetOfflineLesson, markOfflineLessonOpened, getSpeechTextsContentVersion, isOfflineSpeechLessonUpdateAvailable, selectExpiredOfflineLessons, selectOfflineLesson, selectOfflineLessonsOverLimit, selectStaleOfflineStories, type OfflineLesson } from '../src/services/offline-library.js';
+import { readOfflineLessons, registerOfflineGeneratedLesson, removeOfflineLesson, getOfflineLessonContentVersion, isGeneratedLessonAvailableOffline, registerOfflineSpeechLesson, forgetOfflineLesson, markOfflineLessonOpened, getSpeechTextsContentVersion, isOfflineSpeechLessonUpdateAvailable, selectExpiredOfflineLessons, selectOfflineLesson, selectOfflineLessonsOverLimit, selectStaleOfflineStories, type OfflineLesson } from '../src/services/offline-library.js';
 import { audioLibrary, getAudioContentVersion } from '../src/services/audio-library.js';
 import { getStoryContentVersion, storyLibrary } from '../src/services/story-library.js';
 
@@ -48,9 +48,23 @@ describe('offline lesson retention', () => {
     assert.deepEqual(selectExpiredOfflineLessons(lessons, { lessons: 30, listening: 14, speaking: 7, audio: 30, stories: 30, videos: 30 }, Date.parse('2026-09-02T12:00:00.000Z'), new Set(['old'])).map((lesson) => lesson.id), ['old']);
   });
 
-  it('never expires unfinished offline content even after 30 days', () => {
+  it('expires unfinished downloads after 30 days without use', () => {
     const lesson: OfflineLesson = { id: 'unfinished', category: 'audio', title: 'Unfinished', downloadedAt: '2026-07-01T12:00:00.000Z', lastOpenedAt: '2026-07-01T12:00:00.000Z', estimatedBytes: 10 };
-    assert.deepEqual(selectExpiredOfflineLessons([lesson], { lessons: 30, listening: 30, speaking: 30, audio: 30, stories: 30, videos: 30 }, Date.parse('2026-10-09T12:00:00.000Z'), new Set()), []);
+    assert.deepEqual(selectExpiredOfflineLessons([lesson], { lessons: 30, listening: 30, speaking: 30, audio: 30, stories: 30, videos: 30 }, Date.parse('2026-10-09T12:00:00.000Z'), new Set()).map((item) => item.id), ['unfinished']);
+  });
+
+  it('uses last activity for every category, independent of completion or older retention settings', () => {
+    const now = Date.parse('2026-11-03T12:00:00Z');
+    const categories = ['lessons', 'listening', 'speaking', 'audio', 'stories'] as const;
+    const downloads = categories.map((category) => ({
+      id: category, category, title: category, estimatedBytes: 1,
+      downloadedAt: '2026-08-01T12:00:00Z', lastOpenedAt: '2026-10-03T12:00:00Z',
+    }));
+    const retention = { lessons: 90, listening: 90, speaking: 90, audio: 90, stories: 90, videos: 90 } as const;
+    assert.equal(selectExpiredOfflineLessons(downloads, retention, now).length, 5);
+    downloads[0]!.lastOpenedAt = '2026-11-02T12:00:00Z';
+    assert.equal(selectExpiredOfflineLessons(downloads, retention, now).length, 4);
+    assert.equal(selectOfflineLessonsOverLimit(downloads, 0, now).length, 4);
   });
 
   it('keeps lessons added in the last seven days even when the size limit is exceeded', () => {
@@ -147,6 +161,52 @@ describe('offline card availability', () => {
     } finally {
       Object.assign(globalThis, { localStorage: originalStorage, window: originalWindow, caches: originalCaches });
     }
+  });
+
+  it('stores built-in lesson snapshots separately by template without changing lesson identities', async () => {
+    const originals = { localStorage: globalThis.localStorage, window: globalThis.window };
+    let value = '[]';
+    Object.assign(globalThis, {
+      localStorage: { getItem: () => value, setItem: (_key: string, next: string) => { value = next; } },
+      window: { dispatchEvent: () => {} },
+    });
+    try {
+      const first = createSpeakingLesson('weekly-weak-spots-dialogue', '2026-08-24T10:00:00Z');
+      const second = createSpeakingLesson('polite-speaking', '2026-08-24T10:00:00Z');
+      // Built-in plans can share a generated ID; their template downloads must not overwrite each other.
+      second.id = first.id;
+      await registerOfflineGeneratedLesson(first, ['First phrase.']);
+      await registerOfflineGeneratedLesson(second, ['Second phrase.']);
+      const saved = readOfflineLessons();
+      assert.equal(saved.length, 2);
+      assert.equal(saved[0]?.generatedLesson?.id, first.id);
+      assert.equal(saved[1]?.generatedLesson?.id, second.id);
+      assert.notEqual(saved[0]?.generatedLesson?.lessonTemplateKey, saved[1]?.generatedLesson?.lessonTemplateKey);
+    } finally { Object.assign(globalThis, originals); }
+  });
+
+  it('removes a download without deleting speech shared by another saved lesson', async () => {
+    const originals = { localStorage: globalThis.localStorage, window: globalThis.window, caches: globalThis.caches };
+    const base = { category: 'listening' as const, title: 'Download', downloadedAt: '2026-08-01T00:00:00Z', lastOpenedAt: '2026-08-01T00:00:00Z', estimatedBytes: 1 };
+    let records: OfflineLesson[] = [
+      { ...base, id: 'one', speechTexts: ['Shared phrase.', 'Unique phrase.'] },
+      { ...base, id: 'two', speechTexts: ['Shared phrase.'] },
+    ];
+    const deleted: string[] = [];
+    Object.assign(globalThis, {
+      localStorage: { getItem: () => JSON.stringify(records), setItem: (_key: string, value: string) => { records = JSON.parse(value); } },
+      window: { crypto: globalThis.crypto, location: { origin: 'https://mentor.test' }, caches: {}, dispatchEvent: () => {} },
+      caches: { open: async () => ({ delete: async (request: Request) => { deleted.push(request.url); return true; } }) },
+    });
+    try {
+      await removeOfflineLesson(records[0]!);
+      assert.equal(records.length, 1);
+      assert.equal(deleted.length, 1);
+      await removeOfflineLesson(records[0]!);
+      assert.equal(records.length, 0);
+      assert.equal(deleted.length, 2);
+      assert.notEqual(deleted[0], deleted[1]);
+    } finally { Object.assign(globalThis, originals); }
   });
 
   it('notifies open cards after saving and removing a download, without notifying on opening', () => {

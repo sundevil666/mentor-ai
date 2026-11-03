@@ -771,7 +771,6 @@ import {
   readOfflineLessons,
   isGeneratedLessonAvailableOffline,
   readOfflineGeneratedLessons,
-  registerOfflineSpeechLesson,
   replaceOfflineSpeechLesson,
 } from 'src/services/offline-library';
 import { fetchCurrentLesson } from 'src/services/api-client';
@@ -1572,7 +1571,8 @@ async function startLibraryLesson(lesson: TrainingLibraryLesson) {
     manualConceptChoice: true,
     lessonTemplateKey: lesson.templateKey,
   });
-  const deviceLesson = newLessonCatalog.value.find((item) => (item.lessonTemplateKey ?? item.id) === lesson.templateKey);
+  const deviceLesson = (await readOfflineGeneratedLessons()).find((item) => (item.lessonTemplateKey ?? item.id) === lesson.templateKey)
+    ?? readOfflineLessons().find((item) => item.id === lesson.templateKey)?.generatedLesson;
   if (navigator.onLine && lesson.mode !== 'home' && !deviceLesson) {
     try {
       const freshLesson = await fetchCurrentLesson(context, true);
@@ -1637,17 +1637,8 @@ async function downloadLibraryLesson(lesson: TrainingLibraryLesson) {
       manualConceptChoice: true,
       lessonTemplateKey: lesson.templateKey,
     }), new Date().toISOString());
-    if (lesson.mode === 'home' || newLessonCatalog.value.some((item) => item.id === generatedLesson.id)) {
-      await downloadGeneratedLessonOffline(generatedLesson);
-      libraryDownloadStatus.value[lesson.templateKey] = 'ready';
-      return;
-    }
-    const texts = getLessonOfflineSpeechTexts(generatedLesson.exercises);
-    const result = await preloadSpeechBatch(texts);
-    libraryDownloadStatus.value[lesson.templateKey] = result.failed === 0 ? 'ready' : 'error';
-    if (result.failed === 0) {
-      registerOfflineSpeechLesson({ id: lesson.templateKey, category: lesson.mode, title: lesson.title, speechTexts: texts });
-    }
+    await downloadGeneratedLessonOffline(generatedLesson);
+    libraryDownloadStatus.value[lesson.templateKey] = 'ready';
   } catch {
     libraryDownloadStatus.value[lesson.templateKey] = 'error';
   }
@@ -1663,21 +1654,9 @@ async function refreshLibraryDownloadStatuses(lessons: TrainingLibraryLesson[]) 
         libraryDownloadStatus.value[lesson.templateKey] = await isGeneratedLessonAvailableOffline(catalogLesson) ? 'ready' : 'idle';
         return;
       }
-      const generatedLesson = await appStore.loadLesson(createLearningContext(currentSuggestion.value, {
-        mode: lesson.mode,
-        selectedConcept: lesson.concept ?? 'learning',
-        manualConceptChoice: true,
-        lessonTemplateKey: lesson.templateKey,
-      }), new Date().toISOString());
-      if (lesson.mode === 'home') {
-        libraryDownloadStatus.value[lesson.templateKey] = readOfflineLessons().some(
-          (item) => item.id === generatedLesson.id && item.category === 'lessons',
-        ) ? 'ready' : 'idle';
-        return;
-      }
-      const texts = getLessonOfflineSpeechTexts(generatedLesson.exercises);
-      const ready = await isSpeechBatchCached(texts);
-      libraryDownloadStatus.value[lesson.templateKey] = ready ? 'ready' : 'idle';
+      const saved = readOfflineLessons().find((item) => item.id === lesson.templateKey);
+      libraryDownloadStatus.value[lesson.templateKey] = saved?.speechTexts?.length
+        && await isSpeechBatchCached(saved.speechTexts) ? 'ready' : 'idle';
     } catch {
       libraryDownloadStatus.value[lesson.templateKey] = 'idle';
     }

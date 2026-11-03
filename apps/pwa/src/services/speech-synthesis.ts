@@ -388,13 +388,15 @@ export async function deleteGeneratedSpeech(text: string, voice: SpeechVoiceProf
 export function selectSpeechCacheUrlsToDelete(
   entries: Array<{ url: string; createdAt?: string }>,
   now = Date.now(),
+  protectedUrls: ReadonlySet<string> = new Set(),
 ) {
   const fresh = entries.filter((entry) => {
+    if (protectedUrls.has(entry.url)) return false;
     const createdAt = Date.parse(entry.createdAt ?? '');
     return Number.isFinite(createdAt) && now - createdAt < speechCacheMaxAgeMs;
   });
   const retained = new Set(fresh.slice(-speechCacheMaxEntries).map((entry) => entry.url));
-  return entries.filter((entry) => !retained.has(entry.url)).map((entry) => entry.url);
+  return entries.filter((entry) => !protectedUrls.has(entry.url) && !retained.has(entry.url)).map((entry) => entry.url);
 }
 
 async function cleanupSpeechCache(now = Date.now()) {
@@ -406,7 +408,12 @@ async function cleanupSpeechCache(now = Date.now()) {
     url: request.url,
     createdAt: (await cache.match(request))?.headers.get('X-Mentor-Cache-Created-At') ?? undefined,
   })));
-  const obsolete = new Set(selectSpeechCacheUrlsToDelete(entries, now));
+  const { readOfflineLessons } = await import('./offline-library.js');
+  const protectedRequests = await Promise.all(readOfflineLessons()
+    .flatMap((lesson) => lesson.speechTexts ?? [])
+    .map((text) => createSpeechCacheRequest(parseSpeechSegments(text.trim()))));
+  const protectedUrls = new Set(protectedRequests.flatMap((request) => request ? [request.url] : []));
+  const obsolete = new Set(selectSpeechCacheUrlsToDelete(entries, now, protectedUrls));
   await Promise.all(requests.filter((request) => obsolete.has(request.url)).map((request) => cache.delete(request)));
 }
 

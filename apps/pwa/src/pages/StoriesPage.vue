@@ -1050,6 +1050,10 @@ const readingSpeechActionLabel = computed(() => {
   return 'Turn microphone on';
 });
 
+async function refreshCachedStories() {
+  if (isAudioLibrary.value) cachedUrls.value = await getCachedStoryUrls();
+}
+
 onMounted(async () => {
   configurePlaybackAudioSession();
   scheduleReadingDayRefresh();
@@ -1062,6 +1066,7 @@ onMounted(async () => {
     await refreshPersonalBookStatuses();
   }
   document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('mentor-ai:offline-library-changed', refreshCachedStories);
   window.addEventListener('online', handleBookSyncWakeup);
   window.addEventListener('mentor-ai:book-reading-analytics-changed', scheduleBookAnalyticsRefresh);
   window.addEventListener('mentor-ai:daily-server-maintenance-finished', refreshBookCalibration);
@@ -1088,6 +1093,7 @@ onUnmounted(() => {
   stopReaderPagination();
   clearMediaSession();
   document.removeEventListener('visibilitychange', handleVisibilityChange);
+  window.removeEventListener('mentor-ai:offline-library-changed', refreshCachedStories);
   window.removeEventListener('online', handleBookSyncWakeup);
   window.removeEventListener('mentor-ai:book-reading-analytics-changed', scheduleBookAnalyticsRefresh);
   window.removeEventListener('mentor-ai:daily-server-maintenance-finished', refreshBookCalibration);
@@ -2801,6 +2807,7 @@ function setPlaybackRate(rate: number) { playbackRate.value = rate; if (audioEle
 function handlePlay() {
   configurePlaybackAudioSession();
   playing.value = true;
+  if (selectedStory.value) markOfflineLessonOpened(selectedStory.value.id, 'stories');
   setMediaSessionPlaybackState('playing');
   listeningActivityTimer.start();
   if (selectedStory.value) void recordEngagement(selectedStory.value.id, 'started');

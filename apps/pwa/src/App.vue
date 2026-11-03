@@ -81,7 +81,7 @@ import { syncPersonalBookCloud } from 'src/services/personal-book-cloud-sync';
 import { runServerMaintenance } from 'src/services/server-maintenance';
 import { syncBookReadingAnalytics } from 'src/services/book-reading-analytics';
 import { syncReaderVocabulary } from 'src/services/reader-vocabulary';
-import { updateOfflineLessons } from 'src/services/offline-lesson-updates';
+import { fetchNewLessonCatalog } from 'src/services/offline-lesson-updates';
 import { fetchTranslationUsage } from 'src/services/api-client';
 import { pendingMovieLearningReportCount, syncMovieLearningReports } from 'src/services/movie-learning-reports';
 
@@ -420,16 +420,7 @@ async function runDailyServerMaintenance() {
       syncReadingPageSpeech(appStore.studentId),
       syncReaderVocabulary(appStore.studentId),
       syncMovieLearningReports(),
-      updateOfflineLessons(appStore.loadLesson.bind(appStore)).then(async (offlineUpdate) => {
-        if (offlineUpdate.downloaded > 0) {
-          await appStore.recordLessonUpdateNotification(
-            offlineUpdate.downloadedLessons,
-            offlineUpdate.downloadedStories,
-            offlineUpdate.downloadedAudio,
-            offlineUpdate.eventId,
-          );
-        }
-      }),
+      fetchNewLessonCatalog(),
       fetchTranslationUsage(),
       syncPersonalBookCloud(),
       appStore.publishSessionHandoff(true),
