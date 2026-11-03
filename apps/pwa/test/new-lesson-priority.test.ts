@@ -5,6 +5,7 @@ import { getAudioContentVersion } from '../src/services/audio-library.js';
 import { getStoryContentVersion } from '../src/services/story-library.js';
 import {
   getRecentOfflineLessonSince,
+  createLessonCatalogRefresh,
   fetchNewLessonCatalog,
   prioritizeNewLessons,
   selectPendingAudioDownloads,
@@ -100,4 +101,48 @@ it('merges cloud and local catalogs without duplicating IDs, preferring the fres
   const catalog = await fetchNewLessonCatalog(async () => [remote], async () => [local, lesson('local-only', 2)]);
   assert.equal(catalog.length, 2);
   assert.equal(catalog.find((item) => item.id === 'same-id')?.priority, 90);
+});
+
+it('shares catalog requests and uses the persisted device catalog until the next daily check', async () => {
+  let checked = 0;
+  let now = 100000000;
+  let requests = 0;
+  const persisted: GeneratedLesson[] = [];
+  const refresh = createLessonCatalogRefresh({
+    readLastChecked: () => checked,
+    writeLastChecked: (time) => { checked = time; },
+    now: () => now,
+    isOnline: () => true,
+    fetchRemote: async () => { requests++; return [lesson('new', 1)]; },
+    persist: async (lessons) => { persisted.push(...lessons); },
+  });
+  await Promise.all([refresh(), refresh()]);
+  assert.equal(requests, 1);
+  assert.equal(persisted[0]?.id, 'new');
+  await refresh();
+  assert.equal(requests, 1);
+  now += 24 * 60 * 60 * 1000;
+  await refresh();
+  assert.equal(requests, 2);
+});
+
+it('does not contact the catalog server offline and retries unsuccessful checks', async () => {
+  let online = false;
+  let requests = 0;
+  let checked = 0;
+  const refresh = createLessonCatalogRefresh({
+    readLastChecked: () => checked,
+    writeLastChecked: (time) => { checked = time; },
+    now: () => 100000000,
+    isOnline: () => online,
+    fetchRemote: async () => { requests++; throw new Error('unavailable'); },
+    persist: async () => {},
+  });
+  await refresh();
+  assert.equal(requests, 0);
+  online = true;
+  await assert.rejects(refresh());
+  await assert.rejects(refresh());
+  assert.equal(requests, 2);
+  assert.equal(checked, 0);
 });

@@ -77,8 +77,50 @@ export function selectPendingBulkLessonDownloads(
   }));
 }
 
+const catalogCheckKey = 'mentor-ai:lesson-catalog-checked-at:v1';
+const catalogCheckInterval = 24 * 60 * 60 * 1000;
+export function createLessonCatalogRefresh(dependencies: {
+  readLastChecked: () => number;
+  writeLastChecked: (time: number) => void;
+  fetchRemote: () => Promise<GeneratedLesson[]>;
+  persist: (lessons: GeneratedLesson[]) => Promise<void>;
+  isOnline: () => boolean;
+  now: () => number;
+}) {
+  let request: Promise<GeneratedLesson[]> | null = null;
+  return function refresh(): Promise<GeneratedLesson[]> {
+    if (request) return request;
+    if (!dependencies.isOnline()) return Promise.resolve([]);
+    const lastChecked = dependencies.readLastChecked();
+    if (lastChecked > 0 && dependencies.now() - lastChecked < catalogCheckInterval) return Promise.resolve([]);
+    request = (async () => {
+      const remote = await dependencies.fetchRemote();
+      await dependencies.persist(remote);
+      dependencies.writeLastChecked(dependencies.now());
+      return remote;
+    })().finally(() => { request = null; });
+    return request;
+  };
+}
+
+const refreshRemoteLessonCatalog = createLessonCatalogRefresh({
+  readLastChecked: () => Number(localStorage.getItem(catalogCheckKey)),
+  writeLastChecked: (time) => localStorage.setItem(catalogCheckKey, String(time)),
+  fetchRemote: () => fetchOfflineLessons(new Date(0).toISOString()),
+  isOnline: () => typeof navigator === 'undefined' || navigator.onLine,
+  now: () => Date.now(),
+  persist: async (lessons) => {
+    // Persist catalog content without marking audio as downloaded.
+    const { mentorDb } = await import('./indexed-db.js');
+    const db = await mentorDb;
+    const tx = db.transaction('lessons', 'readwrite');
+    for (const lesson of lessons) await tx.store.put(lesson);
+    await tx.done;
+  },
+});
+
 export async function fetchNewLessonCatalog(
-  fetchRemote: () => Promise<GeneratedLesson[]> = () => fetchOfflineLessons(new Date(0).toISOString()),
+  fetchRemote: () => Promise<GeneratedLesson[]> = refreshRemoteLessonCatalog,
   readLocal: () => Promise<GeneratedLesson[]> = readOfflineGeneratedLessons,
 ) {
   const [remote, local] = await Promise.all([

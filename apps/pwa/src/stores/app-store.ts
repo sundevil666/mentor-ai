@@ -450,6 +450,13 @@ export const useAppStore = defineStore('app', {
     },
 
     async loadLesson(context: LearningContext, createdAt: string, forceRefresh = false): Promise<GeneratedLesson> {
+      if (context.lessonTemplateKey && !forceRefresh) {
+        const savedLesson = await findOfflineLesson(context);
+        if (savedLesson) {
+          logDiagnostic('lesson.loaded', { lessonId: savedLesson.id, source: 'offline-library' });
+          return savedLesson;
+        }
+      }
       if (navigator.onLine) {
         try {
           const lesson = await fetchCurrentLesson(context, forceRefresh);

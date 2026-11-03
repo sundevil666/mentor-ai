@@ -1572,7 +1572,8 @@ async function startLibraryLesson(lesson: TrainingLibraryLesson) {
     manualConceptChoice: true,
     lessonTemplateKey: lesson.templateKey,
   });
-  if (navigator.onLine && lesson.mode !== 'home') {
+  const deviceLesson = newLessonCatalog.value.find((item) => (item.lessonTemplateKey ?? item.id) === lesson.templateKey);
+  if (navigator.onLine && lesson.mode !== 'home' && !deviceLesson) {
     try {
       const freshLesson = await fetchCurrentLesson(context, true);
       const speechTexts = getLessonOfflineSpeechTexts(freshLesson.exercises);
@@ -1726,32 +1727,33 @@ function libraryDownloadIcon(templateKey: string) {
 }
 
 async function refreshNewLessonCatalog() {
-  let fetched: GeneratedLesson[] = [];
-  try {
-    fetched = await fetchNewLessonCatalog();
-  } catch {
-    // Previously downloaded lessons still belong in their categories while offline.
-  }
-  fetchedLessonCatalog.value = fetched;
   const cached = await readOfflineGeneratedLessons().catch(() => []);
-  newLessonCatalog.value = mergeAvailableLessonCatalog(
-    fetched,
-    cached,
-    appStore.session?.lesson ?? null,
-    appStore.pausedSessions.map((session) => session.lesson),
-  );
+  const applyCatalog = (lessons: GeneratedLesson[]) => {
+    newLessonCatalog.value = mergeAvailableLessonCatalog(
+      lessons,
+      cached,
+      appStore.session?.lesson ?? null,
+      appStore.pausedSessions.map((session) => session.lesson),
+    );
+  };
+  // Render device content before any server request or unrelated dashboard work.
+  applyCatalog(cached);
+  void fetchNewLessonCatalog().then((lessons) => {
+    fetchedLessonCatalog.value = lessons;
+    applyCatalog(lessons);
+  }).catch(() => { /* Keep the durable device catalog on network failure. */ });
 }
 
 onMounted(async () => {
   if (!appStore.isHydrated) {
     await appStore.hydrate();
   }
+  await refreshNewLessonCatalog();
   await refreshStartedContent();
   await refreshLessonProgressStates();
   await refreshLevelActivity();
   await refreshMovieReports();
   refreshHomeReadingProgress();
-  await refreshNewLessonCatalog();
   if (appStore.session) {
     await syncActiveLessonNavigation();
   } else if (route.query.training === 'grammar' || route.query.training === 'listening' || route.query.training === 'speaking') {
@@ -2252,6 +2254,7 @@ async function requireCurrentLessonUpdateBeforePlayback() {
   const templateKey = session?.lesson.lessonTemplateKey;
   const mode = session?.context.mode;
   if (!session || !templateKey || !navigator.onLine || (mode !== 'listening' && mode !== 'speaking')) return false;
+  if (await isGeneratedLessonAvailableOffline(session.lesson)) return false;
 
   try {
     const freshLesson = await fetchCurrentLesson(session.context, true);
