@@ -18,10 +18,11 @@ export function parseLocalLessonImport(text: string): GeneratedLesson[] {
       || !Array.isArray(lesson.targetSkills) || typeof lesson.estimatedMinutes !== 'number'
       || !Array.isArray(lesson.localEvaluation) || !Array.isArray(lesson.exercises)
       || !lesson.exercises.every((e) => e && typeof e.id === 'string' && typeof e.prompt === 'string'
-        && ['dialogue-translation', 'repeat-speaking'].includes(e.type)
+        && ['dialogue-translation', 'repeat-speaking', 'vocabulary-recall'].includes(e.type)
         && typeof e.expectedResponse === 'string' && Boolean(e.expectedResponse.trim())
-        && typeof e.audioText === 'string' && Boolean(e.audioText.trim()))
-      || !isLessonDeliverable(lesson)) throw new Error('Invalid spoken lesson. Nothing was imported.');
+        && (e.type === 'vocabulary-recall'
+          || (typeof e.audioText === 'string' && Boolean(e.audioText.trim()))))
+      || !isLessonDeliverable(lesson)) throw new Error('Invalid lesson. Nothing was imported.');
     ids.add(lesson.id);
   }
   return lessons as GeneratedLesson[];

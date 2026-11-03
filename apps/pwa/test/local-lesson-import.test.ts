@@ -8,3 +8,10 @@ it('accepts a spoken library and rejects duplicate identities or missing speech 
   assert.throws(() => parseLocalLessonImport(JSON.stringify([{ ...lesson, exercises: [{ ...lesson.exercises[0], expectedResponse: '' }] }])));
   assert.throws(() => parseLocalLessonImport('null'));
 });
+it('accepts mixed written recall and spoken steps while retaining required microphone audio', () => {
+  const written = { ...lesson.exercises[0], id: 'written-step', type: 'vocabulary-recall', prompt: 'Write the answer', audioText: undefined };
+  const mixed = { ...lesson, exercises: [written, lesson.exercises[0]] };
+  assert.equal(parseLocalLessonImport(JSON.stringify([mixed]))[0]?.exercises.length, 2);
+  assert.throws(() => parseLocalLessonImport(JSON.stringify([{ ...mixed, exercises: [written, { ...lesson.exercises[0], audioText: undefined }] }])));
+  assert.throws(() => parseLocalLessonImport(JSON.stringify([{ ...lesson, exercises: [{ ...written, type: 'unknown' }] }])));
+});

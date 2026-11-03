@@ -25,7 +25,7 @@
           <q-icon name="library_add" />
           <span>Local lessons</span>
         </div>
-        <p>Import private speaking lessons on this device. Progress is saved locally and queued for synchronization. Model audio requires a separate download for offline use.</p>
+        <p>Import private speaking and written recall lessons on this device. Progress is saved locally and queued for synchronization. Model audio requires a separate download for offline use.</p>
         <input ref="lessonFileInput" type="file" accept="application/json,.json" hidden @change="importLocalLessons">
         <q-btn color="primary" label="Import local lessons" no-caps unelevated :loading="lessonImportBusy" @click="lessonFileInput?.click()" />
         <p v-if="lessonImportMessage" role="status">{{ lessonImportMessage }}</p>
