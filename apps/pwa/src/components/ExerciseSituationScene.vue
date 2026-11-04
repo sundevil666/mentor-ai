@@ -10,7 +10,61 @@
           <circle cx="59" cy="33" r="1.5" fill="currentColor" /><circle cx="71" cy="33" r="1.5" fill="currentColor" />
         </g>
       <g class="situation-scene__object" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-        <template v-if="scene === 'check' || scene === 'explain'">
+        <template v-if="scene === 'envelope'">
+          <path d="M124 139h102m-92 0v10m82-10v10" />
+          <rect x="131" y="75" width="86" height="54" rx="5" /><path d="m132 78 42 29 42-29m-83 48 27-24m55 24-27-24" />
+        </template>
+        <template v-else-if="scene === 'leak'">
+          <path d="M129 70h69v18h-21v13m-36-31V47h31m-18 0V35m-11 0h22M124 137h94" />
+          <path d="M176 108q-13 15 0 19 13-4 0-19zm-31 18h11m37 7h11" />
+        </template>
+        <template v-else-if="scene === 'luggage'">
+          <rect x="137" y="57" width="70" height="79" rx="9" /><path d="M159 57V37h26v20m-33 14v50m39-50v50" />
+          <circle cx="150" cy="142" r="5" /><circle cx="195" cy="142" r="5" />
+        </template>
+        <template v-else-if="scene === 'wallet'">
+          <rect x="126" y="69" width="91" height="62" rx="7" /><path d="m134 69 6-21 61 17m-49-11 45 11" />
+          <rect x="187" y="89" width="33" height="23" rx="5" /><circle cx="198" cy="100" r="2" />
+        </template>
+        <template v-else-if="scene === 'weather'">
+          <circle cx="151" cy="50" r="18" /><path d="M151 23v-8m-27 35h-8m17-19-6-6m43 6 6-6" />
+          <path d="M139 91a20 20 0 0 1 0-40 26 26 0 0 1 48 1 20 20 0 0 1 16 39zm7 17-5 13m27-13-5 13m27-13-5 13" />
+        </template>
+        <template v-else-if="scene === 'car'">
+          <path d="m126 97 13-31h57l17 31m-87 0h91v31h-91zm19-31 1 31m28-31v31m-41 12h10m55 0h10" />
+          <circle cx="145" cy="131" r="9" /><circle cx="199" cy="131" r="9" />
+        </template>
+        <template v-else-if="scene === 'clothes'">
+          <path d="m150 49-26 19 12 26 13-7v53h46V87l13 7 12-26-26-19-22 15zm22 15v76m-17-23h10m14 0h10" />
+          <path d="m150 49 8 30 14-15 14 15 8-30" />
+        </template>
+        <template v-else-if="scene === 'cooking'">
+          <path d="M136 83h68v27q0 21-34 21t-34-21zm-10 7h10m68 0h11m-84 48h79m-58-68q-9-10 0-20m19 20q-9-10 0-20m19 20q-9-10 0-20" />
+        </template>
+        <template v-else-if="scene === 'laptop'">
+          <rect x="135" y="53" width="75" height="64" rx="5" /><path d="M135 117h75l12 18h-99zm26 8h23m-42-65h61v47h-61" />
+        </template>
+        <template v-else-if="scene === 'map'">
+          <path d="m126 66 29-12 33 12 29-12v77l-29 12-33-12-29 12zm29-12v77m33-65v77" />
+          <path d="M172 102s-17-20-17-31a17 17 0 0 1 34 0c0 11-17 31-17 31z" /><circle cx="172" cy="70" r="5" />
+        </template>
+        <template v-else-if="scene === 'meeting'">
+          <rect x="127" y="49" width="89" height="87" rx="6" /><path d="M127 73h89m-65-35v23m41-23v23m-48 30h15m-15 19h15" />
+          <circle cx="189" cy="105" r="17" /><path d="M189 94v12l8 4" />
+        </template>
+        <template v-else-if="scene === 'conversation'">
+          <path d="M133 44h78v46h-44l-18 16V90h-16zm13 16h51m-51 15h33" />
+          <circle cx="191" cy="121" r="13" /><path d="M170 151q21-30 42 0" />
+        </template>
+        <template v-else-if="scene === 'walk'">
+          <path d="M133 139h85m-74-16 18-12m-8 22 18-12m-8-10 18-12" />
+          <path d="M178 83V40h33v83m-24-71h7m-7 13h7m-7 13h7m-5 45V96h13v27" />
+        </template>
+        <template v-else-if="scene === 'train'">
+          <rect x="137" y="36" width="68" height="96" rx="15" /><path d="M149 46h44m-48 14h52v31h-52zm26 0v31m-31 56 12-15m36 0 14 15m-64 0h66" />
+          <circle cx="152" cy="112" r="5" /><circle cx="190" cy="112" r="5" />
+        </template>
+        <template v-else-if="scene === 'check' || scene === 'explain'">
           <rect x="133" y="42" width="73" height="91" rx="7" /><path d="M150 64h38m-38 15h29m-29 15h20m3 19 9 8 16-20" />
         </template>
         <template v-else-if="scene === 'parcel'">
@@ -66,6 +120,7 @@ const props = defineProps<{ scene: ExerciseScene }>();
 const paused = ref(false);
 const animated = computed(() => ['door-open', 'run'].includes(props.scene));
 const descriptions: Record<ExerciseScene, string> = {
+  walk: 'Человек идёт пешком', envelope: 'Человек и конверт на столе', leak: 'Протекающий кран', luggage: 'Человек с багажом', wallet: 'Человек и кошелёк', weather: 'Погода за окном', car: 'Человек возле автомобиля', clothes: 'Куртка для чистки', cooking: 'Приготовление еды', laptop: 'Человек и ноутбук', map: 'Человек проверяет маршрут', meeting: 'Календарь встречи', conversation: 'Разговор и сообщение', train: 'Поезд у станции',
   window: 'Человек возле окна', help: 'Просьба о помощи', check: 'Человек проверяет запись', parcel: 'Человек и посылка', door: 'Человек возле двери', 'door-open': 'Человек открывает дверь', keys: 'Человек ищет ключи', repair: 'Человек и инструмент для ремонта', cafe: 'Человек в кафе', wait: 'Человек ждёт', relief: 'Человек испытывает облегчение', explain: 'Человек разбирается в объяснении', traffic: 'Транспорт на дороге', run: 'Человек бежит к автобусу', phone: 'Человек и телефонный звонок', tickets: 'Человек забирает билеты',
 };
 const description = computed(() => descriptions[props.scene]);

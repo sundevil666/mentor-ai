@@ -15,3 +15,20 @@ it('keeps static object contexts distinct from opening and prioritizes repairs',
   assert.equal(resolveExerciseScene('Ремонт телефона'), 'repair');
   assert.equal(resolveExerciseScene('The phone is on the table'), 'phone');
 });
+it('recognizes everyday objects without relying on lesson identities', () => {
+  for (const [text, scene] of [
+    ['An envelope beside a pen', 'envelope'], ['A leak near the tap', 'leak'],
+    ['Suitcase by the entrance', 'luggage'], ['A wallet on a shelf', 'wallet'],
+    ['Rain outside', 'weather'], ['A car in the street', 'car'],
+    ['A jacket at the laundry', 'clothes'], ['Cooking dinner', 'cooking'],
+    ['A laptop at the shop', 'laptop'], ['Check an address', 'map'],
+    ['Booking a meeting', 'meeting'], ['A message from a colleague', 'conversation'],
+    ['The train platform', 'train'], ['Walking to work', 'walk'],
+    ['Review the report', 'check'], ['Пробки на дороге', 'traffic'], ['Из-за пробок', 'traffic'],
+  ]) assert.equal(resolveExerciseScene(text!), scene);
+});
+it('does not confuse waiting with rain or generic instructions with their situation', () => {
+  assert.equal(resolveExerciseScene('Подождите здесь'), 'wait');
+  assert.equal(resolveExerciseScene('Объясни, где конверт'), 'envelope');
+  assert.equal(resolveExerciseScene('Исправь ошибку: the wallet is missing'), 'wallet');
+});

@@ -6,23 +6,25 @@ type RestorableLessonSession = {
 export function resolveRestoredLessonSessions<T extends RestorableLessonSession>(
   restoredSession: T | null,
   savedPausedSessions: T[],
-  updateResumeSessionId: string | null,
+  _updateResumeSessionId: string | null,
 ): { activeSession: T | null; pausedSessions: T[] } {
-  const shouldResumeAfterUpdate = Boolean(
+  const shouldResume = Boolean(
     restoredSession
-    && !restoredSession.completedAt
-    && restoredSession.id === updateResumeSessionId,
+    && !restoredSession.completedAt,
   );
 
-  const pausedSessions = savedPausedSessions.filter((session) => !session.completedAt);
-  if (restoredSession && !restoredSession.completedAt && !shouldResumeAfterUpdate) {
-    const existingIndex = pausedSessions.findIndex((session) => session.id === restoredSession.id);
-    if (existingIndex >= 0) pausedSessions.splice(existingIndex, 1);
-    pausedSessions.push(restoredSession);
-  }
+  const pausedSessions = savedPausedSessions.filter((session) => !session.completedAt
+    && (!shouldResume || session.id !== restoredSession?.id));
 
   return {
-    activeSession: shouldResumeAfterUpdate ? restoredSession : null,
+    activeSession: shouldResume ? restoredSession : null,
     pausedSessions,
   };
+}
+
+export function findResumableLessonSession<T extends RestorableLessonSession & {
+  lesson: { id: string; lessonTemplateKey?: string };
+}>(sessions: T[], templateKey: string): T | undefined {
+  return [...sessions].reverse().find((session) => !session.completedAt
+    && (session.lesson.lessonTemplateKey ?? session.lesson.id) === templateKey);
 }

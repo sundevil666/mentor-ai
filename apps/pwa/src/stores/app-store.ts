@@ -69,7 +69,7 @@ import {
 import { cacheMyShiftActivity, readCachedMyShiftActivity } from 'src/services/my-shift-cache';
 import { findOfflineLesson, markOfflineLessonOpened } from 'src/services/offline-library';
 import { selectRetainedUpdateNotifications } from 'src/services/update-notification-retention';
-import { resolveRestoredLessonSessions } from 'src/services/lesson-session-restoration';
+import { findResumableLessonSession, resolveRestoredLessonSessions } from 'src/services/lesson-session-restoration';
 import { rewindLessonSession } from 'src/services/lesson-step-navigation';
 import { isLessonAnswerReady } from 'src/services/lesson-answer-readiness';
 import { refreshImportedLessonSession } from 'src/services/local-lesson-import';
@@ -415,6 +415,17 @@ export const useAppStore = defineStore('app', {
       const createdAt = now();
       const learningContext =
         context ?? createDefaultLearningContext(this.activitySnapshots, this.preferredWorkShift, this.myShiftActivity);
+      const templateKey = learningContext.lessonTemplateKey;
+      if (templateKey && !forceRefresh) {
+        if (this.session && findResumableLessonSession([this.session], templateKey)) return 'resumed';
+        const paused = findResumableLessonSession(this.pausedSessions, templateKey);
+        if (paused) {
+          if (this.session) await this.returnToLessonChoice();
+          await this.resumePausedLesson(paused.id);
+          return 'resumed';
+        }
+      }
+      if (this.session && !this.session.completedAt) await this.returnToLessonChoice();
       const lesson = await this.loadLesson(learningContext, createdAt, forceRefresh);
       markOfflineLessonOpened(lesson.id, 'lessons');
       if (learningContext.lessonTemplateKey && (learningContext.mode === 'listening' || learningContext.mode === 'speaking')) {
@@ -455,6 +466,7 @@ export const useAppStore = defineStore('app', {
         exerciseCount: lesson.exercises.length,
         online: navigator.onLine,
       });
+      return 'started';
     },
 
     async loadLesson(context: LearningContext, createdAt: string, forceRefresh = false): Promise<GeneratedLesson> {
@@ -739,6 +751,9 @@ export const useAppStore = defineStore('app', {
         ? this.pausedSessions.find((session) => session.id === expectedSessionId)
         : this.pausedSessions[this.pausedSessions.length - 1];
       if (!pausedSession) return false;
+      if (this.session && this.session.id !== pausedSession.id && !this.session.completedAt) {
+        await this.returnToLessonChoice();
+      }
       this.session = toStorageRecord(pausedSession);
       markOfflineLessonOpened(pausedSession.lesson.id, 'lessons');
       if (pausedSession.context.lessonTemplateKey && (pausedSession.context.mode === 'listening' || pausedSession.context.mode === 'speaking')) {

@@ -1592,12 +1592,12 @@ async function startLibraryLesson(lesson: TrainingLibraryLesson) {
 }
 
 async function beginLibraryLesson(lesson: TrainingLibraryLesson, context: LearningContext) {
-  recordLessonStart(lesson.templateKey);
   markOfflineLessonOpened(lesson.templateKey, lesson.mode === 'home' ? 'lessons' : lesson.mode);
   lessonReturnDestination.value = selectedLessonLibrary.value;
   answer.value = '';
   setForwardTransition();
-  await appStore.startLesson(context);
+  const outcome = await appStore.startLesson(context);
+  if (outcome === 'started') recordLessonStart(lesson.templateKey);
   await syncActiveLessonNavigation();
 }
 

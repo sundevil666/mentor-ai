@@ -8,9 +8,12 @@
       </div>
     </header>
     <section class="exercise-brief__task">
-      <div v-if="parts.context" class="exercise-brief__context">
+      <div v-if="parts.context" class="exercise-brief__context" :class="{ 'exercise-brief__situation--illustrated': !parts.phrase && scene }">
+        <div>
         <h2><q-icon name="visibility" size="18px" />{{ spoken ? 'Прочитай · ситуация и задание' : mode.taskLabel }}</h2>
         <p class="exercise-brief__prompt">{{ parts.context }}</p>
+        </div>
+        <ExerciseSituationScene v-if="!parts.phrase && scene" :key="exercise.id" :scene="scene" />
       </div>
       <div v-if="parts.phrase" class="exercise-brief__situation" :class="{ 'exercise-brief__situation--illustrated': scene }">
         <div class="exercise-brief__native">
@@ -69,6 +72,8 @@ const mode = computed(() => {
 .exercise-brief .exercise-brief__prompt { color: var(--app-text); font-size: 1rem; line-height: 1.6; white-space: pre-line; }
 .exercise-brief__task { display: grid; gap: 14px; }
 .exercise-brief__context, .exercise-brief__support { padding: 14px 16px; border-radius: 12px; background: var(--app-surface-soft); }
+.exercise-brief__context.exercise-brief__situation--illustrated { display: grid; align-items: center; gap: 20px; }
+.exercise-brief__context > div { min-width: 0; }
 .exercise-brief__support { border: 1px dashed var(--app-border); background: transparent; }
 .exercise-brief__context h2, .exercise-brief__support h2 { margin-bottom: 6px; }
 .exercise-brief__support p { font-size: .94rem; }

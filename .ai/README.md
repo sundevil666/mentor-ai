@@ -52,6 +52,12 @@ Spoken task text must visually separate context/instructions (read), the request
 
 ## Durable lesson catalog and stable release dates
 
+### Always preserve and resume lesson state
+
+Persist the exact current exercise and completed exercise results after every step. Reloading, closing the app, changing categories, returning to the library, installing an update and refreshing lesson content must retain the current position, answers already checked, hints and completion history. Reopening an unfinished lesson must resume its saved session, including offline, rather than create a new session at step one. Resume must not count as another lesson start. Keep the last active unfinished lesson active after reload; retain other unfinished lessons independently.
+
+Content corrections must preserve lesson/exercise IDs, original release dates and saved progress. Verify restoration on a later step after reload and after opening another lesson; test this with synthetic records rather than submitting fabricated learner answers. Completed lessons may be deliberately repeated without deleting earlier completion history.
+
 The IndexedDB `lessons` store is a durable catalog, not a disposable cache. Imported records may be the only device copy: never prune them by age or a maximum lesson count. Removing an offline download may remove media and its readiness record, but must keep the lesson JSON, identity, release date and completion history. Prune statistical evidence independently. Do not restore a shared lesson-count retention limit without a separate, verified recoverable catalog design.
 
 `createdAt` is the original release/library date. Content refresh, database `updated_at`, reimport, restoration and synchronization must not replace it with the current time. Use `updated_at` to discover changed content; group cards by the preserved release date. New batches get their own release date and unique stable IDs; corrections keep the old IDs/date.
