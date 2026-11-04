@@ -2711,7 +2711,7 @@ html.mentor-theme-dark .personal-reader {
     linear-gradient(to right, rgba(72, 184, 178, .36), rgba(105, 197, 194, .09) 42%, transparent 100%) left / 22px 100% no-repeat,
     linear-gradient(to left, rgba(72, 184, 178, .36), rgba(105, 197, 194, .09) 42%, transparent 100%) right / 22px 100% no-repeat;
   animation: reader-listening-frame var(--reader-speech-frame-duration, 8s) linear infinite;
-  will-change: filter, opacity;
+  will-change: opacity;
 }
 
 .personal-reader__speech-frame-wave {
@@ -2723,7 +2723,7 @@ html.mentor-theme-dark .personal-reader {
   opacity: .36;
   transition: opacity 900ms ease;
   transform-origin: center;
-  will-change: filter, opacity, transform;
+  will-change: opacity, transform;
 }
 
 .personal-reader__speech-frame--hearing .personal-reader__speech-frame-wave {
@@ -2732,32 +2732,26 @@ html.mentor-theme-dark .personal-reader {
 
 @keyframes reader-listening-frame {
   0% {
-    filter: brightness(.98) saturate(.94) hue-rotate(0deg);
     opacity: .46;
   }
   50% {
-    filter: brightness(1.07) saturate(1.08) hue-rotate(16deg);
     opacity: .76;
   }
   100% {
-    filter: brightness(.98) saturate(.94) hue-rotate(0deg);
     opacity: .46;
   }
 }
 
 @keyframes reader-listening-wave {
   0% {
-    filter: brightness(.99) saturate(.96) hue-rotate(0deg);
     opacity: .24;
     transform: scale(.992);
   }
   50% {
-    filter: brightness(1.08) saturate(1.1) hue-rotate(14deg);
     opacity: .62;
     transform: scale(1.003);
   }
   100% {
-    filter: brightness(.99) saturate(.96) hue-rotate(0deg);
     opacity: .24;
     transform: scale(.992);
   }

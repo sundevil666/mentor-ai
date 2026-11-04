@@ -86,3 +86,38 @@ to the app after iOS suspension. Record Safari timelines and memory before
 claiming launch-time, battery or peak-memory improvements.
 
 Reference: https://router.vuejs.org/guide/advanced/lazy-loading
+
+## Reader follow-up: continuous speech highlighting
+
+The original reader built every word's nine dynamic highlight classes inside
+StoriesPage's render function. Speech results, lookup state and microphone
+meter updates could therefore re-evaluate the full book's word tree.
+
+- Extracted stable book text into ReaderBookText. Its page props change only
+  when book content or chapter titles change, so speech/UI state does not
+  trigger its render function. Font sizing remains on the outer article.
+- An indexed highlighter now applies/removes only changed word classes after
+  Vue's update. Spoken, current, expected, selected, bookmark and resume classes
+  remain independent. Indexes are rebuilt for new content and released on close.
+- Word-element and token-position indexes replace repeated whole-book DOM
+  queries and token-array flattening for navigation and sentence lookup.
+  Microphone anchoring in paginated mode checks only the current page's words.
+- Removed animated brightness, saturation and hue filters from the full reader
+  frame. Opacity and transform animations retain the listening feedback.
+
+Verification: a temporary Vue renderer experiment using the actual component
+template mounted 20,000 words and performed 100 parent UI updates; the book
+render function ran once in total. A permanent 100,000-word highlighter test
+checks that moving the current highlight touches only the old and new words.
+Reset/overlapping-class coverage is also included. These are algorithm/render
+checks, not Safari timing, battery or physical-device benchmarks.
+
+All 456 PWA tests, full repository tests, typecheck, lint (no errors), and the
+optimized PWA build passed after the reader changes.
+
+The whole book still has DOM nodes for the existing column pagination,
+selection and chapter navigation. This change reduces repeated rendering work;
+it does not implement page virtualization or reduce the speech model's inference
+cost. Very large books can still consume substantial initial memory. Device
+checks for highlighted reading, chapter changes, font resizing, selection and
+resuming remain necessary.

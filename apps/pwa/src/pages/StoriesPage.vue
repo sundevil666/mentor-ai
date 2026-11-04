@@ -361,36 +361,7 @@
             </div>
           </section>
           <article ref="readerPaper" class="personal-reader__paper" :style="{ fontSize: `${readerFontSize}px` }" @click="handleReaderTextTap">
-            <section
-              v-for="(page, pageIndex) in renderedBookPages"
-              :key="page.id"
-              class="personal-reader__chapter"
-              :data-book-chapter-index="pageIndex"
-            >
-              <h2 class="personal-reader__part">{{ formatBookPartLabel(pageIndex, getChapterTitle(page.chapterId)) }}</h2>
-              <p v-for="(paragraph, paragraphIndex) in page.paragraphs" :key="paragraphIndex">
-                <template v-for="(token, tokenIndex) in paragraph" :key="tokenIndex">
-                  <span
-                    v-if="token.isWord"
-                    class="personal-reader__word"
-                    :class="{
-                      'personal-reader__word--loading': readerLookupLoading && token.text.toLocaleLowerCase('en') === selectedReaderText.toLocaleLowerCase('en'),
-                      'personal-reader__word--selected': token.wordIndex === selectedReaderWordIndex,
-                      'personal-reader__word--marker': token.wordIndex === readerMarkerWordIndex,
-                      'personal-reader__word--resume': token.wordIndex === resumeWordIndex,
-                      'personal-reader__word--resume-sentence': token.wordIndex !== undefined && token.wordIndex >= resumeSentenceStartIndex && token.wordIndex <= resumeSentenceEndIndex,
-                      'personal-reader__word--expected': (readingSpeechActive || readingSpeechTransitioning) && token.wordIndex === readingSpeechAnchor,
-                      'personal-reader__word--spoken': token.wordIndex !== undefined && spokenReaderWordIndexes.has(token.wordIndex),
-                      'personal-reader__word--active': token.wordIndex !== undefined && activeReaderWordIndexes.has(token.wordIndex),
-                      'personal-reader__word--current': token.wordIndex === currentReaderHighlightWordIndex,
-                    }"
-                    :data-reader-word="token.text"
-                    :data-reader-word-index="token.wordIndex"
-                  >{{ token.text }}</span>
-                  <template v-else>{{ token.text }}</template>
-                </template>
-              </p>
-            </section>
+            <ReaderBookText :pages="renderedBookPages" />
           </article>
           <span class="personal-reader__end-spacer" aria-hidden="true" />
         </div>
@@ -691,6 +662,8 @@ import AppDetailLayout from 'src/components/AppDetailLayout.vue';
 import AppAudioDock from 'src/components/AppAudioDock.vue';
 import AudioCollection from 'src/components/AudioCollection.vue';
 import { groupAudioCollections } from 'src/services/audio-collections';
+import ReaderBookText from 'src/components/ReaderBookText.vue';
+import { createReaderHighlighter } from 'src/services/reader-highlights';
 import ReaderLookupText from 'src/components/ReaderLookupText.vue';
 import AudioLibraryTabs from 'src/components/AudioLibraryTabs.vue';
 import { loadContentEngagementSummaries, recordContentEngagement, type ContentEngagementSummary } from 'src/services/content-engagement';
@@ -1018,14 +991,65 @@ const readerSidebarStyle = computed(() => ({
 }));
 const renderedBookPages = computed(() => {
   let wordIndex = 0;
-  return selectedBookPages.value.map((page) => ({
+  return selectedBookPages.value.map((page, pageIndex) => ({
     ...page,
+    title: formatBookPartLabel(pageIndex, getChapterTitle(page.chapterId)),
     paragraphs: splitBookParagraphs(page.text).map((paragraph) => tokenizeReaderParagraph(paragraph).map<RenderedReaderToken>((token) => (
       token.isWord ? { ...token, wordIndex: wordIndex++ } : token
     ))),
   }));
 });
 const readerReferenceWords = computed(() => renderedBookPages.value.flatMap((page) => page.paragraphs.flatMap((paragraph) => paragraph.filter((token) => token.isWord).map((token) => token.text))));
+const readerTokens = computed(() => renderedBookPages.value.flatMap((page) => page.paragraphs.flat()));
+const readerWordTokenPositions = computed(() => {
+  const positions: number[] = [];
+  readerTokens.value.forEach((token, index) => {
+    if (token.wordIndex !== undefined) positions[token.wordIndex] = index;
+  });
+  return positions;
+});
+let readerHighlighter: ReturnType<typeof createReaderHighlighter> | null = null;
+const readerWordElements = new Map<number, HTMLElement>();
+let readerWordsByText = new Map<string, number[]>();
+function updateReaderHighlights() {
+  if (!readerHighlighter) return;
+  const set = (kind: string, indexes: Iterable<number>) => readerHighlighter!.update(`personal-reader__word--${kind}`, indexes);
+  const one = (index: number | null) => index !== null && index >= 0 ? [index] : [];
+  set('selected', one(selectedReaderWordIndex.value));
+  set('marker', one(readerMarkerWordIndex.value));
+  set('resume', one(resumeWordIndex.value));
+  const sentence: number[] = [];
+  if (resumeSentenceStartIndex.value >= 0) {
+    for (let index = resumeSentenceStartIndex.value; index <= resumeSentenceEndIndex.value; index++) sentence.push(index);
+  }
+  set('resume-sentence', sentence);
+  set('expected', readingSpeechActive.value || readingSpeechTransitioning.value ? one(readingSpeechAnchor.value) : []);
+  set('spoken', spokenReaderWordIndexes.value);
+  set('active', activeReaderWordIndexes.value);
+  set('current', one(currentReaderHighlightWordIndex.value));
+  set('loading', readerLookupLoading.value ? readerWordsByText.get(selectedReaderText.value.toLocaleLowerCase('en')) ?? [] : []);
+}
+watch([readerPaper, renderedBookPages], () => {
+  readerHighlighter?.clear();
+  readerWordElements.clear();
+  readerWordsByText = new Map();
+  for (const element of readerPaper.value?.querySelectorAll<HTMLElement>('[data-reader-word-index]') ?? []) {
+    const index = Number(element.dataset.readerWordIndex);
+    readerWordElements.set(index, element);
+    const text = (element.dataset.readerWord ?? '').toLocaleLowerCase('en');
+    const indexes = readerWordsByText.get(text) ?? [];
+    indexes.push(index);
+    readerWordsByText.set(text, indexes);
+  }
+  readerHighlighter = readerPaper.value ? createReaderHighlighter(readerWordElements) : null;
+  updateReaderHighlights();
+}, { flush: 'post' });
+watch([
+  selectedReaderWordIndex, readerMarkerWordIndex, resumeWordIndex,
+  resumeSentenceStartIndex, resumeSentenceEndIndex, readingSpeechStatus,
+  readingSpeechTransitioning, readingSpeechAnchor, spokenReaderWordIndexes,
+  activeReaderWordIndexes, readerLookupLoading, selectedReaderText,
+], updateReaderHighlights, { flush: 'post' });
 const currentReaderHighlightWordIndex = computed(() => {
   return [...activeReaderWordIndexes.value].at(-1) ?? -1;
 });
@@ -1105,6 +1129,9 @@ onUnmounted(() => {
   window.clearTimeout(readerWheelSettleTimer);
   cancelAnimationFrame(readerScrollAnimationFrame);
   stopReadingSpeech('idle');
+  readerHighlighter = null;
+  readerWordElements.clear();
+  readerWordsByText.clear();
 });
 
 async function openStory(id: string) {
@@ -1720,8 +1747,8 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
 
 function getReaderLookupContext(selectedText: string, wordIndex: number | null) {
   if (wordIndex !== null) {
-    const tokens = renderedBookPages.value.flatMap((page) => page.paragraphs.flat());
-    const selectedTokenIndex = tokens.findIndex((token) => token.wordIndex === wordIndex);
+    const tokens = readerTokens.value;
+    const selectedTokenIndex = readerWordTokenPositions.value[wordIndex] ?? -1;
     if (selectedTokenIndex >= 0) {
       let start = selectedTokenIndex;
       let end = selectedTokenIndex;
@@ -1842,9 +1869,7 @@ function readReaderStopHistory(bookId: string) {
   return parseReadingStopHistory(localStorage.getItem(readerStopHistoryKey(bookId)));
 }
 function getReaderWord(wordIndex: number) {
-  return renderedBookPages.value
-    .flatMap((page) => page.paragraphs.flat())
-    .find((token) => token.wordIndex === wordIndex)?.text ?? `Word ${wordIndex + 1}`;
+  return readerReferenceWords.value[wordIndex] ?? `Word ${wordIndex + 1}`;
 }
 function formatReaderStopTime(savedAt: string) {
   return new Date(savedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
@@ -2213,10 +2238,17 @@ function getVisibleReaderWordAnchor() {
   const viewport = readerContent.value;
   if (!viewport) return readingSpeechAnchor.value;
   const viewportBounds = viewport.getBoundingClientRect();
-  const visibleWord = Array.from(viewport.querySelectorAll<HTMLElement>('[data-reader-word-index]')).find((word) => {
+  const candidates = readingMode.value
+    ? getReadingPageWords(currentBookPageIndex.value).map(({ index }) => readerWordElements.get(index)).filter((word): word is HTMLElement => !!word)
+    : readerWordElements.values();
+  let visibleWord: HTMLElement | undefined;
+  for (const word of candidates) {
     const bounds = word.getBoundingClientRect();
-    return bounds.right > viewportBounds.left && bounds.left < viewportBounds.right && bounds.bottom > viewportBounds.top && bounds.top < viewportBounds.bottom;
-  });
+    if (bounds.right > viewportBounds.left && bounds.left < viewportBounds.right && bounds.bottom > viewportBounds.top && bounds.top < viewportBounds.bottom) {
+      visibleWord = word;
+      break;
+    }
+  }
   const wordIndex = Number(visibleWord?.dataset.readerWordIndex);
   return Number.isInteger(wordIndex) ? wordIndex : readingSpeechAnchor.value;
 }
@@ -2567,8 +2599,8 @@ function getReaderRestoreWordPosition() {
   return Math.max(0, getReaderChapterWordAnchor(currentBookChapterIndex.value));
 }
 function getReaderSentenceBounds(wordIndex: number) {
-  const tokens = renderedBookPages.value.flatMap((page) => page.paragraphs.flat());
-  const tokenIndex = tokens.findIndex((token) => token.wordIndex === wordIndex);
+  const tokens = readerTokens.value;
+  const tokenIndex = readerWordTokenPositions.value[wordIndex] ?? -1;
   if (tokenIndex < 0) return { start: wordIndex, end: wordIndex };
   let start = wordIndex;
   let end = wordIndex;
@@ -2651,7 +2683,7 @@ async function repaginateReader(position: BookReaderProgress = { wordPosition: g
   saveReadingPageSpeech();
   readingPageSpeech = null;
   readerPageWordCache = new Map();
-  for (const element of paper.querySelectorAll<HTMLElement>('[data-reader-word-index]')) {
+  for (const element of readerWordElements.values()) {
     const pageIndex = Math.floor((element.offsetLeft + 1) / pageWidth);
     const index = Number(element.dataset.readerWordIndex);
     if (!Number.isInteger(index) || index < 0) continue;
@@ -2668,7 +2700,7 @@ async function repaginateReader(position: BookReaderProgress = { wordPosition: g
   });
   if (position.wordPosition !== undefined) {
     stableReaderWordPosition = position.wordPosition;
-    const word = paper.querySelector<HTMLElement>(`[data-reader-word-index="${position.wordPosition}"]`);
+    const word = readerWordElements.get(position.wordPosition);
     currentBookPageIndex.value = Math.max(0, Math.min(readerPageCount.value - 1, Math.floor(((word?.offsetLeft ?? 0) + 1) / readerPageStride.value)));
     const chapterIndex = Number(word?.closest<HTMLElement>('[data-book-chapter-index]')?.dataset.bookChapterIndex);
     selectedBookChapterIndex.value = Number.isInteger(chapterIndex) ? chapterIndex : resolveBookChapterIndex(currentBookPageIndex.value);
@@ -2687,7 +2719,7 @@ async function repaginateReader(position: BookReaderProgress = { wordPosition: g
 }
 function goToSyncedReaderPosition() {
   if (syncedReaderPositionWordIndex < 0 || readerPageStride.value <= 0) return;
-  const word = readerPaper.value?.querySelector<HTMLElement>(`[data-reader-word-index="${syncedReaderPositionWordIndex}"]`);
+  const word = readerWordElements.get(syncedReaderPositionWordIndex);
   if (!word) return;
   stableReaderWordPosition = syncedReaderPositionWordIndex;
   setResumeHighlight(syncedReaderPositionWordIndex);
@@ -2703,7 +2735,7 @@ function getReaderPageWordAnchor(pageIndex: number) {
 }
 function getReaderWordPageIndex(wordIndex: number) {
   if (wordIndex < 0 || !readerPaper.value || readerPageStride.value <= 0) return -1;
-  const word = readerPaper.value.querySelector<HTMLElement>(`[data-reader-word-index="${wordIndex}"]`);
+  const word = readerWordElements.get(wordIndex);
   return word ? Math.floor((word.offsetLeft + 1) / readerPageStride.value) : -1;
 }
 function getReaderChapterWordAnchor(chapterIndex: number) {
@@ -2746,7 +2778,7 @@ function scrollToReaderPage(smooth = true) {
   if (!viewport) return;
   if (!readingMode.value) {
     const wordPosition = getReaderRestoreWordPosition();
-    const word = readerPaper.value?.querySelector<HTMLElement>(`[data-reader-word-index="${wordPosition}"]`);
+    const word = readerWordElements.get(wordPosition);
     const chapter = readerPaper.value?.querySelector<HTMLElement>(`[data-book-chapter-index="${currentBookChapterIndex.value}"]`);
     const targetTop = word
       ? calculateReaderResumeScrollTop({
