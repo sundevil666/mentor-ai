@@ -1713,7 +1713,7 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
     if (requestId === readerLookupRequestId && readingSpeechSuppressedForLookup) {
       readingSpeechSuppressedForLookup = false;
       sherpaReadingTranscriber?.resume();
-      if (readingSpeechActive.value) readingSpeechMessage.value = 'Whisper Base English is ready. Read in phrases; highlighting follows every few seconds.';
+      if (readingSpeechActive.value) readingSpeechMessage.value = 'Read aloud. Recognition is ready.';
     }
   }
 }
@@ -1942,11 +1942,12 @@ async function startReadingSpeech() {
   if (readingSpeechRecognition || readingSpeechStream || !readingMode.value) return;
   const sessionId = ++readingSpeechSessionId;
   readingSpeechSherpaStopping = false;
-  // Prefer the same local English model as lessons. Longer fragments give
-  // Whisper context for short words; highlighting follows each fragment.
-  const useLocalRecognition = true;
-  const useSherpaRecognition = !useLocalRecognition && isSherpaReaderExperiment();
-  const useBrowserRecognition = !useLocalRecognition && !useSherpaRecognition && isSpeechRecognitionAvailable();
+  // Reading needs streaming results to keep word highlighting responsive.
+  // Whisper Base remains the lesson recognizer; use the bundled streaming
+  // reader model here rather than waiting for downloaded batch recognition.
+  const useSherpaRecognition = isSherpaReaderExperiment();
+  const useBrowserRecognition = !useSherpaRecognition && isSpeechRecognitionAvailable();
+  const useLocalRecognition = !useSherpaRecognition && !useBrowserRecognition;
   activeReaderWordIndexes.value = new Set();
   resetReadingSpeechPace();
   loadReadingPageSpeech(currentBookPageIndex.value);
@@ -2086,14 +2087,13 @@ async function startReadingSpeech() {
       const startOfflineRecognition = () => {
         if (sessionId !== readingSpeechSessionId || !readingSpeechStream || localReadingTranscriber) return;
         localReadingTranscriber = startLocalReadingTranscriber(readingSpeechStream, {
-        chunkDurationMs: 5_000,
         onTranscript: (transcript) => {
           handleWhisperTranscript(transcript);
         },
         onReady: () => {
           if (sessionId !== readingSpeechSessionId) return;
           readingSpeechStatus.value = 'listening';
-          readingSpeechMessage.value = 'Whisper Base English is ready. Read in phrases; highlighting follows every few seconds.';
+          readingSpeechMessage.value = 'Read aloud. Recognition is ready.';
           readingSpeechTransitioning.value = false;
         },
         onProgress: (message) => {
@@ -2109,7 +2109,7 @@ async function startReadingSpeech() {
         },
         });
         readingSpeechStatus.value = 'requesting';
-        readingSpeechMessage.value = 'Loading Whisper Base English…';
+        readingSpeechMessage.value = 'Loading offline speech model…';
       };
       startOfflineRecognition();
     }
