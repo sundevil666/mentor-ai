@@ -204,14 +204,17 @@ async function importLocalLessons(event: Event) {
     const db = await mentorDb;
     const tx = db.transaction('lessons', 'readwrite');
     let added = 0;
+    let updated = 0;
     for (const lesson of lessons) {
-      if (await tx.store.get(lesson.id)) continue;
-      await tx.store.add(lesson);
-      added += 1;
+      const existing = await tx.store.get(lesson.id);
+      await tx.store.put(existing ? { ...lesson, createdAt: existing.createdAt } : lesson);
+      if (existing) updated += 1;
+      else added += 1;
     }
     await tx.done;
-    if (added > 0) window.dispatchEvent(new Event('mentor-ai:lesson-catalog-changed'));
-    lessonImportMessage.value = `${added} lessons added on this device. Open Speak to start.`;
+    await appStore.refreshImportedLessons(lessons);
+    window.dispatchEvent(new Event('mentor-ai:lesson-catalog-changed'));
+    lessonImportMessage.value = `${added} lessons added, ${updated} updated on this device. Open Speak to start.`;
     Notify.create({ type: 'positive', message: lessonImportMessage.value });
   } catch (error) {
     lessonImportMessage.value = error instanceof Error ? error.message : 'Import failed.';

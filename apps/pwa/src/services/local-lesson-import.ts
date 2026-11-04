@@ -1,5 +1,16 @@
 import { isLessonDeliverable, type GeneratedLesson } from '@mentor-ai/shared';
 
+/** Refresh content only when the saved exercise identities still match. */
+export function refreshImportedLessonSession<T extends { lesson: GeneratedLesson; completedAt?: string }>(
+  session: T, lessons: GeneratedLesson[],
+): T {
+  if (session.completedAt) return session;
+  const replacement = lessons.find((lesson) => lesson.id === session.lesson.id);
+  if (!replacement || replacement.exercises.length !== session.lesson.exercises.length
+    || replacement.exercises.some((exercise, index) => exercise.id !== session.lesson.exercises[index]?.id)) return session;
+  return { ...session, lesson: { ...replacement, createdAt: session.lesson.createdAt } };
+}
+
 export function parseLocalLessonImport(text: string): GeneratedLesson[] {
   if (text.length > 1_000_000) throw new Error('Lesson file is too large.');
   const data: unknown = JSON.parse(text);

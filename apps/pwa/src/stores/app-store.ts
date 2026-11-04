@@ -72,6 +72,7 @@ import { selectRetainedUpdateNotifications } from 'src/services/update-notificat
 import { resolveRestoredLessonSessions } from 'src/services/lesson-session-restoration';
 import { rewindLessonSession } from 'src/services/lesson-step-navigation';
 import { isLessonAnswerReady } from 'src/services/lesson-answer-readiness';
+import { refreshImportedLessonSession } from 'src/services/local-lesson-import';
 
 interface LearningSessionState {
   id: string;
@@ -345,6 +346,9 @@ export const useAppStore = defineStore('app', {
       );
       this.session = restoredSessions.activeSession ? toStorageRecord(restoredSessions.activeSession) : null;
       this.pausedSessions = deduplicatePausedSessions(restoredSessions.pausedSessions.map(toStorageRecord));
+      const savedCatalog = await db.getAll('lessons');
+      if (this.session) this.session = refreshImportedLessonSession(this.session, savedCatalog);
+      this.pausedSessions = this.pausedSessions.map((session) => refreshImportedLessonSession(session, savedCatalog));
       clearSessionCheckpoint();
       clearUpdateResumeSessionId();
       if (!this.session) await db.delete('learning-sessions', sessionStoreKey);
@@ -752,6 +756,18 @@ export const useAppStore = defineStore('app', {
       this.pausedSessions = this.pausedSessions.filter((session) => session.id !== sessionId);
       await this.persistPausedSessions();
       return true;
+    },
+
+    async refreshImportedLessons(lessons: GeneratedLesson[]) {
+      if (this.session) {
+        const refreshed = refreshImportedLessonSession(this.session, lessons);
+        if (refreshed !== this.session) {
+          this.session = refreshed;
+          await this.persistSession();
+        }
+      }
+      this.pausedSessions = this.pausedSessions.map((session) => refreshImportedLessonSession(session, lessons));
+      await this.persistPausedSessions();
     },
 
     async persistPausedSessions() {
