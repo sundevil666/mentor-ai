@@ -40,4 +40,32 @@ describe('cached media responses', () => {
     assert.equal(response.status, 416);
     assert.equal(response.headers.get('Content-Range'), 'bytes */5');
   });
+  it('slices a Blob without requesting a recording-sized ArrayBuffer', async () => {
+    const cached = new Response('0123456789');
+    cached.arrayBuffer = async () => { throw new Error('Full JS heap copy'); };
+    const response = await createCachedMediaResponse(new Request('https://example.com/audio.mp3', {
+      headers: { Range: 'bytes=0-1' },
+    }), cached);
+    assert.equal(await response.text(), '01');
+  });
+
+  for (const [range, expected] of [['bytes=-3', '789'], ['bytes=7-', '789'], ['bytes=8-99', '89'], ['bytes=-99', '0123456789']]) {
+    it(`serves ${range}`, async () => {
+      const response = await createCachedMediaResponse(new Request('https://example.com/audio.mp3', {
+        headers: { Range: range! },
+      }), new Response('0123456789'));
+      assert.equal(response.status, 206);
+      assert.equal(await response.text(), expected);
+    });
+  }
+
+  for (const range of ['bytes=-0', 'bytes=-', 'bytes=5-2', 'bytes=9007199254740992-']) {
+    it(`rejects invalid range ${range}`, async () => {
+      const response = await createCachedMediaResponse(new Request('https://example.com/audio.mp3', {
+        headers: { Range: range },
+      }), new Response('0123456789'));
+      assert.equal(response.status, 416);
+    });
+  }
+
 });

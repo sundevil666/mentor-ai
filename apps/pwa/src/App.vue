@@ -78,6 +78,7 @@ import { syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
 import { mentorDb } from 'src/services/indexed-db';
 import { syncReadingPageSpeech, readingPageSpeechSyncIntervalMs } from 'src/services/reading-page-speech-outbox';
 import { syncPersonalBookCloud } from 'src/services/personal-book-cloud-sync';
+import { settleTasks } from 'src/services/settle-tasks';
 import { runServerMaintenance } from 'src/services/server-maintenance';
 import { syncBookReadingAnalytics } from 'src/services/book-reading-analytics';
 import { syncReaderVocabulary } from 'src/services/reader-vocabulary';
@@ -112,7 +113,7 @@ onMounted(async () => {
   stopUpdatePolling = startAppUpdatePolling(handleServerUpdateAvailable);
   void runDailyServerMaintenance();
   dailySyncTimer = setInterval(() => { void runDailyServerMaintenance(); }, 60 * 60 * 1_000);
-  readingPageSpeechTimer = setInterval(() => { if (navigator.onLine) void syncReadingPageSpeech(appStore.studentId).catch(() => undefined); }, readingPageSpeechSyncIntervalMs);
+  readingPageSpeechTimer = setInterval(() => { if (document.visibilityState === 'visible' && navigator.onLine) void syncReadingPageSpeech(appStore.studentId).catch(() => undefined); }, readingPageSpeechSyncIntervalMs);
   await showCompletedUpdateNotification();
 });
 
@@ -406,25 +407,25 @@ async function handleServerMaintenanceWakeup() {
 }
 
 async function runDailyServerMaintenance() {
-  if (!navigator.onLine) return;
+  if (!navigator.onLine || document.visibilityState !== 'visible') return;
   if (!appStore.isHydrated) await appStore.hydrate();
   await runServerMaintenance(async () => {
-    const syncResults = await Promise.allSettled([
-      appStore.refreshMyShiftActivity(false),
-      appStore.refreshRemoteLearningState(),
-      syncAllContentProgress(),
-      syncContentEngagement(),
-      syncLearningActivity(),
-      syncApplicationTelemetry(),
-      syncReadingTranscripts(),
-      syncReadingPageSpeech(appStore.studentId),
-      syncReaderVocabulary(appStore.studentId),
-      syncMovieLearningReports(),
-      fetchNewLessonCatalog(),
-      fetchTranslationUsage(),
-      syncPersonalBookCloud(),
-      appStore.publishSessionHandoff(true),
-      syncBookReadingAnalytics(appStore.studentId),
+    const syncResults = await settleTasks<unknown>([
+      () => appStore.refreshMyShiftActivity(false),
+      () => appStore.refreshRemoteLearningState(),
+      () => syncAllContentProgress(),
+      () => syncContentEngagement(),
+      () => syncLearningActivity(),
+      () => syncApplicationTelemetry(),
+      () => syncReadingTranscripts(),
+      () => syncReadingPageSpeech(appStore.studentId),
+      () => syncReaderVocabulary(appStore.studentId),
+      () => syncMovieLearningReports(),
+      () => fetchNewLessonCatalog(),
+      () => fetchTranslationUsage(),
+      () => syncPersonalBookCloud(),
+      () => appStore.publishSessionHandoff(true),
+      () => syncBookReadingAnalytics(appStore.studentId),
     ]);
     window.dispatchEvent(new Event('mentor-ai:daily-server-maintenance-finished'));
     if ([2, 3, 4, 6, 7, 8, 9, 14].some((index) => syncResults[index]?.status === 'rejected')

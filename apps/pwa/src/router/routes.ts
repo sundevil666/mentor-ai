@@ -1,15 +1,15 @@
 import type { RouteRecordRaw } from 'vue-router';
 import MainLayout from 'layouts/MainLayout.vue';
-import DashboardPage from 'pages/DashboardPage.vue';
-import ErrorNotFound from 'pages/ErrorNotFound.vue';
-import SettingsPage from 'pages/SettingsPage.vue';
-import StatisticsPage from 'pages/StatisticsPage.vue';
-import StoriesPage from 'pages/StoriesPage.vue';
-import StoragePage from 'pages/StoragePage.vue';
-import AudioPage from 'pages/AudioPage.vue';
-import PatternsPage from 'pages/PatternsPage.vue';
-import MoviesPage from 'pages/MoviesPage.vue';
-import LearningBalancePage from 'pages/LearningBalancePage.vue';
+const DashboardPage = () => import('pages/DashboardPage.vue');
+const ErrorNotFound = () => import('pages/ErrorNotFound.vue');
+const SettingsPage = () => import('pages/SettingsPage.vue');
+const StatisticsPage = () => import('pages/StatisticsPage.vue');
+const StoriesPage = () => import('pages/StoriesPage.vue');
+const StoragePage = () => import('pages/StoragePage.vue');
+const AudioPage = () => import('pages/AudioPage.vue');
+const PatternsPage = () => import('pages/PatternsPage.vue');
+const MoviesPage = () => import('pages/MoviesPage.vue');
+const LearningBalancePage = () => import('pages/LearningBalancePage.vue');
 
 const routes: RouteRecordRaw[] = [
   {
