@@ -713,10 +713,8 @@ import AudioPlaybackSpeedMenu from 'src/components/AudioPlaybackSpeedMenu.vue';
 import ExerciseBrief from 'src/components/ExerciseBrief.vue';
 import AppDetailLayout from 'src/components/AppDetailLayout.vue';
 import {
-  type ContinuousSpeechRecognition,
   isSpeechRecognitionAvailable,
   recognizeSpeechOnce,
-  startContinuousSpeechRecognition,
   stopSpeechRecognition,
 } from 'src/services/speech-recognition';
 import {
@@ -726,7 +724,6 @@ import {
 } from 'src/services/local-reading-transcriber';
 import {
   chooseBestDialogueTranscript,
-  dialoguePreviewStatus,
   getDialogueExpectedSegments,
   isConfidentDialogueAnswer,
   resolveDialogueExpectedText,
@@ -881,7 +878,6 @@ const dialogueAnswerStatus = ref<'idle' | 'correct' | 'incorrect'>('idle');
 let dialogueRecognitionRunId = 0;
 let dialogueSpeechStream: MediaStream | null = null;
 let dialogueLocalTranscriber: LocalReadingTranscriber | null = null;
-let dialogueLiveRecognition: ContinuousSpeechRecognition | null = null;
 let dialogueSpeechAudioContext: AudioContext | null = null;
 let dialogueSilenceTimer = 0;
 let dialogueRecordingTimeout = 0;
@@ -1892,7 +1888,7 @@ async function recordDialogueAnswer() {
   }
 
   if (isRecognizingSpeech.value) {
-    stopDialogueSpeechRecording();
+    finishDialogueSpeechRecording();
     return;
   }
 
@@ -1909,8 +1905,8 @@ async function recordDialogueAnswer() {
   try {
     if (localSpeechRecognitionAvailable.value) {
       dialogueSpeechStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      startDialogueLiveTranscript(recognitionRunId);
       dialogueLocalTranscriber = startLocalReadingTranscriber(dialogueSpeechStream, {
+        onFinished: () => stopDialogueSpeechRecording(),
         onTranscript: (transcript) => {
           applyDialogueTranscript(transcript, recognitionRunId);
         },
@@ -1926,7 +1922,7 @@ async function recordDialogueAnswer() {
         },
         chunkDurationMs: 5_000,
       });
-      speechRecognitionProgress.value = 'Preparing offline speech recognition…';
+      speechRecognitionProgress.value = 'Preparing Whisper Base English…';
       return;
     }
 
@@ -1946,33 +1942,6 @@ async function recordDialogueAnswer() {
   }
 }
 
-function startDialogueLiveTranscript(recognitionRunId: number) {
-  if (!isSpeechRecognitionAvailable()) return;
-  const finalParts: string[] = [];
-  dialogueLiveRecognition = startContinuousSpeechRecognition({
-    lang: 'en-US',
-    onInterim: (transcript) => {
-      if (recognitionRunId !== dialogueRecognitionRunId || dialogueAnswerStatus.value === 'correct') return;
-      answer.value = [...finalParts, transcript].filter(Boolean).join(' ').trim();
-      if (dialoguePreviewStatus(answer.value, dialogueExpectedText.value, false) === 'correct') {
-        applyDialogueTranscript(answer.value, recognitionRunId);
-      }
-    },
-    onFinal: (transcript) => {
-      if (recognitionRunId !== dialogueRecognitionRunId || dialogueAnswerStatus.value === 'correct') return;
-      finalParts.push(transcript);
-      answer.value = finalParts.join(' ').trim();
-      applyDialogueTranscript(answer.value, recognitionRunId);
-    },
-    onError: () => {
-      // Browser recognition is only a low-latency preview. Local Whisper still
-      // produces and validates the final answer when the network service fails.
-      dialogueLiveRecognition?.stop();
-      dialogueLiveRecognition = null;
-    },
-  });
-}
-
 function applyDialogueTranscript(transcript: string, recognitionRunId: number) {
   if (recognitionRunId !== dialogueRecognitionRunId || !transcript.trim() || dialogueAnswerStatus.value === 'correct') return;
   const expected = dialogueExpectedText.value;
@@ -1984,12 +1953,21 @@ function applyDialogueTranscript(transcript: string, recognitionRunId: number) {
   if (matchesExpected) stopDialogueSpeechRecording();
 }
 
+function finishDialogueSpeechRecording() {
+  if (!dialogueLocalTranscriber) {
+    stopDialogueSpeechRecording();
+    return;
+  }
+  window.clearInterval(dialogueSilenceTimer);
+  window.clearTimeout(dialogueRecordingTimeout);
+  speechRecognitionProgress.value = 'Recognizing your answer…';
+  dialogueLocalTranscriber.finish();
+}
+
 function stopDialogueSpeechRecording() {
   if (dialogueAnswerStatus.value === 'idle' && answer.value.trim()) {
     applyDialogueTranscript(answer.value, dialogueRecognitionRunId);
   }
-  dialogueLiveRecognition?.stop();
-  dialogueLiveRecognition = null;
   dialogueLocalTranscriber?.stop();
   dialogueLocalTranscriber = null;
   dialogueSpeechStream?.getTracks().forEach((track) => track.stop());
@@ -2029,10 +2007,10 @@ function monitorDialogueSpeech(stream: MediaStream) {
     }
     if (!speechStarted) return;
     quietSince ||= now;
-    if (now - quietSince >= 1_000) stopDialogueSpeechRecording();
+    if (now - quietSince >= 1_000) finishDialogueSpeechRecording();
   }, 100);
 
-  dialogueRecordingTimeout = window.setTimeout(() => stopDialogueSpeechRecording(), 15_000);
+  dialogueRecordingTimeout = window.setTimeout(() => finishDialogueSpeechRecording(), 15_000);
 }
 
 async function playAudio() {

@@ -2,12 +2,13 @@ type LocalTranscriberOptions = {
   onTranscript: (text: string) => void;
   onDebug?: (message: string) => void;
   onReady: () => void;
+  onFinished?: () => void;
   onProgress: (message: string) => void;
   onError: (message: string) => void;
   chunkDurationMs?: number;
 };
 
-export type LocalReadingTranscriber = { stop: () => void };
+export type LocalReadingTranscriber = { stop: () => void; finish: () => void };
 export type NormalizedReadingAudio = { audio: Float32Array; rms: number; peak: number; gain: number; usable: boolean };
 
 let sharedWorker: Worker | null = null;
@@ -47,6 +48,9 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
   let silentOutput: GainNode | null = null;
   let timer = 0;
   let stopped = false;
+  let finishing = false;
+  let lastSentId = 0;
+  let lastReceivedId = 0;
   let pcmChunks: Float32Array[] = [];
   let pcmSampleCount = 0;
   const firstSessionRequestId = sharedRequestId + 1;
@@ -71,7 +75,9 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
     if (event.data.type === 'debug' && event.data.message) options.onDebug?.(event.data.message);
     if (event.data.type === 'result') {
       options.onDebug?.(`Worker result #${event.data.id ?? '?'}: ${event.data.text ? 'text received' : 'empty text'}.`);
+      lastReceivedId = event.data.id ?? 0;
       if (event.data.text) options.onTranscript(event.data.text);
+      if (!stopped && finishing && lastReceivedId >= lastSentId) options.onFinished?.();
     }
     if (event.data.type === 'ready') {
       options.onReady();
@@ -112,6 +118,7 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
       return;
     }
     options.onDebug?.(`Sending speech batch #${id} to worker.`);
+    lastSentId = id;
     worker.postMessage({ id, audio: normalized.audio }, [normalized.audio.buffer]);
   };
 
@@ -139,6 +146,15 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
     timer = window.setInterval(flushPcm, chunkDurationMs);
   };
   return {
+    finish() {
+      if (stopped || finishing) return;
+      finishing = true;
+      window.clearInterval(timer);
+      if (processor) processor.port.onmessage = null;
+      source?.disconnect();
+      flushPcm();
+      if (lastReceivedId >= lastSentId) options.onFinished?.();
+    },
     stop() {
       stopped = true;
       worker.postMessage({ type: 'cancel', beforeId: sharedRequestId + 1 });

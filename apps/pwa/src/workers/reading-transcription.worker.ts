@@ -22,9 +22,9 @@ async function createTranscriber() {
       self.postMessage({ type: 'progress', progress: progress.progress });
     }
   };
-  return await pipeline('automatic-speech-recognition', 'onnx-community/whisper-tiny.en', {
+  return await pipeline('automatic-speech-recognition', 'onnx-community/whisper-base.en', {
     device: 'wasm',
-    dtype: 'q4',
+    dtype: 'q8',
     progress_callback,
   }) as unknown as (audio: Float32Array, options?: Record<string, unknown>) => Promise<TranscriptionResult>;
 }
@@ -69,7 +69,7 @@ async function transcribe(request: { id: number; audio: Float32Array }) {
   self.postMessage({ type: 'debug', message: `Worker transcribing chunk #${request.id}.` });
   try {
     const transcriber = await transcriberPromise!;
-    // whisper-tiny.en is English-only and already defaults to transcription.
+    // whisper-base.en is English-only and already defaults to transcription.
     // Transformers.js rejects language/task overrides for this model.
     const result = await transcriber(request.audio);
     self.postMessage({ type: 'debug', message: `Worker finished chunk #${request.id} in ${((performance.now() - startedAt) / 1_000).toFixed(1)}s.` });

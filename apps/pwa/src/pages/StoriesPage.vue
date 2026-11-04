@@ -1713,7 +1713,7 @@ async function selectReaderText(rawText: string, speakImmediately: boolean, word
     if (requestId === readerLookupRequestId && readingSpeechSuppressedForLookup) {
       readingSpeechSuppressedForLookup = false;
       sherpaReadingTranscriber?.resume();
-      if (readingSpeechActive.value) readingSpeechMessage.value = 'Read aloud. Recognition is ready.';
+      if (readingSpeechActive.value) readingSpeechMessage.value = 'Whisper Base English is ready. Read in phrases; highlighting follows every few seconds.';
     }
   }
 }
@@ -1942,9 +1942,11 @@ async function startReadingSpeech() {
   if (readingSpeechRecognition || readingSpeechStream || !readingMode.value) return;
   const sessionId = ++readingSpeechSessionId;
   readingSpeechSherpaStopping = false;
-  const useSherpaRecognition = isSherpaReaderExperiment();
-  const useBrowserRecognition = !useSherpaRecognition && isSpeechRecognitionAvailable();
-  const useLocalRecognition = !useSherpaRecognition && !useBrowserRecognition;
+  // Prefer the same local English model as lessons. Longer fragments give
+  // Whisper context for short words; highlighting follows each fragment.
+  const useLocalRecognition = true;
+  const useSherpaRecognition = !useLocalRecognition && isSherpaReaderExperiment();
+  const useBrowserRecognition = !useLocalRecognition && !useSherpaRecognition && isSpeechRecognitionAvailable();
   activeReaderWordIndexes.value = new Set();
   resetReadingSpeechPace();
   loadReadingPageSpeech(currentBookPageIndex.value);
@@ -2084,13 +2086,14 @@ async function startReadingSpeech() {
       const startOfflineRecognition = () => {
         if (sessionId !== readingSpeechSessionId || !readingSpeechStream || localReadingTranscriber) return;
         localReadingTranscriber = startLocalReadingTranscriber(readingSpeechStream, {
+        chunkDurationMs: 5_000,
         onTranscript: (transcript) => {
           handleWhisperTranscript(transcript);
         },
         onReady: () => {
           if (sessionId !== readingSpeechSessionId) return;
           readingSpeechStatus.value = 'listening';
-          readingSpeechMessage.value = 'Read aloud. Recognition is ready.';
+          readingSpeechMessage.value = 'Whisper Base English is ready. Read in phrases; highlighting follows every few seconds.';
           readingSpeechTransitioning.value = false;
         },
         onProgress: (message) => {
@@ -2106,7 +2109,7 @@ async function startReadingSpeech() {
         },
         });
         readingSpeechStatus.value = 'requesting';
-        readingSpeechMessage.value = 'Loading offline speech model…';
+        readingSpeechMessage.value = 'Loading Whisper Base English…';
       };
       startOfflineRecognition();
     }
