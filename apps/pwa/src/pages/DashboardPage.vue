@@ -16,28 +16,7 @@
 
         <section v-else-if="!appStore.session" key="choice" class="learning-start">
           <template v-if="selectedLessonLibrary === 'home'">
-          <section class="home-overview" aria-label="Learning progress">
-            <div class="home-progress-heading">
-              <span class="home-progress-heading__icon"><q-icon name="insights" size="22px" /></span>
-              <div>
-                <p class="learning-start__eyebrow">Statistics · view only</p>
-                <h1>Your progress</h1>
-                <span>See what you have completed and what is still left. Reading time also counts toward your level growth.</span>
-              </div>
-            </div>
-            <div class="home-progress-list">
-              <article v-for="item in homeProgressItems" :key="item.label" class="home-progress-item">
-                <q-icon :name="item.icon" size="25px" />
-                <div class="home-progress-item__copy">
-                  <strong>{{ item.label }}</strong>
-                  <span>{{ item.done }}{{ item.ratio === null ? ' · ' : ' of ' }}{{ item.total }}</span>
-                  <span v-if="item.detail">{{ item.detail }}</span>
-                  <q-linear-progress v-if="item.ratio !== null" :value="item.ratio" color="primary" track-color="grey-3" rounded size="7px" />
-                </div>
-                <b v-if="item.remaining">{{ item.remaining }}</b>
-              </article>
-            </div>
-          </section>
+          <HomeMentorAdvice :statistics="appStore.statisticsSnapshots" :student-id="appStore.studentId" />
 
           <section class="home-work-lists" aria-label="Your learning lists">
             <q-tabs v-model="selectedHomeListTab" dense no-caps align="justify" active-color="primary" indicator-color="primary" class="home-work-tabs">
@@ -699,14 +678,12 @@
 </template>
 
 <script setup lang="ts">
-import type { GeneratedLesson, LearningActivityTotals, LearningContext, MovieLearningReport, PreferredLessonDevice } from '@mentor-ai/shared';
+import type { GeneratedLesson, LearningContext, PreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { resolveDashboardTrainingCategory, resolveLessonReturnDestination, synchronizeDashboardLessonRoute, type DashboardTrainingCategory } from 'src/services/navigation-category';
 import { sortMaterialsNewestFirst } from 'src/services/material-order';
 import { groupLessonsByProgressAndReleaseDate, groupLessonDates, resolveSelectedLessonDate } from 'src/services/lesson-library-order';
-import { loadMovieLearningReports, refreshMovieLearningReportsFromCloud } from 'src/services/movie-learning-reports';
-import { summarizeMovieViewing } from 'src/services/movie-viewing-summary';
 import {
   createCurrentActivitySuggestion,
   createLearningContext,
@@ -778,20 +755,18 @@ import { downloadGeneratedLessonOffline, fetchNewLessonCatalog } from 'src/servi
 import {
   buildGeneratedLessonLinks,
   generatedLessonCategory,
-  generatedLessonMode,
   mergeAvailableLessonCatalog,
   selectProgressLessonCatalog,
   type LessonProgressState,
 } from 'src/services/lesson-category-progress';
 import { isLessonAnswerReady, requiresExactLessonAnswer, requiresSpokenLessonAnswer } from 'src/services/lesson-answer-readiness';
-import { loadLearningActivityTotals } from 'src/services/learning-activity';
-import { createDailyReadingProgress, dailyReadingTargetWords, dailyWordsRead, localReadingDate, prepareDailyReadingProgress, type DailyReadingProgress } from 'src/services/daily-reading-progress';
 import { audioLibrary } from 'src/services/audio-library';
 import { storyLibrary } from 'src/services/story-library';
 import { loadAllContentProgress } from 'src/services/content-progress';
 import { belongsToRequiredLessons, belongsToStartedLessons } from 'src/services/home-lesson-lists';
 import { selectUnfinishedStartedContent, type StartedContentState } from 'src/services/home-started-content';
 import { listPersonalBooks, type PersonalBook } from 'src/services/personal-book-library';
+import HomeMentorAdvice from 'src/components/HomeMentorAdvice.vue';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import {
   loadContentEngagementSummaries,
@@ -1456,77 +1431,7 @@ const startedContentItems = computed<StartedContentItem[]>(() => {
     .filter((item): item is StartedContentItem => item !== null);
 });
 
-const levelActivity = ref<LearningActivityTotals>({ grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null });
-const movieReports = ref<MovieLearningReport[]>([]);
-const movieSummary = computed(() => summarizeMovieViewing(movieReports.value));
 const fetchedLessonCatalog = ref<GeneratedLesson[]>([]);
-const homeReadingProgress = ref<DailyReadingProgress>(createDailyReadingProgress());
-function refreshHomeReadingProgress() {
-  try {
-    const saved = JSON.parse(localStorage.getItem('mentor-ai:daily-reading-progress') ?? 'null') as DailyReadingProgress | null;
-    homeReadingProgress.value = prepareDailyReadingProgress(saved, localReadingDate());
-  } catch {
-    homeReadingProgress.value = createDailyReadingProgress();
-  }
-}
-const homeProgressItems = computed(() => {
-  const totals = appStore.statisticsSnapshots.reduce((summary, snapshot) => ({
-    listeningSeconds: summary.listeningSeconds + (snapshot.listeningSeconds ?? 0),
-  }), { listeningSeconds: 0 });
-  const listenedSeconds = Math.max(totals.listeningSeconds, levelActivity.value.listeningSeconds);
-  const listeningLessonSeconds = trainingLibraries.listening.lessons.reduce((sum, lesson) => sum + lesson.minutes * 60, 0);
-  const generatedListeningSeconds = selectProgressLessonCatalog(fetchedLessonCatalog.value, newLessonCatalog.value)
-    .filter((lesson) => generatedLessonMode(lesson) === 'listening')
-    .reduce((sum, lesson) => sum + lesson.estimatedMinutes * 60, 0);
-  const listeningTotalSeconds = audioLibrary.reduce((sum, item) => sum + item.durationSeconds, 0)
-    + storyLibrary.reduce((sum, item) => sum + item.durationSeconds, 0)
-    + listeningLessonSeconds
-    + generatedListeningSeconds;
-  const lessonKeys = new Set([
-    ...allHomeLessons.value.map((lesson) => lesson.templateKey),
-    ...newLessonCatalog.value.map((lesson) => lesson.lessonTemplateKey ?? lesson.id),
-  ]);
-  const completedLessons = [...lessonKeys].filter((key) => lessonProgressState(key) === 'completed').length;
-  const lessonTotal = lessonKeys.size;
-  const completedSessions = appStore.completedLessonsCount;
-  const wordsRead = dailyWordsRead(homeReadingProgress.value);
-  const readingTarget = dailyReadingTargetWords(homeReadingProgress.value);
-  return [
-    {
-      icon: 'headphones',
-      label: 'Listening',
-      done: `${formatDuration(listenedSeconds)} listened`,
-      total: formatDuration(listeningTotalSeconds),
-      remaining: `${formatDuration(Math.max(0, listeningTotalSeconds - listenedSeconds))} left`,
-      ratio: listeningTotalSeconds > 0 ? Math.min(1, listenedSeconds / listeningTotalSeconds) : 0,
-    },
-    {
-      icon: 'menu_book',
-      label: 'Reading',
-      done: `${wordsRead.toLocaleString()} words today · ${formatDuration(levelActivity.value.readingSeconds)} reading`,
-      total: `${readingTarget.toLocaleString()} words daily goal`,
-      remaining: `${Math.max(0, readingTarget - wordsRead).toLocaleString()} left`,
-      ratio: readingTarget > 0 ? Math.min(1, wordsRead / readingTarget) : 0,
-    },
-    {
-      icon: 'task_alt',
-      label: 'Lessons',
-      done: `${completedSessions} done`,
-      total: `${lessonTotal} lesson goal`,
-      detail: `${completedLessons} different lessons completed`,
-      remaining: `${Math.max(0, lessonTotal - completedSessions)} to goal`,
-      ratio: lessonTotal > 0 ? Math.min(1, completedSessions / lessonTotal) : 0,
-    },
-    {
-      icon: 'movie',
-      label: 'Movies',
-      done: `${movieSummary.value.movieCount} watched`,
-      total: `≈ ${formatDuration(movieSummary.value.estimatedViewingSeconds)} viewing time`,
-      remaining: '',
-      ratio: null,
-    },
-  ];
-});
 const lessonBackLabel = computed(() => {
   if ((appStore.session?.currentExerciseIndex ?? 0) > 0) return 'Back to previous step';
   if (lessonReturnDestination.value === 'grammar') return 'Back to Grammar lessons';
@@ -1536,19 +1441,6 @@ const lessonBackLabel = computed(() => {
   return 'Back to Home';
 });
 
-function deviceRecommendation(device: PreferredLessonDevice) {
-  return device === 'mac'
-    ? {
-        icon: 'laptop_mac',
-        label: 'Mac preferred',
-        tooltip: 'Mac is preferred for more reliable voice recognition and detailed answers.',
-      }
-    : {
-        icon: 'phone_iphone',
-        label: 'iPhone preferred',
-        tooltip: 'iPhone is preferred for convenient listening on the move.',
-      };
-}
 function lessonCategoryIcon(category: DashboardTrainingCategory) {
   return trainingLibraries[category].icon;
 }
@@ -1730,9 +1622,6 @@ onMounted(async () => {
   await refreshNewLessonCatalog();
   await refreshStartedContent();
   await refreshLessonProgressStates();
-  await refreshLevelActivity();
-  await refreshMovieReports();
-  refreshHomeReadingProgress();
   if (appStore.session) {
     await syncActiveLessonNavigation();
   } else if (route.query.training === 'grammar' || route.query.training === 'listening' || route.query.training === 'speaking') {
@@ -1747,10 +1636,7 @@ onMounted(async () => {
   window.addEventListener('pagehide', handlePageExit);
   window.addEventListener('mentor-ai:prepare-app-update', handlePrepareAppUpdate);
   window.addEventListener('mentor-content-engagement', handleLessonEngagementChange);
-  window.addEventListener('mentor-learning-activity-updated', refreshLevelActivity);
-  window.addEventListener('mentor-movie-reports-updated', refreshMovieReports);
   window.addEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyMaintenanceFinished);
-  window.addEventListener('focus', refreshHomeReadingProgress);
 });
 
 onUnmounted(() => {
@@ -1766,20 +1652,10 @@ onUnmounted(() => {
   window.removeEventListener('pagehide', handlePageExit);
   window.removeEventListener('mentor-ai:prepare-app-update', handlePrepareAppUpdate);
   window.removeEventListener('mentor-content-engagement', handleLessonEngagementChange);
-  window.removeEventListener('mentor-learning-activity-updated', refreshLevelActivity);
-  window.removeEventListener('mentor-movie-reports-updated', refreshMovieReports);
   window.removeEventListener('mentor-ai:daily-server-maintenance-finished', handleDailyMaintenanceFinished);
-  window.removeEventListener('focus', refreshHomeReadingProgress);
 });
 
 watch(selectedHomeListTab, (tab) => saveHomePreference('mentor-ai:home-list-tab', tab));
-
-async function refreshLevelActivity() { levelActivity.value = await loadLearningActivityTotals(); }
-
-async function refreshMovieReports() {
-  if (navigator.onLine) await refreshMovieLearningReportsFromCloud().catch(() => 0);
-  movieReports.value = await loadMovieLearningReports();
-}
 
 watch(
   () => route.query.training,
@@ -2785,14 +2661,6 @@ function formatClockTime(totalSeconds: number): string {
   const seconds = safeSeconds % 60;
 
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
-
-function formatDuration(totalSeconds: number): string {
-  const minutes = Math.floor(Math.max(0, totalSeconds) / 60);
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  return remainder ? `${hours} h ${remainder} min` : `${hours} h`;
 }
 
 function readHomePreference(key: string): string | null {
