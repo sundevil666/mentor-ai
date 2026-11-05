@@ -25,6 +25,10 @@ async function createTranscriber() {
   return await pipeline('automatic-speech-recognition', 'onnx-community/whisper-base.en', {
     device: 'wasm',
     dtype: 'q8',
+    // The bundled ORT WASM extended optimizer incorrectly fuses the decoder's
+    // shared quantized embedding weights (TransposeDQWeightsForMatMulNBits).
+    // Basic optimization preserves the valid graph and works with this export.
+    session_options: { graphOptimizationLevel: 'basic' },
     progress_callback,
   }) as unknown as (audio: Float32Array, options?: Record<string, unknown>) => Promise<TranscriptionResult>;
 }
