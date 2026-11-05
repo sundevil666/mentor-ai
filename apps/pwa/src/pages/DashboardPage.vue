@@ -713,6 +713,8 @@ import AudioPlaybackSpeedMenu from 'src/components/AudioPlaybackSpeedMenu.vue';
 import ExerciseBrief from 'src/components/ExerciseBrief.vue';
 import AppDetailLayout from 'src/components/AppDetailLayout.vue';
 import {
+  type ContinuousSpeechRecognition,
+  startContinuousSpeechRecognition,
   isSpeechRecognitionAvailable,
   recognizeSpeechOnce,
   stopSpeechRecognition,
@@ -878,8 +880,7 @@ const dialogueAnswerStatus = ref<'idle' | 'correct' | 'incorrect'>('idle');
 let dialogueRecognitionRunId = 0;
 let dialogueSpeechStream: MediaStream | null = null;
 let dialogueLocalTranscriber: LocalReadingTranscriber | null = null;
-let dialogueSpeechAudioContext: AudioContext | null = null;
-let dialogueSilenceTimer = 0;
+let dialogueLivePreview: ContinuousSpeechRecognition | null = null;
 let dialogueRecordingTimeout = 0;
 const speechRecognitionCaptured = ref(false);
 const selectedListeningItemId = ref<string | null>(null);
@@ -1906,13 +1907,18 @@ async function recordDialogueAnswer() {
     if (localSpeechRecognitionAvailable.value) {
       dialogueSpeechStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       dialogueLocalTranscriber = startLocalReadingTranscriber(dialogueSpeechStream, {
+        wholeUtterance: true,
         onFinished: () => stopDialogueSpeechRecording(),
         onTranscript: (transcript) => {
+          // The local result covers the whole recording; replace the provisional
+          // browser text instead of selecting a partial fragment against it.
+          answer.value = '';
           applyDialogueTranscript(transcript, recognitionRunId);
         },
         onReady: () => {
-          if (dialogueSpeechStream) monitorDialogueSpeech(dialogueSpeechStream);
-          speechRecognitionProgress.value = 'Speak now. Recording stops after a pause.';
+          startDialoguePreview(recognitionRunId);
+          dialogueRecordingTimeout = window.setTimeout(() => finishDialogueSpeechRecording(), 25_000);
+          speechRecognitionProgress.value = 'Speak at your own pace. Tap Stop when you finish (up to 25 seconds).';
         },
         onProgress: (message) => { speechRecognitionProgress.value = `${message}. Keep this screen open.`; },
         onError: (message) => {
@@ -1953,64 +1959,50 @@ function applyDialogueTranscript(transcript: string, recognitionRunId: number) {
   if (matchesExpected) stopDialogueSpeechRecording();
 }
 
+function startDialoguePreview(recognitionRunId: number) {
+  if (!isSpeechRecognitionAvailable()) return;
+  const parts: string[] = [];
+  try {
+    dialogueLivePreview = startContinuousSpeechRecognition({
+      lang: 'en-US',
+      onInterim: (text) => {
+        if (dialogueLivePreview && recognitionRunId === dialogueRecognitionRunId) answer.value = [...parts, text].join(' ').trim();
+      },
+      onFinal: (text) => {
+        if (!dialogueLivePreview || recognitionRunId !== dialogueRecognitionRunId) return;
+        parts.push(text);
+        answer.value = parts.join(' ');
+      },
+      // Preview is provisional; only the full local recording is graded.
+      onError: () => { dialogueLivePreview?.stop(); dialogueLivePreview = null; },
+    });
+  } catch { /* Local recording remains available without browser preview. */ }
+}
+
 function finishDialogueSpeechRecording() {
   if (!dialogueLocalTranscriber) {
     stopDialogueSpeechRecording();
     return;
   }
-  window.clearInterval(dialogueSilenceTimer);
   window.clearTimeout(dialogueRecordingTimeout);
-  speechRecognitionProgress.value = 'Recognizing your answer…';
+  dialogueLivePreview?.stop();
+  dialogueLivePreview = null;
+  speechRecognitionProgress.value = 'Checking the full recording…';
   dialogueLocalTranscriber.finish();
 }
 
 function stopDialogueSpeechRecording() {
-  if (dialogueAnswerStatus.value === 'idle' && answer.value.trim()) {
-    applyDialogueTranscript(answer.value, dialogueRecognitionRunId);
-  }
+  dialogueLivePreview?.stop();
+  dialogueLivePreview = null;
   dialogueLocalTranscriber?.stop();
   dialogueLocalTranscriber = null;
   dialogueSpeechStream?.getTracks().forEach((track) => track.stop());
   dialogueSpeechStream = null;
-  window.clearInterval(dialogueSilenceTimer);
   window.clearTimeout(dialogueRecordingTimeout);
-  dialogueSilenceTimer = 0;
   dialogueRecordingTimeout = 0;
-  if (dialogueSpeechAudioContext) void dialogueSpeechAudioContext.close().catch(() => undefined);
-  dialogueSpeechAudioContext = null;
   stopSpeechRecognition();
   speechRecognitionProgress.value = '';
   isRecognizingSpeech.value = false;
-}
-
-function monitorDialogueSpeech(stream: MediaStream) {
-  const context = new AudioContext();
-  const analyser = context.createAnalyser();
-  analyser.fftSize = 1024;
-  context.createMediaStreamSource(stream).connect(analyser);
-  dialogueSpeechAudioContext = context;
-  const samples = new Float32Array(analyser.fftSize);
-  let speechStarted = false;
-  let quietSince = 0;
-
-  dialogueSilenceTimer = window.setInterval(() => {
-    if (!isRecognizingSpeech.value) return;
-    analyser.getFloatTimeDomainData(samples);
-    let sumSquares = 0;
-    for (const sample of samples) sumSquares += sample * sample;
-    const rms = Math.sqrt(sumSquares / samples.length);
-    const now = performance.now();
-    if (rms >= 0.012) {
-      speechStarted = true;
-      quietSince = 0;
-      return;
-    }
-    if (!speechStarted) return;
-    quietSince ||= now;
-    if (now - quietSince >= 1_000) finishDialogueSpeechRecording();
-  }, 100);
-
-  dialogueRecordingTimeout = window.setTimeout(() => finishDialogueSpeechRecording(), 15_000);
 }
 
 async function playAudio() {

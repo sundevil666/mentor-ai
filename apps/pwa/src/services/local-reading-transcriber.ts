@@ -6,6 +6,7 @@ type LocalTranscriberOptions = {
   onProgress: (message: string) => void;
   onError: (message: string) => void;
   chunkDurationMs?: number;
+  wholeUtterance?: boolean;
 };
 
 export type LocalReadingTranscriber = { stop: () => void; finish: () => void };
@@ -80,8 +81,9 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
       if (!stopped && finishing && lastReceivedId >= lastSentId) options.onFinished?.();
     }
     if (event.data.type === 'ready') {
-      options.onReady();
-      void startCapture().catch((error) => options.onError(error instanceof Error ? error.message : String(error)));
+      void startCapture()
+        .then(() => { if (!stopped && !finishing) options.onReady(); })
+        .catch((error) => options.onError(error instanceof Error ? error.message : String(error)));
     }
     if (event.data.type === 'progress') {
       const progress = Number.isFinite(event.data.progress) ? ` ${Math.round(event.data.progress ?? 0)}%` : '';
@@ -95,8 +97,9 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
   if (sharedWorkerReady) {
     queueMicrotask(() => {
       if (stopped) return;
-      options.onReady();
-      void startCapture().catch((error) => options.onError(error instanceof Error ? error.message : String(error)));
+      void startCapture()
+        .then(() => { if (!stopped && !finishing) options.onReady(); })
+        .catch((error) => options.onError(error instanceof Error ? error.message : String(error)));
     });
   } else if (!sharedWorkerInitializing) {
     sharedWorkerInitializing = true;
@@ -143,7 +146,7 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
     if (context.state === 'suspended') await context.resume();
     const chunkDurationMs = options.chunkDurationMs ?? localReadingChunkDurationMs;
     options.onDebug?.(`Continuous PCM capture ready; checking speech every ${(chunkDurationMs / 1_000).toFixed(1)}s.`);
-    timer = window.setInterval(flushPcm, chunkDurationMs);
+    if (!options.wholeUtterance) timer = window.setInterval(flushPcm, chunkDurationMs);
   };
   return {
     finish() {
