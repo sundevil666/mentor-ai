@@ -73,7 +73,7 @@
         </div>
 
         <section class="audio-player" aria-label="Audio player">
-          <audio ref="audioElement" :src="playbackUrl" controls :loop="repeatEnabled" preload="metadata" @loadedmetadata="restoreAudioProgress" @ended="handleEnded" @pause="handlePause" @play="handlePlay" @seeking="handleSeeking" @timeupdate="saveProgress" />
+          <audio ref="audioElement" :src="playbackUrl" controls preload="metadata" @loadedmetadata="restoreAudioProgress" @ended="handleEnded" @pause="handlePause" @play="handlePlay" @seeking="handleSeeking" @timeupdate="saveProgress" />
           <div class="audio-player__actions">
             <a :href="selectedAudio.articleUrl" target="_blank" rel="noopener">Transcript and source <q-icon name="open_in_new" /></a>
           </div>
@@ -120,6 +120,7 @@ import AppAudioDock from 'src/components/AppAudioDock.vue';
 import AudioLibraryTabs from 'src/components/AudioLibraryTabs.vue';
 import { ActiveLearningTimer } from 'src/services/learning-activity';
 import { resolveAudioResumePosition } from 'src/services/audio-resume';
+import { replayCompletedAudio } from 'src/services/audio-repeat';
 import { loadAllContentProgress, loadContentProgress, saveContentProgress } from 'src/services/content-progress';
 import { isAudioPlaybackCompleted } from 'src/services/audio-completion';
 
@@ -341,6 +342,11 @@ function handleEnded() {
   if (item) localStorage.removeItem(`mentor-ai:audio-progress:${item.id}`);
   persistSyncedProgress(true, true);
   isPlaying.value = false;
+  if (repeatEnabled.value && audioElement.value) {
+    void replayCompletedAudio(audioElement.value).catch(() => {
+      Notify.create({ type: 'negative', message: 'Tap play again to repeat this audio.' });
+    });
+  }
 }
 function recordAudioEngagement(type: 'started' | 'finished' | 'full-play') {
   if (!selectedAudio.value) return Promise.resolve();

@@ -105,7 +105,6 @@
           class="story-audio"
           :src="selectedStory.sourceUrl"
           controls
-          :loop="repeat"
           preload="metadata"
           @ended="handleEnded"
           @loadedmetadata="restoreProgress"
@@ -654,6 +653,7 @@
 <script setup lang="ts">
 import { Dialog, Notify } from 'quasar';
 import { resolveAudioResumePosition } from 'src/services/audio-resume';
+import { replayCompletedAudio } from 'src/services/audio-repeat';
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { ContentProgress, ReaderTextLookup, ReadingChapter, ReadingPage } from '@mentor-ai/shared';
 import type { BookReaderDifficultyRating } from '@mentor-ai/shared';
@@ -2873,6 +2873,11 @@ function handleEnded() {
     void recordEngagement(selectedStory.value.id, 'finished');
   }
   persistProgress(true);
+  if (repeat.value && audioElement.value) {
+    void replayCompletedAudio(audioElement.value).catch(() => {
+      Notify.create({ type: 'negative', message: 'Tap play again to repeat this story.' });
+    });
+  }
 }
 function isStoryCompleted(id: string) { return completedStoryIds.value.has(id); }
 async function refreshCompletedStories() {
