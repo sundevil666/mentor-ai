@@ -293,7 +293,7 @@
                 :class="[
                   'dialogue-drill__recorder',
                   {
-                    'dialogue-drill__recorder--active': isRecognizingSpeech,
+                    'dialogue-drill__recorder--active': speechRecordingPhase === 'recording',
                     'dialogue-drill__recorder--captured': dialogueAnswerStatus === 'correct',
                     'dialogue-drill__recorder--error': speechRecognitionError || dialogueAnswerStatus === 'incorrect',
                   },
@@ -303,12 +303,13 @@
               >
                 <q-btn
                   class="dialogue-drill__record-button"
-                  :color="isRecognizingSpeech ? 'negative' : 'primary'"
-                  :icon="isRecognizingSpeech ? 'stop_circle' : 'mic'"
-                  :label="isRecognizingSpeech ? 'Остановить' : speechRecognitionCaptured ? 'Ещё раз' : 'Записать ответ'"
+                  :color="speechRecordingPhase === 'recording' ? 'negative' : 'primary'"
+                  :icon="speechRecordingPhase === 'recording' ? 'stop_circle' : 'mic'"
+                  :label="speechRecordingButtonLabel"
+                  :loading="speechRecordingPhase === 'preparing' || speechRecordingPhase === 'checking'"
                   unelevated
                   no-caps
-                  :disable="!speechRecognitionAvailable"
+                  :disable="!speechRecognitionAvailable || speechRecordingPhase === 'preparing' || speechRecordingPhase === 'checking'"
                   @click="recordDialogueAnswer"
                 />
                 <q-btn
@@ -348,7 +349,7 @@
                 :color="dialogueAnswerStatus === 'correct' ? 'positive' : undefined"
                 :error="dialogueAnswerStatus === 'incorrect'"
                 hide-bottom-space
-                label="Распознанная речь"
+                :label="isRecognizingSpeech ? 'Предварительный текст — ещё не проверен' : 'Распознанная речь'"
                 outlined
                 readonly
                 tabindex="-1"
@@ -873,7 +874,14 @@ const lessonUpdateError = ref('');
 const pendingLessonUpdate = ref<PendingLessonUpdate | null>(null);
 const offlineAudioStatus = ref<'idle' | 'downloading' | 'ready' | 'error'>('idle');
 const offlineAudioProgress = ref(0);
-const isRecognizingSpeech = ref(false);
+const speechRecordingPhase = ref<'idle' | 'preparing' | 'recording' | 'checking'>('idle');
+const isRecognizingSpeech = computed(() => speechRecordingPhase.value !== 'idle');
+const speechRecordingButtonLabel = computed(() => ({
+  preparing: 'Подготовка…',
+  recording: 'Остановить запись',
+  checking: 'Проверяем…',
+  idle: speechRecognitionCaptured.value ? 'Записать ещё раз' : 'Записать ответ',
+})[speechRecordingPhase.value]);
 const speechRecognitionError = ref('');
 const speechRecognitionProgress = ref('');
 const dialogueAnswerStatus = ref<'idle' | 'correct' | 'incorrect'>('idle');
@@ -1018,6 +1026,7 @@ const speechRecognitionAvailable = computed(() => (
   localSpeechRecognitionAvailable.value || isSpeechRecognitionAvailable()
 ));
 const speechSupportMessage = computed(() => {
+  if (speechRecordingPhase.value === 'checking') return 'Запись завершена. Подожди результат проверки — говорить больше не нужно.';
   if (isRecognizingSpeech.value) {
     return speechRecognitionProgress.value || 'Speak now. Tap Stop recording when you finish.';
   }
@@ -1039,7 +1048,9 @@ const speechSupportMessage = computed(() => {
   return 'Нажми «Записать ответ», произнеси фразу и останови запись.';
 });
 const speechStatusTitle = computed(() => {
-  if (isRecognizingSpeech.value) return 'Recording now';
+  if (speechRecordingPhase.value === 'preparing') return 'Готовим микрофон';
+  if (speechRecordingPhase.value === 'checking') return 'Проверяем ответ';
+  if (speechRecordingPhase.value === 'recording') return 'Идёт запись';
   if (speechRecognitionError.value) return 'Recording failed';
   if (dialogueAnswerStatus.value === 'correct') return 'Correct answer';
   if (dialogueAnswerStatus.value === 'incorrect') return 'Try again';
@@ -1047,7 +1058,8 @@ const speechStatusTitle = computed(() => {
   return 'Можно говорить';
 });
 const speechStatusIcon = computed(() => {
-  if (isRecognizingSpeech.value) return 'graphic_eq';
+  if (speechRecordingPhase.value === 'preparing' || speechRecordingPhase.value === 'checking') return 'hourglass_top';
+  if (speechRecordingPhase.value === 'recording') return 'graphic_eq';
   if (speechRecognitionError.value) return 'error_outline';
   if (dialogueAnswerStatus.value === 'correct') return 'check_circle';
   if (dialogueAnswerStatus.value === 'incorrect') return 'cancel';
@@ -1888,7 +1900,8 @@ async function recordDialogueAnswer() {
     return;
   }
 
-  if (isRecognizingSpeech.value) {
+  if (speechRecordingPhase.value === 'preparing' || speechRecordingPhase.value === 'checking') return;
+  if (speechRecordingPhase.value === 'recording') {
     finishDialogueSpeechRecording();
     return;
   }
@@ -1899,30 +1912,45 @@ async function recordDialogueAnswer() {
   speechRecognitionCaptured.value = false;
   answer.value = '';
   dialogueAnswerStatus.value = 'idle';
-  isRecognizingSpeech.value = true;
+  speechRecordingPhase.value = 'preparing';
   speechRecognitionProgress.value = '';
   const recognitionRunId = ++dialogueRecognitionRunId;
 
   try {
     if (localSpeechRecognitionAvailable.value) {
-      dialogueSpeechStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (recognitionRunId !== dialogueRecognitionRunId) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+      dialogueSpeechStream = stream;
       dialogueLocalTranscriber = startLocalReadingTranscriber(dialogueSpeechStream, {
         wholeUtterance: true,
-        onFinished: () => stopDialogueSpeechRecording(),
+        onFinished: () => {
+          if (recognitionRunId !== dialogueRecognitionRunId) return;
+          if (!speechRecognitionCaptured.value) {
+            answer.value = '';
+            speechRecognitionError.value = 'Не удалось распознать ответ. Нажми «Записать ответ» и попробуй снова.';
+          }
+          stopDialogueSpeechRecording();
+        },
         onTranscript: (transcript) => {
+          if (recognitionRunId !== dialogueRecognitionRunId) return;
           // The local result covers the whole recording; replace the provisional
           // browser text instead of selecting a partial fragment against it.
           answer.value = '';
           applyDialogueTranscript(transcript, recognitionRunId);
         },
         onReady: () => {
+          if (recognitionRunId !== dialogueRecognitionRunId) return;
+          speechRecordingPhase.value = 'recording';
           startDialoguePreview(recognitionRunId);
           dialogueRecordingTimeout = window.setTimeout(() => finishDialogueSpeechRecording(), 25_000);
-          speechRecognitionProgress.value = 'Speak at your own pace. Tap Stop when you finish (up to 25 seconds).';
+          speechRecognitionProgress.value = 'Говори спокойно. Текст пока предварительный. Закончив, нажми «Остановить запись» (до 25 секунд).';
         },
-        onProgress: (message) => { speechRecognitionProgress.value = `${message}. Keep this screen open.`; },
+        onProgress: (message) => { if (recognitionRunId === dialogueRecognitionRunId) speechRecognitionProgress.value = `${message}. Keep this screen open.`; },
         onError: (message) => {
-          if (dialogueAnswerStatus.value === 'correct') return;
+          if (recognitionRunId !== dialogueRecognitionRunId || dialogueAnswerStatus.value === 'correct') return;
           speechRecognitionError.value = message;
           stopDialogueSpeechRecording();
         },
@@ -1932,19 +1960,21 @@ async function recordDialogueAnswer() {
       return;
     }
 
+    speechRecordingPhase.value = 'recording';
     const result = await recognizeSpeechOnce('en-US', undefined, (transcript) => {
       if (recognitionRunId !== dialogueRecognitionRunId) return;
       answer.value = transcript;
     });
     applyDialogueTranscript(result.transcript, recognitionRunId);
   } catch (error) {
+    if (recognitionRunId !== dialogueRecognitionRunId) return;
     speechRecognitionCaptured.value = false;
     speechRecognitionError.value =
       error instanceof Error
         ? error.message
         : 'Speech recognition failed. Tap Record answer to try again.';
   } finally {
-    if (!dialogueLocalTranscriber) isRecognizingSpeech.value = false;
+    if (recognitionRunId === dialogueRecognitionRunId && !dialogueLocalTranscriber) speechRecordingPhase.value = 'idle';
   }
 }
 
@@ -1980,6 +2010,8 @@ function startDialoguePreview(recognitionRunId: number) {
 }
 
 function finishDialogueSpeechRecording() {
+  if (speechRecordingPhase.value !== 'recording') return;
+  speechRecordingPhase.value = 'checking';
   if (!dialogueLocalTranscriber) {
     stopDialogueSpeechRecording();
     return;
@@ -1989,9 +2021,11 @@ function finishDialogueSpeechRecording() {
   dialogueLivePreview = null;
   speechRecognitionProgress.value = 'Checking the full recording…';
   dialogueLocalTranscriber.finish();
+  dialogueSpeechStream?.getTracks().forEach(track => track.stop());
 }
 
 function stopDialogueSpeechRecording() {
+  dialogueRecognitionRunId += 1;
   dialogueLivePreview?.stop();
   dialogueLivePreview = null;
   dialogueLocalTranscriber?.stop();
@@ -2002,7 +2036,7 @@ function stopDialogueSpeechRecording() {
   dialogueRecordingTimeout = 0;
   stopSpeechRecognition();
   speechRecognitionProgress.value = '';
-  isRecognizingSpeech.value = false;
+  speechRecordingPhase.value = 'idle';
 }
 
 async function playAudio() {
