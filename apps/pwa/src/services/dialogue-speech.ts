@@ -157,3 +157,11 @@ export function chooseBestDialogueTranscript(current: string, candidate: string,
   const candidateDistance = Math.abs(words(candidate).length - targetLength);
   return candidateDistance < currentDistance ? candidate.trim() : current.trim();
 }
+
+// The quick path must match every word in order, including repeated words.
+// Partial coverage and reordered words still require the full local check.
+export function isExactDialogueAnswer(transcript: string, expected: string): boolean {
+  const heard = words(transcript);
+  const target = words(expected);
+  return target.length > 0 && heard.length === target.length && heard.every((word, index) => word === target[index]);
+}

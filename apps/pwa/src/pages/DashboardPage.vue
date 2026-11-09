@@ -727,6 +727,7 @@ import {
 } from 'src/services/local-reading-transcriber';
 import {
   chooseBestDialogueTranscript,
+  isExactDialogueAnswer,
   getDialogueExpectedSegments,
   isConfidentDialogueAnswer,
   resolveDialogueExpectedText,
@@ -1045,7 +1046,7 @@ const speechSupportMessage = computed(() => {
     return 'Voice recognition is not available on this device.';
   }
 
-  return 'Нажми «Записать ответ», произнеси фразу и останови запись.';
+  return 'Нажми «Записать ответ» и произнеси фразу. После паузы запись завершится сама.';
 });
 const speechStatusTitle = computed(() => {
   if (speechRecordingPhase.value === 'preparing') return 'Готовим микрофон';
@@ -1926,6 +1927,10 @@ async function recordDialogueAnswer() {
       dialogueSpeechStream = stream;
       dialogueLocalTranscriber = startLocalReadingTranscriber(dialogueSpeechStream, {
         wholeUtterance: true,
+        hasCompleteAnswer: () => isExactDialogueAnswer(answer.value, dialogueExpectedText.value),
+        onSpeechEnd: () => {
+          if (recognitionRunId === dialogueRecognitionRunId) finishDialogueSpeechRecording();
+        },
         onFinished: () => {
           if (recognitionRunId !== dialogueRecognitionRunId) return;
           if (!speechRecognitionCaptured.value) {
@@ -1946,7 +1951,7 @@ async function recordDialogueAnswer() {
           speechRecordingPhase.value = 'recording';
           startDialoguePreview(recognitionRunId);
           dialogueRecordingTimeout = window.setTimeout(() => finishDialogueSpeechRecording(), 25_000);
-          speechRecognitionProgress.value = 'Говори спокойно. Текст пока предварительный. Закончив, нажми «Остановить запись» (до 25 секунд).';
+          speechRecognitionProgress.value = 'Произнеси ответ. После паузы запись завершится сама — нажимать ещё раз не нужно.';
         },
         onProgress: (message) => { if (recognitionRunId === dialogueRecognitionRunId) speechRecognitionProgress.value = `${message}. Keep this screen open.`; },
         onError: (message) => {
@@ -2003,7 +2008,7 @@ function startDialoguePreview(recognitionRunId: number) {
         parts.push(text);
         answer.value = parts.join(' ');
       },
-      // Preview is provisional; only the full local recording is graded.
+      // Partial previews stay provisional; an exact full answer can finish after a pause.
       onError: () => { dialogueLivePreview?.stop(); dialogueLivePreview = null; },
     });
   } catch { /* Local recording remains available without browser preview. */ }
@@ -2011,6 +2016,10 @@ function startDialoguePreview(recognitionRunId: number) {
 
 function finishDialogueSpeechRecording() {
   if (speechRecordingPhase.value !== 'recording') return;
+  if (isExactDialogueAnswer(answer.value, dialogueExpectedText.value)) {
+    applyDialogueTranscript(answer.value, dialogueRecognitionRunId);
+    return;
+  }
   speechRecordingPhase.value = 'checking';
   if (!dialogueLocalTranscriber) {
     stopDialogueSpeechRecording();

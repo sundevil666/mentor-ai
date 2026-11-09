@@ -1,3 +1,5 @@
+import { createSpeechEndpointDetector } from './speech-endpoint.js';
+
 type LocalTranscriberOptions = {
   onTranscript: (text: string) => void;
   onDebug?: (message: string) => void;
@@ -7,6 +9,8 @@ type LocalTranscriberOptions = {
   onError: (message: string) => void;
   chunkDurationMs?: number;
   wholeUtterance?: boolean;
+  onSpeechEnd?: () => void;
+  hasCompleteAnswer?: () => boolean;
 };
 
 export type LocalReadingTranscriber = { stop: () => void; finish: () => void };
@@ -54,6 +58,7 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
   let lastReceivedId = 0;
   let pcmChunks: Float32Array[] = [];
   let pcmSampleCount = 0;
+  const detectSpeechEnd = createSpeechEndpointDetector();
   const firstSessionRequestId = sharedRequestId + 1;
   options.onDebug?.(sharedWorkerReady ? 'Reusing ready offline speech model.' : sharedWorkerInitializing ? 'Waiting for offline speech model already loading.' : 'Creating offline transcription worker.');
 
@@ -141,6 +146,14 @@ export function startLocalReadingTranscriber(stream: MediaStream, options: Local
       if (stopped || !(event.data instanceof Float32Array)) return;
       pcmChunks.push(event.data);
       pcmSampleCount += event.data.length;
+      if (options.onSpeechEnd && context && !finishing) {
+        let squares = 0;
+        for (const sample of event.data) squares += sample * sample;
+        const rms = Math.sqrt(squares / event.data.length);
+        if (detectSpeechEnd(rms, event.data.length / context.sampleRate * 1_000, options.hasCompleteAnswer?.())) {
+          options.onSpeechEnd();
+        }
+      }
     };
     source.connect(processor).connect(silentOutput).connect(context.destination);
     if (context.state === 'suspended') await context.resume();
