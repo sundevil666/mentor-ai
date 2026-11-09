@@ -61,8 +61,11 @@ export function selectPendingBulkLessonDownloads(
   savedLessonIds: ReadonlySet<string>,
   completedLessonKeys: ReadonlySet<string> = new Set(),
 ) {
-  void completedLessonKeys;
-  return prioritizeNewLessons(lessons.filter((lesson) => !savedLessonIds.has(lesson.id)));
+  return prioritizeNewLessons(lessons.filter((lesson) => (
+    !savedLessonIds.has(lesson.id)
+    && !completedLessonKeys.has(lesson.id)
+    && !(lesson.lessonTemplateKey && completedLessonKeys.has(lesson.lessonTemplateKey))
+  )));
 }
 
 const catalogCheckKey = 'mentor-ai:lesson-catalog-checked-at:v1';
@@ -129,10 +132,12 @@ export function selectPendingStoryDownloads(
   origin: string,
   completedIds: ReadonlySet<string> = new Set(),
 ) {
-  void completedIds;
   return stories.filter((story) => (
-    !cachedUrls.has(new URL(story.sourceUrl, origin).href)
-    || savedVersions.get(story.id) !== getStoryContentVersion(story)
+    !completedIds.has(story.id)
+    && (
+      !cachedUrls.has(new URL(story.sourceUrl, origin).href)
+      || savedVersions.get(story.id) !== getStoryContentVersion(story)
+    )
   ));
 }
 
@@ -142,10 +147,12 @@ export function selectPendingAudioDownloads(
   savedVersions: ReadonlyMap<string, string | undefined>,
   completedIds: ReadonlySet<string> = new Set(),
 ) {
-  void completedIds;
   return audioPrograms.filter((audio) => (
-    !cachedUrls.has(audio.sourceUrl)
-    || savedVersions.get(audio.id) !== getAudioContentVersion(audio)
+    !completedIds.has(audio.id)
+    && (
+      !cachedUrls.has(audio.sourceUrl)
+      || savedVersions.get(audio.id) !== getAudioContentVersion(audio)
+    )
   ));
 }
 

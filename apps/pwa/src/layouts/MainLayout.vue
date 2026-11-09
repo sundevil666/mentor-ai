@@ -356,10 +356,11 @@ import { fetchTranslationUsage } from 'src/services/api-client';
 import { recordApplicationTelemetry } from 'src/services/application-telemetry';
 import { readThemePreference, saveThemePreference } from 'src/services/user-preferences';
 import { formatDisplayDateTime } from 'src/services/date-format';
-import { builtInOfflineLessons, readOfflineLessons, cleanupExpiredOfflineLessons, isGeneratedLessonAvailableOffline } from 'src/services/offline-library';
+import { builtInOfflineLessons, cleanupExpiredOfflineLessons, isGeneratedLessonAvailableOffline } from 'src/services/offline-library';
 import { loadLearningActivityTotals, pendingLearningActivityCount, syncLearningActivity } from 'src/services/learning-activity';
 import { syncAllContentProgress } from 'src/services/content-progress';
-import { syncContentEngagement } from 'src/services/content-engagement';
+import { loadAllContentProgress } from 'src/services/content-progress';
+import { loadContentEngagementSummaries, syncContentEngagement } from 'src/services/content-engagement';
 import { syncReadingTranscripts } from 'src/services/reading-transcript-outbox';
 import { syncReadingPageSpeech } from 'src/services/reading-page-speech-outbox';
 import { syncReaderVocabulary } from 'src/services/reader-vocabulary';
@@ -376,7 +377,6 @@ import {
   selectPendingBulkLessonDownloads,
   subscribeOfflineLessonUpdates,
   updateOfflineLessons,
-  updateBuiltInLessons,
   type OfflineLessonUpdateState,
   type PendingOfflineMediaDownload,
 } from 'src/services/offline-lesson-updates';
@@ -431,9 +431,8 @@ const isBulkLessonDownloadRunning = ref(false);
 const bulkLessonDownloadCompleted = ref(0);
 const bulkLessonDownloadTotal = ref(0);
 const pendingBulkLessonDownloads = ref<GeneratedLesson[]>([]);
-const pendingBuiltInDownloads = ref(0);
 const pendingBulkMediaDownloads = ref<PendingOfflineMediaDownload[]>([]);
-const pendingBulkDownloadCount = computed(() => pendingBulkLessonDownloads.value.length + pendingBulkMediaDownloads.value.length + pendingBuiltInDownloads.value);
+const pendingBulkDownloadCount = computed(() => pendingBulkLessonDownloads.value.length + pendingBulkMediaDownloads.value.length);
 const bulkLessonDownloadPercent = computed(() => (
   bulkLessonDownloadTotal.value > 0
     ? Math.round((bulkLessonDownloadCompleted.value / bulkLessonDownloadTotal.value) * 100)
@@ -774,13 +773,29 @@ function handleOfflineLessonCatalogChange() {
 async function refreshPendingBulkLessonDownloads() {
   if (!appStore.isHydrated || !navigator.onLine || isBulkLessonDownloadRunning.value) return;
   try {
-    const catalog = await fetchNewLessonCatalog();
+    const [catalog, lessonEngagement, audioEngagement, contentProgress] = await Promise.all([
+      fetchNewLessonCatalog(),
+      loadContentEngagementSummaries('lesson'),
+      loadContentEngagementSummaries('audio'),
+      loadAllContentProgress(),
+    ]);
     const privateCatalog = catalog.filter((lesson) => !builtInOfflineLessons.some((item) => item.id === lesson.lessonTemplateKey));
-    const savedBuiltIns = readOfflineLessons();
-    pendingBuiltInDownloads.value = (await Promise.all(builtInOfflineLessons.map(async (item) => {
-      const saved = savedBuiltIns.find((record) => record.id === item.id && record.category === item.category);
-      return !saved?.generatedLesson || !await isGeneratedLessonAvailableOffline(saved.generatedLesson);
-    }))).filter(Boolean).length;
+    const completedLessonKeys = new Set<string>();
+    for (const snapshot of appStore.statisticsSnapshots) {
+      if (snapshot.lessonId) completedLessonKeys.add(snapshot.lessonId);
+      if (snapshot.lessonTemplateKey) completedLessonKeys.add(snapshot.lessonTemplateKey);
+    }
+    for (const [key, summary] of lessonEngagement) {
+      if (summary.finishes > 0 || summary.fullPlays > 0) completedLessonKeys.add(key);
+    }
+    const completedMediaIds = new Set(
+      contentProgress
+        .filter((item) => item.category === 'audio' && item.completed)
+        .map((item) => item.contentId),
+    );
+    for (const [key, summary] of audioEngagement) {
+      if (summary.finishes > 0 || summary.fullPlays > 0) completedMediaIds.add(key);
+    }
     const readiness = await Promise.all(privateCatalog.map(async (lesson) => ({
       id: lesson.id,
       ready: await isGeneratedLessonAvailableOffline(lesson),
@@ -789,8 +804,9 @@ async function refreshPendingBulkLessonDownloads() {
     pendingBulkLessonDownloads.value = selectPendingBulkLessonDownloads(
       privateCatalog,
       savedIds,
+      completedLessonKeys,
     );
-    pendingBulkMediaDownloads.value = await findPendingOfflineMediaDownloads();
+    pendingBulkMediaDownloads.value = await findPendingOfflineMediaDownloads(completedMediaIds);
   } catch {
     // Keep the last known list; the next online or maintenance event retries it.
   }
@@ -799,17 +815,11 @@ async function downloadAllPendingLessons() {
   if (isBulkLessonDownloadRunning.value || !navigator.onLine) return;
   const lessons = [...pendingBulkLessonDownloads.value];
   const media = [...pendingBulkMediaDownloads.value];
-  if (lessons.length + media.length + pendingBuiltInDownloads.value === 0) return;
+  if (lessons.length + media.length === 0) return;
   isBulkLessonDownloadRunning.value = true;
   bulkLessonDownloadCompleted.value = 0;
-  bulkLessonDownloadTotal.value = lessons.length + media.length + pendingBuiltInDownloads.value;
+  bulkLessonDownloadTotal.value = lessons.length + media.length;
   let failed = 0;
-  if (pendingBuiltInDownloads.value > 0) {
-    try {
-      await updateBuiltInLessons(appStore.loadLesson.bind(appStore));
-      bulkLessonDownloadCompleted.value += pendingBuiltInDownloads.value;
-    } catch { failed += 1; }
-  }
   for (const lesson of lessons) {
     try {
       await downloadGeneratedLessonOffline(lesson);

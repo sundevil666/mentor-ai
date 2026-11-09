@@ -36,7 +36,7 @@ describe('new lesson catalog priority', () => {
     assert.deepEqual(sorted.map(({ id }) => id), ['newer', 'older', 'lower']);
   });
 
-  it('offers every missing lesson for an explicit download, including completed lessons', () => {
+  it('offers only missing lessons that have not been completed', () => {
     const lessons = [
       { ...lesson('fresh', 90), lessonTemplateKey: 'fresh-template' },
       { ...lesson('downloaded', 80), lessonTemplateKey: 'downloaded-template' },
@@ -50,7 +50,7 @@ describe('new lesson catalog priority', () => {
       new Set(['completed-id', 'completed-template-key']),
     );
 
-    assert.deepEqual(pending.map(({ id }) => id), ['fresh', 'completed-id', 'completed-template']);
+    assert.deepEqual(pending.map(({ id }) => id), ['fresh']);
   });
 
   it('keeps the update window at 30 days without limiting the full bulk-download catalog', () => {
@@ -80,11 +80,24 @@ describe('new lesson catalog priority', () => {
     assert.deepEqual(selectPendingAudioDownloads([audio], new Set([audio.sourceUrl]), version), []);
   });
 
-  it('offers completed audio again after its device copy is removed', () => {
+  it('does not offer completed audio again after its device copy is removed', () => {
     const audio = {
       id: 'completed-audio', sourceUrl: 'https://audio.test/completed.mp3', durationSeconds: 60, sizeBytes: 1_000, publishedAt: '2026-10-09',
     } as Parameters<typeof selectPendingAudioDownloads>[0][number];
-    assert.deepEqual(selectPendingAudioDownloads([audio], new Set(), new Map(), new Set([audio.id])), [audio]);
+    assert.deepEqual(selectPendingAudioDownloads([audio], new Set(), new Map(), new Set([audio.id])), []);
+  });
+
+  it('does not offer a completed story again after its device copy is removed', () => {
+    const story = {
+      id: 'completed-story', sourceUrl: '/completed.mp3', durationSeconds: 60, sizeBytes: 1_000, reader: 'Reader',
+    } as Parameters<typeof selectPendingStoryDownloads>[0][number];
+    assert.deepEqual(selectPendingStoryDownloads(
+      [story],
+      new Set(),
+      new Map(),
+      'https://app.test',
+      new Set([story.id]),
+    ), []);
   });
 });
 
@@ -93,7 +106,7 @@ it('keeps locally imported lessons eligible for bulk download while the cloud is
   const catalog = await fetchNewLessonCatalog(async () => { throw new Error('quota'); }, async () => [imported]);
   assert.deepEqual(selectPendingBulkLessonDownloads(catalog, new Set(), new Set()).map((item) => item.id), ['local-import']);
   assert.deepEqual(selectPendingBulkLessonDownloads(catalog, new Set(['local-import']), new Set()), []);
-  assert.deepEqual(selectPendingBulkLessonDownloads(catalog, new Set(), new Set(['local-import-template'])), [imported]);
+  assert.deepEqual(selectPendingBulkLessonDownloads(catalog, new Set(), new Set(['local-import-template'])), []);
 });
 it('merges cloud and local catalogs without duplicating IDs, preferring the fresh cloud copy', async () => {
   const local = lesson('same-id', 1);
