@@ -2,12 +2,17 @@
   <q-page class="learning-balance-page">
     <section class="learning-balance-shell">
       <header class="learning-balance-hero">
-        <div><p>Learning direction</p><h1>Your learning balance</h1><span>See what is moving your English forward and what deserves attention next.</span></div>
+        <div><p>Last 30 days</p><h1>Your learning balance</h1><span>See what is moving your English forward and what deserves attention next.</span></div>
         <div class="learning-balance-score" :aria-label="`Learning balance ${balance.balanceScore}%, target 100%`">
-          <div class="learning-balance-score__target">
-            <q-circular-progress show-value :value="balance.balanceScore" size="92px" :thickness="0.16" color="primary" track-color="grey-3"><strong>{{ balance.balanceScore }}%</strong></q-circular-progress>
-          </div>
-          <span>balance · target 100%</span>
+          <svg class="learning-balance-gauge" viewBox="0 0 200 118" aria-hidden="true">
+            <path class="learning-balance-gauge__track" d="M 20 100 A 80 80 0 0 1 180 100" pathLength="100" />
+            <path class="learning-balance-gauge__value" d="M 20 100 A 80 80 0 0 1 180 100" pathLength="100" :stroke-dasharray="`${balance.balanceScore} 100`" />
+            <line class="learning-balance-gauge__needle" x1="100" y1="100" x2="100" y2="35" :transform="`rotate(${-90 + balance.balanceScore * 1.8} 100 100)`" />
+            <circle class="learning-balance-gauge__hub" cx="100" cy="100" r="7" />
+            <text x="18" y="116">0</text><text x="166" y="116">100</text>
+          </svg>
+          <strong>{{ balance.balanceScore }}%</strong>
+          <span>current mix · target 100%</span>
         </div>
       </header>
 
@@ -51,7 +56,7 @@
             <div class="learning-balance-card__impact"><strong>{{ row.impactPercent }}%</strong><span>{{ row.estimated ? 'listening credit' : 'of impact' }}</span></div>
           </div>
           <q-linear-progress rounded size="10px" :value="row.estimated ? 0 : Math.min(1, row.impactPercent / Math.max(1, row.targetPercent))" :color="row.status === 'focus' ? 'deep-orange-6' : row.status === 'strong' ? 'secondary' : 'primary'" track-color="grey-3" />
-          <div class="learning-balance-card__meta"><span>{{ row.estimated ? `${movieReports.length} report${movieReports.length === 1 ? '' : 's'} · ${formatDuration(row.seconds)} estimated` : `${formatDuration(row.seconds)} recorded` }}</span><span>{{ row.estimated ? 'Included in listening' : `Target mix ${row.targetPercent}%` }}</span></div>
+          <div class="learning-balance-card__meta"><span>{{ row.estimated ? `${recentMovieReports.length} report${recentMovieReports.length === 1 ? '' : 's'} · ${formatDuration(row.seconds)} estimated` : `${formatDuration(row.seconds)} recorded` }}</span><span>{{ row.estimated ? 'Included in listening' : `Target mix ${row.targetPercent}%` }}</span></div>
           <div class="learning-balance-card__footer">
             <span class="learning-balance-card__status">{{ row.estimated ? '1 h 45 min per completed report' : row.status === 'focus' ? 'Needs more attention' : row.status === 'strong' ? 'Already a strong area' : 'Close to balance' }}</span>
             <span class="learning-balance-card__action">{{ row.actionLabel }}<q-icon name="arrow_forward" /></span>
@@ -65,19 +70,30 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { LearningActivityEvent, LearningActivityTotals, MovieLearningReport } from '@mentor-ai/shared';
+import type { LearningActivityEvent, MovieLearningReport } from '@mentor-ai/shared';
 import { useAppStore } from 'src/stores/app-store';
-import { loadLearningActivityHistory, loadLearningActivityTotals } from 'src/services/learning-activity';
-import { calculateLatestBalanceChange, calculateLearningBalance } from 'src/services/learning-balance';
+import { loadLearningActivityHistory } from 'src/services/learning-activity';
+import { calculateLatestBalanceChange, calculateLearningBalance, summarizeRecentLearningActivity } from 'src/services/learning-balance';
 import { loadMovieLearningReports, refreshMovieLearningReportsFromCloud } from 'src/services/movie-learning-reports';
 import { estimatedMovieViewingSeconds, summarizeMovieViewing } from 'src/services/movie-viewing-summary';
 
 const appStore = useAppStore();
-const activity = ref<LearningActivityTotals>({ grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null });
 const movieReports = ref<MovieLearningReport[]>([]);
 const activityHistory = ref<LearningActivityEvent[]>([]);
-const balance = computed(() => calculateLearningBalance({ activity: activity.value, estimatedMovieSeconds: summarizeMovieViewing(movieReports.value).estimatedViewingSeconds }));
-const latestChange = computed(() => calculateLatestBalanceChange({ activity: activity.value, events: activityHistory.value, movieReports: movieReports.value, estimatedMovieSecondsPerReport: estimatedMovieViewingSeconds }));
+const balanceNow = ref(new Date());
+const balanceSince = computed(() => new Date(balanceNow.value.getTime() - 30 * 24 * 60 * 60 * 1_000));
+const recentActivityHistory = computed(() => activityHistory.value.filter((event) => {
+  const endedAt = Date.parse(event.endedAt);
+  return Number.isFinite(endedAt) && endedAt >= balanceSince.value.getTime() && endedAt <= balanceNow.value.getTime() && event.contentId !== 'historic-device-baseline';
+}));
+const recentActivity = computed(() => summarizeRecentLearningActivity(recentActivityHistory.value, balanceNow.value));
+const recentMovieReports = computed(() => movieReports.value.filter((report) => {
+  const watchedAt = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(report.watchedAt) ? `${report.watchedAt}T12:00:00` : report.watchedAt);
+  return Number.isFinite(watchedAt) && watchedAt >= balanceSince.value.getTime() && watchedAt <= balanceNow.value.getTime();
+}));
+const recentMovieViewing = computed(() => summarizeMovieViewing(recentMovieReports.value));
+const balance = computed(() => calculateLearningBalance({ activity: recentActivity.value, estimatedMovieSeconds: recentMovieViewing.value.estimatedViewingSeconds }));
+const latestChange = computed(() => calculateLatestBalanceChange({ activity: recentActivity.value, events: recentActivityHistory.value, movieReports: recentMovieReports.value, estimatedMovieSecondsPerReport: estimatedMovieViewingSeconds }));
 
 onMounted(async () => {
   if (!appStore.isHydrated) await appStore.hydrate();
@@ -90,10 +106,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('mentor-movie-reports-updated', refreshMovies);
 });
 async function refreshActivity(refreshHistory = false) {
-  [activity.value, activityHistory.value] = await Promise.all([
-    loadLearningActivityTotals(),
-    loadLearningActivityHistory(refreshHistory).catch(() => loadLearningActivityHistory()),
-  ]);
+  activityHistory.value = await loadLearningActivityHistory(refreshHistory).catch(() => loadLearningActivityHistory());
 }
 function handleActivityUpdated() { void refreshActivity(); }
 async function refreshMovies() { if (navigator.onLine) await refreshMovieLearningReportsFromCloud().catch(() => 0); movieReports.value = await loadMovieLearningReports(); }

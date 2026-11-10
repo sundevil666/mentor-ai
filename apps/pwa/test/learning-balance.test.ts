@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { calculateLatestBalanceChange, calculateLearningBalance } from '../src/services/learning-balance.js';
+import { calculateLatestBalanceChange, calculateLearningBalance, summarizeRecentLearningActivity } from '../src/services/learning-balance.js';
 
 const emptyActivity = { grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null };
 
@@ -58,5 +58,18 @@ describe('learning balance', () => {
     assert.equal(change.kind, 'movies');
     assert.equal(change.activeSeconds, 6_300);
     assert.match(change.action, /The King’s Speech/);
+  });
+
+  it('summarizes only real activity from the rolling 30-day window', () => {
+    const events = [
+      { id: 'recent', studentId: 'student-1', kind: 'speaking' as const, contentId: 'lesson-1', activeSeconds: 600, sourceDeviceId: 'device-1', startedAt: '2026-11-09T09:50:00.000Z', endedAt: '2026-11-09T10:00:00.000Z' },
+      { id: 'old', studentId: 'student-1', kind: 'listening' as const, contentId: 'lesson-2', activeSeconds: 9_000, sourceDeviceId: 'device-1', startedAt: '2026-09-01T09:00:00.000Z', endedAt: '2026-09-01T10:00:00.000Z' },
+      { id: 'baseline', studentId: 'student-1', kind: 'reading' as const, contentId: 'historic-device-baseline', activeSeconds: 90_000, sourceDeviceId: 'device-1', startedAt: '2026-11-09T09:00:00.000Z', endedAt: '2026-11-09T10:00:00.000Z' },
+    ];
+    const totals = summarizeRecentLearningActivity(events, new Date('2026-11-10T12:00:00.000Z'));
+    assert.equal(totals.speakingSeconds, 600);
+    assert.equal(totals.listeningSeconds, 0);
+    assert.equal(totals.readingSeconds, 0);
+    assert.equal(totals.totalSeconds, 600);
   });
 });

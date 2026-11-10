@@ -30,3 +30,14 @@ test('returns an empty summary when there are no movie reports', () => {
     estimatedViewingSeconds: 0,
   });
 });
+
+test('filters movie estimates by the viewing date window', () => {
+  const recent = report('recent');
+  recent.watchedAt = '2026-11-09';
+  const old = report('old');
+  old.watchedAt = '2026-09-01';
+  assert.deepEqual(summarizeMovieViewing([recent, old], {
+    since: new Date('2026-10-11T00:00:00.000Z'),
+    until: new Date('2026-11-10T23:59:59.000Z'),
+  }), { movieCount: 1, estimatedViewingSeconds: estimatedMovieViewingSeconds });
+});

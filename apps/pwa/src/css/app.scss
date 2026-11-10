@@ -325,10 +325,16 @@ body .q-menu {
 .learning-balance-hero p { color: var(--app-primary); font-weight: 800; margin: 0 0 4px; text-transform: uppercase; }
 .learning-balance-hero h1 { font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.05; margin: 0 0 10px; }
 .learning-balance-hero > div > span, .learning-balance-note { color: var(--app-muted-strong); line-height: 1.55; }
-.learning-balance-score { align-items: center; display: grid; flex: 0 0 auto; justify-items: center; }
-.learning-balance-score span { color: var(--app-muted-strong); font-size: .78rem; margin-top: 4px; }
-.learning-balance-score__target { border: 2px dashed color-mix(in srgb, var(--app-secondary) 72%, transparent); border-radius: 50%; padding: 5px; position: relative; }
-.learning-balance-score__target::after { background: var(--app-secondary); border: 2px solid var(--app-surface); border-radius: 50%; content: ''; height: 9px; position: absolute; right: 7px; top: 1px; width: 9px; }
+.learning-balance-score { align-items: center; display: grid; flex: 0 0 220px; justify-items: center; position: relative; }
+.learning-balance-score > strong { font-size: 1.35rem; margin-top: -35px; }
+.learning-balance-score span { color: var(--app-muted-strong); font-size: .78rem; margin-top: 1px; }
+.learning-balance-gauge { height: auto; overflow: visible; width: 210px; }
+.learning-balance-gauge__track, .learning-balance-gauge__value { fill: none; stroke-linecap: round; stroke-width: 16; }
+.learning-balance-gauge__track { stroke: color-mix(in srgb, var(--app-muted) 22%, transparent); }
+.learning-balance-gauge__value { stroke: var(--app-primary); }
+.learning-balance-gauge__needle { stroke: var(--app-text); stroke-linecap: round; stroke-width: 4; transition: transform .45s cubic-bezier(.2, .8, .2, 1); }
+.learning-balance-gauge__hub { fill: var(--app-text); }
+.learning-balance-gauge text { fill: var(--app-muted-strong); font-size: 10px; font-weight: 700; }
 .learning-balance-change { background: linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 8%, var(--app-surface)), var(--app-surface)); border-radius: 18px; }
 .learning-balance-change .q-card__section { align-items: center; display: flex; gap: 16px; }
 .learning-balance-change__delta { align-items: center; border-radius: 14px; display: flex; flex: 0 0 64px; font-size: 1.45rem; font-weight: 900; height: 64px; justify-content: center; }
@@ -4182,7 +4188,8 @@ body.body--dark .personal-reader__lookup-error {
   .learning-balance-page { padding: 18px 14px calc(104px + env(safe-area-inset-bottom)); }
   .learning-balance-hero { align-items: flex-start; }
   .learning-balance-hero h1 { font-size: 2.15rem; }
-  .learning-balance-score .q-circular-progress { font-size: .9rem; height: 72px !important; width: 72px !important; }
+  .learning-balance-score { flex-basis: 150px; }
+  .learning-balance-gauge { width: 150px; }
   .learning-focus-card .q-card__section { align-items: start; grid-template-columns: auto minmax(0, 1fr); }
   .learning-focus-card .q-btn { grid-column: 1 / -1; width: 100%; }
   .learning-balance-grid { grid-template-columns: 1fr; }

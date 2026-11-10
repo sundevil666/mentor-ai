@@ -1,4 +1,4 @@
-import type { LearningActivityEvent, LearningActivityKind, LearningActivityTotals, MovieLearningReport } from '@mentor-ai/shared';
+import { learningActivityKinds, type LearningActivityEvent, type LearningActivityKind, type LearningActivityTotals, type MovieLearningReport } from '@mentor-ai/shared';
 
 export type LearningBalanceKind = LearningActivityKind | 'movies';
 
@@ -24,6 +24,24 @@ const qualityWeights: Record<LearningBalanceKind, number> = {
   speaking: 1, vocabulary: 0.9, listening: 0.85, grammar: 0.85, phrases: 0.85, reading: 0.7, audio: 0.5, movies: 0,
 };
 const movieListeningWeight = 0.6;
+
+export function summarizeRecentLearningActivity(events: LearningActivityEvent[], now = new Date(), days = 30): LearningActivityTotals {
+  const end = now.getTime();
+  const start = end - days * 24 * 60 * 60 * 1_000;
+  const totals = Object.fromEntries(learningActivityKinds.map((kind) => [`${kind}Seconds`, 0])) as Omit<LearningActivityTotals, 'totalSeconds' | 'updatedAt'>;
+  let updatedAt: string | null = null;
+  for (const event of events) {
+    const endedAt = Date.parse(event.endedAt);
+    if (!Number.isFinite(endedAt) || endedAt < start || endedAt > end || event.contentId === 'historic-device-baseline') continue;
+    totals[`${event.kind}Seconds`] += Math.max(0, event.activeSeconds);
+    if (!updatedAt || event.endedAt > updatedAt) updatedAt = event.endedAt;
+  }
+  return {
+    ...totals,
+    totalSeconds: learningActivityKinds.reduce((sum, kind) => sum + totals[`${kind}Seconds`], 0),
+    updatedAt,
+  };
+}
 
 export function calculateLearningBalance(input: { activity: LearningActivityTotals; estimatedMovieSeconds?: number }) {
   const secondsByKind = Object.fromEntries(definitions.map(({ kind }) => [kind, kind === 'movies'

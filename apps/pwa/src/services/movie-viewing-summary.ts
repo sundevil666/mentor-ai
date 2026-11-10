@@ -9,9 +9,15 @@ export interface MovieViewingSummary {
   estimatedViewingSeconds: number;
 }
 
-export function summarizeMovieViewing(reports: readonly MovieLearningReport[]): MovieViewingSummary {
+export function summarizeMovieViewing(reports: readonly MovieLearningReport[], options?: { since?: Date; until?: Date }): MovieViewingSummary {
+  const filteredReports = reports.filter((report) => {
+    const watchedAt = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(report.watchedAt) ? `${report.watchedAt}T12:00:00` : report.watchedAt);
+    return Number.isFinite(watchedAt)
+      && (!options?.since || watchedAt >= options.since.getTime())
+      && (!options?.until || watchedAt <= options.until.getTime());
+  });
   return {
-    movieCount: reports.length,
-    estimatedViewingSeconds: reports.length * estimatedMovieViewingSeconds,
+    movieCount: filteredReports.length,
+    estimatedViewingSeconds: filteredReports.length * estimatedMovieViewingSeconds,
   };
 }
