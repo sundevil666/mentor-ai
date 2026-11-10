@@ -45,6 +45,16 @@ describe('learning balance', () => {
     assert.equal(change.occurredAt, '2026-11-10T10:00:00.000Z');
   });
 
+  it('shows a book title instead of its internal reading id', () => {
+    const bookId = '7d9fe6e0-4150-4c2d-83ed-a75a96ac85ab';
+    const activity = { ...emptyActivity, readingSeconds: 600, totalSeconds: 600, updatedAt: '2026-11-10T10:00:00.000Z' };
+    const event = { id: 'event-book', studentId: 'student-1', kind: 'reading' as const, contentId: bookId, activeSeconds: 600, sourceDeviceId: 'device-1', startedAt: '2026-11-10T09:50:00.000Z', endedAt: '2026-11-10T10:00:00.000Z' };
+    const named = calculateLatestBalanceChange({ activity, events: [event], contentTitles: { [bookId]: 'The Secret Garden' } });
+    const missing = calculateLatestBalanceChange({ activity, events: [event] });
+    assert.equal(named?.action, 'Reading · The Secret Garden');
+    assert.equal(missing?.action, 'Reading');
+  });
+
   it('does not invent a change when there is no activity event', () => {
     assert.equal(calculateLatestBalanceChange({ activity: emptyActivity, events: [] }), null);
   });

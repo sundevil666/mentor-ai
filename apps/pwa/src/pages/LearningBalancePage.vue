@@ -76,10 +76,12 @@ import { loadLearningActivityHistory } from 'src/services/learning-activity';
 import { calculateLatestBalanceChange, calculateLearningBalance, summarizeRecentLearningActivity } from 'src/services/learning-balance';
 import { loadMovieLearningReports, refreshMovieLearningReportsFromCloud } from 'src/services/movie-learning-reports';
 import { estimatedMovieViewingSeconds, summarizeMovieViewing } from 'src/services/movie-viewing-summary';
+import { listPersonalBooks } from 'src/services/personal-book-library';
 
 const appStore = useAppStore();
 const movieReports = ref<MovieLearningReport[]>([]);
 const activityHistory = ref<LearningActivityEvent[]>([]);
+const readingTitles = ref<Record<string, string>>({});
 const balanceNow = ref(new Date());
 const balanceSince = computed(() => new Date(balanceNow.value.getTime() - 30 * 24 * 60 * 60 * 1_000));
 const recentActivityHistory = computed(() => activityHistory.value.filter((event) => {
@@ -93,11 +95,11 @@ const recentMovieReports = computed(() => movieReports.value.filter((report) => 
 }));
 const recentMovieViewing = computed(() => summarizeMovieViewing(recentMovieReports.value));
 const balance = computed(() => calculateLearningBalance({ activity: recentActivity.value, estimatedMovieSeconds: recentMovieViewing.value.estimatedViewingSeconds }));
-const latestChange = computed(() => calculateLatestBalanceChange({ activity: recentActivity.value, events: recentActivityHistory.value, movieReports: recentMovieReports.value, estimatedMovieSecondsPerReport: estimatedMovieViewingSeconds }));
+const latestChange = computed(() => calculateLatestBalanceChange({ activity: recentActivity.value, events: recentActivityHistory.value, movieReports: recentMovieReports.value, estimatedMovieSecondsPerReport: estimatedMovieViewingSeconds, contentTitles: readingTitles.value }));
 
 onMounted(async () => {
   if (!appStore.isHydrated) await appStore.hydrate();
-  await Promise.all([refreshActivity(true), refreshMovies()]);
+  await Promise.all([refreshActivity(true), refreshMovies(), refreshReadingTitles()]);
   window.addEventListener('mentor-learning-activity-updated', handleActivityUpdated);
   window.addEventListener('mentor-movie-reports-updated', refreshMovies);
 });
@@ -110,6 +112,10 @@ async function refreshActivity(refreshHistory = false) {
 }
 function handleActivityUpdated() { void refreshActivity(); }
 async function refreshMovies() { if (navigator.onLine) await refreshMovieLearningReportsFromCloud().catch(() => 0); movieReports.value = await loadMovieLearningReports(); }
+async function refreshReadingTitles() {
+  const books = await listPersonalBooks().catch(() => []);
+  readingTitles.value = Object.fromEntries(books.map((book) => [book.id, book.title]));
+}
 function formatDuration(seconds: number) { const minutes = Math.round(Math.max(0, seconds) / 60); if (minutes < 60) return `${minutes} min`; const hours = Math.floor(minutes / 60); const remainder = minutes % 60; return remainder ? `${hours} h ${remainder} min` : `${hours} h`; }
 function formatDelta(delta: number) { return delta > 0 ? `+${delta}` : `${delta}`; }
 function formatChangeTime(value: string) { return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)); }

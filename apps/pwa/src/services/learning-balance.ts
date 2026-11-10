@@ -77,6 +77,7 @@ export function calculateLatestBalanceChange(input: {
   events: LearningActivityEvent[];
   movieReports?: MovieLearningReport[];
   estimatedMovieSecondsPerReport?: number;
+  contentTitles?: Record<string, string>;
 }): LearningBalanceChange | null {
   const latestActivity = [...input.events].filter((event) => event.activeSeconds > 0).sort((a, b) => b.endedAt.localeCompare(a.endedAt))[0];
   const latestMovie = [...(input.movieReports ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
@@ -97,14 +98,16 @@ export function calculateLatestBalanceChange(input: {
   previousActivity[secondsKey] -= removedSeconds;
   previousActivity.totalSeconds = Math.max(0, previousActivity.totalSeconds - removedSeconds);
   const previousScore = calculateLearningBalance({ activity: previousActivity, estimatedMovieSeconds }).balanceScore;
-  return { delta: currentScore - previousScore, occurredAt: latest.endedAt, action: describeLearningAction(latest), activeSeconds: latest.activeSeconds, kind: latest.kind };
+  return { delta: currentScore - previousScore, occurredAt: latest.endedAt, action: describeLearningAction(latest, input.contentTitles), activeSeconds: latest.activeSeconds, kind: latest.kind };
 }
 
-function describeLearningAction(event: LearningActivityEvent) {
+function describeLearningAction(event: LearningActivityEvent, contentTitles?: Record<string, string>) {
   const labels: Record<LearningActivityKind, string> = {
     speaking: 'Speaking practice', listening: 'Listening practice', vocabulary: 'Vocabulary practice', reading: 'Reading',
     grammar: 'Grammar practice', phrases: 'Phrase practice', audio: 'Podcast or audio listening',
   };
-  if (event.contentId === 'daily-category-total' || event.contentId === event.kind || /^(audio|story|book|phrases)$/.test(event.contentId)) return labels[event.kind];
+  const title = contentTitles?.[event.contentId]?.trim();
+  if (title) return `${labels[event.kind]} · ${title}`;
+  if (event.contentId === 'daily-category-total' || event.contentId === event.kind || /^(audio|story|book|phrases)$/.test(event.contentId) || /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(event.contentId)) return labels[event.kind];
   return `${labels[event.kind]} · ${event.contentId}`;
 }
