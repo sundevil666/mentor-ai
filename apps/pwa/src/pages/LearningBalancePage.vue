@@ -3,11 +3,28 @@
     <section class="learning-balance-shell">
       <header class="learning-balance-hero">
         <div><p>Learning direction</p><h1>Your learning balance</h1><span>See what is moving your English forward and what deserves attention next.</span></div>
-        <div class="learning-balance-score" :aria-label="`Learning balance ${balance.balanceScore}%`">
-          <q-circular-progress show-value :value="balance.balanceScore" size="92px" :thickness="0.16" color="primary" track-color="grey-3"><strong>{{ balance.balanceScore }}%</strong></q-circular-progress>
-          <span>balance</span>
+        <div class="learning-balance-score" :aria-label="`Learning balance ${balance.balanceScore}%, target 100%`">
+          <div class="learning-balance-score__target">
+            <q-circular-progress show-value :value="balance.balanceScore" size="92px" :thickness="0.16" color="primary" track-color="grey-3"><strong>{{ balance.balanceScore }}%</strong></q-circular-progress>
+          </div>
+          <span>balance · target 100%</span>
         </div>
       </header>
+
+      <q-card flat bordered class="learning-balance-change" aria-live="polite">
+        <q-card-section v-if="latestChange">
+          <div class="learning-balance-change__delta" :class="latestChange.delta > 0 ? 'is-positive' : latestChange.delta < 0 ? 'is-negative' : 'is-neutral'">{{ formatDelta(latestChange.delta) }}</div>
+          <div>
+            <span>Latest balance change · {{ formatChangeTime(latestChange.occurredAt) }}</span>
+            <h2>{{ latestChange.action }}</h2>
+            <p>{{ formatDuration(latestChange.activeSeconds) }} recorded. {{ changeExplanation(latestChange.delta) }}</p>
+          </div>
+        </q-card-section>
+        <q-card-section v-else>
+          <div class="learning-balance-change__delta is-neutral">—</div>
+          <div><span>Latest balance change</span><h2>No recorded activity yet</h2><p>Your first measured practice will appear here.</p></div>
+        </q-card-section>
+      </q-card>
 
       <q-card flat bordered class="learning-focus-card">
         <q-card-section>
@@ -48,29 +65,40 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { LearningActivityTotals, MovieLearningReport } from '@mentor-ai/shared';
+import type { LearningActivityEvent, LearningActivityTotals, MovieLearningReport } from '@mentor-ai/shared';
 import { useAppStore } from 'src/stores/app-store';
-import { loadLearningActivityTotals } from 'src/services/learning-activity';
-import { calculateLearningBalance } from 'src/services/learning-balance';
+import { loadLearningActivityHistory, loadLearningActivityTotals } from 'src/services/learning-activity';
+import { calculateLatestBalanceChange, calculateLearningBalance } from 'src/services/learning-balance';
 import { loadMovieLearningReports, refreshMovieLearningReportsFromCloud } from 'src/services/movie-learning-reports';
 import { summarizeMovieViewing } from 'src/services/movie-viewing-summary';
 
 const appStore = useAppStore();
 const activity = ref<LearningActivityTotals>({ grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null });
 const movieReports = ref<MovieLearningReport[]>([]);
+const activityHistory = ref<LearningActivityEvent[]>([]);
 const balance = computed(() => calculateLearningBalance({ activity: activity.value, estimatedMovieSeconds: summarizeMovieViewing(movieReports.value).estimatedViewingSeconds }));
+const latestChange = computed(() => calculateLatestBalanceChange(activity.value, activityHistory.value));
 
 onMounted(async () => {
   if (!appStore.isHydrated) await appStore.hydrate();
-  await Promise.all([refreshActivity(), refreshMovies()]);
-  window.addEventListener('mentor-learning-activity-updated', refreshActivity);
+  await Promise.all([refreshActivity(true), refreshMovies()]);
+  window.addEventListener('mentor-learning-activity-updated', handleActivityUpdated);
   window.addEventListener('mentor-movie-reports-updated', refreshMovies);
 });
 onBeforeUnmount(() => {
-  window.removeEventListener('mentor-learning-activity-updated', refreshActivity);
+  window.removeEventListener('mentor-learning-activity-updated', handleActivityUpdated);
   window.removeEventListener('mentor-movie-reports-updated', refreshMovies);
 });
-async function refreshActivity() { activity.value = await loadLearningActivityTotals(); }
+async function refreshActivity(refreshHistory = false) {
+  [activity.value, activityHistory.value] = await Promise.all([
+    loadLearningActivityTotals(),
+    loadLearningActivityHistory(refreshHistory).catch(() => loadLearningActivityHistory()),
+  ]);
+}
+function handleActivityUpdated() { void refreshActivity(); }
 async function refreshMovies() { if (navigator.onLine) await refreshMovieLearningReportsFromCloud().catch(() => 0); movieReports.value = await loadMovieLearningReports(); }
 function formatDuration(seconds: number) { const minutes = Math.round(Math.max(0, seconds) / 60); if (minutes < 60) return `${minutes} min`; const hours = Math.floor(minutes / 60); const remainder = minutes % 60; return remainder ? `${hours} h ${remainder} min` : `${hours} h`; }
+function formatDelta(delta: number) { return delta > 0 ? `+${delta}` : `${delta}`; }
+function formatChangeTime(value: string) { return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)); }
+function changeExplanation(delta: number) { if (delta > 0) return `This moved your balance ${delta} point${delta === 1 ? '' : 's'} closer to the target.`; if (delta < 0) return `This moved the mix ${Math.abs(delta)} point${delta === -1 ? '' : 's'} away from the target.`; return 'This activity was recorded, but the rounded balance score did not change.'; }
 </script>

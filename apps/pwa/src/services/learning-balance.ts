@@ -1,4 +1,4 @@
-import type { LearningActivityKind, LearningActivityTotals } from '@mentor-ai/shared';
+import type { LearningActivityEvent, LearningActivityKind, LearningActivityTotals } from '@mentor-ai/shared';
 
 export type LearningBalanceKind = LearningActivityKind | 'movies';
 
@@ -43,4 +43,30 @@ export function calculateLearningBalance(input: { activity: LearningActivityTota
   const totalGap = measuredRows.reduce((sum, row) => sum + Math.abs(row.gapPercent), 0);
   const movieRows = rows.filter((row) => row.kind === 'movies');
   return { rows: [...prioritizedRows, ...movieRows], primaryFocus, strongestArea, balanceScore: Math.max(0, Math.round(100 - totalGap / 2)) };
+}
+
+export interface LearningBalanceChange {
+  delta: number; occurredAt: string; action: string; activeSeconds: number; kind: LearningActivityKind;
+}
+
+export function calculateLatestBalanceChange(activity: LearningActivityTotals, events: LearningActivityEvent[]): LearningBalanceChange | null {
+  const latest = [...events].filter((event) => event.activeSeconds > 0).sort((a, b) => b.endedAt.localeCompare(a.endedAt))[0];
+  if (!latest) return null;
+  const currentScore = calculateLearningBalance({ activity }).balanceScore;
+  const previousActivity = { ...activity };
+  const secondsKey = `${latest.kind}Seconds` as const;
+  const removedSeconds = Math.min(previousActivity[secondsKey], latest.activeSeconds);
+  previousActivity[secondsKey] -= removedSeconds;
+  previousActivity.totalSeconds = Math.max(0, previousActivity.totalSeconds - removedSeconds);
+  const previousScore = calculateLearningBalance({ activity: previousActivity }).balanceScore;
+  return { delta: currentScore - previousScore, occurredAt: latest.endedAt, action: describeLearningAction(latest), activeSeconds: latest.activeSeconds, kind: latest.kind };
+}
+
+function describeLearningAction(event: LearningActivityEvent) {
+  const labels: Record<LearningActivityKind, string> = {
+    speaking: 'Speaking practice', listening: 'Listening practice', vocabulary: 'Vocabulary practice', reading: 'Reading',
+    grammar: 'Grammar practice', phrases: 'Phrase practice', audio: 'Podcast or audio listening',
+  };
+  if (event.contentId === 'daily-category-total' || event.contentId === event.kind || /^(audio|story|book|phrases)$/.test(event.contentId)) return labels[event.kind];
+  return `${labels[event.kind]} · ${event.contentId}`;
 }

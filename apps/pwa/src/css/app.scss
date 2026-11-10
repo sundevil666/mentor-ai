@@ -327,6 +327,17 @@ body .q-menu {
 .learning-balance-hero > div > span, .learning-balance-note { color: var(--app-muted-strong); line-height: 1.55; }
 .learning-balance-score { align-items: center; display: grid; flex: 0 0 auto; justify-items: center; }
 .learning-balance-score span { color: var(--app-muted-strong); font-size: .78rem; margin-top: 4px; }
+.learning-balance-score__target { border: 2px dashed color-mix(in srgb, var(--app-secondary) 72%, transparent); border-radius: 50%; padding: 5px; position: relative; }
+.learning-balance-score__target::after { background: var(--app-secondary); border: 2px solid var(--app-surface); border-radius: 50%; content: ''; height: 9px; position: absolute; right: 7px; top: 1px; width: 9px; }
+.learning-balance-change { background: linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 8%, var(--app-surface)), var(--app-surface)); border-radius: 18px; }
+.learning-balance-change .q-card__section { align-items: center; display: flex; gap: 16px; }
+.learning-balance-change__delta { align-items: center; border-radius: 14px; display: flex; flex: 0 0 64px; font-size: 1.45rem; font-weight: 900; height: 64px; justify-content: center; }
+.learning-balance-change__delta.is-positive { background: color-mix(in srgb, var(--app-secondary) 16%, transparent); color: var(--app-secondary); }
+.learning-balance-change__delta.is-negative { background: rgba(234, 88, 12, .12); color: #c2410c; }
+.learning-balance-change__delta.is-neutral { background: color-mix(in srgb, var(--app-muted) 13%, transparent); color: var(--app-muted-strong); }
+.learning-balance-change span { color: var(--app-muted-strong); font-size: .78rem; }
+.learning-balance-change h2 { font-size: 1.05rem; margin: 2px 0 3px; overflow-wrap: anywhere; }
+.learning-balance-change p { color: var(--app-muted-strong); margin: 0; }
 .learning-focus-card { background: linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 12%, var(--app-surface)), var(--app-surface)); border-radius: 22px; }
 .learning-focus-card .q-card__section { align-items: center; display: grid; gap: 18px; grid-template-columns: auto minmax(0, 1fr) auto; padding: 22px; }
 .learning-focus-card__icon { align-items: center; background: var(--app-primary); border-radius: 16px; color: white; display: flex; height: 52px; justify-content: center; width: 52px; }

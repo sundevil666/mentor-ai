@@ -23,13 +23,14 @@ export async function recordLearningActivity(input: {
   const db = await mentorDb;
   const date = new Date(endedAt);
   const day = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
-  const id = `activity:${getDeviceId()}:${getBatchId()}:${day}:${input.kind}`;
+  const contentId = input.contentId.trim() || input.kind;
+  const id = `activity:${getDeviceId()}:${getBatchId()}:${day}:${input.kind}:${stableContentKey(contentId)}`;
   const previous = await db.get('learning-activity-outbox', id) as LearningActivityEvent | undefined;
   const latestEvent: LearningActivityEvent = {
       id,
       studentId: input.studentId,
       kind: input.kind,
-      contentId: 'daily-category-total',
+      contentId,
       activeSeconds: (previous?.activeSeconds ?? 0) + activeSeconds,
       sourceDeviceId: getDeviceId(),
       startedAt: previous?.startedAt ?? input.startedAt ?? new Date(Date.parse(endedAt) - activeSeconds * 1_000).toISOString(),
@@ -154,6 +155,15 @@ function getBatchId() {
 
 function rotateBatchId() {
   localStorage.setItem(batchKey, crypto.randomUUID());
+}
+
+function stableContentKey(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
 }
 
 // Reuse the summary store for an account-scoped offline history cache.

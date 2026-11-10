@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { calculateLearningBalance } from '../src/services/learning-balance.js';
+import { calculateLatestBalanceChange, calculateLearningBalance } from '../src/services/learning-balance.js';
 
 const emptyActivity = { grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null };
 
@@ -30,5 +30,21 @@ describe('learning balance', () => {
     assert.deepEqual(measuredRows.map((row) => row.priorityRank), [1, 2, 3, 4, 5, 6, 7]);
     assert.equal(balance.rows.at(-1)?.kind, 'movies');
     assert.equal(balance.primaryFocus.kind, balance.rows[0]?.kind);
+  });
+
+  it('derives the latest signed score change from real activity history', () => {
+    const activity = { ...emptyActivity, speakingSeconds: 600, audioSeconds: 3_600, totalSeconds: 4_200, updatedAt: '2026-11-10T10:00:00.000Z' };
+    const change = calculateLatestBalanceChange(activity, [{
+      id: 'event-1', studentId: 'student-1', kind: 'speaking', contentId: 'lesson-travel-questions', activeSeconds: 600,
+      sourceDeviceId: 'device-1', startedAt: '2026-11-10T09:50:00.000Z', endedAt: '2026-11-10T10:00:00.000Z',
+    }]);
+    assert.ok(change);
+    assert.ok(change.delta > 0);
+    assert.match(change.action, /lesson-travel-questions/);
+    assert.equal(change.occurredAt, '2026-11-10T10:00:00.000Z');
+  });
+
+  it('does not invent a change when there is no activity event', () => {
+    assert.equal(calculateLatestBalanceChange(emptyActivity, []), null);
   });
 });
