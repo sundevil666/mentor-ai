@@ -48,17 +48,17 @@
           </div>
           <div class="learning-balance-card__heading">
             <div><strong>{{ row.label }}</strong><span>{{ row.description }}</span></div>
-            <div class="learning-balance-card__impact"><strong>{{ row.impactPercent }}%</strong><span>of impact</span></div>
+            <div class="learning-balance-card__impact"><strong>{{ row.impactPercent }}%</strong><span>{{ row.estimated ? 'listening credit' : 'of impact' }}</span></div>
           </div>
           <q-linear-progress rounded size="10px" :value="row.estimated ? 0 : Math.min(1, row.impactPercent / Math.max(1, row.targetPercent))" :color="row.status === 'focus' ? 'deep-orange-6' : row.status === 'strong' ? 'secondary' : 'primary'" track-color="grey-3" />
-          <div class="learning-balance-card__meta"><span>{{ row.estimated ? `${movieReports.length} saved report${movieReports.length === 1 ? '' : 's'}` : `${formatDuration(row.seconds)} recorded` }}</span><span>{{ row.estimated ? 'Not included in balance' : `Target mix ${row.targetPercent}%` }}</span></div>
+          <div class="learning-balance-card__meta"><span>{{ row.estimated ? `${movieReports.length} report${movieReports.length === 1 ? '' : 's'} · ${formatDuration(row.seconds)} estimated` : `${formatDuration(row.seconds)} recorded` }}</span><span>{{ row.estimated ? 'Included in listening' : `Target mix ${row.targetPercent}%` }}</span></div>
           <div class="learning-balance-card__footer">
-            <span class="learning-balance-card__status">{{ row.estimated ? 'Actual viewing time is unknown' : row.status === 'focus' ? 'Needs more attention' : row.status === 'strong' ? 'Already a strong area' : 'Close to balance' }}</span>
+            <span class="learning-balance-card__status">{{ row.estimated ? '1 h 45 min per completed report' : row.status === 'focus' ? 'Needs more attention' : row.status === 'strong' ? 'Already a strong area' : 'Close to balance' }}</span>
             <span class="learning-balance-card__action">{{ row.actionLabel }}<q-icon name="arrow_forward" /></span>
           </div>
         </router-link>
       </section>
-      <p class="learning-balance-note">Percentages show the share of estimated learning impact, not an exam score. Active speech and checked recall receive more weight than passive input. Movie reports remain visible, but do not affect the balance until actual viewing activity can be measured.</p>
+      <p class="learning-balance-note">Percentages show the share of estimated learning impact, not an exam score. Active speech and checked recall receive more weight than passive input. Each completed movie report adds an estimated 1 h 45 min of English listening with a cautious weight because viewing time is not directly timed.</p>
     </section>
   </q-page>
 </template>
@@ -70,14 +70,14 @@ import { useAppStore } from 'src/stores/app-store';
 import { loadLearningActivityHistory, loadLearningActivityTotals } from 'src/services/learning-activity';
 import { calculateLatestBalanceChange, calculateLearningBalance } from 'src/services/learning-balance';
 import { loadMovieLearningReports, refreshMovieLearningReportsFromCloud } from 'src/services/movie-learning-reports';
-import { summarizeMovieViewing } from 'src/services/movie-viewing-summary';
+import { estimatedMovieViewingSeconds, summarizeMovieViewing } from 'src/services/movie-viewing-summary';
 
 const appStore = useAppStore();
 const activity = ref<LearningActivityTotals>({ grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null });
 const movieReports = ref<MovieLearningReport[]>([]);
 const activityHistory = ref<LearningActivityEvent[]>([]);
 const balance = computed(() => calculateLearningBalance({ activity: activity.value, estimatedMovieSeconds: summarizeMovieViewing(movieReports.value).estimatedViewingSeconds }));
-const latestChange = computed(() => calculateLatestBalanceChange(activity.value, activityHistory.value));
+const latestChange = computed(() => calculateLatestBalanceChange({ activity: activity.value, events: activityHistory.value, movieReports: movieReports.value, estimatedMovieSecondsPerReport: estimatedMovieViewingSeconds }));
 
 onMounted(async () => {
   if (!appStore.isHydrated) await appStore.hydrate();

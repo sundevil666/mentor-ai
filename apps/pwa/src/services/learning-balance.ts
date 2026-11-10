@@ -1,4 +1,4 @@
-import type { LearningActivityEvent, LearningActivityKind, LearningActivityTotals } from '@mentor-ai/shared';
+import type { LearningActivityEvent, LearningActivityKind, LearningActivityTotals, MovieLearningReport } from '@mentor-ai/shared';
 
 export type LearningBalanceKind = LearningActivityKind | 'movies';
 
@@ -17,20 +17,25 @@ const definitions: Array<Omit<LearningBalanceRow, 'impactPercent' | 'gapPercent'
   { kind: 'grammar', label: 'Grammar', description: 'Grammar used in checked exercises', targetPercent: 12, actionLabel: 'Practice grammar', route: { name: 'dashboard', query: { training: 'grammar' } } },
   { kind: 'phrases', label: 'Phrases', description: 'Useful patterns and spoken repetition', targetPercent: 10, actionLabel: 'Practice phrases', route: { name: 'patterns' } },
   { kind: 'audio', label: 'Podcasts & audio', description: 'Stories, podcasts and repeated listening', targetPercent: 5, actionLabel: 'Open audio', route: { name: 'audio' } },
-  { kind: 'movies', label: 'Movies', description: 'Reports are visible, but viewing time is not measured yet', targetPercent: 0, actionLabel: 'Review a movie', route: { name: 'movies' } },
+  { kind: 'movies', label: 'Movies', description: 'English-language films confirmed by a learning report', targetPercent: 0, actionLabel: 'Review a movie', route: { name: 'movies' } },
 ];
 
 const qualityWeights: Record<LearningBalanceKind, number> = {
   speaking: 1, vocabulary: 0.9, listening: 0.85, grammar: 0.85, phrases: 0.85, reading: 0.7, audio: 0.5, movies: 0,
 };
+const movieListeningWeight = 0.6;
 
 export function calculateLearningBalance(input: { activity: LearningActivityTotals; estimatedMovieSeconds?: number }) {
   const secondsByKind = Object.fromEntries(definitions.map(({ kind }) => [kind, kind === 'movies'
     ? Math.max(0, input.estimatedMovieSeconds ?? 0)
     : Math.max(0, input.activity[`${kind}Seconds`] ?? 0)])) as Record<LearningBalanceKind, number>;
-  const weightedTotal = definitions.reduce((sum, item) => sum + secondsByKind[item.kind] * qualityWeights[item.kind], 0);
+  const movieListeningImpact = secondsByKind.movies * movieListeningWeight;
+  const weightedTotal = definitions.reduce((sum, item) => sum + secondsByKind[item.kind] * qualityWeights[item.kind], movieListeningImpact);
   const rows = definitions.map((item): LearningBalanceRow => {
-    const impactPercent = weightedTotal ? Math.round(secondsByKind[item.kind] * qualityWeights[item.kind] / weightedTotal * 100) : 0;
+    const weightedImpact = item.kind === 'movies'
+      ? movieListeningImpact
+      : secondsByKind[item.kind] * qualityWeights[item.kind] + (item.kind === 'listening' ? movieListeningImpact : 0);
+    const impactPercent = weightedTotal ? Math.round(weightedImpact / weightedTotal * 100) : 0;
     const gapPercent = item.targetPercent - impactPercent;
     return { ...item, impactPercent, gapPercent, seconds: secondsByKind[item.kind], estimated: item.kind === 'movies', priorityRank: null, status: item.kind === 'movies' ? 'balanced' : gapPercent >= 4 ? 'focus' : gapPercent <= -4 ? 'strong' : 'balanced' };
   });
@@ -46,19 +51,34 @@ export function calculateLearningBalance(input: { activity: LearningActivityTota
 }
 
 export interface LearningBalanceChange {
-  delta: number; occurredAt: string; action: string; activeSeconds: number; kind: LearningActivityKind;
+  delta: number; occurredAt: string; action: string; activeSeconds: number; kind: LearningBalanceKind;
 }
 
-export function calculateLatestBalanceChange(activity: LearningActivityTotals, events: LearningActivityEvent[]): LearningBalanceChange | null {
-  const latest = [...events].filter((event) => event.activeSeconds > 0).sort((a, b) => b.endedAt.localeCompare(a.endedAt))[0];
-  if (!latest) return null;
-  const currentScore = calculateLearningBalance({ activity }).balanceScore;
+export function calculateLatestBalanceChange(input: {
+  activity: LearningActivityTotals;
+  events: LearningActivityEvent[];
+  movieReports?: MovieLearningReport[];
+  estimatedMovieSecondsPerReport?: number;
+}): LearningBalanceChange | null {
+  const latestActivity = [...input.events].filter((event) => event.activeSeconds > 0).sort((a, b) => b.endedAt.localeCompare(a.endedAt))[0];
+  const latestMovie = [...(input.movieReports ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  const movieSeconds = Math.max(0, input.estimatedMovieSecondsPerReport ?? 0);
+  const estimatedMovieSeconds = (input.movieReports?.length ?? 0) * movieSeconds;
+  const movieIsLatest = Boolean(latestMovie && (!latestActivity || latestMovie.createdAt > latestActivity.endedAt));
+  if (!latestActivity && !latestMovie) return null;
+  const currentScore = calculateLearningBalance({ activity: input.activity, estimatedMovieSeconds }).balanceScore;
+  if (movieIsLatest && latestMovie) {
+    const previousScore = calculateLearningBalance({ activity: input.activity, estimatedMovieSeconds: Math.max(0, estimatedMovieSeconds - movieSeconds) }).balanceScore;
+    return { delta: currentScore - previousScore, occurredAt: latestMovie.createdAt, action: `Watched ${latestMovie.movieTitle}`, activeSeconds: movieSeconds, kind: 'movies' };
+  }
+  const latest = latestActivity!;
+  const activity = input.activity;
   const previousActivity = { ...activity };
   const secondsKey = `${latest.kind}Seconds` as const;
   const removedSeconds = Math.min(previousActivity[secondsKey], latest.activeSeconds);
   previousActivity[secondsKey] -= removedSeconds;
   previousActivity.totalSeconds = Math.max(0, previousActivity.totalSeconds - removedSeconds);
-  const previousScore = calculateLearningBalance({ activity: previousActivity }).balanceScore;
+  const previousScore = calculateLearningBalance({ activity: previousActivity, estimatedMovieSeconds }).balanceScore;
   return { delta: currentScore - previousScore, occurredAt: latest.endedAt, action: describeLearningAction(latest), activeSeconds: latest.activeSeconds, kind: latest.kind };
 }
 

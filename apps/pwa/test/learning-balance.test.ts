@@ -16,9 +16,10 @@ describe('learning balance', () => {
     assert.ok(balance.rows.find((row) => row.kind === 'speaking')!.impactPercent > balance.rows.find((row) => row.kind === 'audio')!.impactPercent);
   });
 
-  it('keeps estimated movies visible without distorting the measured balance', () => {
+  it('counts estimated movie viewing as cautious listening impact', () => {
     const balance = calculateLearningBalance({ activity: emptyActivity, estimatedMovieSeconds: 7_200 });
-    assert.equal(balance.rows.find((row) => row.kind === 'movies')?.impactPercent, 0);
+    assert.equal(balance.rows.find((row) => row.kind === 'movies')?.impactPercent, 100);
+    assert.equal(balance.rows.find((row) => row.kind === 'listening')?.impactPercent, 100);
     assert.equal(balance.rows.reduce((sum, row) => sum + row.targetPercent, 0), 100);
   });
 
@@ -34,10 +35,10 @@ describe('learning balance', () => {
 
   it('derives the latest signed score change from real activity history', () => {
     const activity = { ...emptyActivity, speakingSeconds: 600, audioSeconds: 3_600, totalSeconds: 4_200, updatedAt: '2026-11-10T10:00:00.000Z' };
-    const change = calculateLatestBalanceChange(activity, [{
+    const change = calculateLatestBalanceChange({ activity, events: [{
       id: 'event-1', studentId: 'student-1', kind: 'speaking', contentId: 'lesson-travel-questions', activeSeconds: 600,
       sourceDeviceId: 'device-1', startedAt: '2026-11-10T09:50:00.000Z', endedAt: '2026-11-10T10:00:00.000Z',
-    }]);
+    }] });
     assert.ok(change);
     assert.ok(change.delta > 0);
     assert.match(change.action, /lesson-travel-questions/);
@@ -45,6 +46,17 @@ describe('learning balance', () => {
   });
 
   it('does not invent a change when there is no activity event', () => {
-    assert.equal(calculateLatestBalanceChange(emptyActivity, []), null);
+    assert.equal(calculateLatestBalanceChange({ activity: emptyActivity, events: [] }), null);
+  });
+
+  it('uses the latest movie report as a real estimated listening change', () => {
+    const change = calculateLatestBalanceChange({
+      activity: { ...emptyActivity, speakingSeconds: 3_600, totalSeconds: 3_600 }, events: [], estimatedMovieSecondsPerReport: 6_300,
+      movieReports: [{ id: 'movie-1', studentId: 'student-1', movieTitle: 'The King’s Speech', watchedAt: '2026-11-09', report: 'Report', sourceDeviceId: 'device-1', createdAt: '2026-11-10T12:00:00.000Z', updatedAt: '2026-11-10T12:00:00.000Z' }],
+    });
+    assert.ok(change);
+    assert.equal(change.kind, 'movies');
+    assert.equal(change.activeSeconds, 6_300);
+    assert.match(change.action, /The King’s Speech/);
   });
 });

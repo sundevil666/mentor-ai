@@ -17,6 +17,7 @@ function report(id: string): MovieLearningReport {
 }
 
 test('summarizes movie reports using the shared approximate runtime', () => {
+  assert.equal(estimatedMovieViewingSeconds, 105 * 60);
   assert.deepEqual(summarizeMovieViewing([report('1'), report('2'), report('3')]), {
     movieCount: 3,
     estimatedViewingSeconds: 3 * estimatedMovieViewingSeconds,

@@ -1,6 +1,8 @@
 import type { MovieLearningReport } from '@mentor-ai/shared';
 
-export const estimatedMovieViewingSeconds = 2 * 60 * 60;
+// The learner usually watches one 90–120 minute English-language film per
+// report, so use the midpoint rather than pretending that runtime was timed.
+export const estimatedMovieViewingSeconds = 105 * 60;
 
 export interface MovieViewingSummary {
   movieCount: number;
