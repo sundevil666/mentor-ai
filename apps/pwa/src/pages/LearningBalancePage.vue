@@ -3,10 +3,15 @@
     <section class="learning-balance-shell">
       <header class="learning-balance-hero">
         <div><p>Last 30 days</p><h1>Your learning balance</h1><span>See what is moving your English forward and what deserves attention next.</span></div>
-        <div class="learning-balance-score" :aria-label="`Learning balance ${balance.balanceScore}%, target 100%`">
+        <div class="learning-balance-score" :class="`learning-balance-score--${balanceTone}`" :aria-label="`Learning balance ${balance.balanceScore}%, target 100%`">
           <svg class="learning-balance-gauge" viewBox="0 0 200 118" aria-hidden="true">
             <path class="learning-balance-gauge__track" d="M 20 100 A 80 80 0 0 1 180 100" pathLength="100" />
-            <path class="learning-balance-gauge__value" d="M 20 100 A 80 80 0 0 1 180 100" pathLength="100" :stroke-dasharray="`${balance.balanceScore} 100`" />
+            <path class="learning-balance-gauge__zone learning-balance-gauge__zone--red" d="M 20 100 A 80 80 0 0 1 180 100" pathLength="100" />
+            <path class="learning-balance-gauge__zone learning-balance-gauge__zone--yellow" d="M 20 100 A 80 80 0 0 1 180 100" pathLength="100" />
+            <path class="learning-balance-gauge__zone learning-balance-gauge__zone--green" d="M 20 100 A 80 80 0 0 1 180 100" pathLength="100" />
+            <path class="learning-balance-gauge__value learning-balance-gauge__value--red" d="M 20 100 A 80 80 0 0 1 180 100" pathLength="100" :stroke-dasharray="`${Math.min(balance.balanceScore, 30)} 100`" />
+            <path class="learning-balance-gauge__value learning-balance-gauge__value--yellow" d="M 20 100 A 80 80 0 0 1 180 100" pathLength="100" :stroke-dasharray="`${Math.min(30, Math.max(0, balance.balanceScore - 30))} 100`" />
+            <path class="learning-balance-gauge__value learning-balance-gauge__value--green" d="M 20 100 A 80 80 0 0 1 180 100" pathLength="100" :stroke-dasharray="`${Math.max(0, balance.balanceScore - 60)} 100`" />
             <line class="learning-balance-gauge__needle" x1="100" y1="100" x2="100" y2="35" :transform="`rotate(${-90 + balance.balanceScore * 1.8} 100 100)`" />
             <circle class="learning-balance-gauge__hub" cx="100" cy="100" r="7" />
             <text x="18" y="116">0</text><text x="166" y="116">100</text>
@@ -95,6 +100,7 @@ const recentMovieReports = computed(() => movieReports.value.filter((report) => 
 }));
 const recentMovieViewing = computed(() => summarizeMovieViewing(recentMovieReports.value));
 const balance = computed(() => calculateLearningBalance({ activity: recentActivity.value, estimatedMovieSeconds: recentMovieViewing.value.estimatedViewingSeconds }));
+const balanceTone = computed(() => balance.value.balanceScore <= 30 ? 'red' : balance.value.balanceScore <= 60 ? 'yellow' : 'green');
 const latestChange = computed(() => calculateLatestBalanceChange({ activity: recentActivity.value, events: recentActivityHistory.value, movieReports: recentMovieReports.value, estimatedMovieSecondsPerReport: estimatedMovieViewingSeconds, contentTitles: readingTitles.value }));
 
 onMounted(async () => {

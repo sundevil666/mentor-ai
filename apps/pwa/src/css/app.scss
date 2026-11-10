@@ -326,14 +326,25 @@ body .q-menu {
 .learning-balance-hero h1 { font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.05; margin: 0 0 10px; }
 .learning-balance-hero > div > span, .learning-balance-note { color: var(--app-muted-strong); line-height: 1.55; }
 .learning-balance-score { align-items: center; display: grid; flex: 0 0 220px; justify-items: center; position: relative; }
-.learning-balance-score > strong { font-size: 1.35rem; margin-top: -35px; }
+.learning-balance-score--red { --balance-color: #dc2626; }
+.learning-balance-score--yellow { --balance-color: #d89b00; }
+.learning-balance-score--green { --balance-color: #16a34a; }
+.learning-balance-score > strong { color: var(--balance-color); font-size: 1.45rem; line-height: 1; margin-top: 4px; }
 .learning-balance-score span { color: var(--app-muted-strong); font-size: .78rem; margin-top: 1px; }
 .learning-balance-gauge { height: auto; overflow: visible; width: 210px; }
-.learning-balance-gauge__track, .learning-balance-gauge__value { fill: none; stroke-linecap: round; stroke-width: 16; }
+.learning-balance-gauge__track, .learning-balance-gauge__zone, .learning-balance-gauge__value { fill: none; stroke-linecap: butt; }
 .learning-balance-gauge__track { stroke: color-mix(in srgb, var(--app-muted) 22%, transparent); }
-.learning-balance-gauge__value { stroke: var(--app-primary); }
-.learning-balance-gauge__needle { stroke: var(--app-text); stroke-linecap: round; stroke-width: 4; transition: transform .45s cubic-bezier(.2, .8, .2, 1); }
-.learning-balance-gauge__hub { fill: var(--app-text); }
+.learning-balance-gauge__track, .learning-balance-gauge__zone { stroke-width: 16; }
+.learning-balance-gauge__zone { opacity: .34; }
+.learning-balance-gauge__zone--red { stroke: #dc2626; stroke-dasharray: 30 70; }
+.learning-balance-gauge__zone--yellow { stroke: #eab308; stroke-dasharray: 30 70; stroke-dashoffset: -30; }
+.learning-balance-gauge__zone--green { stroke: #16a34a; stroke-dasharray: 40 60; stroke-dashoffset: -60; }
+.learning-balance-gauge__value { stroke-linecap: butt; stroke-width: 9; }
+.learning-balance-gauge__value--red { stroke: #dc2626; }
+.learning-balance-gauge__value--yellow { stroke: #eab308; stroke-dashoffset: -30; }
+.learning-balance-gauge__value--green { stroke: #16a34a; stroke-dashoffset: -60; }
+.learning-balance-gauge__needle { stroke: var(--balance-color); stroke-linecap: round; stroke-width: 4; transition: stroke .25s ease, transform .45s cubic-bezier(.2, .8, .2, 1); }
+.learning-balance-gauge__hub { fill: var(--balance-color); transition: fill .25s ease; }
 .learning-balance-gauge text { fill: var(--app-muted-strong); font-size: 10px; font-weight: 700; }
 .learning-balance-change { background: linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 8%, var(--app-surface)), var(--app-surface)); border-radius: 18px; }
 .learning-balance-change .q-card__section { align-items: center; display: flex; gap: 16px; }
