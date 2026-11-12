@@ -10,14 +10,14 @@
     <section class="exercise-brief__task">
       <div v-if="parts.context" class="exercise-brief__context" :class="{ 'exercise-brief__situation--illustrated': !parts.phrase && scene }">
         <div>
-        <h2><q-icon name="visibility" size="18px" />{{ spoken ? 'Прочитай · ситуация и задание' : mode.taskLabel }}</h2>
+        <h2><q-icon name="visibility" size="18px" />{{ spoken ? 'Что нужно сделать' : mode.taskLabel }}</h2>
         <p class="exercise-brief__prompt">{{ parts.context }}</p>
         </div>
         <ExerciseSituationScene v-if="!parts.phrase && scene" :key="exercise.id" :scene="scene" />
       </div>
       <div v-if="parts.phrase" class="exercise-brief__situation" :class="{ 'exercise-brief__situation--illustrated': scene }">
         <div class="exercise-brief__native">
-          <h2><q-icon :name="spoken ? 'mic' : 'edit_note'" size="18px" />{{ spoken ? 'Произнеси по-английски' : 'Фраза задания' }}</h2>
+          <h2><q-icon :name="spoken ? 'mic' : 'edit_note'" size="18px" />{{ spoken ? 'Текст, который нужно сказать по-английски' : 'Фраза задания' }}</h2>
           <strong>{{ parts.phrase }}</strong>
         </div>
         <ExerciseSituationScene v-if="scene" :key="exercise.id" :scene="scene" />
@@ -69,7 +69,7 @@ const mode = computed(() => {
 .exercise-brief .exercise-brief__heading { margin: 10px 0 0; color: var(--app-text-strong); font-size: clamp(1.2rem, 1.7vw, 1.5rem); line-height: 1.35; font-weight: 700; }
 .exercise-brief h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; color: var(--app-muted-strong); font-size: .8rem; font-weight: 650; line-height: 1.4; }
 .exercise-brief p { margin: 0; color: var(--app-muted-strong); font-size: 1rem; line-height: 1.65; overflow-wrap: anywhere; }
-.exercise-brief .exercise-brief__prompt { color: var(--app-text); font-size: 1rem; line-height: 1.6; white-space: pre-line; }
+.exercise-brief .exercise-brief__prompt { color: var(--app-text); font-size: clamp(1.08rem, 1.3vw, 1.2rem); line-height: 1.6; white-space: pre-line; }
 .exercise-brief__task { display: grid; gap: 14px; }
 .exercise-brief__context, .exercise-brief__support { padding: 14px 16px; border-radius: 12px; background: var(--app-surface-soft); }
 .exercise-brief__context.exercise-brief__situation--illustrated { display: grid; align-items: center; gap: 20px; }
@@ -81,7 +81,7 @@ const mode = computed(() => {
 .exercise-brief__situation { display: grid; align-items: center; gap: 20px; margin-top: 0; padding: 20px; border: 1px solid var(--category-border); border-left: 3px solid var(--category-accent); border-radius: 16px; background: color-mix(in srgb, var(--category-accent) 6%, var(--app-surface)); }
 .exercise-brief__situation--illustrated { grid-template-columns: minmax(0, 1fr) 150px; }
 .exercise-brief__native { display: grid; gap: 10px; min-width: 0; }
-.exercise-brief__native strong { color: var(--app-text-strong); font-size: clamp(1.15rem, 1.6vw, 1.4rem); font-weight: 650; line-height: 1.5; }
+.exercise-brief__native strong { color: var(--app-text-strong); font-size: clamp(1.3rem, 2vw, 1.65rem); font-weight: 700; line-height: 1.5; }
 .exercise-brief__explanation { padding-left: 14px; border-left: 2px solid var(--category-border); }
 .exercise-brief__tip { padding: 16px; border-radius: 12px; background: var(--app-surface-soft); }
 .exercise-brief__tip p { font-size: .94rem; }

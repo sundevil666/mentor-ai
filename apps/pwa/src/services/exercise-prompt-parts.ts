@@ -2,7 +2,7 @@
 export function splitExercisePrompt(prompt: string, nativePrompt?: string) {
   if (nativePrompt) return { context: prompt, phrase: nativePrompt, support: '' };
   const spokenQuote = /(?:скажи|повтори|попроси|расскажи|произнеси)[^«"\n]*[«"]/i.exec(prompt)
-    ?? (/Используй/i.test(prompt) ? /:\s*[«"]/.exec(prompt) : null);
+    ?? /:\s*[«"]/.exec(prompt);
   if (!spokenQuote) return { context: prompt, phrase: '', support: '' };
   const openingIndex = spokenQuote.index + spokenQuote[0].length - 1;
   const closingQuote = prompt[openingIndex] === '«' ? '»' : '"';

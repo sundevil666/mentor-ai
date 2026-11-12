@@ -19,6 +19,13 @@ it('recognizes a colon-led practice phrase with an explicit vocabulary instructi
     context: 'Днём', phrase: 'Магазин закрыт', support: 'Используй closed.',
   });
 });
+it('recognizes a colon-led phrase when the context itself contains the full instruction', () => {
+  assert.deepEqual(splitExercisePrompt('Без английской опоры, о вчера: «Если бы я знал об отмене, я бы не поехал на станцию».'), {
+    context: 'Без английской опоры, о вчера',
+    phrase: 'Если бы я знал об отмене, я бы не поехал на станцию',
+    support: '',
+  });
+});
 it('uses an explicit native prompt without searching the model answer', () => {
   assert.deepEqual(splitExercisePrompt('Translate and say it aloud', 'Доброе утро'), {
     context: 'Translate and say it aloud', phrase: 'Доброе утро', support: '',

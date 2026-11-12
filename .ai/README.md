@@ -50,6 +50,8 @@ Before delivery, check the latest lesson batch against the scene resolver privat
 
 Spoken task text must visually separate context/instructions (read), the requested phrase (say in English), and supporting vocabulary/constructions. Reuse `splitExercisePrompt` for existing quoted prompts and explicit `nativePrompt` values. Never derive the visible phrase from `expectedResponse` or audio text; preserve unmatched prompts intact. Keep context quiet, the spoken phrase prominent, and support in a separate compact block.
 
+Author every new spoken task with the same three-part structure. Put the instruction and situation in `prompt`, then a colon and the exact native-language text to produce inside `«…»`; place any required words or constructions after the closing quote. Example shape: `Без английской опоры, о вчера: «…». Используй …`. Prefer an explicit `nativePrompt` when the source format already separates the phrase. The shared UI must label the instruction as what to do, show the quoted/native phrase in a separate larger emphasized card, and keep any language support visually separate. Do not mix the instruction into the phrase that the learner must say.
+
 ## Durable lesson catalog and stable release dates
 
 ### Always preserve and resume lesson state
