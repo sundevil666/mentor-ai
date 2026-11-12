@@ -111,3 +111,18 @@ function describeLearningAction(event: LearningActivityEvent, contentTitles?: Re
   if (event.contentId === 'daily-category-total' || event.contentId === event.kind || /^(audio|story|book|phrases)$/.test(event.contentId) || /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(event.contentId)) return labels[event.kind];
   return `${labels[event.kind]} · ${event.contentId}`;
 }
+
+/** Keep today's priorities anchored to the mix before today's practice. */
+export function calculateDailyBalanceGoals(events: LearningActivityEvent[], estimatedMovieSeconds: number, now = new Date()) {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  const baseline = summarizeRecentLearningActivity(events, new Date(start.getTime() - 1));
+  const balance = calculateLearningBalance({ activity: baseline, estimatedMovieSeconds });
+  const today = summarizeRecentLearningActivity(events.filter((event) => Date.parse(event.endedAt) >= start.getTime()), now);
+  const goals = balance.rows.filter((row) => row.kind !== 'movies' && row.status === 'focus').map((row) => ({
+    ...row,
+    remainingSeconds: Math.max(0, 300 - today[`${row.kind as LearningActivityKind}Seconds`]),
+  }));
+  const pending = goals.filter((goal) => goal.remainingSeconds > 0);
+  return { goals, pending, current: pending[0] ?? null, completed: pending.length === 0 };
+}

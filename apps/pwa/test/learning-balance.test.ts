@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { calculateLatestBalanceChange, calculateLearningBalance, summarizeRecentLearningActivity } from '../src/services/learning-balance.js';
+import { calculateDailyBalanceGoals, calculateLatestBalanceChange, calculateLearningBalance, summarizeRecentLearningActivity } from '../src/services/learning-balance.js';
 
 const emptyActivity = { grammarSeconds: 0, listeningSeconds: 0, speakingSeconds: 0, phrasesSeconds: 0, audioSeconds: 0, readingSeconds: 0, vocabularySeconds: 0, totalSeconds: 0, updatedAt: null };
 
@@ -81,5 +81,22 @@ describe('learning balance', () => {
     assert.equal(totals.listeningSeconds, 0);
     assert.equal(totals.readingSeconds, 0);
     assert.equal(totals.totalSeconds, 600);
+  });
+});
+
+
+describe('daily balance goals', () => {
+  it('advances through the queue only after five minutes and resets tomorrow', () => {
+    const now = new Date(2026, 10, 12, 14);
+    const initial = calculateDailyBalanceGoals([], 0, now);
+    assert.equal(initial.current?.kind, 'speaking');
+    const event = { id: 'today', studentId: 'student', kind: 'speaking' as const, contentId: 'practice', sourceDeviceId: 'device', startedAt: new Date(2026, 10, 12, 10).toISOString(), endedAt: new Date(2026, 10, 12, 10, 5).toISOString(), activeSeconds: 299 };
+    assert.equal(calculateDailyBalanceGoals([event], 0, now).current?.kind, 'speaking');
+    const next = calculateDailyBalanceGoals([{ ...event, activeSeconds: 300 }], 0, now);
+    assert.equal(next.current?.kind, 'listening');
+    assert.equal(next.pending.length, initial.pending.length - 1);
+    const all = initial.goals.map((goal, index) => ({ ...event, id: String(index), kind: goal.kind as typeof event.kind, activeSeconds: 300 }));
+    assert.equal(calculateDailyBalanceGoals(all, 0, now).completed, true);
+    assert.equal(calculateDailyBalanceGoals(all, 0, new Date(2026, 10, 13, 14)).completed, false);
   });
 });

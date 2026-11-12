@@ -16,6 +16,7 @@
 
         <section v-else-if="!appStore.session" key="choice" class="learning-start">
           <template v-if="selectedLessonLibrary === 'home'">
+          <HomeLearningBalance />
           <HomeMentorAdvice :statistics="appStore.statisticsSnapshots" :student-id="appStore.studentId" />
 
           <section class="home-work-lists" aria-label="Your learning lists">
@@ -767,6 +768,7 @@ import { loadAllContentProgress } from 'src/services/content-progress';
 import { belongsToRequiredLessons, belongsToStartedLessons } from 'src/services/home-lesson-lists';
 import { selectUnfinishedStartedContent, type StartedContentState } from 'src/services/home-started-content';
 import { listPersonalBooks, type PersonalBook } from 'src/services/personal-book-library';
+import HomeLearningBalance from 'src/components/HomeLearningBalance.vue';
 import HomeMentorAdvice from 'src/components/HomeMentorAdvice.vue';
 import ContentMentorFeedback from 'src/components/ContentMentorFeedback.vue';
 import {
