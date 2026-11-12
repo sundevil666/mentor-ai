@@ -1,6 +1,6 @@
 import type { LearningMode } from '@mentor-ai/shared';
 
-export type DashboardTrainingCategory = 'grammar' | 'listening' | 'speaking';
+export type DashboardTrainingCategory = 'grammar' | 'listening' | 'speaking' | 'vocabulary';
 
 export function resolveLessonReturnDestination(
   activeCategory: DashboardTrainingCategory | undefined,
@@ -20,7 +20,7 @@ export function resolveDashboardTrainingCategory(
   routeTraining: unknown,
   sessionMode?: LearningMode,
 ): DashboardTrainingCategory | undefined {
-  if (routeTraining === 'grammar' || routeTraining === 'listening' || routeTraining === 'speaking') return routeTraining;
+  if (routeTraining === 'grammar' || routeTraining === 'listening' || routeTraining === 'speaking' || routeTraining === 'vocabulary') return routeTraining;
   if (sessionMode === 'listening' || sessionMode === 'speaking') return sessionMode;
   return undefined;
 }

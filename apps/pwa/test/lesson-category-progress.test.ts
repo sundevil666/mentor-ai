@@ -59,9 +59,16 @@ describe('lesson category progress', () => {
         { type: 'listening-comprehension', targetSkill: 'listening' },
       ],
     } as GeneratedLesson;
+    const vocabularyLesson = {
+      concept: 'vocabulary',
+      targetSkills: ['vocabulary', 'grammar'],
+      exercises: [{ type: 'word-order', targetSkill: 'grammar' }],
+    } as GeneratedLesson;
 
     assert.equal(generatedLessonMode(speakingLesson), 'speaking');
     assert.equal(generatedLessonMode(listeningLesson), 'listening');
+    assert.equal(generatedLessonCategory(vocabularyLesson), 'vocabulary');
+    assert.equal(generatedLessonMode(vocabularyLesson), 'home');
     assert.equal(generatedLessonCategory({ targetSkills: ['grammar'], exercises: [] } as unknown as GeneratedLesson), 'grammar');
     assert.equal(generatedLessonCategory({
       targetSkills: ['grammar', 'review'],

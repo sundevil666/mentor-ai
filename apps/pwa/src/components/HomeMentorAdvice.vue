@@ -56,7 +56,7 @@
           class="mentor-advice__card"
           :class="{ 'mentor-advice__card--read': note.read }"
           :disabled="note.read"
-          @click="markRead(note.id)"
+          @click="openAdvice(note)"
         >
           <q-icon
             :name="note.read ? 'done' : note.tone === 'positive' ? 'thumb_up' : 'lightbulb_outline'"
@@ -85,6 +85,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import type { StatisticsSnapshot } from '@mentor-ai/shared';
 import { listBookReadingAnalytics } from 'src/services/book-reading-analytics';
 import { loadLearningActivityHistory } from 'src/services/learning-activity';
@@ -93,6 +94,7 @@ import { loadMovieLearningReports, refreshMovieLearningReportsFromCloud } from '
 import { buildHomeMentorAdvice, type MentorAdvice } from 'src/services/home-mentor-advice';
 
 const props = defineProps<{ statistics: StatisticsSnapshot[]; studentId: string }>();
+const router = useRouter();
 type SavedAdvice = MentorAdvice & { read: boolean };
 const notes = ref<SavedAdvice[]>([]);
 const tab = ref('new');
@@ -111,6 +113,10 @@ function persist() {
 function markRead(id: string) {
   notes.value = notes.value.map(note => note.id === id ? { ...note, read: true } : note);
   persist();
+}
+function openAdvice(note: SavedAdvice) {
+  markRead(note.id);
+  if (note.id.startsWith('vocabulary:')) void router.push({ name: 'dashboard', query: { training: 'vocabulary' } });
 }
 async function refresh() {
   const currentRun = ++run;

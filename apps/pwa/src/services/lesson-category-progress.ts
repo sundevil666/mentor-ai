@@ -2,7 +2,7 @@ import type { GeneratedLesson, LearningMode, SkillArea } from '@mentor-ai/shared
 
 export type LessonProgressState = 'new' | 'started' | 'completed';
 export type LessonCategoryState = 'new' | 'started' | 'progress' | 'complete';
-export type GeneratedLessonCategory = 'grammar' | 'listening' | 'speaking';
+export type GeneratedLessonCategory = 'grammar' | 'listening' | 'speaking' | 'vocabulary';
 export interface GeneratedLessonLink {
   templateKey: string;
   addedAt: string;
@@ -12,7 +12,7 @@ export interface GeneratedLessonLink {
   mode: 'home' | 'listening' | 'speaking';
   category: GeneratedLessonCategory;
   minutes: number;
-  skillLabel: 'Grammar' | 'Listening' | 'Speaking';
+  skillLabel: 'Grammar' | 'Listening' | 'Speaking' | 'Vocabulary';
 }
 
 const categories: Array<{ key: SkillArea; label: string; icon: string }> = [
@@ -24,6 +24,8 @@ const categories: Array<{ key: SkillArea; label: string; icon: string }> = [
 ];
 
 export function generatedLessonCategory(lesson: GeneratedLesson): GeneratedLessonCategory {
+  if (lesson.concept === 'vocabulary') return 'vocabulary';
+
   if (lesson.exercises.some((exercise) => (
     exercise.type === 'listening-text'
     || exercise.type === 'listening-comprehension'
@@ -51,7 +53,8 @@ export function generatedLessonCategory(lesson: GeneratedLesson): GeneratedLesso
 }
 
 export function generatedLessonMode(lesson: GeneratedLesson): LearningMode {
-  return generatedLessonCategory(lesson) === 'listening' ? 'listening' : 'speaking';
+  const category = generatedLessonCategory(lesson);
+  return category === 'listening' ? 'listening' : category === 'speaking' ? 'speaking' : 'home';
 }
 
 export function sortGeneratedLessonsNewestFirst(lessons: GeneratedLesson[]): GeneratedLesson[] {
@@ -63,7 +66,7 @@ export function sortGeneratedLessonsNewestFirst(lessons: GeneratedLesson[]): Gen
 export function buildGeneratedLessonLinks(lessons: GeneratedLesson[]): GeneratedLessonLink[] {
   return sortGeneratedLessonsNewestFirst(lessons).map((lesson) => {
     const category = generatedLessonCategory(lesson);
-    const mode = category === 'grammar' ? 'home' : category;
+    const mode = category === 'grammar' || category === 'vocabulary' ? 'home' : category;
     return {
       templateKey: lesson.lessonTemplateKey ?? lesson.id,
       addedAt: lesson.createdAt,
@@ -73,7 +76,7 @@ export function buildGeneratedLessonLinks(lessons: GeneratedLesson[]): Generated
       mode,
       category,
       minutes: lesson.estimatedMinutes,
-      skillLabel: category === 'listening' ? 'Listening' : category === 'speaking' ? 'Speaking' : 'Grammar',
+      skillLabel: category === 'listening' ? 'Listening' : category === 'speaking' ? 'Speaking' : category === 'vocabulary' ? 'Vocabulary' : 'Grammar',
     };
   });
 }

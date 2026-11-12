@@ -12,7 +12,7 @@ export interface LearningBalanceRow {
 const definitions: Array<Omit<LearningBalanceRow, 'impactPercent' | 'gapPercent' | 'status' | 'seconds' | 'estimated' | 'priorityRank'>> = [
   { kind: 'speaking', label: 'Speaking', description: 'Active speech and pronunciation feedback', targetPercent: 23, actionLabel: 'Practice speaking', route: { name: 'dashboard', query: { training: 'speaking' } } },
   { kind: 'listening', label: 'Listening practice', description: 'Listening lessons with comprehension work', targetPercent: 19, actionLabel: 'Practice listening', route: { name: 'dashboard', query: { training: 'listening' } } },
-  { kind: 'vocabulary', label: 'Vocabulary', description: 'Recall and use words without a prompt', targetPercent: 17, actionLabel: 'Practice vocabulary', route: { name: 'dashboard', query: { training: 'home' } } },
+  { kind: 'vocabulary', label: 'Vocabulary', description: 'Recall and use words without a prompt', targetPercent: 17, actionLabel: 'Practice vocabulary', route: { name: 'dashboard', query: { training: 'vocabulary' } } },
   { kind: 'reading', label: 'Reading', description: 'Meaningful reading and comprehension', targetPercent: 14, actionLabel: 'Read a book', route: { name: 'reading' } },
   { kind: 'grammar', label: 'Grammar', description: 'Grammar used in checked exercises', targetPercent: 12, actionLabel: 'Practice grammar', route: { name: 'dashboard', query: { training: 'grammar' } } },
   { kind: 'phrases', label: 'Phrases', description: 'Useful patterns and spoken repetition', targetPercent: 10, actionLabel: 'Practice phrases', route: { name: 'patterns' } },

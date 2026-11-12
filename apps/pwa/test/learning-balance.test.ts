@@ -11,6 +11,14 @@ describe('learning balance', () => {
     assert.equal(balance.rows.find((row) => row.kind === 'audio')?.status, 'strong');
   });
 
+  it('opens the dedicated vocabulary library from its balance card', () => {
+    const balance = calculateLearningBalance({ activity: emptyActivity });
+    assert.deepEqual(balance.rows.find((row) => row.kind === 'vocabulary')?.route, {
+      name: 'dashboard',
+      query: { training: 'vocabulary' },
+    });
+  });
+
   it('weights active speaking more strongly than passive audio', () => {
     const balance = calculateLearningBalance({ activity: { ...emptyActivity, speakingSeconds: 3_600, audioSeconds: 3_600, totalSeconds: 7_200 } });
     assert.ok(balance.rows.find((row) => row.kind === 'speaking')!.impactPercent > balance.rows.find((row) => row.kind === 'audio')!.impactPercent);

@@ -1220,12 +1220,23 @@ const trainingLibraries: Record<DashboardTrainingCategory, {
       { templateKey: 'polite-speaking', addedAt: '2026-08-24T10:00:01.000Z', title: 'Polite requests', focus: 'Keep a conversation going when you need help', mode: 'speaking', minutes: 7 },
     ],
   },
+  vocabulary: {
+    label: 'Vocabulary',
+    title: 'Vocabulary lessons',
+    icon: 'translate',
+    lessons: [
+      { templateKey: 'greetings-vocabulary', addedAt: '2026-08-24T10:00:00.000Z', title: 'Vocabulary Growth: greetings', focus: 'Recognize, recall, and use everyday greetings', mode: 'home', concept: 'vocabulary', minutes: 5 },
+      { templateKey: 'work-vocabulary', addedAt: '2026-08-24T10:00:01.000Z', title: 'Vocabulary Growth: work words', focus: 'Practice useful words for your workday', mode: 'home', concept: 'vocabulary', minutes: 5 },
+      { templateKey: 'travel-vocabulary', addedAt: '2026-08-24T10:00:02.000Z', title: 'Vocabulary Growth: travel words', focus: 'Recall practical words for travel and commuting', mode: 'home', concept: 'vocabulary', minutes: 5 },
+    ],
+  },
 };
 const generatedHomeLessons = computed<HomeLesson[]>(() => buildGeneratedLessonLinks(newLessonCatalog.value));
 const lessonsByTrainingCategory = computed(() => ({
   grammar: generatedHomeLessons.value.filter((lesson) => lesson.category === 'grammar'),
   listening: sortMaterialsNewestFirst([...generatedHomeLessons.value.filter((lesson) => lesson.category === 'listening'), ...trainingLibraries.listening.lessons]),
   speaking: sortMaterialsNewestFirst([...generatedHomeLessons.value.filter((lesson) => lesson.category === 'speaking'), ...trainingLibraries.speaking.lessons]),
+  vocabulary: sortMaterialsNewestFirst([...generatedHomeLessons.value.filter((lesson) => lesson.category === 'vocabulary'), ...trainingLibraries.vocabulary.lessons]),
 }));
 const activeTrainingLibrary = computed(() => {
   const category = selectedLessonLibrary.value === 'home' ? 'grammar' : selectedLessonLibrary.value;
@@ -1234,6 +1245,7 @@ const activeTrainingLibrary = computed(() => {
 const allHomeLessons = computed<HomeLesson[]>(() => [
   ...trainingLibraries.listening.lessons.map((lesson) => ({ ...lesson, category: 'listening' as const, skillLabel: 'Listening' })),
   ...trainingLibraries.speaking.lessons.map((lesson) => ({ ...lesson, category: 'speaking' as const, skillLabel: 'Speaking' })),
+  ...trainingLibraries.vocabulary.lessons.map((lesson) => ({ ...lesson, category: 'vocabulary' as const, skillLabel: 'Vocabulary' })),
   ...generatedHomeLessons.value,
 ]);
 const lessonCompletionCounts = computed(() => {
@@ -1449,6 +1461,7 @@ const lessonBackLabel = computed(() => {
   if (lessonReturnDestination.value === 'grammar') return 'Back to Grammar lessons';
   if (lessonReturnDestination.value === 'listening') return 'Back to Listening lessons';
   if (lessonReturnDestination.value === 'speaking') return 'Back to Speaking lessons';
+  if (lessonReturnDestination.value === 'vocabulary') return 'Back to Vocabulary lessons';
   if (lessonReturnDestination.value === 'specific-lessons') return 'Back to Specific lessons';
   return 'Back to Home';
 });
@@ -1636,7 +1649,7 @@ onMounted(async () => {
   await refreshLessonProgressStates();
   if (appStore.session) {
     await syncActiveLessonNavigation();
-  } else if (route.query.training === 'grammar' || route.query.training === 'listening' || route.query.training === 'speaking') {
+  } else if (route.query.training === 'grammar' || route.query.training === 'listening' || route.query.training === 'speaking' || route.query.training === 'vocabulary') {
     await openTrainingLibrary(route.query.training);
   }
 
@@ -1672,7 +1685,7 @@ watch(selectedHomeListTab, (tab) => saveHomePreference('mentor-ai:home-list-tab'
 watch(
   () => route.query.training,
   (training) => {
-    if (training === 'grammar' || training === 'listening' || training === 'speaking') {
+    if (training === 'grammar' || training === 'listening' || training === 'speaking' || training === 'vocabulary') {
       if (appStore.session && generatedLessonCategory(appStore.session.lesson) === training) {
         selectedLessonLibrary.value = training;
         return;

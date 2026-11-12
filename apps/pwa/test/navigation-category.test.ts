@@ -88,6 +88,10 @@ describe('dashboard navigation category', () => {
     assert.equal(resolveDashboardTrainingCategory('grammar', 'home'), 'grammar');
   });
 
+  it('opens Vocabulary as a dedicated training library', () => {
+    assert.equal(resolveDashboardTrainingCategory('vocabulary', 'home'), 'vocabulary');
+  });
+
   it('does not replace an already matching lesson category route', async () => {
     let replacements = 0;
 
