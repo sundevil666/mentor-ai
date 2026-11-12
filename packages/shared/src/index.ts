@@ -1734,7 +1734,7 @@ const learningLessonTemplates: LessonTemplate[] = [
       },
       {
         type: 'vocabulary-recall',
-        prompt: 'Translate: dobrý deň',
+        prompt: 'Переведите: добрый день',
         microLesson: 'This step checks whether the greeting is ready for real use.',
         successTip: 'Think of the polite afternoon greeting.',
         targetSkill: 'vocabulary',
@@ -2200,7 +2200,7 @@ const vocabularyLessonTemplates: LessonTemplate[] = [
       },
       {
         type: 'vocabulary-recall',
-        prompt: 'Translate: dobrý deň',
+        prompt: 'Переведите: добрый день',
         microLesson:
           'Active recall is stronger than reading the answer. Pause for one second before typing.',
         successTip: 'Use the polite greeting for later in the day.',
@@ -2233,7 +2233,7 @@ const vocabularyLessonTemplates: LessonTemplate[] = [
       },
       {
         type: 'vocabulary-recall',
-        prompt: 'Translate: zmena',
+        prompt: 'Переведите: смена',
         microLesson: 'Recall checks whether the word is ready without seeing it first.',
         successTip: 'Use the English work word.',
         targetSkill: 'vocabulary',
@@ -2264,7 +2264,7 @@ const vocabularyLessonTemplates: LessonTemplate[] = [
       },
       {
         type: 'vocabulary-recall',
-        prompt: 'Translate: prísť',
+        prompt: 'Переведите: прибыть',
         microLesson: 'Active recall makes the word available for real sentences.',
         successTip: 'Use the travel verb from the first question.',
         targetSkill: 'vocabulary',

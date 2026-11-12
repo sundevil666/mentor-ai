@@ -81,7 +81,7 @@ describe('shared domain helpers', () => {
         {
           id: 'exercise-1',
           type: 'vocabulary-recall',
-          prompt: 'Translate: dobrý deň',
+          prompt: 'Переведите: добрый день',
           targetSkill: 'vocabulary',
           expectedResponse: 'good afternoon',
         },
