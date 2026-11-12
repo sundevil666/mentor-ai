@@ -219,8 +219,13 @@ async function installUpdate(version: string) {
       ...lessonProgress,
     });
 
-    await activatePendingServiceWorkerUpdate();
-    window.location.replace(createAppUpdateReloadUrl(window.location, version));
+    const activationResult = await activatePendingServiceWorkerUpdate();
+
+    // controllerchange triggers the single shared reload handler. Avoid racing it
+    // with a second location.replace(), which can leave some PWA browsers blank.
+    if (activationResult !== 'controllerchange') {
+      window.location.replace(createAppUpdateReloadUrl(window.location, version));
+    }
   } catch {
     isReloadingForUpdate = false;
     appStore.setAppUpdateInstalling(false);
@@ -235,7 +240,6 @@ async function installUpdateInBackground(manifest: AppUpdateCheckResult['manifes
 
   try {
     const progress = await prepareUpdateProgress();
-    await activatePendingServiceWorkerUpdate();
     rememberPendingAppUpdate({
       targetVersion: manifest.version,
       requestedAt: new Date().toISOString(),
@@ -249,18 +253,18 @@ async function installUpdateInBackground(manifest: AppUpdateCheckResult['manifes
 
     const notification = await appStore.recordUpdateNotification(
       manifest.version,
-      'Mentor AI was updated automatically in the background.',
+      'A Mentor AI update is ready and will be applied safely when the app reloads.',
     );
     if (document.visibilityState !== 'visible') await showSystemUpdateNotification(notification);
     Notify.create({
       type: 'positive',
       icon: 'published_with_changes',
-      message: 'Mentor AI was updated in the background',
+      message: 'Mentor AI update is ready',
       actions: [{ label: 'OK', color: 'white' }],
       timeout: 0,
       position: 'top-right',
     });
-    if (document.visibilityState !== 'visible') reloadWithBackgroundUpdate(route.fullPath);
+    if (document.visibilityState !== 'visible') await activateAndReloadBackgroundUpdate(route.fullPath);
   } catch {
     Notify.create({ type: 'negative', icon: 'cloud_off', message: 'Could not update Mentor AI in the background' });
   } finally {
@@ -319,7 +323,18 @@ async function showRouteUpdateAndReload(target: string, showLoader: boolean) {
     await nextTick();
     await new Promise((resolve) => window.setTimeout(resolve, 80));
   }
-  reloadWithBackgroundUpdate(target);
+  await activateAndReloadBackgroundUpdate(target);
+}
+
+async function activateAndReloadBackgroundUpdate(target: string) {
+  try {
+    await activatePendingServiceWorkerUpdate();
+    reloadWithBackgroundUpdate(target);
+  } catch {
+    isRouteUpdateInstalling.value = false;
+    appStore.setAppUpdateInstalling(false);
+    Notify.create({ type: 'negative', icon: 'cloud_off', message: 'Could not apply the update', caption: 'Your progress is safe. Try again when the connection is stable.' });
+  }
 }
 
 function reloadWithBackgroundUpdate(target: string) {

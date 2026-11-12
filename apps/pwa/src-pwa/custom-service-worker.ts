@@ -33,7 +33,6 @@ const learningSyncTag = 'mentor-ai-learning-sync';
 const offlineAudioCacheName = 'mentor-ai-offline-audio-v1';
 const offlineStoryCacheName = 'mentor-ai-offline-stories-v1';
 
-self.skipWaiting();
 clientsClaim();
 
 cleanupOutdatedCaches();

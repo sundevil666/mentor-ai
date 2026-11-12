@@ -139,8 +139,10 @@ export async function activatePendingServiceWorkerUpdate(timeoutMs = 8000): Prom
 
   await registration.update();
 
-  if (registration.waiting) {
-    registration.waiting.postMessage({ type: 'mentor-ai:skip-waiting' });
+  const waitingWorker = registration.waiting ?? await waitForWaitingServiceWorker(registration, timeoutMs);
+
+  if (!waitingWorker) {
+    return 'timeout';
   }
 
   if (!navigator.serviceWorker.controller) {
@@ -160,6 +162,42 @@ export async function activatePendingServiceWorkerUpdate(timeoutMs = 8000): Prom
     };
 
     navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange, { once: true });
+    waitingWorker.postMessage({ type: 'mentor-ai:skip-waiting' });
+  });
+}
+
+async function waitForWaitingServiceWorker(
+  registration: ServiceWorkerRegistration,
+  timeoutMs: number,
+): Promise<ServiceWorker | null> {
+  const installingWorker = registration.installing;
+
+  if (!installingWorker) {
+    return null;
+  }
+
+  return new Promise((resolve) => {
+    const timeoutId = window.setTimeout(() => {
+      installingWorker.removeEventListener('statechange', handleStateChange);
+      resolve(null);
+    }, timeoutMs);
+
+    const finish = (worker: ServiceWorker | null) => {
+      window.clearTimeout(timeoutId);
+      installingWorker.removeEventListener('statechange', handleStateChange);
+      resolve(worker);
+    };
+
+    const handleStateChange = () => {
+      if (registration.waiting) {
+        finish(registration.waiting);
+      } else if (installingWorker.state === 'redundant') {
+        finish(null);
+      }
+    };
+
+    installingWorker.addEventListener('statechange', handleStateChange);
+    handleStateChange();
   });
 }
 
