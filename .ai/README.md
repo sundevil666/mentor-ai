@@ -20,6 +20,17 @@ Mentor AI is a Russian-English learning application. All learner-facing lesson c
 
 Never introduce Slovak or any other third language into learner-facing content unless the user explicitly requests that language for a specific task. Do not use the device locale, the user's location, or nearby-language vocabulary as a reason to substitute another language. Before delivering lesson-related changes, search every changed lesson and template for unintended third-language text and verify that translation tasks have the correct Russian source and English answer.
 
+## Lesson response controls
+
+Never require the learner to type an answer in a lesson. Every answer step must use exactly one of these response modes:
+
+- selection from visible prepared options for recognition, vocabulary, listening comprehension, reading confirmation, and other closed questions;
+- microphone recording for pronunciation, translation into English, sentence construction, word order, and other productive answers.
+
+Do not render an editable text field as a fallback when an exercise has no options. A checkable exercise with an `expectedResponse` and no options must automatically use the microphone, including older saved or remotely loaded lessons. A speech transcript may be shown in a read-only field so the learner can see what was recognized, but it must never become a typed fallback or count without a real recording. Keep the model answer concealed until requested.
+
+Before delivering any lesson-related change, inspect all changed built-in and generated exercises. Verify that every non-listening step has either at least one selectable option or a complete expected spoken response, and verify that the shared lesson screen contains no editable answer input.
+
 ## Spoken exercise contract
 
 - Instructions to speak, say, repeat aloud, or give a full spoken response must use a microphone-based exercise (`repeat-speaking` or `dialogue-translation`), never a typed answer field. Supply a complete `expectedResponse` and matching `audioText` for recognition and model playback.

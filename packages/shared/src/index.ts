@@ -1681,11 +1681,12 @@ const learningLessonTemplates: LessonTemplate[] = [
       {
         type: 'vocabulary-recall',
         prompt:
-          'Type one repeated word from the listening text: morning, bus, work, listen, today, or later.',
+          'Choose one repeated word from the listening text.',
         microLesson: 'Repeated words become friendly because your ears meet them many times.',
-        successTip: 'Use one exact word from the list.',
+        successTip: 'Choose the word you heard repeatedly.',
         targetSkill: 'vocabulary',
         expectedResponse: 'bus',
+        options: ['bus', 'kitchen', 'weekend'],
       },
     ],
   },
@@ -1695,11 +1696,12 @@ const learningLessonTemplates: LessonTemplate[] = [
     exercises: [
       {
         type: 'review',
-        prompt: 'Review: say or type "{reviewTarget}".',
+        prompt: 'Произнесите по-английски: «{reviewTarget}».',
         microLesson: 'Warmup protects earlier progress before adding new pressure.',
         successTip: 'Copy the phrase slowly and clearly.',
         targetSkill: 'review',
         expectedResponse: '{reviewTarget}',
+        audioText: '{reviewTarget}',
       },
       {
         type: 'repeat-speaking',
@@ -1712,7 +1714,7 @@ const learningLessonTemplates: LessonTemplate[] = [
       },
       {
         type: 'word-order',
-        prompt: 'Order the words: you / help / can / me',
+        prompt: 'Составьте фразу и произнесите её: you / help / can / me',
         microLesson: 'English yes/no questions often start with can, then the person.',
         successTip: 'Start with can, then you.',
         targetSkill: 'grammar',
@@ -1726,11 +1728,12 @@ const learningLessonTemplates: LessonTemplate[] = [
     exercises: [
       {
         type: 'review',
-        prompt: 'Review: say or type "{reviewTarget}".',
+        prompt: 'Произнесите по-английски: «{reviewTarget}».',
         microLesson: 'Warmup protects earlier progress before adding new pressure.',
         successTip: 'Copy the phrase slowly and clearly.',
         targetSkill: 'review',
         expectedResponse: '{reviewTarget}',
+        audioText: '{reviewTarget}',
       },
       {
         type: 'vocabulary-recall',
@@ -1739,10 +1742,11 @@ const learningLessonTemplates: LessonTemplate[] = [
         successTip: 'Think of the polite afternoon greeting.',
         targetSkill: 'vocabulary',
         expectedResponse: 'good afternoon',
+        options: ['good afternoon', 'good night', 'see you later'],
       },
       {
         type: 'word-order',
-        prompt: 'Order the words: you / are / where',
+        prompt: 'Составьте фразу и произнесите её: you / are / where',
         microLesson: 'English questions often use question word + helper verb + subject.',
         successTip: 'Start with where, then are, then you.',
         targetSkill: 'grammar',
@@ -1871,7 +1875,7 @@ const learningLessonTemplates: LessonTemplate[] = [
       },
       {
         type: 'word-order',
-        prompt: 'Order the words: when / you / do / start / work',
+        prompt: 'Составьте фразу и произнесите её: when / you / do / start / work',
         microLesson: 'Many present simple questions use question word + do + person + verb.',
         successTip: 'Start with when do you.',
         targetSkill: 'grammar',
@@ -1885,11 +1889,12 @@ const learningLessonTemplates: LessonTemplate[] = [
     exercises: [
       {
         type: 'review',
-        prompt: 'Review: say or type "{reviewTarget}".',
+        prompt: 'Произнесите по-английски: «{reviewTarget}».',
         microLesson: 'A short familiar phrase makes the first spoken step easier.',
         successTip: 'Copy the phrase calmly before the new sentence.',
         targetSkill: 'review',
         expectedResponse: '{reviewTarget}',
+        audioText: '{reviewTarget}',
       },
       {
         type: 'repeat-speaking',
@@ -1902,7 +1907,7 @@ const learningLessonTemplates: LessonTemplate[] = [
       },
       {
         type: 'word-order',
-        prompt: 'Order the words: I / to / work / go / morning / in / the',
+        prompt: 'Составьте фразу и произнесите её: I / to / work / go / morning / in / the',
         microLesson: 'Simple routine sentences often use person + action + time.',
         successTip: 'Start with I go to work.',
         targetSkill: 'grammar',
@@ -1939,7 +1944,7 @@ const listeningLessonTemplates: LessonTemplate[] = [
       },
       {
         type: 'word-order',
-        prompt: 'Order the words: when / you / do / start / work',
+        prompt: 'Составьте фразу и произнесите её: when / you / do / start / work',
         microLesson: 'Many present simple questions use question word + do + person + verb.',
         successTip: 'Start with when do you.',
         targetSkill: 'grammar',
@@ -2003,11 +2008,12 @@ const speakingLessonTemplates: LessonTemplate[] = [
     exercises: [
       {
         type: 'review',
-        prompt: 'Review: say or type "{reviewTarget}".',
+        prompt: 'Произнесите по-английски: «{reviewTarget}».',
         microLesson: 'A short familiar phrase makes the first spoken step easier.',
         successTip: 'Copy the phrase calmly before the new sentence.',
         targetSkill: 'review',
         expectedResponse: '{reviewTarget}',
+        audioText: '{reviewTarget}',
       },
       {
         type: 'repeat-speaking',
@@ -2020,7 +2026,7 @@ const speakingLessonTemplates: LessonTemplate[] = [
       },
       {
         type: 'word-order',
-        prompt: 'Order the words: I / to / work / go / morning / in / the',
+        prompt: 'Составьте фразу и произнесите её: I / to / work / go / morning / in / the',
         microLesson: 'Simple routine sentences often use person + action + time.',
         successTip: 'Start with I go to work.',
         targetSkill: 'grammar',
@@ -2094,9 +2100,10 @@ const readingLessonTemplates: LessonTemplate[] = [
         prompt:
           'Read: Tom works in a small cafe. In the afternoon, he helps a friend and drinks tea.',
         microLesson: 'Read for the simple situation first: who, where, and when.',
-        successTip: 'Type read when you finish the short text.',
+        successTip: 'Choose the confirmation when you finish the short text.',
         targetSkill: 'review',
-        expectedResponse: 'read',
+        expectedResponse: 'Я прочитал',
+        options: ['Я прочитал'],
       },
       {
         type: 'listening-comprehension',
@@ -2111,9 +2118,10 @@ const readingLessonTemplates: LessonTemplate[] = [
         type: 'vocabulary-recall',
         prompt: 'Which word means a place where people drink tea or coffee?',
         microLesson: 'Unknown words from reading become vocabulary targets for future review.',
-        successTip: 'Look back at the text and write the place word.',
+        successTip: 'Choose the place word from the text.',
         targetSkill: 'vocabulary',
         expectedResponse: 'cafe',
+        options: ['cafe', 'station', 'factory'],
       },
     ],
   },
@@ -2126,9 +2134,10 @@ const readingLessonTemplates: LessonTemplate[] = [
         prompt:
           'Read: Maria sends a message to her team. She says the meeting starts at nine, but the room is different today.',
         microLesson: 'Notice names, time, and the changed detail.',
-        successTip: 'Type read when you finish the message.',
+        successTip: 'Choose the confirmation when you finish the message.',
         targetSkill: 'review',
-        expectedResponse: 'read',
+        expectedResponse: 'Я прочитал',
+        options: ['Я прочитал'],
       },
       {
         type: 'listening-comprehension',
@@ -2146,6 +2155,7 @@ const readingLessonTemplates: LessonTemplate[] = [
         successTip: 'Use the word from the text.',
         targetSkill: 'vocabulary',
         expectedResponse: 'meeting',
+        options: ['meeting', 'holiday', 'ticket'],
       },
     ],
   },
@@ -2158,9 +2168,10 @@ const readingLessonTemplates: LessonTemplate[] = [
         prompt:
           'Read: After work, I cook dinner, call my sister, and read one page in English before I sleep.',
         microLesson: 'Sequence words help you understand a small routine.',
-        successTip: 'Type read when you finish the routine.',
+        successTip: 'Choose the confirmation when you finish the routine.',
         targetSkill: 'review',
-        expectedResponse: 'read',
+        expectedResponse: 'Я прочитал',
+        options: ['Я прочитал'],
       },
       {
         type: 'listening-comprehension',
@@ -2173,11 +2184,12 @@ const readingLessonTemplates: LessonTemplate[] = [
       },
       {
         type: 'vocabulary-recall',
-        prompt: 'Write the word that means make food.',
+        prompt: 'Choose the word that means make food.',
         microLesson: 'Action words from reading become useful everyday vocabulary.',
         successTip: 'Use the action from the first part of the text.',
         targetSkill: 'vocabulary',
         expectedResponse: 'cook',
+        options: ['cook', 'sleep', 'travel'],
       },
     ],
   },
@@ -2202,14 +2214,15 @@ const vocabularyLessonTemplates: LessonTemplate[] = [
         type: 'vocabulary-recall',
         prompt: 'Переведите: добрый день',
         microLesson:
-          'Active recall is stronger than reading the answer. Pause for one second before typing.',
+          'Active recall is stronger than reading the answer. Pause for one second before choosing.',
         successTip: 'Use the polite greeting for later in the day.',
         targetSkill: 'vocabulary',
         expectedResponse: 'good afternoon',
+        options: ['good afternoon', 'good night', 'see you later'],
       },
       {
         type: 'word-order',
-        prompt: 'Order the words: good / afternoon / teacher',
+        prompt: 'Составьте фразу и произнесите её: good / afternoon / teacher',
         microLesson: 'Putting a word into a phrase makes it easier to use in real speech.',
         successTip: 'Keep the greeting together: good afternoon.',
         targetSkill: 'grammar',
@@ -2238,10 +2251,11 @@ const vocabularyLessonTemplates: LessonTemplate[] = [
         successTip: 'Use the English work word.',
         targetSkill: 'vocabulary',
         expectedResponse: 'shift',
+        options: ['shift', 'break', 'office'],
       },
       {
         type: 'word-order',
-        prompt: 'Order the words: my / starts / shift / early',
+        prompt: 'Составьте фразу и произнесите её: my / starts / shift / early',
         microLesson: 'A word becomes stronger when you can place it inside a real sentence.',
         successTip: 'Start with my shift.',
         targetSkill: 'grammar',
@@ -2269,10 +2283,11 @@ const vocabularyLessonTemplates: LessonTemplate[] = [
         successTip: 'Use the travel verb from the first question.',
         targetSkill: 'vocabulary',
         expectedResponse: 'arrive',
+        options: ['arrive', 'leave', 'wait'],
       },
       {
         type: 'word-order',
-        prompt: 'Order the words: I / arrive / at / work',
+        prompt: 'Составьте фразу и произнесите её: I / arrive / at / work',
         microLesson: 'Short practical sentences turn vocabulary into usable English.',
         successTip: 'Start with I arrive.',
         targetSkill: 'grammar',

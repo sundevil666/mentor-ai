@@ -20,6 +20,11 @@ export function isLessonAnswerReady(exercise: Exercise, answer: string, rules: L
   return accepted.some((response) => normalizeAnswer(response) === normalized);
 }
 
-export function requiresSpokenLessonAnswer(exercise: Pick<Exercise, 'type'>): boolean {
-  return exercise.type === 'dialogue-translation' || exercise.type === 'repeat-speaking';
+export function requiresSpokenLessonAnswer(
+  exercise: Pick<Exercise, 'type' | 'expectedResponse' | 'options'>,
+): boolean {
+  if (exercise.type === 'dialogue-translation' || exercise.type === 'repeat-speaking') return true;
+  return exercise.type !== 'listening-text'
+    && Boolean(exercise.expectedResponse?.trim())
+    && !exercise.options?.length;
 }

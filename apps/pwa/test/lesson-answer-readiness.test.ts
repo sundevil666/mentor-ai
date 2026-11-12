@@ -32,10 +32,19 @@ describe('typed lesson answer readiness', () => {
 });
 
 describe('spoken lesson input', () => {
-  it('uses the recorder for dialogue and full spoken responses, keeping writing typed', () => {
+  it('uses choices for closed questions and the recorder for every answer without choices', () => {
     assert.equal(requiresSpokenLessonAnswer({ type: 'repeat-speaking' }), true);
     assert.equal(requiresSpokenLessonAnswer({ type: 'dialogue-translation' }), true);
-    assert.equal(requiresSpokenLessonAnswer({ type: 'word-order' }), false);
+    assert.equal(requiresSpokenLessonAnswer({
+      type: 'word-order',
+      expectedResponse: 'where are you',
+    }), true);
+    assert.equal(requiresSpokenLessonAnswer({
+      type: 'vocabulary-recall',
+      expectedResponse: 'arrive',
+      options: ['arrive', 'leave', 'wait'],
+    }), false);
+    assert.equal(requiresSpokenLessonAnswer({ type: 'listening-text', expectedResponse: 'listened' }), false);
     assert.equal(getLessonExerciseNavigation(true, 0, false, true).nextDisabled, true);
   });
 });

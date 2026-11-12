@@ -398,21 +398,11 @@
               </div>
 
               <q-option-group
-                v-if="currentExercise.options"
+                v-if="currentExercise.options?.length"
                 v-model="answer"
                 class="exercise-options"
                 :options="optionList"
                 color="primary"
-              />
-              <q-input
-                v-else
-                v-model="answer"
-                :label="inputLabel"
-                :color="standardAnswerStatus === 'correct' ? 'positive' : undefined"
-                :class="`standard-answer--${standardAnswerStatus}`"
-                outlined
-                autofocus
-                @keyup.enter="submit"
               />
 
               <div class="lesson-actions">
@@ -1183,9 +1173,6 @@ const nextListeningSentenceItem = computed(
 );
 const optionList = computed(
   () => currentExercise.value?.options?.map((option) => ({ label: option, value: option })) ?? [],
-);
-const inputLabel = computed(() =>
-  currentExercise.value?.type === 'repeat-speaking' ? 'What did you say?' : 'Your answer',
 );
 const currentSuggestion = computed(() =>
   createCurrentActivitySuggestion(appStore.preferredWorkShift, appStore.activitySnapshots, new Date(), appStore.myShiftActivity),
