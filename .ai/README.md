@@ -14,6 +14,12 @@ Production data must be written directly by the backend to private storage such 
 
 Private authored lessons may be staged locally in `.ai/private/lessons/lesson-library.json`. Run `npm run lessons:queue:status` to inspect unsynchronized changes and `npm run lessons:queue:sync` to make the at-most-daily protected import attempt. The synchronizer fingerprints lesson contents, retains failed work locally, and reports warning and critical backlog ages without committing lesson data.
 
+## Russian-English language contract
+
+Mentor AI is a Russian-English learning application. All learner-facing lesson content, built-in templates, generated exercises, prompts, instructions, hints, explanations, answer choices, and feedback must use only Russian and English. Use Russian for the source phrase and learner guidance, and English for the language being learned and produced.
+
+Never introduce Slovak or any other third language into learner-facing content unless the user explicitly requests that language for a specific task. Do not use the device locale, the user's location, or nearby-language vocabulary as a reason to substitute another language. Before delivering lesson-related changes, search every changed lesson and template for unintended third-language text and verify that translation tasks have the correct Russian source and English answer.
+
 ## Spoken exercise contract
 
 - Instructions to speak, say, repeat aloud, or give a full spoken response must use a microphone-based exercise (`repeat-speaking` or `dialogue-translation`), never a typed answer field. Supply a complete `expectedResponse` and matching `audioText` for recognition and model playback.
