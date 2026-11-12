@@ -151,12 +151,12 @@ watch(() => [props.statistics, props.studentId], refresh);
 .mentor-advice { width: 100%; min-width: 0; border: 1px solid rgba(124, 58, 237, .25); border-radius: 22px; padding: 16px; background: rgba(124, 58, 237, .04); }
 .mentor-advice__heading { display: flex; align-items: center; gap: 12px; }
 .mentor-advice h1 { font-size: 1.5rem; line-height: 1.3; margin: 0; }
-.mentor-advice__heading p { font-size: .8rem; opacity: .75; margin: 5px 0 12px; }
+.mentor-advice__heading p { font-size: .95rem; line-height: 1.5; opacity: .75; margin: 5px 0 12px; }
 .mentor-advice__list { height: 290px; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 8px; padding: 8px 2px; }
 .mentor-advice__card { display: flex; align-items: flex-start; gap: 12px; padding: 13px; width: 100%; border: 1px solid rgba(124, 58, 237, .2); border-radius: 14px; text-align: left; background: transparent; color: inherit; cursor: pointer; font: inherit; }
 .mentor-advice__card > span { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
-.mentor-advice__card span span { font-size: .85rem; line-height: 1.5; }
+.mentor-advice__card span span { font-size: 1rem; line-height: 1.55; }
 .mentor-advice__card--read { cursor: default; opacity: .8; }
 .mentor-advice__card:focus-visible { outline: 2px solid var(--q-primary); outline-offset: 1px; }
-.mentor-advice__empty { font-size: .85rem; padding: 12px; margin: 0; }
+.mentor-advice__empty { font-size: .95rem; line-height: 1.5; padding: 12px; margin: 0; }
 </style>

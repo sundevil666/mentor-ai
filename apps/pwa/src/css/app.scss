@@ -1813,8 +1813,8 @@ body.body--dark .training-library-card--completed .training-library-card__status
 .priority-link { border-color: var(--category-border); border-left: 4px solid var(--category-accent); display: grid; overflow: hidden; width: 100%; }
 .priority-link__main { align-items: center; background: transparent; border: 0; color: var(--category-accent); cursor: pointer; display: grid; gap: 12px; grid-template-columns: 32px 1fr 24px; padding: 16px 18px; text-align: left; }
 .priority-link__main span { display: grid; gap: 3px; }
-.priority-link__main small { color: var(--category-accent); font-size: .76rem; font-weight: 800; text-transform: uppercase; }
-.priority-link__main strong { color: var(--app-text-strong); font-size: 1.05rem; }
+.priority-link__main small { color: var(--category-accent); font-size: .88rem; line-height: 1.4; font-weight: 800; text-transform: uppercase; }
+.priority-link__main strong { color: var(--app-text-strong); font-size: 1.15rem; line-height: 1.4; }
 .priority-link__actions { border-top: 1px solid var(--app-border); display: flex; gap: 4px; padding: 2px 8px; }
 .priority-link--resume { border-color: var(--app-border-strong); }
 .home-work-lists { border: 1px solid var(--app-border); border-radius: 22px; box-shadow: 0 16px 38px rgba(30, 41, 59, .1); overflow: hidden; width: 100%; }
@@ -1829,7 +1829,7 @@ body.body--dark .training-library-card--completed .training-library-card__status
 .home-work-card { background: rgba(255, 255, 255, .83); box-shadow: 0 9px 24px rgba(30, 41, 59, .09); }
 .home-work-card--required { --category-accent: #c2410c; --category-border: rgba(234, 88, 12, .3); }
 .home-work-card--started { --category-accent: #0369a1; --category-border: rgba(2, 132, 199, .3); }
-.home-work-empty { align-items: center; color: var(--app-text-muted); display: flex; font-weight: 800; justify-content: center; margin: 0; min-height: 104px; text-align: center; }
+.home-work-empty { align-items: center; color: var(--app-text-muted); display: flex; font-size: 1rem; font-weight: 800; justify-content: center; margin: 0; min-height: 104px; text-align: center; }
 body.body--dark .home-work-lists { border-color: rgba(148, 163, 184, .2); box-shadow: 0 18px 42px rgba(0, 0, 0, .28); }
 body.body--dark .home-work-tabs { background: rgba(15, 23, 42, .96); }
 body.body--dark .home-work-tabs .q-tab--active { background: rgba(51, 65, 85, .94); box-shadow: 0 6px 18px rgba(0, 0, 0, .34); }

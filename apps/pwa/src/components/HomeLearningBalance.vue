@@ -111,7 +111,7 @@ onBeforeUnmount(() => {
 .home-balance__skill--active { animation: balance-goal-pulse 2s ease-in-out infinite; }
 .home-balance__copy { display: grid; gap: 5px; overflow-wrap: anywhere; }
 .home-balance__copy strong { font-size: 1.1rem; }
-.home-balance__copy small, .home-balance__copy > span { color: var(--app-muted-strong); font-size: .8rem; }
+.home-balance__copy small, .home-balance__copy > span { color: var(--app-muted-strong); font-size: .95rem; line-height: 1.45; }
 .home-balance__queue { width: 40px; height: 40px; display: grid; place-items: center; }
 .home-balance__queue > span { display: grid; justify-items: center; }
 .home-balance__meter { display: grid; justify-items: center; }
@@ -124,7 +124,8 @@ onBeforeUnmount(() => {
   .home-balance__goal { grid-template-columns: 32px minmax(0, 1fr) 26px; gap: 6px; }
   .home-balance__skill { width: 32px; height: 40px; }
   .home-balance__queue { width: 26px; }
-  .home-balance__copy strong { font-size: .95rem; }
+  .home-balance__copy strong { font-size: 1.05rem; }
+  .home-balance__copy small, .home-balance__copy > span { font-size: .9rem; }
   .home-balance__meter :deep(.learning-balance-gauge) { width: 105px; }
   .home-balance__meter :deep(.learning-balance-score span) { max-width: 108px; text-align: center; }
 }
