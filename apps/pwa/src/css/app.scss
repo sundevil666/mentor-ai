@@ -171,6 +171,21 @@ body .q-menu {
   overflow-y: auto;
 }
 
+/* iOS Safari zooms the viewport when a form control with text smaller than
+   16px receives focus. Keep touch form controls at the native-safe size while
+   preserving user pinch zoom for the rest of the application. */
+@supports (-webkit-touch-callout: none) {
+  @media (hover: none) and (pointer: coarse) {
+    input,
+    select,
+    textarea,
+    .q-field__native,
+    .q-field__input {
+      font-size: 16px;
+    }
+  }
+}
+
 .q-btn {
   border: 1px solid var(--app-border-strong);
   border-radius: var(--app-radius-sm);
