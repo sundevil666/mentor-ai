@@ -120,10 +120,11 @@ export function calculateDailyBalanceGoals(events: LearningActivityEvent[], esti
   const balance = calculateLearningBalance({ activity: baseline, estimatedMovieSeconds });
   const today = summarizeRecentLearningActivity(events.filter((event) => Date.parse(event.endedAt) >= start.getTime()), now);
   const goal = balance.primaryFocus;
+  const completed = today[`${goal.kind as LearningActivityKind}Seconds`] > 0;
   const goals = [{
     ...goal,
-    remainingSeconds: Math.max(0, 300 - today[`${goal.kind as LearningActivityKind}Seconds`]),
+    completed,
   }];
-  const pending = goals.filter((goal) => goal.remainingSeconds > 0);
+  const pending = goals.filter((goal) => !goal.completed);
   return { goals, pending, current: pending[0] ?? null, completed: pending.length === 0 };
 }

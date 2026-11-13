@@ -26,7 +26,7 @@
       >
         <small>Today's balance</small>
         <strong>{{ loading ? 'Loading your goal…' : daily.completed ? 'Today’s goals complete' : daily.current!.label }}</strong>
-        <span>{{ loading ? 'Checking your practice' : daily.completed ? 'Well done · come back tomorrow' : `${Math.ceil(daily.current!.remainingSeconds / 60)} min of practice · do this next` }}</span>
+        <span>{{ loading ? 'Checking your practice' : daily.completed ? 'Well done · come back tomorrow' : 'Complete this once today' }}</span>
       </span>
       <span class="home-balance__status">
         <q-icon
