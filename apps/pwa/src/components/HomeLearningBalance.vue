@@ -25,8 +25,8 @@
         aria-live="polite"
       >
         <small>Today's balance</small>
-        <strong>{{ loading ? 'Loading your goal…' : daily.completed ? 'Today’s goals complete' : daily.current!.label }}</strong>
-        <span>{{ loading ? 'Checking your practice' : daily.completed ? 'Well done · come back tomorrow' : 'Complete this once today' }}</span>
+        <strong>{{ loading ? 'Loading your goal…' : daily.completed ? 'Daily minimum complete' : daily.current!.label }}</strong>
+        <span>{{ loading ? 'Checking your practice' : daily.completed ? `Optional next: ${nextRecommendation.label}` : 'Your most important practice today' }}</span>
       </span>
       <span class="home-balance__status">
         <q-icon
@@ -51,8 +51,8 @@
     >
       <div class="home-balance__details-heading">
         <div>
-          <strong>Daily balance goals</strong>
-          <span>One priority per day · completed goals stay checked</span>
+          <strong>Your balance priorities</strong>
+          <span>One required minimum · the rest are optional next steps</span>
         </div>
         <router-link :to="{ name: 'learning-balance' }">
           View balance
@@ -60,23 +60,37 @@
       </div>
       <ul class="home-balance__goal-list">
         <li
-          v-for="entry in visibleDailyGoals"
-          :key="entry.date"
-          :class="{ 'is-complete': entry.completed }"
+          class="home-balance__required-goal"
+          :class="{ 'is-complete': daily.completed }"
         >
           <q-icon
-            :name="entry.completed ? 'check_circle' : 'radio_button_unchecked'"
-            :color="entry.completed ? 'positive' : 'primary'"
+            :name="daily.completed ? 'check_circle' : 'radio_button_unchecked'"
+            :color="daily.completed ? 'positive' : 'primary'"
             size="22px"
           />
-          <span><small>{{ entry.dayLabel }}</small><strong>{{ entry.label }}</strong></span>
+          <span><small>Required today · critical priority</small><strong>{{ daily.goals[0]!.label }}</strong></span>
           <router-link
-            v-if="entry.today && !entry.completed"
-            :to="entry.route"
+            v-if="!daily.completed"
+            :to="daily.goals[0]!.route"
           >
             Start
           </router-link>
-          <small v-else>{{ entry.completed ? 'Completed' : 'Not completed' }}</small>
+          <small v-else>Completed</small>
+        </li>
+        <li
+          v-for="(entry, index) in priorityQueue"
+          :key="entry.kind"
+          class="home-balance__optional-goal"
+        >
+          <span class="home-balance__priority-number">{{ index + 1 }}</span>
+          <span>
+            <small>{{ index === 0 ? 'Best optional next step' : 'Optional priority' }}</small>
+            <strong>{{ entry.label }}</strong>
+            <small>{{ formatPriorityEvidence(entry) }}</small>
+          </span>
+          <router-link :to="entry.route">
+            Practice
+          </router-link>
         </li>
       </ul>
     </div>
@@ -87,7 +101,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { LearningActivityEvent, MovieLearningReport } from '@mentor-ai/shared';
 import LearningBalanceGauge from './LearningBalanceGauge.vue';
 import { loadLearningActivityHistory } from 'src/services/learning-activity';
-import { calculateDailyBalanceGoals, calculateLearningBalance, summarizeRecentLearningActivity } from 'src/services/learning-balance';
+import { calculateDailyBalanceGoals, calculateLearningBalance, summarizeRecentLearningActivity, type LearningBalanceRow } from 'src/services/learning-balance';
 import { loadMovieLearningReports, refreshMovieLearningReportsFromCloud } from 'src/services/movie-learning-reports';
 import { summarizeMovieViewing } from 'src/services/movie-viewing-summary';
 const events = ref<LearningActivityEvent[]>([]);
@@ -108,36 +122,13 @@ const daily = computed(() => {
   const start = new Date(now.value); start.setHours(0, 0, 0, 0);
   return calculateDailyBalanceGoals(events.value, movieSeconds(new Date(start.getTime() - 1)), now.value);
 });
-const visibleDailyGoals = computed(() => {
-  const entries: Array<{
-    date: string;
-    dayLabel: string;
-    label: string;
-    route: { name: string; query?: Record<string, string> };
-    completed: boolean;
-    today: boolean;
-  }> = [];
-  for (let offset = 0; offset < 7; offset += 1) {
-    const day = new Date(now.value);
-    day.setDate(day.getDate() - offset);
-    const start = new Date(day); start.setHours(0, 0, 0, 0);
-    const end = offset === 0 ? now.value : new Date(start.getTime() + 24 * 60 * 60 * 1_000 - 1);
-    const result = calculateDailyBalanceGoals(events.value, movieSeconds(new Date(start.getTime() - 1)), end);
-    const goal = result.goals[0]!;
-    if (offset > 0 && !result.completed) continue;
-    entries.push({
-      date: localDateKey(start),
-      dayLabel: offset === 0 ? 'Today' : new Intl.DateTimeFormat('en', { weekday: 'short', day: 'numeric', month: 'short' }).format(start),
-      label: goal.label,
-      route: goal.route,
-      completed: result.completed,
-      today: offset === 0,
-    });
-  }
-  return entries;
-});
-function localDateKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const priorityQueue = computed(() => balance.value.rows
+  .filter(row => row.kind !== 'movies' && row.gapPercent > 0 && (daily.value.completed || row.kind !== daily.value.goals[0]!.kind))
+  .slice(0, 4));
+const nextRecommendation = computed(() => priorityQueue.value[0] ?? balance.value.primaryFocus);
+function formatPriorityEvidence(entry: LearningBalanceRow) {
+  const duration = entry.seconds < 60 ? '<1 min' : entry.seconds < 3600 ? `${Math.round(entry.seconds / 60)} min` : `${(entry.seconds / 3600).toFixed(1)} h`;
+  return `${duration} in 30 days · ${entry.impactPercent}% now / ${entry.targetPercent}% target`;
 }
 async function refresh() {
   now.value = new Date();
@@ -189,6 +180,8 @@ onBeforeUnmount(() => {
 .home-balance__goal-list li > span { display: grid; gap: 2px; }
 .home-balance__goal-list small { color: var(--app-muted-strong); }
 .home-balance__goal-list a { color: var(--q-primary); font-weight: 700; }
+.home-balance__required-goal { border: 1px solid color-mix(in srgb, var(--q-primary) 25%, transparent); }
+.home-balance__priority-number { width: 22px; height: 22px; display: grid !important; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--q-primary) 13%, transparent); color: var(--q-primary); font-size: .75rem; font-weight: 800; }
 @keyframes balance-goal-pulse {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--q-primary) 48%, transparent), 0 4px 12px color-mix(in srgb, var(--q-primary) 30%, transparent); transform: scale(1); }
   50% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--q-primary) 8%, transparent), 0 7px 20px color-mix(in srgb, var(--q-primary) 48%, transparent); transform: scale(1.1); }
