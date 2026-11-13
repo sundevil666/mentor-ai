@@ -1,3 +1,13 @@
+/* Most application copy is sized in rem. Increase the root scale only when
+   the desktop layouts have enough room; phone and compact tablet controls
+   keep their existing proportions. Quasar buttons use their own px-based
+   control sizing, so this improves surrounding copy without crowding them. */
+@media (min-width: 1000px) {
+  html {
+    font-size: 18px;
+  }
+}
+
 body {
   --app-bg: #f4f7f6;
   --inspiration-image: url('/category-backgrounds/inspiration.webp');
