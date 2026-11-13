@@ -25,19 +25,9 @@
         <strong>{{ loading ? 'Loading your goal…' : daily.completed ? 'Today’s goals complete' : daily.current!.label }}</strong>
         <span>{{ loading ? 'Checking your practice' : daily.completed ? 'Well done · come back tomorrow' : `${Math.ceil(daily.current!.remainingSeconds / 60)} min of practice · do this next` }}</span>
       </span>
-      <span class="home-balance__queue">
-        <span
-          v-if="!loading && daily.pending.length > 1"
-          :aria-label="`${daily.pending.length - 1} more goals in queue`"
-        >
-          <q-icon
-            name="playlist_play"
-            size="22px"
-          /><small>+{{ daily.pending.length - 1 }}</small>
-          <q-tooltip>{{ daily.pending.slice(1).map(goal => goal.label).join(' · ') }}</q-tooltip>
-        </span>
+      <span class="home-balance__status">
         <q-icon
-          v-else-if="!loading && daily.completed"
+          v-if="!loading && daily.completed"
           name="check_circle"
           color="positive"
           size="24px"
@@ -112,8 +102,7 @@ onBeforeUnmount(() => {
 .home-balance__copy { display: grid; gap: 5px; overflow-wrap: anywhere; }
 .home-balance__copy strong { font-size: 1.1rem; }
 .home-balance__copy small, .home-balance__copy > span { color: var(--app-muted-strong); font-size: .95rem; line-height: 1.45; }
-.home-balance__queue { width: 40px; height: 40px; display: grid; place-items: center; }
-.home-balance__queue > span { display: grid; justify-items: center; }
+.home-balance__status { width: 40px; height: 40px; display: grid; place-items: center; }
 .home-balance__meter { display: grid; justify-items: center; }
 .home-balance__meter :deep(.learning-balance-gauge) { width: 170px; }
 .home-balance__meter :deep(.learning-balance-score span) { font-size: .65rem; }
@@ -126,7 +115,7 @@ onBeforeUnmount(() => {
   .home-balance { grid-template-columns: minmax(0, 1fr) 108px; padding: 12px; gap: 8px; }
   .home-balance__goal { grid-template-columns: 32px minmax(0, 1fr) 26px; gap: 6px; }
   .home-balance__skill { width: 32px; height: 40px; }
-  .home-balance__queue { width: 26px; }
+  .home-balance__status { width: 26px; }
   .home-balance__copy strong { font-size: 1.05rem; }
   .home-balance__copy small, .home-balance__copy > span { font-size: .9rem; }
   .home-balance__meter :deep(.learning-balance-gauge) { width: 105px; }
