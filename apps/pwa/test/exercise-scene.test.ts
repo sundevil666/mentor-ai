@@ -10,6 +10,12 @@ it('prioritizes the visible action over contextual objects', () => {
 it('does not invent a scene for an unrelated exercise', () => {
   assert.equal(resolveExerciseScene('Выбери подходящее окончание'), null);
 });
+it('distinguishes bicycles and correspondence while keeping repairs primary', () => {
+  assert.equal(resolveExerciseScene('A bicycle outside the shop'), 'bicycle');
+  assert.equal(resolveExerciseScene('Велосипед у входа'), 'bicycle');
+  assert.equal(resolveExerciseScene('Repair a bike'), 'repair');
+  assert.equal(resolveExerciseScene('Отправить письмо'), 'envelope');
+});
 it('keeps static object contexts distinct from opening and prioritizes repairs', () => {
   assert.equal(resolveExerciseScene('За окном светло'), 'window');
   assert.equal(resolveExerciseScene('Ремонт телефона'), 'repair');

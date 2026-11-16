@@ -30,6 +30,10 @@
           <circle cx="151" cy="50" r="18" /><path d="M151 23v-8m-27 35h-8m17-19-6-6m43 6 6-6" />
           <path d="M139 91a20 20 0 0 1 0-40 26 26 0 0 1 48 1 20 20 0 0 1 16 39zm7 17-5 13m27-13-5 13m27-13-5 13" />
         </template>
+        <template v-else-if="scene === 'bicycle'">
+          <circle cx="140" cy="115" r="23" /><circle cx="211" cy="115" r="23" />
+          <path d="m140 115 25-41 22 41h-47m25-41h31l-9 41m0 0 24-41m-15 0 7-22h14m-62 12h20" />
+        </template>
         <template v-else-if="scene === 'car'">
           <path d="m126 97 13-31h57l17 31m-87 0h91v31h-91zm19-31 1 31m28-31v31m-41 12h10m55 0h10" />
           <circle cx="145" cy="131" r="9" /><circle cx="199" cy="131" r="9" />
@@ -120,6 +124,7 @@ const props = defineProps<{ scene: ExerciseScene }>();
 const paused = ref(false);
 const animated = computed(() => ['door-open', 'run'].includes(props.scene));
 const descriptions: Record<ExerciseScene, string> = {
+  bicycle: 'Человек рядом с велосипедом',
   walk: 'Человек идёт пешком', envelope: 'Человек и конверт на столе', leak: 'Протекающий кран', luggage: 'Человек с багажом', wallet: 'Человек и кошелёк', weather: 'Погода за окном', car: 'Человек возле автомобиля', clothes: 'Куртка для чистки', cooking: 'Приготовление еды', laptop: 'Человек и ноутбук', map: 'Человек проверяет маршрут', meeting: 'Календарь встречи', conversation: 'Разговор и сообщение', train: 'Поезд у станции',
   window: 'Человек возле окна', help: 'Просьба о помощи', check: 'Человек проверяет запись', parcel: 'Человек и посылка', door: 'Человек возле двери', 'door-open': 'Человек открывает дверь', keys: 'Человек ищет ключи', repair: 'Человек и инструмент для ремонта', cafe: 'Человек в кафе', wait: 'Человек ждёт', relief: 'Человек испытывает облегчение', explain: 'Человек разбирается в объяснении', traffic: 'Транспорт на дороге', run: 'Человек бежит к автобусу', phone: 'Человек и телефонный звонок', tickets: 'Человек забирает билеты',
 };

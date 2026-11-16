@@ -1,15 +1,16 @@
 /** Generic visual vocabulary; never store personalized lesson text or IDs here. */
-export type ExerciseScene = 'help' | 'check' | 'parcel' | 'door' | 'door-open' | 'window' | 'keys' | 'repair' | 'cafe' | 'wait' | 'relief' | 'explain' | 'traffic' | 'run' | 'phone' | 'tickets' | 'envelope' | 'leak' | 'luggage' | 'wallet' | 'weather' | 'car' | 'clothes' | 'cooking' | 'laptop' | 'map' | 'meeting' | 'conversation' | 'train' | 'walk';
+export type ExerciseScene = 'help' | 'check' | 'parcel' | 'door' | 'door-open' | 'window' | 'keys' | 'repair' | 'cafe' | 'wait' | 'relief' | 'explain' | 'traffic' | 'run' | 'phone' | 'tickets' | 'envelope' | 'leak' | 'luggage' | 'wallet' | 'weather' | 'car' | 'clothes' | 'cooking' | 'laptop' | 'map' | 'meeting' | 'conversation' | 'train' | 'walk' | 'bicycle';
 export function resolveExerciseScene(prompt: string): ExerciseScene | null {
   const rules: Array<[RegExp, ExerciseScene]> = [
     [/беж|побеж|\brun\b|\bran\b/i, 'run'],
     [/откр.{0,12}двер|open.{0,12}door/i, 'door-open'],
-    [/конверт|\benvelope\b/i, 'envelope'],
+    [/конверт|письм|\benvelope\b|\bletter\b/i, 'envelope'],
     [/теч[её]т|протеч|\bleak\b/i, 'leak'],
     [/чемодан|\bsuitcase\b|\bluggage\b/i, 'luggage'],
     [/кошел[её]к|\bwallet\b/i, 'wallet'],
     [/багажник|\bboot\b|\btrunk\b/i, 'car'],
     [/ремонт|почин|почини|\brepair\b|\bfixed\b|электрик|тормоз|заменил.{0,8}экран|\bbrakes\b/i, 'repair'],
+    [/велосип|\bbike\b|\bbicycle\b/i, 'bicycle'],
     [/куртк|чистк|\bjacket\b|\blaundry\b/i, 'clothes'],
     [/готовил|готовить|\bcook(?:ing)?\b/i, 'cooking'],
     [/ноутбук|\blaptop\b/i, 'laptop'],
