@@ -33,6 +33,16 @@ import type { AuthenticatedUser } from './auth.service.js';
 import { aiTeacherService } from './ai-teacher.service.js';
 
 export const learningStateService = {
+  async getLessonReview(user: AuthenticatedUser) {
+    const state = await learningStateRepository.readFields(
+      ['exerciseResults', 'acceptedEvents', 'statisticsSnapshots', 'speechResults'], user,
+    );
+    const own = <T extends { studentId: string }>(rows: T[]) => rows.filter((row) => row.studentId === user.id);
+    return { source: 'authenticated-cloud', exportedAt: now(),
+      results: own(state.exerciseResults), events: own(state.acceptedEvents),
+      statistics: own(state.statisticsSnapshots), speech: own(state.speechResults) };
+  },
+
   async getStudentState(user?: AuthenticatedUser) {
     const state = await learningStateRepository.readStudentOverview(user);
 

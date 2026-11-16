@@ -105,6 +105,14 @@ export async function fetchStudentState(): Promise<StudentStateResponse> {
   return body.data;
 }
 
+export async function fetchCloudLessonReview(): Promise<unknown> {
+  const response = await fetch(`${apiBaseUrl}/api/student-state?review=1`, {
+    headers: authHeaders(), cache: 'no-store',
+  });
+  if (!response.ok) await throwApiError(response, 'Cloud lesson review request failed.');
+  return ((await response.json()) as ApiResponse<unknown>).data;
+}
+
 export async function fetchAppConfiguration(): Promise<AppConfiguration> {
   const response = await fetch(`${apiBaseUrl}/api/configuration?t=${Date.now()}`, {
     cache: 'no-store',
