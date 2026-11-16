@@ -34,7 +34,9 @@
       <section class="settings-section">
         <div class="settings-section__heading"><q-icon name="download" /><span>Lesson review</span></div>
         <p>Download your saved lesson results for a teacher review. Includes this device and your cloud results when available. The private file is downloaded here and excludes sign-in details.</p>
-        <q-btn color="primary" label="Download lesson review" no-caps outline :loading="reviewExportBusy" @click="downloadLessonReview" />
+        <q-btn color="primary" label="Download lesson review" no-caps outline :loading="reviewExportBusy" @click="downloadLessonReview()" />
+        <q-btn class="q-ml-sm" color="primary" label="View lesson review" no-caps flat :loading="reviewExportBusy" @click="downloadLessonReview(true)" />
+        <details v-if="reviewExportText" open><summary>Private review details</summary><pre class="lesson-review-details" style="max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere">{{ reviewExportText }}</pre></details>
       </section>
 
       <section class="settings-section">
@@ -194,7 +196,8 @@ import {
 
 const appStore = useAppStore();
 const reviewExportBusy = ref(false);
-async function downloadLessonReview() {
+const reviewExportText = ref('');
+async function downloadLessonReview(display = false) {
   reviewExportBusy.value = true;
   try {
     await appStore.hydrate();
@@ -206,7 +209,12 @@ async function downloadLessonReview() {
     let cloudError: string | null = null;
     try { cloud = await fetchCloudLessonReview(); }
     catch { cloudError = 'Cloud results unavailable; device records only.'; }
-    const url = URL.createObjectURL(new Blob([JSON.stringify({ ...review, cloud, cloudError }, null, 2)], { type: 'application/json' }));
+    const json = JSON.stringify({ ...review, cloud, cloudError }, null, 2);
+    if (display) {
+      reviewExportText.value = json;
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
     const link = document.createElement('a');
     link.href = url;
     link.download = `mentor-lesson-review-${new Date().toISOString().slice(0, 10)}.json`;
