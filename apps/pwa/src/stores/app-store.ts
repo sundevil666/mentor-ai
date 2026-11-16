@@ -359,7 +359,7 @@ export const useAppStore = defineStore('app', {
       if (!this.session) await db.delete('learning-sessions', sessionStoreKey);
       else {
         await db.put('learning-sessions', toStorageRecord(this.session), sessionStoreKey);
-        await db.put('lessons', this.session.lesson);
+        await db.put('lessons', toStorageRecord(this.session.lesson));
       }
       await this.persistPausedSessions();
       this.latestRecommendation = restoredSession?.recommendation ?? createRecommendationFromModel(this.studentModel, now());

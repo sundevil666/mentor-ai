@@ -32,6 +32,12 @@
       </section>
 
       <section class="settings-section">
+        <div class="settings-section__heading"><q-icon name="download" /><span>Lesson review</span></div>
+        <p>Download your saved lesson results and practice evidence from this device for a teacher review. The private file stays on your device and excludes sign-in details.</p>
+        <q-btn color="primary" label="Download lesson review" no-caps outline :loading="reviewExportBusy" @click="downloadLessonReview" />
+      </section>
+
+      <section class="settings-section">
         <div class="settings-section__heading">
           <q-icon name="info" />
           <span>Versions</span>
@@ -156,6 +162,7 @@
 import { Notify } from 'quasar';
 import { mentorDb } from 'src/services/indexed-db';
 import { parseLocalLessonImport } from 'src/services/local-lesson-import';
+import { buildLessonReviewExport } from 'src/services/lesson-review-export';
 import type { WorkShift } from '@mentor-ai/shared';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -186,6 +193,25 @@ import {
 } from 'src/services/my-shift';
 
 const appStore = useAppStore();
+const reviewExportBusy = ref(false);
+async function downloadLessonReview() {
+  reviewExportBusy.value = true;
+  try {
+    await appStore.hydrate();
+    const db = await mentorDb;
+    const names = ['statistics', 'speech-results', 'sync-queue', 'learning-sessions', 'lessons'];
+    const stores = Object.fromEntries(await Promise.all(names.map(async (name) => [name, await db.getAll(name)])));
+    const review = buildLessonReviewExport(appStore.studentId, stores, new Date().toISOString());
+    const url = URL.createObjectURL(new Blob([JSON.stringify(review, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `mentor-lesson-review-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch {
+    Notify.create({ type: 'negative', message: 'Could not export lesson results. Please try again.' });
+  } finally { reviewExportBusy.value = false; }
+}
 const appVersion = process.env.APP_VERSION ?? 'development';
 const lessonVersion = ref('Checking…');
 const lessonCount = ref('—');
