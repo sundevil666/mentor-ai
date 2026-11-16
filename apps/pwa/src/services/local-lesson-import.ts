@@ -1,5 +1,32 @@
 import { isLessonDeliverable, type GeneratedLesson } from '@mentor-ai/shared';
 
+const legacyTranslationExercises = new Map<string, { prompt: string; options: string[] }>([
+  ['Translate: dobrý deň', {
+    prompt: 'Переведите: добрый день',
+    options: ['good afternoon', 'good night', 'see you later'],
+  }],
+  ['Translate: zmena', {
+    prompt: 'Переведите: смена',
+    options: ['shift', 'break', 'office'],
+  }],
+  ['Translate: prísť', {
+    prompt: 'Переведите: прибыть',
+    options: ['arrive', 'leave', 'wait'],
+  }],
+]);
+
+/** Repairs legacy public template text while preserving lesson and exercise identities. */
+export function migrateLegacyLessonContent(lesson: GeneratedLesson): GeneratedLesson {
+  let changed = false;
+  const exercises = lesson.exercises.map((exercise) => {
+    const replacement = legacyTranslationExercises.get(exercise.prompt);
+    if (!replacement) return exercise;
+    changed = true;
+    return { ...exercise, ...replacement };
+  });
+  return changed ? { ...lesson, exercises } : lesson;
+}
+
 /** Refresh content only when the saved exercise identities still match. */
 export function refreshImportedLessonSession<T extends { lesson: GeneratedLesson; completedAt?: string }>(
   session: T, lessons: GeneratedLesson[],

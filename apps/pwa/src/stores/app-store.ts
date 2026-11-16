@@ -72,7 +72,7 @@ import { selectRetainedUpdateNotifications } from 'src/services/update-notificat
 import { findResumableLessonSession, resolveRestoredLessonSessions } from 'src/services/lesson-session-restoration';
 import { rewindLessonSession } from 'src/services/lesson-step-navigation';
 import { isLessonAnswerReady } from 'src/services/lesson-answer-readiness';
-import { refreshImportedLessonSession } from 'src/services/local-lesson-import';
+import { migrateLegacyLessonContent, refreshImportedLessonSession } from 'src/services/local-lesson-import';
 
 interface LearningSessionState {
   id: string;
@@ -349,9 +349,18 @@ export const useAppStore = defineStore('app', {
       const savedCatalog = await db.getAll('lessons');
       if (this.session) this.session = refreshImportedLessonSession(this.session, savedCatalog);
       this.pausedSessions = this.pausedSessions.map((session) => refreshImportedLessonSession(session, savedCatalog));
+      if (this.session) this.session = { ...this.session, lesson: migrateLegacyLessonContent(this.session.lesson) };
+      this.pausedSessions = this.pausedSessions.map((session) => ({
+        ...session,
+        lesson: migrateLegacyLessonContent(session.lesson),
+      }));
       clearSessionCheckpoint();
       clearUpdateResumeSessionId();
       if (!this.session) await db.delete('learning-sessions', sessionStoreKey);
+      else {
+        await db.put('learning-sessions', toStorageRecord(this.session), sessionStoreKey);
+        await db.put('lessons', this.session.lesson);
+      }
       await this.persistPausedSessions();
       this.latestRecommendation = restoredSession?.recommendation ?? createRecommendationFromModel(this.studentModel, now());
       this.statisticsSnapshots = (statistics as StatisticsSnapshot[]).sort((left, right) =>
@@ -474,14 +483,14 @@ export const useAppStore = defineStore('app', {
         const savedLesson = await findOfflineLesson(context);
         if (savedLesson) {
           logDiagnostic('lesson.loaded', { lessonId: savedLesson.id, source: 'offline-library' });
-          return savedLesson;
+          return migrateLegacyLessonContent(savedLesson);
         }
       }
       if (navigator.onLine) {
         try {
           const lesson = await fetchCurrentLesson(context, forceRefresh);
           logDiagnostic('lesson.loaded', { lessonId: lesson.id, source: 'api' });
-          return lesson;
+          return migrateLegacyLessonContent(lesson);
         } catch (error) {
           logDiagnostic('lesson.api_fallback', { reason: getErrorMessage(error) }, 'warn');
           // Keep offline-first practice usable when the API is temporarily unavailable.
@@ -491,13 +500,13 @@ export const useAppStore = defineStore('app', {
       const offlineLesson = await findOfflineLesson(context);
       if (offlineLesson) {
         logDiagnostic('lesson.loaded', { lessonId: offlineLesson.id, source: 'offline-library' });
-        return offlineLesson;
+        return migrateLegacyLessonContent(offlineLesson);
       }
 
       const plan = createLessonPlan(this.studentModel, context, createdAt);
       const lesson = generateLessonFromPlan(plan, createdAt);
       logDiagnostic('lesson.loaded', { lessonId: lesson.id, source: 'local' });
-      return lesson;
+      return migrateLegacyLessonContent(lesson);
     },
 
     async setPreferredWorkShift(workShift: WorkShift) {
