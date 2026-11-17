@@ -38,19 +38,19 @@ describe('offline lesson retention', () => {
     assert.equal(selectOfflineLesson([grammar], context)?.id, 'grammar-correction');
   });
 
-  it('selects lessons that were not opened within their category period', () => {
+  it('selects lessons that were not opened within the fixed 30-day period', () => {
     const now = Date.parse('2026-08-23T12:00:00.000Z');
     const lessons: OfflineLesson[] = [
       { id: 'old', category: 'listening', title: 'Old', downloadedAt: '2026-08-01T12:00:00.000Z', lastOpenedAt: '2026-08-01T12:00:00.000Z', estimatedBytes: 10 },
       { id: 'recent', category: 'speaking', title: 'Recent', downloadedAt: '2026-08-20T12:00:00.000Z', lastOpenedAt: '2026-08-20T12:00:00.000Z', estimatedBytes: 10 },
     ];
-    assert.deepEqual(selectExpiredOfflineLessons(lessons, { lessons: 30, listening: 14, speaking: 7, audio: 30, stories: 30, videos: 30 }, now, new Set(['old', 'recent'])).map((lesson) => lesson.id), []);
-    assert.deepEqual(selectExpiredOfflineLessons(lessons, { lessons: 30, listening: 14, speaking: 7, audio: 30, stories: 30, videos: 30 }, Date.parse('2026-09-02T12:00:00.000Z'), new Set(['old'])).map((lesson) => lesson.id), ['old']);
+    assert.deepEqual(selectExpiredOfflineLessons(lessons, now).map((lesson) => lesson.id), []);
+    assert.deepEqual(selectExpiredOfflineLessons(lessons, Date.parse('2026-09-02T12:00:00.000Z')).map((lesson) => lesson.id), ['old']);
   });
 
   it('expires unfinished downloads after 30 days without use', () => {
     const lesson: OfflineLesson = { id: 'unfinished', category: 'audio', title: 'Unfinished', downloadedAt: '2026-07-01T12:00:00.000Z', lastOpenedAt: '2026-07-01T12:00:00.000Z', estimatedBytes: 10 };
-    assert.deepEqual(selectExpiredOfflineLessons([lesson], { lessons: 30, listening: 30, speaking: 30, audio: 30, stories: 30, videos: 30 }, Date.parse('2026-10-09T12:00:00.000Z'), new Set()).map((item) => item.id), ['unfinished']);
+    assert.deepEqual(selectExpiredOfflineLessons([lesson], Date.parse('2026-10-09T12:00:00.000Z')).map((item) => item.id), ['unfinished']);
   });
 
   it('uses last activity for every category, independent of completion or older retention settings', () => {
@@ -60,10 +60,9 @@ describe('offline lesson retention', () => {
       id: category, category, title: category, estimatedBytes: 1,
       downloadedAt: '2026-08-01T12:00:00Z', lastOpenedAt: '2026-10-03T12:00:00Z',
     }));
-    const retention = { lessons: 90, listening: 90, speaking: 90, audio: 90, stories: 90, videos: 90 } as const;
-    assert.equal(selectExpiredOfflineLessons(downloads, retention, now).length, 5);
+    assert.equal(selectExpiredOfflineLessons(downloads, now).length, 5);
     downloads[0]!.lastOpenedAt = '2026-11-02T12:00:00Z';
-    assert.equal(selectExpiredOfflineLessons(downloads, retention, now).length, 4);
+    assert.equal(selectExpiredOfflineLessons(downloads, now).length, 4);
     assert.equal(selectOfflineLessonsOverLimit(downloads, 0, now).length, 4);
   });
 
@@ -74,7 +73,7 @@ describe('offline lesson retention', () => {
       { id: 'older', category: 'lessons', title: 'Older', sourceCreatedAt: '2026-07-20T12:00:00.000Z', downloadedAt: '2026-08-02T12:00:00.000Z', lastOpenedAt: '2026-08-02T12:00:00.000Z', estimatedBytes: 60 },
       { id: 'mandatory', category: 'lessons', title: 'Mandatory', sourceCreatedAt: '2026-08-20T12:00:00.000Z', downloadedAt: '2026-08-20T12:00:00.000Z', lastOpenedAt: '2026-08-20T12:00:00.000Z', estimatedBytes: 80 },
     ];
-    assert.deepEqual(selectOfflineLessonsOverLimit(lessons, 100, now, new Set()).map((lesson) => lesson.id), []);
+    assert.deepEqual(selectOfflineLessonsOverLimit(lessons, 100, now).map((lesson) => lesson.id), []);
   });
 
   it('removes stories that no longer belong to the current catalog', () => {

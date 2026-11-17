@@ -1,3 +1,13 @@
+export type { BookReadingAnalytics, BookReadingAnalyticsReceipt } from './book-reading-analytics.js';
+import type { WorkShift, WorkShiftTiming } from './work-shifts.js';
+export {
+  getWorkShiftTiming,
+  workShiftSchedules,
+  type WorkShift,
+  type WorkShiftSchedule,
+  type WorkShiftTiming,
+} from './work-shifts.js';
+
 export type StorageMode = 'demo' | 'personal';
 
 export type EnglishLevel = 'beginner' | 'intermediate' | 'advanced';
@@ -25,8 +35,6 @@ export type LearningActivityType =
 export type LearningMode =
   'bus' | 'walking' | 'home' | 'listening' | 'speaking' | 'review' | 'recovery';
 
-export type WorkShift = 'first' | 'second' | 'third' | 'off' | 'unknown';
-
 export type ActivityPace = 'passive' | 'steady' | 'active' | 'deep';
 
 export type DeviceSurface = 'mobile' | 'desktop';
@@ -44,26 +52,6 @@ export interface MovieLearningReport {
 }
 
 export type PreferredLessonDevice = 'iphone' | 'mac';
-
-export interface WorkShiftSchedule {
-  shift: WorkShift;
-  startsAtMinutes: number;
-  endsAtMinutes: number;
-  leaveHomeMinutesBeforeStart: number;
-  busLeavesMinutesBeforeStart: number;
-  busArrivesMinutesBeforeStart: number;
-  headphonesOffMinutesBeforeStart: number;
-}
-
-export interface WorkShiftTiming {
-  shift: WorkShift;
-  startsAt: string;
-  endsAt: string;
-  leaveHomeAt: string;
-  busLeavesAt: string;
-  busArrivesAt: string;
-  headphonesOffAt: string;
-}
 
 export type ExerciseType =
   | 'vocabulary-recall'
@@ -855,41 +843,6 @@ export const initialStudentModel: StudentModel = {
   fatigue: { value: 0, confidence: 0 },
   updatedAt: '2026-06-28T00:00:00.000Z',
 };
-
-export const workShiftSchedules: Record<
-  Exclude<WorkShift, 'off' | 'unknown'>,
-  WorkShiftSchedule
-> = {
-  first: createWorkShiftSchedule('first', 6 * 60, 14 * 60),
-  second: createWorkShiftSchedule('second', 14 * 60, 22 * 60),
-  third: createWorkShiftSchedule('third', 22 * 60, 6 * 60),
-};
-
-export function getWorkShiftTiming(workShift: WorkShift): WorkShiftTiming | undefined {
-  if (workShift === 'off' || workShift === 'unknown') {
-    return undefined;
-  }
-
-  const schedule = workShiftSchedules[workShift];
-
-  return {
-    shift: workShift,
-    startsAt: formatClockMinutes(schedule.startsAtMinutes),
-    endsAt: formatClockMinutes(schedule.endsAtMinutes),
-    leaveHomeAt: formatClockMinutes(
-      schedule.startsAtMinutes - schedule.leaveHomeMinutesBeforeStart,
-    ),
-    busLeavesAt: formatClockMinutes(
-      schedule.startsAtMinutes - schedule.busLeavesMinutesBeforeStart,
-    ),
-    busArrivesAt: formatClockMinutes(
-      schedule.startsAtMinutes - schedule.busArrivesMinutesBeforeStart,
-    ),
-    headphonesOffAt: formatClockMinutes(
-      schedule.startsAtMinutes - schedule.headphonesOffMinutesBeforeStart,
-    ),
-  };
-}
 
 export function clampSignal(value: number): SignalScore {
   return {
@@ -2723,57 +2676,6 @@ function labelConcept(concept: LearningConcept): string {
   }
 }
 
-function createWorkShiftSchedule(
-  shift: Exclude<WorkShift, 'off' | 'unknown'>,
-  startsAtMinutes: number,
-  endsAtMinutes: number,
-): WorkShiftSchedule {
-  return {
-    shift,
-    startsAtMinutes,
-    endsAtMinutes,
-    leaveHomeMinutesBeforeStart: 65,
-    busLeavesMinutesBeforeStart: 50,
-    busArrivesMinutesBeforeStart: 30,
-    headphonesOffMinutesBeforeStart: 20,
-  };
-}
-
-function formatClockMinutes(minutes: number): string {
-  const normalizedMinutes = ((minutes % (24 * 60)) + 24 * 60) % (24 * 60);
-  const hour = Math.floor(normalizedMinutes / 60);
-  const minute = normalizedMinutes % 60;
-
-  return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-}
-
 function clamp(value: number): number {
   return Math.max(0, Math.min(1, value));
-}
-
-
-/** Cumulative evidence per device/book. Never sum revisions of the same row. */
-export interface BookReadingAnalytics {
-  version: 1;
-  bookId: string;
-  deviceId: string;
-  revision: number;
-  startedAt: string;
-  updatedAt: string;
-  readWords: number;
-  wordLookups: number;
-  passageLookups: number;
-  pronunciationRequests: number;
-  speechPageWords: number;
-  speechMatchedWords: number;
-  words: Array<{ text: string; translations: number; pronunciations: number; context?: string }>;
-  passages: Array<{ text: string; count: number }>;
-  unmatchedSpeechWords: string[];
-  examplesTruncated: boolean;
-}
-
-export interface BookReadingAnalyticsReceipt {
-  bookId: string;
-  deviceId: string;
-  revision: number;
 }

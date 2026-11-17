@@ -701,6 +701,21 @@ import { ActiveLearningTimer } from 'src/services/learning-activity';
 import { addReadingStopHistoryEntry, parseReadingStopHistory, type ReadingStopHistoryEntry } from 'src/services/reading-stop-history';
 import { bookReadingForecast, formatReadingDaysRemaining } from 'src/services/book-reading-forecast';
 import { formatDisplayDate } from 'src/services/date-format';
+import {
+  bookReaderSettingsKey,
+  clampProgressRatio,
+  formatBookPartLabel,
+  maxReaderFontSize,
+  maxReaderSidebarScale,
+  minReaderFontSize,
+  minReaderSidebarScale,
+  readBookReaderSettings,
+  readReaderSidebarScale,
+  saveBookReaderSettings as persistBookReaderSettings,
+  saveReaderSidebarScale,
+  splitBookParagraphs,
+  tokenizeReaderParagraph,
+} from 'src/services/reader-settings';
 
 const props = withDefaults(defineProps<{
   libraryMode?: 'audio' | 'reading';
@@ -745,12 +760,8 @@ const readerPhonetic = ref<string | undefined>();
 const readerPhoneticLoading = ref(false);
 const readerLookupError = ref('');
 const readerLookupSignInRequired = ref(false);
-const minReaderFontSize = 14;
-const maxReaderFontSize = 32;
 const readerFontSize = ref(20);
 const readingMode = ref(false);
-const minReaderSidebarScale = 0;
-const maxReaderSidebarScale = 4;
 const readerSidebarScale = ref(readReaderSidebarScale());
 type ReadingSpeechStatus = 'idle' | 'requesting' | 'listening' | 'noise' | 'paused' | 'error';
 type RenderedReaderToken = { text: string; isWord: boolean; wordIndex?: number };
@@ -1491,22 +1502,8 @@ async function goToBookChapter(chapterIndex: number | null) {
   await persistReaderNavigationProgress(getReaderChapterWordAnchor(chapterIndex));
   markReadingDevicePositionChanged();
 }
-function formatBookPartLabel(index: number, title?: string) {
-  const normalizedTitle = title?.replace(/\s+/g, ' ').trim();
-  const genericTitle = normalizedTitle && !/^part\s+\d+$/i.test(normalizedTitle) ? normalizedTitle : 'Part';
-  return `${index + 1}. ${genericTitle}`;
-}
 function getChapterTitle(chapterId?: string) {
   return selectedBookChapters.value.find((chapter) => chapter.id === chapterId)?.title;
-}
-function splitBookParagraphs(text: string) {
-  return text.split('\n').filter(Boolean);
-}
-function tokenizeReaderParagraph(text: string): Array<{ text: string; isWord: boolean }> {
-  return text.split(/([\p{L}]+(?:[-'’][\p{L}]+)*)/gu).filter(Boolean).map((token) => ({
-    text: token,
-    isWord: /^[\p{L}]+(?:[-'’][\p{L}]+)*$/u.test(token),
-  }));
 }
 function handleReaderTextTap(event: MouseEvent) {
   if (Date.now() < suppressReaderTapUntil) return;
@@ -2352,33 +2349,16 @@ function changeReaderFontSize(change: -1 | 1) {
   saveBookReaderSettings();
   void repaginateReader({ wordPosition });
 }
-const readerSidebarScaleKey = 'mentor-ai:personal-reader-sidebar-scale';
-function readReaderSidebarScale() {
-  if (typeof localStorage === 'undefined') return minReaderSidebarScale;
-  const value = Number(localStorage.getItem(readerSidebarScaleKey));
-  return Number.isInteger(value) ? Math.max(minReaderSidebarScale, Math.min(maxReaderSidebarScale, value)) : minReaderSidebarScale;
-}
 function changeReaderSidebarScale(change: -1 | 1) {
   const wordPosition = getReaderRestoreWordPosition();
   readerSidebarScale.value = Math.max(minReaderSidebarScale, Math.min(maxReaderSidebarScale, readerSidebarScale.value + change));
-  if (typeof localStorage !== 'undefined') localStorage.setItem(readerSidebarScaleKey, String(readerSidebarScale.value));
+  saveReaderSidebarScale(readerSidebarScale.value);
   void repaginateReader({ wordPosition });
-}
-function bookReaderSettingsKey(bookId: string) { return `mentor-ai:personal-book-reader-settings:${bookId}`; }
-function readBookReaderSettings(bookId: string): { fontSize: number } {
-  if (typeof localStorage === 'undefined') return { fontSize: 20 };
-  try {
-    const parsed = JSON.parse(localStorage.getItem(bookReaderSettingsKey(bookId)) ?? 'null') as { fontSize?: number } | null;
-    const fontSize = Math.max(minReaderFontSize, Math.min(maxReaderFontSize, Number(parsed?.fontSize) || 20));
-    return { fontSize };
-  } catch {
-    return { fontSize: 20 };
-  }
 }
 function saveBookReaderSettings() {
   const book = selectedBook.value;
-  if (!book || typeof localStorage === 'undefined') return;
-  localStorage.setItem(bookReaderSettingsKey(book.id), JSON.stringify({ fontSize: readerFontSize.value }));
+  if (!book) return;
+  persistBookReaderSettings(book.id, readerFontSize.value);
 }
 function handleReaderKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape' && readingMode.value) closeBook();
@@ -2578,10 +2558,6 @@ function readBookProgress(bookId: string, chapterCount: number): BookReaderProgr
   } catch {
     return { progressRatio: 0, furthestProgressRatio: 0 };
   }
-}
-function clampProgressRatio(value: unknown) {
-  const numericValue = Number(value);
-  return Number.isFinite(numericValue) ? Math.max(0, Math.min(1, numericValue)) : 0;
 }
 function getCurrentReaderProgressRatio() {
   return readerPageCount.value <= 1 ? 0 : currentBookPageIndex.value / (readerPageCount.value - 1);

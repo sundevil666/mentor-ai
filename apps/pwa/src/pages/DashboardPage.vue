@@ -672,6 +672,16 @@
 <script setup lang="ts">
 import type { GeneratedLesson, LearningContext, PreferredLessonDevice } from '@mentor-ai/shared';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import {
+  clampIndex,
+  findLastNumberIndex,
+  formatClockTime,
+  getSentenceStartWordIndexes,
+  normalizeListeningSentence,
+  readHomePreference,
+  saveHomePreference,
+  tokenizeListeningText,
+} from 'src/services/dashboard-listening';
 import { useRoute, useRouter } from 'vue-router';
 import { resolveDashboardTrainingCategory, resolveLessonReturnDestination, synchronizeDashboardLessonRoute, type DashboardTrainingCategory } from 'src/services/navigation-category';
 import { sortMaterialsNewestFirst } from 'src/services/material-order';
@@ -772,13 +782,6 @@ type LessonChoice = {
   title: string;
   focus: string;
   preferredDevice?: PreferredLessonDevice;
-};
-type ListeningToken = {
-  index: number;
-  word: string;
-  trailing: string;
-  start: number;
-  end: number;
 };
 type ListeningPlaylistItem = {
   id: string;
@@ -2611,92 +2614,11 @@ function handlePrepareAppUpdate() {
   stopListeningAudio(false);
 }
 
-function tokenizeListeningText(text: string): ListeningToken[] {
-  const tokens: ListeningToken[] = [];
-  let index = 0;
-
-  for (const match of text.matchAll(/\S+/g)) {
-    const word = match[0];
-    const start = match.index ?? 0;
-    const end = start + word.length;
-    const nextWordOffset = text.slice(end).search(/\S/);
-    const trailingEnd = nextWordOffset === -1 ? text.length : end + nextWordOffset;
-
-    tokens.push({
-      index,
-      word,
-      trailing: text.slice(end, trailingEnd),
-      start,
-      end,
-    });
-    index += 1;
-  }
-
-  return tokens;
-}
-
-function getSentenceStartWordIndexes(tokens: ListeningToken[]): number[] {
-  if (tokens.length === 0) {
-    return [];
-  }
-
-  const starts = [0];
-
-  for (const token of tokens) {
-    if (/[.!?]["')\]]*$/.test(token.word)) {
-      const nextToken = tokens[token.index + 1];
-
-      if (nextToken) {
-        starts.push(nextToken.index);
-      }
-    }
-  }
-
-  return Array.from(new Set(starts));
-}
-
 function translateListeningSentence(sentence: string): string {
   const normalizedSentence = normalizeListeningSentence(sentence);
   const translation = listeningSentenceTranslations[normalizedSentence];
 
   return translation ?? sentence;
-}
-
-function normalizeListeningSentence(sentence: string): string {
-  return sentence.replace(/\s+/g, ' ').trim().toLowerCase();
-}
-
-function clampIndex(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
-
-function formatClockTime(totalSeconds: number): string {
-  const safeSeconds = Math.max(0, Math.round(totalSeconds));
-  const minutes = Math.floor(safeSeconds / 60);
-  const seconds = safeSeconds % 60;
-
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
-
-function readHomePreference(key: string): string | null {
-  if (typeof localStorage === 'undefined') return null;
-  return localStorage.getItem(key);
-}
-
-function saveHomePreference(key: string, value: string | null) {
-  if (typeof localStorage === 'undefined') return;
-  if (value) localStorage.setItem(key, value);
-  else localStorage.removeItem(key);
-}
-
-function findLastNumberIndex(values: number[], maxValue: number): number {
-  for (let index = values.length - 1; index >= 0; index -= 1) {
-    if ((values[index] ?? 0) <= maxValue) {
-      return index;
-    }
-  }
-
-  return -1;
 }
 
 const listeningSentenceTranslations: Record<string, string> = {

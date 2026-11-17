@@ -10,8 +10,8 @@ import {
 } from './offline-library-storage.js';
 
 export { readOfflineLessons, type OfflineCategory, type OfflineLesson } from './offline-library-storage.js';
-export type RetentionDays = 7 | 14 | 30 | 90;
 export const defaultOfflineMaxBytes = 250_000_000;
+export const offlineRetentionDays = 30;
 
 export const offlineCategories: Array<{ id: OfflineCategory; label: string; icon: string }> = [
   { id: 'lessons', label: 'Lessons', icon: 'school' },
@@ -20,7 +20,6 @@ export const offlineCategories: Array<{ id: OfflineCategory; label: string; icon
   { id: 'audio', label: 'Audio', icon: 'podcasts' },
   { id: 'stories', label: 'Audio stories', icon: 'auto_stories' },
 ];
-const retentionKey = 'mentor-ai:offline-retention:v1';
 const maxBytesKey = 'mentor-ai:offline-max-bytes:v1';
 export const builtInOfflineLessons = [
   { id: 'commute-listening', category: 'listening', title: 'Commute listening' },
@@ -29,14 +28,8 @@ export const builtInOfflineLessons = [
   { id: 'polite-speaking', category: 'speaking', title: 'Polite requests' },
 ] as const;
 
-export function readOfflineRetention(): Record<OfflineCategory, RetentionDays> {
-  return { lessons: 30, listening: 30, speaking: 30, audio: 30, stories: 30, videos: 30 };
-}
 export function readOfflineMaxBytes() { return readJson(maxBytesKey, defaultOfflineMaxBytes); }
 export function saveOfflineMaxBytes(bytes: number) { localStorage.setItem(maxBytesKey, JSON.stringify(bytes)); }
-export function saveOfflineRetention(category: OfflineCategory, days: RetentionDays) {
-  localStorage.setItem(retentionKey, JSON.stringify({ ...readOfflineRetention(), [category]: days }));
-}
 export function registerOfflineSpeechLesson(input: { id: string; category: 'listening' | 'speaking'; title: string; speechTexts: string[] }) {
   upsert({ ...input, contentVersion: getSpeechTextsContentVersion(input.speechTexts), estimatedBytes: input.speechTexts.join('').length * 48 });
 }
@@ -179,27 +172,21 @@ export async function clearOfflineCategory(category: OfflineCategory) {
 }
 export function selectExpiredOfflineLessons(
   lessons: OfflineLesson[],
-  retention: Record<OfflineCategory, RetentionDays>,
   now = Date.now(),
-  completedKeys: ReadonlySet<string> = new Set(),
 ) {
-  void retention;
-  void completedKeys;
   return lessons.filter((lesson) => {
     const lastUsed = Date.parse(lesson.lastOpenedAt || lesson.downloadedAt);
-    return Number.isFinite(lastUsed) && now - lastUsed >= 30 * 86_400_000;
+    return Number.isFinite(lastUsed) && now - lastUsed >= offlineRetentionDays * 86_400_000;
   });
 }
 export function selectOfflineLessonsOverLimit(
   lessons: OfflineLesson[],
   maxBytes: number,
   now = Date.now(),
-  completedKeys: ReadonlySet<string> = new Set(),
 ) {
   let total = lessons.reduce((sum, lesson) => sum + Math.max(0, lesson.estimatedBytes), 0);
   if (total <= maxBytes) return [];
-  void completedKeys;
-  const removable = lessons.filter((lesson) => now - Date.parse(lesson.lastOpenedAt || lesson.downloadedAt) >= 30 * 86_400_000)
+  const removable = lessons.filter((lesson) => now - Date.parse(lesson.lastOpenedAt || lesson.downloadedAt) >= offlineRetentionDays * 86_400_000)
     .sort((left, right) => Date.parse(left.downloadedAt) - Date.parse(right.downloadedAt));
   const selected: OfflineLesson[] = [];
   for (const lesson of removable) {
@@ -217,7 +204,7 @@ export function selectStaleOfflineAudio(lessons: OfflineLesson[], activeAudioIds
 }
 export async function cleanupExpiredOfflineLessons(now = Date.now()) {
   await purgeLegacyVideoLibrary();
-  const expired = selectExpiredOfflineLessons(readOfflineLessons(), readOfflineRetention(), now);
+  const expired = selectExpiredOfflineLessons(readOfflineLessons(), now);
   for (const lesson of expired) await removeOfflineLesson(lesson);
   const oversized = selectOfflineLessonsOverLimit(readOfflineLessons(), readOfflineMaxBytes(), now);
   for (const lesson of oversized) await removeOfflineLesson(lesson);
