@@ -286,9 +286,9 @@
     </q-dialog>
 
     <q-page-container class="app-page-container">
-      <router-view v-slot="{ Component, route }">
+      <router-view v-slot="{ Component, route: viewRoute }">
         <transition :name="routeTransitionName">
-          <component :is="Component" :key="route.name ?? route.fullPath" />
+          <component :is="Component" :key="viewRoute.name ?? viewRoute.fullPath" />
         </transition>
       </router-view>
     </q-page-container>

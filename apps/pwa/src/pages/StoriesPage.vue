@@ -470,8 +470,8 @@
                       <q-item
                         v-for="entry in readerStopHistory"
                         :key="entry.id"
-                        clickable
                         v-close-popup
+                        clickable
                         @click="goToReaderStop(entry)"
                       >
                         <q-item-section>

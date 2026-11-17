@@ -1,4 +1,5 @@
 import { getAuthToken } from './auth.js';
+import { readOfflineLessons } from './offline-library-storage.js';
 export const SPEECH_CACHE_NAME = 'mentor-ai-speech-dialogue-v2';
 
 export type SpeechVoiceProfile = 'mia' | 'tom';
@@ -408,7 +409,6 @@ async function cleanupSpeechCache(now = Date.now()) {
     url: request.url,
     createdAt: (await cache.match(request))?.headers.get('X-Mentor-Cache-Created-At') ?? undefined,
   })));
-  const { readOfflineLessons } = await import('./offline-library.js');
   const protectedRequests = await Promise.all(readOfflineLessons()
     .flatMap((lesson) => lesson.speechTexts ?? [])
     .map((text) => createSpeechCacheRequest(parseSpeechSegments(text.trim()))));

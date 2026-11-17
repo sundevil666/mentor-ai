@@ -2,26 +2,16 @@ import { deleteSpeechBatch, getSpeechBatchSize, isSpeechBatchCached, splitSpeech
 import { deleteOfflineStory, getStoryContentVersion, type LibraryStory } from './story-library.js';
 import { deleteOfflineAudio, getAudioContentVersion, type LibraryAudio } from './audio-library.js';
 import type { GeneratedLesson, LearningContext } from '@mentor-ai/shared';
+import {
+  offlineLessonsStorageKey,
+  readOfflineLessons,
+  type OfflineCategory,
+  type OfflineLesson,
+} from './offline-library-storage.js';
 
-export type OfflineCategory = 'lessons' | 'listening' | 'speaking' | 'audio' | 'stories' | 'videos';
+export { readOfflineLessons, type OfflineCategory, type OfflineLesson } from './offline-library-storage.js';
 export type RetentionDays = 7 | 14 | 30 | 90;
 export const defaultOfflineMaxBytes = 250_000_000;
-export interface OfflineLesson {
-  id: string;
-  category: OfflineCategory;
-  title: string;
-  downloadedAt: string;
-  lastOpenedAt: string;
-  estimatedBytes: number;
-  contentBytes?: number;
-  contentVersion?: string;
-  speechTexts?: string[];
-  generatedLesson?: GeneratedLesson;
-  story?: LibraryStory;
-  audio?: LibraryAudio;
-  sourceCreatedAt?: string;
-  contentKey?: string;
-}
 
 export const offlineCategories: Array<{ id: OfflineCategory; label: string; icon: string }> = [
   { id: 'lessons', label: 'Lessons', icon: 'school' },
@@ -30,7 +20,6 @@ export const offlineCategories: Array<{ id: OfflineCategory; label: string; icon
   { id: 'audio', label: 'Audio', icon: 'podcasts' },
   { id: 'stories', label: 'Audio stories', icon: 'auto_stories' },
 ];
-const lessonsKey = 'mentor-ai:offline-lessons:v1';
 const retentionKey = 'mentor-ai:offline-retention:v1';
 const maxBytesKey = 'mentor-ai:offline-max-bytes:v1';
 export const builtInOfflineLessons = [
@@ -40,7 +29,6 @@ export const builtInOfflineLessons = [
   { id: 'polite-speaking', category: 'speaking', title: 'Polite requests' },
 ] as const;
 
-export function readOfflineLessons(): OfflineLesson[] { return readJson(lessonsKey, []); }
 export function readOfflineRetention(): Record<OfflineCategory, RetentionDays> {
   return { lessons: 30, listening: 30, speaking: 30, audio: 30, stories: 30, videos: 30 };
 }
@@ -273,7 +261,7 @@ function getStringContentVersion(value: string) {
   return (hash >>> 0).toString(36);
 }
 function saveLessons(lessons: OfflineLesson[], notify = false) {
-  localStorage.setItem(lessonsKey, JSON.stringify(lessons));
+  localStorage.setItem(offlineLessonsStorageKey, JSON.stringify(lessons));
   if (notify && typeof window !== 'undefined') window.dispatchEvent(new Event('mentor-ai:offline-library-changed'));
 }
 function notifyGeneratedLessonOfflineChange() {
