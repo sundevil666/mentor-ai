@@ -559,6 +559,21 @@ async function removeReport(report: MovieLearningReport) {
 .movie-report-dialog__content { overflow-y: auto; }
 .movie-report-dialog__content p { line-height: 1.65; margin: 16px 0 0; white-space: pre-wrap; }
 .movies-learning-empty { align-items: center; border: 1px dashed var(--app-border-strong); border-radius: 18px; color: var(--app-muted-strong); display: grid; gap: 8px; justify-items: center; padding: 48px 24px; text-align: center; }
+@media (min-width: 1000px) {
+  .movies-learning-page { padding-left: 16px; padding-right: 16px; }
+  .movies-learning-shell { max-width: none; }
+  .movies-learning-page--discuss .movies-learning-shell { max-width: none; }
+  .movies-learning-page--discuss .movies-learning-header { align-items: baseline; display: flex; gap: 12px; margin-bottom: 8px; }
+  .movies-learning-page--discuss .movies-learning-header p { margin: 0; }
+  .movies-learning-page--discuss .movies-learning-header h1 { font-size: 1.7rem; line-height: 1.2; }
+  .movies-learning-page--discuss .movies-learning-workspace { gap: 12px; grid-template-columns: 116px minmax(0, 1fr); }
+  .movies-learning-page--discuss .movies-learning-tabs :deep(.q-tab) { min-height: 48px; }
+  .movie-chat-layout { margin: 0; max-width: none; width: 100%; }
+  .movie-chat-heading { padding: 8px 16px; }
+  .movie-chat-messages { gap: 8px; padding: 12px 16px; }
+  .movie-chat-message { padding: 9px 12px; }
+  .movie-chat-composer { padding: 10px 16px; }
+}
 @media (max-width: 760px) {
   .movie-memory-actions { grid-template-columns: 1fr; }
   .movie-memory-actions .q-btn { justify-self: start; }
