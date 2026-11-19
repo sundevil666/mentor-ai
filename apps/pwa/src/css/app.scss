@@ -441,8 +441,25 @@ body .q-menu {
   text-transform: uppercase;
 }
 
-.q-notifications__list--top {
-  top: calc(54px + env(safe-area-inset-top));
+.q-notifications__list--bottom {
+  bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.q-notification {
+  width: 150px;
+  min-width: 0;
+  max-width: min(150px, calc(100vw - 24px));
+  height: auto;
+  overflow-wrap: anywhere;
+}
+
+.q-notification__content,
+.q-notification__message,
+.q-notification__caption,
+.q-notification__actions {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .theme-toggle-button,

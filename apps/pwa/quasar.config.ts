@@ -9,7 +9,7 @@ export default configure(() => ({
   framework: {
     config: {
       notify: {
-        position: 'right',
+        position: 'bottom-right',
       },
     },
     plugins: ['Dialog', 'Notify'],

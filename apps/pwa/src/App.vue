@@ -165,7 +165,7 @@ function showActivePageUpdatePrompt(version: string) {
     message: 'This page has an update ready',
     caption: 'Update now, or open another page and Mentor AI will finish it in the background.',
     timeout: 0,
-    position: 'top-right',
+    position: 'bottom-right',
     actions: [{ label: 'OK', color: 'white', handler: () => void installUpdate(version) }],
   });
 }
@@ -262,7 +262,7 @@ async function installUpdateInBackground(manifest: AppUpdateCheckResult['manifes
       message: 'Mentor AI update is ready',
       actions: [{ label: 'OK', color: 'white' }],
       timeout: 0,
-      position: 'top-right',
+      position: 'bottom-right',
     });
     if (document.visibilityState !== 'visible') await activateAndReloadBackgroundUpdate(route.fullPath);
   } catch {
