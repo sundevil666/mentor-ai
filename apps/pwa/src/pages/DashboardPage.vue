@@ -352,8 +352,9 @@
                 hide-bottom-space
                 :label="isRecognizingSpeech ? 'Предварительный текст — ещё не проверен' : 'Распознанная речь'"
                 outlined
-                readonly
-                tabindex="-1"
+                :readonly="isRecognizingSpeech || !speechRecognitionCaptured || dialogueAnswerStatus === 'correct'"
+                :tabindex="!isRecognizingSpeech && speechRecognitionCaptured && dialogueAnswerStatus === 'incorrect' ? 0 : -1"
+                @update:model-value="onDialogueTranscriptCorrection"
               >
                 <template v-if="dialogueAnswerStatus !== 'idle'" #append>
                   <q-icon
@@ -362,6 +363,9 @@
                   />
                 </template>
               </q-input>
+              <small v-if="!isRecognizingSpeech && speechRecognitionCaptured && dialogueAnswerStatus === 'incorrect'">
+                Если распознавание ошиблось, исправь текст выше. Проверка обновится без повторной записи.
+              </small>
               </section>
             </div>
 
@@ -1997,6 +2001,13 @@ function applyDialogueTranscript(transcript: string, recognitionRunId: number) {
   speechRecognitionCaptured.value = true;
   dialogueAnswerStatus.value = matchesExpected ? 'correct' : 'incorrect';
   if (matchesExpected) stopDialogueSpeechRecording();
+}
+
+function onDialogueTranscriptCorrection(value: string | number | null) {
+  if (isRecognizingSpeech.value || !speechRecognitionCaptured.value) return;
+  dialogueAnswerStatus.value = isConfidentDialogueAnswer(String(value ?? ''), dialogueExpectedText.value)
+    ? 'correct'
+    : 'incorrect';
 }
 
 function startDialoguePreview(recognitionRunId: number) {
