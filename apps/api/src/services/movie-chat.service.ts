@@ -4,7 +4,7 @@ export type MovieChatMessage = { role: 'user' | 'assistant'; content: string };
 
 interface OpenAiResponseBody {
   output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
-  error?: { message?: string };
+  error?: { message?: string; code?: string };
   status?: string;
   incomplete_details?: { reason?: string } | null;
 }
@@ -25,7 +25,7 @@ export async function createMovieChatReply(
   if (!history.length || history.at(-1)?.role !== 'user') {
     throw new Error('A user message is required.');
   }
-  if (!config.openAiApiKey) throw new Error('Movie chat is not configured on the server.');
+  if (!config.openAiApiKey) throw publicMovieChatError(503, 'Movie chat is not configured on the server.');
   const primaryPrompt = sanitizeText(prompt, maximumPromptCharacters) || movieCoachInstructions;
   const compactMemory = sanitizeText(memory, maximumMemoryCharacters);
   const input: MovieChatMessage[] = compactMemory
@@ -47,13 +47,28 @@ export async function createMovieChatReply(
         reasoning: { effort: 'low' },
         store: false,
       }),
+    }).catch((error: unknown) => {
+      console.error('Movie chat could not reach OpenAI:', error);
+      throw publicMovieChatError(502, 'The server could not reach OpenAI. Please retry shortly.');
     });
     const body = await response.json().catch(() => ({})) as OpenAiResponseBody;
-    if (!response.ok) throw new Error(body.error?.message || 'Movie chat request failed.');
+    if (!response.ok) throw providerError(response.status, body.error?.code);
     const reply = extractReply(body);
     if (reply) return { reply, model: config.openAiMovieChatModel };
   }
-  throw new Error('Movie chat did not return an answer after retrying.');
+  throw publicMovieChatError(502, 'The AI service returned no answer. Please retry.');
+}
+
+function publicMovieChatError(statusCode: number, message: string) {
+  return Object.assign(new Error(message), { name: 'MovieChatPublicError', statusCode });
+}
+
+function providerError(status: number, code?: string) {
+  if (code === 'insufficient_quota') return publicMovieChatError(503, 'OpenAI API quota is exhausted. Check the API project billing and limits.');
+  if (status === 401 || status === 403) return publicMovieChatError(503, 'OpenAI API authentication failed. Check the server API key and project access.');
+  if (status === 429) return publicMovieChatError(429, 'OpenAI API rate limit reached. Please retry shortly.');
+  if (status === 400 || status === 404) return publicMovieChatError(502, 'OpenAI rejected the movie chat configuration. Check the configured model and request settings.');
+  return publicMovieChatError(502, 'OpenAI is temporarily unavailable. Please retry.');
 }
 
 function extractReply(body: OpenAiResponseBody) {

@@ -81,7 +81,12 @@ type ApiErrorBody = {
 
 export async function apiErrorMessage(response: Response, fallback: string): Promise<string> {
   const body = await response.json().catch(() => null) as ApiErrorBody | null;
-  const serverMessage = body?.error?.message ?? body?.data?.message ?? body?.message;
+  return apiErrorMessageFromBody(response, body, fallback);
+}
+
+function apiErrorMessageFromBody(response: Response, body: unknown, fallback: string): string {
+  const errorBody = body as ApiErrorBody | null;
+  const serverMessage = errorBody?.error?.message ?? errorBody?.data?.message ?? errorBody?.message;
   const detail = typeof serverMessage === 'string' && serverMessage.trim()
     ? serverMessage.trim()
     : fallback;
@@ -483,7 +488,7 @@ export async function requestMovieChatReply(
   });
   const body = await response.json().catch(() => null) as ApiResponse<{ reply: string; model: string }> | { error?: { message?: string } } | null;
   if (!response.ok || !body || !('data' in body)) {
-    throw new Error(body && 'error' in body ? body.error?.message ?? 'Movie chat is unavailable.' : 'Movie chat is unavailable.');
+    throw new Error(apiErrorMessageFromBody(response, body, 'Movie chat is unavailable.'));
   }
   return body.data;
 }

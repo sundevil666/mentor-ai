@@ -2,7 +2,7 @@ import type { PersonalReadingBookArchive } from '@mentor-ai/shared';
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-import { fetchLearningActivityTotals, fetchOfflineLessons, fetchReaderTextLookup, fetchReadingResumeSnapshot, fetchTranslationUsage, ReaderTranslationSignInRequiredError, saveReadingTranscripts, synchronizePersonalReadingBooks, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, synchronizeStatisticsSnapshots, upsertSessionHandoff } from '../src/services/api-client.js';
+import { fetchLearningActivityTotals, fetchOfflineLessons, fetchReaderTextLookup, fetchReadingResumeSnapshot, fetchTranslationUsage, ReaderTranslationSignInRequiredError, requestMovieChatReply, saveReadingTranscripts, synchronizePersonalReadingBooks, synchronizeContentProgress, synchronizeLearningActivity, synchronizeLearningEvidence, synchronizeStatisticsSnapshots, upsertSessionHandoff } from '../src/services/api-client.js';
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
@@ -31,6 +31,11 @@ describe('PWA API client', () => {
     };
     assert.deepEqual(await synchronizePersonalReadingBooks([book]), []);
     assert.deepEqual(payloads, [{ manifest: true }]);
+  });
+
+  it('shows a movie chat error returned in the serverless data envelope', async () => {
+    globalThis.fetch = async () => new Response(JSON.stringify({ data: { message: 'OpenAI API quota is exhausted.' } }), { status: 503 });
+    await assert.rejects(requestMovieChatReply([{ role: 'user', content: 'Hello' }], '', ''), /OpenAI API quota is exhausted\. \(HTTP 503\)/);
   });
 
   it('uploads only newer books and supplies versions to avoid repeated downloads', async () => {

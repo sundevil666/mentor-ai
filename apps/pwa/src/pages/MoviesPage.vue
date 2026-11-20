@@ -56,7 +56,7 @@
                 </div>
                 <div v-if="chatSending" class="movie-chat-thinking"><q-spinner-dots color="primary" size="32px" /> Movie coach is thinking…</div>
                 <div v-else-if="hasUnansweredMessage" class="movie-chat-retry">
-                  <span>The coach did not answer this message.</span>
+                  <span>{{ chatError || 'The coach did not answer this message.' }}</span>
                   <q-btn color="primary" flat no-caps icon="refresh" label="Retry unanswered message" :disable="!appStore.isOnline" @click="retryUnansweredMessage" />
                 </div>
               </div>
@@ -228,6 +228,7 @@ const chatFontSize = ref(Number.isFinite(storedMovieChatFontSize)
 const chatDraft = ref('');
 const chatMessages = ref<LocalMovieChatMessage[]>([]);
 const chatSending = ref(false);
+const chatError = ref('');
 const chatScroll = ref<HTMLElement | null>(null);
 const reportListScroll = ref<HTMLElement | null>(null);
 const movieTitle = ref('');
@@ -330,16 +331,18 @@ async function retryUnansweredMessage() {
 }
 async function requestChatReply() {
   chatSending.value = true;
+  chatError.value = '';
   try {
     const response = await sendMovieChatMessage(chatMessages.value, savedCoachPrompt.value, movieMemory.value);
     await appendMovieChatMessage('assistant', response.reply);
     chatMessages.value = await loadMovieChatMessages();
     await scrollChatToEnd();
   } catch (error) {
+    chatError.value = error instanceof Error ? error.message : 'Movie chat is unavailable.';
     Notify.create({
       type: 'warning',
       icon: 'cloud_off',
-      message: `${error instanceof Error ? error.message : 'Movie chat is unavailable.'} Your message is saved; use Retry to send it again.`,
+      message: `${chatError.value} Your message is saved; use Retry to send it again.`,
     });
   } finally {
     chatSending.value = false;
@@ -514,7 +517,7 @@ async function removeReport(report: MovieLearningReport) {
 .movie-chat-code-block pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: var(--movie-chat-font-size); line-height: 1.55; margin: 0; max-width: 100%; overflow-x: auto; padding: 14px; white-space: pre-wrap; word-break: break-word; }
 .movie-chat-message--user .movie-chat-code-block { background: rgb(0 0 0 / 28%); }
 .movie-chat-thinking { align-items: center; color: var(--app-muted-strong); display: flex; gap: 8px; }
-.movie-chat-retry { align-items: center; align-self: flex-end; background: var(--app-surface-active); border: 1px solid var(--app-border); border-radius: 12px; display: flex; gap: 8px; padding: 6px 8px 6px 12px; }
+.movie-chat-retry { align-items: center; align-self: flex-end; background: var(--app-surface-active); border: 1px solid var(--app-border); border-radius: 12px; display: flex; flex-wrap: wrap; gap: 8px; max-width: 100%; padding: 6px 8px 6px 12px; }
 .movie-chat-retry span { color: var(--app-muted-strong); font-size: 0.86rem; }
 .movie-chat-composer { align-items: flex-end; border-top: 1px solid var(--app-border); display: grid; gap: 10px; grid-template-columns: 1fr auto; }
 .movie-chat-composer :deep(.q-field__native) { font-size: var(--movie-chat-font-size); line-height: 1.55; }

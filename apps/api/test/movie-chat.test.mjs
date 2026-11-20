@@ -67,6 +67,20 @@ describe('movie chat service', () => {
     }
   });
 
+  it('reports an exhausted provider quota without leaking the provider response', async () => {
+    const previousKey = config.openAiApiKey;
+    config.openAiApiKey = 'test-key';
+    try {
+      await assert.rejects(
+        createMovieChatReply([{ role: 'user', content: 'Hello' }], '', '', async () =>
+          new Response(JSON.stringify({ error: { code: 'insufficient_quota', message: 'private provider detail' } }), { status: 429 })),
+        (error) => error.statusCode === 503 && error.message.includes('quota is exhausted') && !error.message.includes('private'),
+      );
+    } finally {
+      config.openAiApiKey = previousKey;
+    }
+  });
+
   it('publishes the movie chat through the Vercel serverless endpoint', () => {
     const serverlessRoute = readFileSync(new URL('../../../api/synchronization.js', import.meta.url), 'utf8');
     const vercelConfiguration = readFileSync(new URL('../../../vercel.json', import.meta.url), 'utf8');
