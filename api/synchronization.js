@@ -2,18 +2,12 @@ const { handleError, readJsonBody, requireLearningIdentity, sendJson } = require
 
 module.exports = async (request, response) => {
   try {
-    const user = requireLearningIdentity(request, response);
-
-    if (user === null) {
-      return;
-    }
-
-    const body = await readJsonBody(request);
     if (request.query?.action === 'movie-chat') {
       if (request.method !== 'POST') {
         sendJson(response, 405, { message: 'Method not allowed.' });
         return;
       }
+      const body = await readJsonBody(request);
       const messages = Array.isArray(body?.messages) ? body.messages : [];
       const { createMovieChatReply } = await import('../apps/api/src/services/movie-chat.service.js');
       sendJson(response, 200, await createMovieChatReply(
@@ -23,6 +17,13 @@ module.exports = async (request, response) => {
       ));
       return;
     }
+    const user = requireLearningIdentity(request, response);
+
+    if (user === null) {
+      return;
+    }
+
+    const body = await readJsonBody(request);
     if (request.query?.action === 'movie-reports') {
       const { learningStateService } = await import('../apps/api/src/services/learning-state.service.js');
       if (request.method === 'GET') {

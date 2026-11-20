@@ -25,6 +25,7 @@ import { requireLearningIdentity } from '../middleware/auth-context.js';
 
 export const learningStateRouter = Router();
 
+learningStateRouter.post('/movie-chat', replyToMovieChat);
 learningStateRouter.use(requireLearningIdentity);
 
 learningStateRouter.get('/student-state', getStudentState);
@@ -45,6 +46,5 @@ learningStateRouter.post('/application-telemetry-synchronize', mergeApplicationT
 learningStateRouter.post('/movie-learning-reports-synchronize', mergeMovieLearningReports);
 learningStateRouter.get('/movie-learning-reports-synchronize', listMovieLearningReports);
 learningStateRouter.delete('/movie-learning-reports-synchronize', deleteMovieLearningReport);
-learningStateRouter.post('/movie-chat', replyToMovieChat);
 learningStateRouter.get('/configuration', getConfiguration);
 learningStateRouter.post('/synchronization', synchronizeLearningEvents);
